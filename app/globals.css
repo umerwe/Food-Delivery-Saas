@@ -34,6 +34,7 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-blue: var(--blue);
   --color-primary: var(--primary);
+  --color-yellow:var(--yellow);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -54,6 +55,7 @@
   /* Brand Colors */
   --primary: #EC5834;
   --blue: #1877F2;
+  --yellow: #FF9F0D;
   
   /* Standard UI Colors (Removed the duplicate --secondary) */
   --background: oklch(1 0 0);
@@ -105,18 +107,6 @@
   --sidebar-ring: oklch(0.556 0 0);
 } */
 
-@layer base {
-  :root {
-    --font-nunito: 'Nunito', sans-serif;
-    --font-poppins: 'Poppins', sans-serif;
-    --font-roboto: 'Roboto', sans-serif;
-  }
-
-  body {
-    /* font-family: var(--font-nunito); */
-    font-family: var(--font-poppins);
-  }
-}
 
 @layer components {
   /* Headline Text Styles */

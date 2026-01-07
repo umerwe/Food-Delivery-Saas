@@ -81,7 +81,7 @@ export default function FoodCategorySection() {
            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {banners.map((banner, index) => (
           <div key={index} className="space-y-4">
-            <div className="relative aspect-[4/3] rounded-3xl overflow-hidden shadow-md">
+            <div className="relative aspect-4/3 rounded-[20px] overflow-hidden shadow-md">
               <Image 
                 src={banner.image} 
                 alt="Promotion" 
@@ -89,7 +89,7 @@ export default function FoodCategorySection() {
                 className="object-cover"
               />
             </div>
-            <p className="text-[#424242] font-bold leading-tight">
+            <p className="text-[#424242] text-[22px] font-semibold leading-tight">
               {banner.text}
             </p>
           </div>

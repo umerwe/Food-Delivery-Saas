@@ -1,26 +1,6 @@
 import type { Metadata } from "next";
-import { Nunito, Poppins, Roboto } from "next/font/google";
 import "./globals.css";
-
-const nunito = Nunito({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-nunito'
-});
-
-const poppins = Poppins({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  display: 'swap',
-  variable: '--font-poppins'
-});
-
-const roboto = Roboto({
-  subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  display: 'swap',
-  variable: '--font-roboto'
-});
+import { poppins } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -34,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${nunito.variable} ${poppins.variable} ${roboto.variable}`}>
+      <body className={`${poppins.className}`}>
         {children}
       </body>
     </html>
