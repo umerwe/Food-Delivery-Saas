@@ -32,7 +32,7 @@ const Footer = () => {
           {/* Quick Links */}
           <div>
             <h3 className="text-xl font-bold text-gray-800 mb-[26px]">Quick Links</h3>
-            <ul className="flex flex-col gap-4">
+            <ul className="flex flex-col gap-[22px]">
               {quickLinks.map((link) => (
                 <li key={link}>
                   <a href="#" className="text-gray-800 text-base hover:text-primary transition-colors">
@@ -46,7 +46,7 @@ const Footer = () => {
           {/* Company Links */}
           <div>
             <h3 className="text-xl font-bold text-gray-800 mb-[26px]">Company</h3>
-            <ul className="flex flex-col gap-4">
+            <ul className="flex flex-col gap-[22px]">
               {companyLinks.map((link) => (
                 <li key={link}>
                   <a href="#" className="text-gray-800 text-base hover:text-primary transition-colors">
@@ -60,7 +60,7 @@ const Footer = () => {
           {/* Contact Section */}
           <div>
             <h3 className="text-xl font-bold text-gray-800 mb-[26px]">Contact</h3>
-            <div className="flex flex-col gap-6 text-base">
+            <div className="flex flex-col gap-[22px] text-base">
               <p className="text-gray-800 font-medium">
                 Call : <span className="text-gray-800 font-normal">+91 9512212240</span>
               </p>
