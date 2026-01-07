@@ -1,3 +1,4 @@
+"use client"
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import {
     CarouselContent,
     CarouselItem,
 } from "@/components/ui/carousel";
+import { useRouter } from 'next/navigation';
 
 const categories = [
     { name: 'Pizza', image: '/pizza.png' },
@@ -25,6 +27,7 @@ const banners = [
 ];
 
 export default function FoodCategorySection() {
+    const router = useRouter();
     return (
         <section className="max-w-7xl mx-auto px-6 py-12 space-y-16">
 
@@ -32,7 +35,11 @@ export default function FoodCategorySection() {
             <div className="flex items-center justify-between mb-8">
                 <h2 className="text-[42px] font-semibold text-[#212121]">Search by Food</h2>
                 <div className="flex items-center gap-[16.5px]">
-                    <Button variant="link" className="text-[#F15A2B] font-bold text-lg p-0">
+                    <Button
+                        variant="link"
+                        className="text-[#F15A2B] font-bold text-lg p-0"
+                        onClick={() => router.push("/details")}
+                    >
                         View All
                         <ChevronRight className='w-[10px] h-[16px]' strokeWidth={3} />
                     </Button>
@@ -52,7 +59,11 @@ export default function FoodCategorySection() {
             <Carousel className="w-full">
                 <CarouselContent className="">
                     {categories.map((item, index) => (
-                        <CarouselItem key={index} className="pl-4 basis-1/2 md:basis-1/3 lg:basis-1/5">
+                        <CarouselItem
+                            key={index}
+                            onClick={() => router.push("/details")}
+                            className="pl-4 basis-1/2 md:basis-1/3 lg:basis-1/5"
+                        >
                             <div className="flex flex-col items-center gap-4 group cursor-pointer">
                                 <div className="relative w-[218px] h-[218px] rounded-full overflow-hidden border-4 border-transparent group-hover:border-[#F15A2B] transition-all">
                                     <Image
@@ -72,29 +83,30 @@ export default function FoodCategorySection() {
             <div className="flex justify-end">
                 <Button
                     variant="primary"
+                    onClick={()=> router.push("/details")}
                 >
                     Order Now
                 </Button>
             </div>
 
             {/* Promotional Banners Grid */}
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {banners.map((banner, index) => (
-          <div key={index} className="space-y-4">
-            <div className="relative aspect-4/3 rounded-[20px] overflow-hidden shadow-md">
-              <Image 
-                src={banner.image} 
-                alt="Promotion" 
-                fill 
-                className="object-cover"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {banners.map((banner, index) => (
+                    <div onClick={()=> router.push("/details")} key={index} className="space-y-4">
+                        <div className="relative aspect-4/3 rounded-[20px] overflow-hidden shadow-md">
+                            <Image
+                                src={banner.image}
+                                alt="Promotion"
+                                fill
+                                className="object-cover"
+                            />
+                        </div>
+                        <p className="text-[#424242] text-[22px] font-semibold leading-tight">
+                            {banner.text}
+                        </p>
+                    </div>
+                ))}
             </div>
-            <p className="text-[#424242] text-[22px] font-semibold leading-tight">
-              {banner.text}
-            </p>
-          </div>
-        ))}
-      </div>
 
         </section>
     );

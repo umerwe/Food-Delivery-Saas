@@ -21,7 +21,7 @@ const NewsletterSection = () => {
 
 
                 {/* Sub-headline */}
-                <p className="text-base font-normal leading-[28px] text-white/90 mb-[32px]">
+                <p className="text-base  leading-[28px] text-white/90 mb-[32px]">
                     Lorem ipsum dolor sit amet consectetur. Urna eu amet laoreet nisl. Amet pellentesque
                 </p>
 

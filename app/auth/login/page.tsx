@@ -8,7 +8,6 @@ export const metadata = {
 
 export default function LoginPage() {
     return (
-        // h-screen and overflow-hidden prevents the scroller
         <div className="grid h-screen grid-cols-1 lg:grid-cols-2 overflow-hidden">
             {/* Left Side */}
             <AuthHero />

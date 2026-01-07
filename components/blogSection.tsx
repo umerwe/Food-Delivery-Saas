@@ -1,3 +1,4 @@
+"use client"
 import Image from "next/image";
 import { Calendar, MessageSquare, ArrowRight } from "lucide-react";
 import {
@@ -7,6 +8,7 @@ import {
     CardHeader
 } from "@/components/ui/card";
 import { roboto } from "@/lib/fonts";
+import { useRouter } from "next/navigation";
 
 const blogPosts = [
     {
@@ -36,6 +38,7 @@ const blogPosts = [
 ];
 
 const BlogSection = () => {
+    const router = useRouter();
     return (
         <section className="py-16 px-4 max-w-7xl mx-auto">
             {/* Header Section */}
@@ -63,7 +66,10 @@ const BlogSection = () => {
             {/* Blog Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {blogPosts.map((post) => (
-                    <Card key={post.id} className="border-none shadow-lg rounded-md p-[16px]">
+                    <Card 
+                    key={post.id} 
+                    onClick={()=> router.push("/details")}
+                    className="border-none shadow-lg rounded-md p-[16px]">
                         <CardHeader className="p-0">
                             <div className="relative -top-[35px] aspect-4/3 overflow-hidden rounded-[20px]">
                                 <Image

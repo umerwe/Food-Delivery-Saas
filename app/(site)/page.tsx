@@ -1,4 +1,3 @@
-import Navbar from '@/components/layout/navbar';
 import HeroSection from '@/components/heroSection';
 import FoodCategorySection from '@/components/foodCategorySection';
 import WhyChooseUs from '@/components/whyChooseUsSection';
@@ -11,7 +10,6 @@ import Footer from '@/components/layout/footer';
 const HomePage = () => {
   return (
     <div>
-      <Navbar />
       <HeroSection />
       <FoodCategorySection />
       <WhyChooseUs />
@@ -19,7 +17,7 @@ const HomePage = () => {
       <Stats />
       <BlogSection />
       <NewsletterSection />
-      <Footer />
+      <Footer isHome={true} />
     </div>
   );
 };
