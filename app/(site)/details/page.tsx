@@ -225,7 +225,7 @@ export default function RestaurantDetailsPage() {
                                         placeholder="Apply Coupon Code here"
                                         className="pl-[26px] pr-18 border border-gray-200 placeholder:text-gray-800"
                                     />
-                                    <button className="absolute right-[36px] -top-[1px] translate-y-1/2 text-primary hover:text-primary/80">
+                                    <button className="absolute right-[36px] top-0 translate-y-1/2 text-primary hover:text-primary/80">
                                         <CircleArrowRight size={24} />
                                     </button>
                                 </div>
