@@ -83,7 +83,7 @@ export default function ReserveTablePage() {
                         </div>
 
                         {/* Number of Guests */}
-                        <div>
+                        <div className="pb-4 border-b-2 border-gray-200">
                             <label className="text-base font-medium text-gray-700">
                                 Number of Guests
                             </label>
@@ -116,7 +116,7 @@ export default function ReserveTablePage() {
                         </div>
 
                         {/* Contact Details Title */}
-                        <h3 className="text-[20px] font-bold text-gray-900 pt-4">
+                        <h3 className="text-[20px] font-semibold text-gray-900 ">
                             Contact Details
                         </h3>
 
