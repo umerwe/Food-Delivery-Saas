@@ -29,7 +29,7 @@ const banners = [
 export default function FoodCategorySection() {
     const router = useRouter();
     return (
-        <section className="max-w-7xl mx-auto px-6 pt-[80px]">
+        <section className="max-w-[1400px] mx-auto px-6 pt-[80px]">
 
             {/* Search by Food Header */}
             <div className="flex items-center justify-between mb-[60px]">

@@ -39,7 +39,7 @@ const cartItems = [
 export default function RestaurantDetailsPage() {
     const router = useRouter();
     return (
-        <div className="max-w-7xl mx-auto px-4 pt-[25.5px] pb-[108px]">
+        <div className="max-w-[1400px] mx-auto px-4 pt-[25.5px] pb-[108px]">
 
             <div className="relative w-full h-[300px] md:h-[425.48px] overflow-hidden rounded-[20px]">
                 <Image
