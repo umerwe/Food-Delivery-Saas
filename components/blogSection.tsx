@@ -40,7 +40,7 @@ const blogPosts = [
 const BlogSection = () => {
     const router = useRouter();
     return (
-        <section className="py-16 px-4 max-w-7xl mx-auto">
+        <section className="pt-[110px] pb-[65px] px-4 max-w-7xl mx-auto">
             {/* Header Section */}
             <div className="text-center mb-12 relative">
                 <div className="relative inline-block">

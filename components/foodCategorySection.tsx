@@ -29,10 +29,10 @@ const banners = [
 export default function FoodCategorySection() {
     const router = useRouter();
     return (
-        <section className="max-w-7xl mx-auto px-6 py-12 space-y-16">
+        <section className="max-w-7xl mx-auto px-6 pt-[80px]">
 
             {/* Search by Food Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-[60px]">
                 <h2 className="text-[42px] font-semibold text-[#212121]">Search by Food</h2>
                 <div className="flex items-center gap-[16.5px]">
                     <Button
@@ -80,7 +80,7 @@ export default function FoodCategorySection() {
                 </CarouselContent>
             </Carousel>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end mt-[60px] mb-[80px]">
                 <Button
                     variant="primary"
                     onClick={()=> router.push("/details")}

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 export default function PickupAddressSection() {
   return (
     <section className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 mb-[53px]">
         <MapPin className="text-primary" size={28} />
         <h2 className="text-[24px] font-semibold text-gray-900">Pickup address</h2>
       </div>

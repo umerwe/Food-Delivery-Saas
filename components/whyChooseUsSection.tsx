@@ -35,8 +35,8 @@ const FeatureCard = ({ title, desc, img }: { title: string; desc: string; img: s
 
 export default function WhyChooseUs() {
   return (
-    <section className="py-16 px-4 max-w-7xl mx-auto">
-      <h2 className="text-[42px] font-semibold text-center leading-[30px] mb-12">Why Choose Us</h2>
+    <section className="py-[80px] px-4 max-w-7xl mx-auto">
+      <h2 className="text-[42px] font-semibold text-center leading-[30px] mb-[60px]">Why Choose Us</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-[135px]">
         {features.map((f) => (
           <FeatureCard key={f.id} {...f} />

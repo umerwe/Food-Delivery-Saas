@@ -22,7 +22,7 @@ const Navbar = () => {
             <Search size={20} className="text-primary" strokeWidth={3} />
             Search Food
           </button>
-          <Link href={'/cart'} className="flex items-center text-primary gap-2 hover:text-primary transition-colors">
+          <Link href={'/checkout'} className="flex items-center text-primary gap-2 hover:text-primary transition-colors">
             <ShoppingBag size={20} strokeWidth={3} />
             Cart
           </Link>

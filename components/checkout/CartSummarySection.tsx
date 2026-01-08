@@ -6,6 +6,7 @@ import {
     TicketPercent
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import Link from 'next/link';
 
 const cartItems = [
     { id: 1, name: "Garden Vegetable Salad", price: 30, desc: "Crisp & refreshing from garden", quantity: 1, img: "/cart-item.png" },
@@ -14,11 +15,11 @@ const cartItems = [
     { id: 4, name: "Garden Vegetable Salad", price: 30, desc: "Crisp & refreshing from garden", quantity: 1, img: "/cart-item.png" },
 ];
 
-export default function CartSummarySection() {
+export default function CartSummarySection({ title = "Cart Summary" }: { title?: string }) {
     return (
         <div className="sticky top-10 space-y-[42.63px]">
             <section className="space-y-[20.37px]">
-                <h2 className="text-[20px] font-medium text-gray-900">Cart Summary</h2>
+                <h2 className="text-[20px] font-medium text-gray-900">{title}</h2>
                 {/* Cart Items List */}
                 <div className="space-y-[19px]">
                     {cartItems.map((item) => (
@@ -100,11 +101,16 @@ export default function CartSummarySection() {
                     </div>
                 </div>
 
-                <Button
-                    variant="primary"
-                    className="w-full h-[54px] rounded-[10px] text-base font-medium shadow-lg shadow-primary/20 mt-[15px]">
-                    Place Order
-                </Button>
+                {
+                    title !== "Order Details" &&
+                    <Link href={"/order"}>
+                        <Button
+                            variant="primary"
+                            className="w-full h-[54px] rounded-[10px] text-base font-medium shadow-lg shadow-primary/20 mt-[15px]">
+                            Place Order
+                        </Button>
+                    </Link>
+                }
             </section>
         </div>
     )

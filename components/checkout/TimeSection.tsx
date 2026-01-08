@@ -7,7 +7,6 @@ export default function SelectPickupTimeSection() {
   const [selectedDate, setSelectedDate] = useState(1)
   const [selectedTime, setSelectedTime] = useState("7:00 AM")
 
-  // Mock slots to match the image grid
   const timeSlots = [
     { time: "ASAP", available: true, isSpecial: true },
     { time: "7:00 AM", available: true },

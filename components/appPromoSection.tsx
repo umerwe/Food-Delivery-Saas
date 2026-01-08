@@ -4,7 +4,7 @@ import Image from 'next/image';
 
 export default function AppPromo() {
   return (
-    <section className="px-4 py-16 md:py-20">
+    <section className="px-4 pt-5 pb-[80px]">
       <div className="max-w-7xl mx-auto">
         <div className="relative w-fulloverflow-hidden">
           {/* Background Image */}
