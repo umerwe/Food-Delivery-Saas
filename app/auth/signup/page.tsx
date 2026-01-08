@@ -2,19 +2,16 @@ import { AuthHero } from "@/components/auth/hero"
 import SignUpForm from "@/components/forms/SignupForm"
 
 export const metadata = {
-    title: "Sign Up",
+    title: "Sign Up | Food",
     description: "Create your account",
 }
 
 export default function SignUpPage() {
     return (
-        // h-screen and overflow-hidden prevents the scroller
-        <div className="grid h-screen grid-cols-1 lg:grid-cols-2 overflow-hidden">
-            {/* Left Side */}
+        <div className="flex flex-col flex-1 lg:flex-row gap-[70px] xl:gap-[130px] min-h-screen">
             <AuthHero />
-            
-            {/* Right Side: Centered Form */}
-            <div className="flex items-center justify-center w-full h-full p-4">
+
+            <div className="flex items-center justify-center lg:justify-normal w-full flex-1 px-4 md:px-32 lg:px-0 py-[85px]">
                 <SignUpForm />
             </div>
         </div>

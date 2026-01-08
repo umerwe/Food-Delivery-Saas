@@ -2,18 +2,16 @@ import { AuthHero } from "@/components/auth/hero"
 import LoginForm from "@/components/forms/LoginForm"
 
 export const metadata = {
-    title: "Login",
+    title: "Login | Food",
     description: "Login to your account",
 }
 
 export default function LoginPage() {
     return (
-        <div className="grid h-screen grid-cols-1 lg:grid-cols-2 overflow-hidden">
-            {/* Left Side */}
+        <div className="flex flex-col flex-1 lg:flex-row gap-[70px] xl:gap-[130px] min-h-screen">
             <AuthHero />
-            
-            {/* Right Side: Centered Form */}
-            <div className="flex items-center justify-center w-full h-full p-4">
+
+            <div className="flex items-center justify-center lg:justify-normal w-full flex-1 px-4 md:px-32 lg:px-0 py-[85px]">
                 <LoginForm />
             </div>
         </div>

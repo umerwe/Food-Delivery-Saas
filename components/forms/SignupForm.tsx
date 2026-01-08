@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { FcGoogle } from "react-icons/fc"
 import { FaFacebook } from "react-icons/fa"
+import { roboto } from "@/lib/fonts"
 
 export default function SignUpForm() {
   const [isLoading, setIsLoading] = useState(false)
@@ -37,7 +38,7 @@ export default function SignUpForm() {
   }
 
   return (
-    <div className="w-[562px]">
+    <div className="w-full lg:mr-[79px]">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-headline-sm font-bold font-roboto text-primary">Sign Up</h1>
@@ -162,23 +163,24 @@ export default function SignUpForm() {
         </Button>
       </form>
 
-      {/* Social Buttons */}
       <div className="space-y-9 flex flex-col items-center">
-        <Button
+        <Link
+          href="/auth/login"
           type="button"
-          className="w-[345px] h-[54px] text-title-md bg-blue font-semibold hover:bg-blue/90 text-white font-bolsd rounded-base transition-colors"
+          className="w-[345px] flex items-center justify-center h-[54px] font-medium bg-blue rounded-[10px] hover:bg-blue/90 text-white shadow-lg"
         >
-          <FaFacebook className="w-[23px] h-[23px] mr-[15.5px]" />
-          Sign up with Facebook
-        </Button>
+          <FaFacebook className="w-[23px] h-[23px] mr-[15px]" />
+          <span className={`${roboto.className} font-medium text-xl`}>SignIn with Facebook</span>
+        </Link>
 
-        <Button
+        <Link
+          href="/auth/login"
           type="button"
-          className="w-[345px] h-[54px] text-title-md font-semibold bg-transparent hover:bg-gray-100 shadow-lg"
+          className="w-[345px] flex items-center justify-center h-[54px] font-medium bg-transparent rounded-[10px] hover:bg-gray-100 shadow-sm border border-gray-200"
         >
           <FcGoogle className="w-[24px] h-[24px] mr-[15px]" />
-          <p className="text-gray-500">Sign up with Google</p>
-        </Button>
+          <p className={`${roboto.className} font-medium text-xl text-gray-500`}>Sign In with Google</p>
+        </Link>
       </div>
 
       {/* Sign In Link */}
