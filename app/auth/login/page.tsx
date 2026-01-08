@@ -1,5 +1,5 @@
 import { AuthHero } from "@/components/auth/hero"
-import { LoginForm } from "@/components/forms/login"
+import LoginForm from "@/components/forms/LoginForm"
 
 export const metadata = {
     title: "Login",

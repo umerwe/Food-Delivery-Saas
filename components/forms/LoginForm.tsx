@@ -6,11 +6,10 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
 import { FcGoogle } from "react-icons/fc"
 import { FaFacebook } from "react-icons/fa"
 
-export function LoginForm() {
+export default function LoginForm() {
     const [isLoading, setIsLoading] = useState(false)
     const [formData, setFormData] = useState({
         firstName: "",

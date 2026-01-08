@@ -10,7 +10,7 @@ const Navbar = () => {
           href={'/'}
            className="relative w-[190px] h-[36.77px]">
             <Image
-              src="/logo.png"
+              src="/nav-logo.png"
               alt="Logo"
               fill
               className="object-contain" />
