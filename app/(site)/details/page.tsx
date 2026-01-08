@@ -66,7 +66,7 @@ export default function RestaurantDetailsPage() {
                         </div>
                     </div>
 
-                    <Button variant="primary" className="rounded-[8px] h-[50px] w-[228px] px-8 text-base font-semibold">
+                    <Button onClick={() => router.push('/reservetable')} variant="primary" className="rounded-[8px] h-[50px] w-[228px] px-8 text-base font-semibold">
                         Reserve table
                     </Button>
                 </div>

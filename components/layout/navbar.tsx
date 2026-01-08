@@ -9,7 +9,6 @@ const Navbar = () => {
   const [isAuth, setIsAuth] = useState(false);
 
   useEffect(() => {
-    // Check localStorage for the demo auth state
     const authStatus = localStorage.getItem("isAuth");
     if (authStatus === "true") {
       setIsAuth(true);

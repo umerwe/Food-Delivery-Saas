@@ -48,7 +48,7 @@ const HeroSection = () => {
                                 className="w-full bg-[#F5F5F5] border-none rounded-xl h-[49px] pl-12 pr-4 text-gray-700 focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-gray-400"
                             />
                         </div>
-                        <button className="bg-primary hover:bg-[#d94e24] text-white px-10 py-4 rounded-xl font-bold flex items-center justify-center gap-2">
+                        <button className="bg-primary hover:bg-[#d94e24] text-white px-10 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-2">
                             <Search size={18} strokeWidth={3} />
                             Find Food
                         </button>
