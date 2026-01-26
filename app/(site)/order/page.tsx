@@ -37,17 +37,13 @@ export default function OrderStatusPage() {
                         <div className="space-y-0">
                             {orderSteps.map((step, index) => (
                                 <div key={step.id} className="relative flex gap-6 pb-10 group">
-                                    {/* Connector Line */}
                                     {index !== orderSteps.length - 1 && (
                                         <div className={`absolute left-[17px] top-10 w-px h-full border-l-2 border-dashed border-gray-200`} />
                                     )}
-
-                                    {/* Circle Indicator */}
                                     <div className={`relative z-10 flex items-center justify-center w-9 h-9 rounded-full shrink-0 text-sm font-medium transition-colors ${step.active ? 'bg-primary text-white' : 'bg-[#D9D9D9] text-white'}`}>
                                         {step.id}
                                     </div>
 
-                                    {/* Text */}
                                     <div className="pt-1">
                                         <h3 className={`text-[22px] font-medium mb-[4px] ${step.active ? 'text-gray-900' : 'text-gray-400'}`}>
                                             {step.title}

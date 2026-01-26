@@ -8,7 +8,6 @@ import { CalendarIcon, Clock } from "lucide-react";
 export default function ReserveTablePage() {
     return (
         <main className="relative w-full min-h-screen flex items-center justify-center overflow-hidden">
-            {/* Background Image with Overlay */}
             <div className="absolute inset-0 z-0">
                 <Image
                     src="/reserve-table-bg.jpg"
@@ -21,7 +20,7 @@ export default function ReserveTablePage() {
 
             {/* Content Container */}
             <div className="relative z-10 w-full max-w-[1200px] mx-auto px-6 grid lg:grid-cols-2 gap-12 py-12">
-                {/* Left Column: Text Content */}
+                {/* Left Column */}
                 <div className="text-gray-900 space-y-[12px] max-w-[500px] mt-10">
                     <h1 className="text-[60px] font-bold leading-tight">
                         Taste The{" "}
@@ -40,7 +39,7 @@ export default function ReserveTablePage() {
                     </div>
                 </div>
 
-                {/* Right Column: Reservation Form */}
+                {/* Right Column */}
                 <div className="bg-white rounded-[20px] p-[40px] shadow-2xl w-full max-w-[618px] mx-auto lg:ml-auto">
                     <div className="space-y-[8px] mb-[27px]">
                         <h2 className="text-[24px] font-semibold text-gray-900">

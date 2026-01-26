@@ -11,7 +11,7 @@ import { FaFacebook } from "react-icons/fa"
 import { roboto } from "@/lib/fonts"
 
 export default function LoginForm() {
-    const router = useRouter() // Initialize the router
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false)
     const [formData, setFormData] = useState({
         email: "",
@@ -28,8 +28,7 @@ export default function LoginForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        
-        // Basic validation for testing
+                
         if (!formData.email || !formData.password) {
             alert("Please enter both email and password")
             return
@@ -37,15 +36,12 @@ export default function LoginForm() {
 
         setIsLoading(true)
 
-        // Simulate API delay
         setTimeout(() => {
-            // Set Auth demo state
-            localStorage.setItem("isAuth", "true") // Store auth state for demo
+            localStorage.setItem("isAuth", "true")
             
             setIsLoading(false)
             
-            // Navigate to home screen
-            router.push("/") // Redirect to home
+            router.push("/")
         }, 1000)
     }
 

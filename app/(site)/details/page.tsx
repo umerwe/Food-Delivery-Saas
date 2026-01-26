@@ -1,4 +1,5 @@
 "use client"
+
 import Image from 'next/image';
 import {
     Star,
@@ -115,9 +116,6 @@ export default function RestaurantDetailsPage() {
                 </Button>
             </div>
 
-
-            {/* ================= MENU & CART SECTION (New Code) ================= */}
-
             {/* 1. Category Filter Bar */}
             <div className="flex items-center gap-[60px] overflow-x-auto mt-[12px] mb-[59px]">
                 {categories.map((category, index) => (
@@ -137,7 +135,7 @@ export default function RestaurantDetailsPage() {
             {/* 2. Main Content Grid (Menu + Cart) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-[60px] pt-0">
 
-                {/* LEFT COLUMN: Menu Items List */}
+                {/* LEFT COLUMN */}
                 <div className="space-y-[24px]">
                     {menuItems.map((item) => (
                         <Card key={item.id} className="rounded-none border-none shadow-none flex flex-col md:flex-row gap-6 p-0 overflow-hidden">
@@ -170,7 +168,7 @@ export default function RestaurantDetailsPage() {
                     ))}
                 </div>
 
-                {/* RIGHT COLUMN: Cart Summary */}
+                {/* RIGHT COLUMN */}
                 <div className="lg:col-span-1 w-[372px]">
                     <Card className="border-none shadow-none p-0 sticky top-8">
                         <CardContent className="p-0">
@@ -261,7 +259,6 @@ export default function RestaurantDetailsPage() {
                         </CardContent>
                     </Card>
                 </div>
-
             </div>
         </div>
     );
