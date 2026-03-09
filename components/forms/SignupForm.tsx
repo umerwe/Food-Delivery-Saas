@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import { toast } from "sonner"
 import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -10,19 +10,23 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { FcGoogle } from "react-icons/fc"
 import { FaFacebook } from "react-icons/fa"
 import { roboto } from "@/lib/fonts"
+import { useRouter } from "next/navigation"
+import { API_BASE_URL } from "@/lib/constants"
 
 export default function SignUpForm() {
   const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    password: "",
-    confirmPassword: "",
-    acceptTerms: false,
-  })
-
+  const router = useRouter();
+const [formData, setFormData] = useState({
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  password: "",
+  confirmPassword: "",
+  restaurantId: "",
+  tenantId: "",
+  acceptTerms: false,
+})
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target
     setFormData((prev) => ({
@@ -32,10 +36,55 @@ export default function SignUpForm() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setTimeout(() => setIsLoading(false), 1000)
+  e.preventDefault()
+
+  if (formData.password !== formData.confirmPassword) {
+    toast.error("Passwords do not match")
+    return
   }
+
+  if (!formData.acceptTerms) {
+    toast.error("Please accept the terms and privacy policy")
+    return
+  }
+
+  try {
+    setIsLoading(true)
+
+    const res = await fetch(`${API_BASE_URL}/v1/auth/register-customer`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: formData.email,
+        password: formData.password,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        restaurantId: formData.restaurantId,
+// tenantId: formData.tenantId,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Registration failed")
+    }
+
+    toast.success("Account created successfully")
+
+    setTimeout(() => {
+      router.push("/auth/login")
+    }, 1200)
+
+  } catch (error: any) {
+    toast.error(error.message || "Something went wrong")
+  } finally {
+    setIsLoading(false)
+  }
+}
 
   return (
     <div className="w-full lg:mr-[79px]">
@@ -101,7 +150,31 @@ export default function SignUpForm() {
             />
           </div>
         </div>
+{/* Restaurant ID */}
+<div className="space-y-2">
+  <Input
+    id="restaurantId"
+    name="restaurantId"
+    type="text"
+    placeholder="Restaurant ID"
+    value={formData.restaurantId}
+    onChange={handleChange}
+    required
+  />
+</div>
 
+{/* Tenant ID */}
+{/* <div className="space-y-2">
+  <Input
+    id="tenantId"
+    name="tenantId"
+    type="text"
+    placeholder="Tenant ID"
+    value={formData.tenantId}
+    onChange={handleChange}
+    required
+  />
+</div> */}
         {/* Password */}
         <div className="space-y-2">
           <div className="relative">

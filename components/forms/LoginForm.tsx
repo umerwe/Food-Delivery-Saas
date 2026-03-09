@@ -3,12 +3,14 @@
 import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation" // Import useRouter for navigation
+import { useRouter } from "next/navigation" 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { FcGoogle } from "react-icons/fc"
 import { FaFacebook } from "react-icons/fa"
 import { roboto } from "@/lib/fonts"
+import { toast } from "sonner"
+import { API_BASE_URL } from "@/lib/constants"
 
 export default function LoginForm() {
     const router = useRouter();
@@ -16,6 +18,7 @@ export default function LoginForm() {
     const [formData, setFormData] = useState({
         email: "",
         password: "",
+        restaurantId: "",
     })
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -26,25 +29,50 @@ export default function LoginForm() {
         }))
     }
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-                
-        if (!formData.email || !formData.password) {
-            alert("Please enter both email and password")
-            return
-        }
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
 
-        setIsLoading(true)
+  if (!formData.email || !formData.password || !formData.restaurantId) {
+  toast.error("Please fill all fields");
+  return;
+}
 
-        setTimeout(() => {
-            localStorage.setItem("isAuth", "true")
-            
-            setIsLoading(false)
-            
-            router.push("/")
-        }, 1000)
+  try {
+    setIsLoading(true)
+
+    const res = await fetch(`${API_BASE_URL}/v1/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: formData.email,
+        password: formData.password,
+         restaurantId: formData.restaurantId,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Login failed")
     }
 
+    localStorage.setItem("isAuth", "true")
+    localStorage.setItem("user", JSON.stringify(data))
+
+    toast.success("Login successful")
+
+    setTimeout(() => {
+      router.push("/")
+    }, 1000)
+
+  } catch (error: any) {
+    toast.error(error.message || "Something went wrong")
+  } finally {
+    setIsLoading(false)
+  }
+}
     return (
         <div className="w-full lg:mr-[79px]">
             {/* Header */}
@@ -76,6 +104,17 @@ export default function LoginForm() {
                         type="password"
                         placeholder="Password"
                         value={formData.password}
+                        onChange={handleChange}
+                        required
+                    />
+                </div>
+  <div className="relative">
+                    <Input
+                        id="restaurantId"
+                        name="restaurantId"
+                        type="text"
+                        placeholder="Restaurant Id"
+                        value={formData.restaurantId}
                         onChange={handleChange}
                         required
                     />
