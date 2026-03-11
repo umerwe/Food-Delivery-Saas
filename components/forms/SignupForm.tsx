@@ -73,7 +73,43 @@ const [formData, setFormData] = useState({
       throw new Error(data?.message || "Registration failed")
     }
 
-    toast.success("Account created successfully")
+
+    
+const { verificationToken } = data?.data;
+
+    /* ================= AUTO VERIFY EMAIL (DEV MODE) ================= */
+
+    if (formData.email && verificationToken) {
+      try {
+        const verifyRes = await fetch(`${API_BASE_URL}/v1/auth/verify-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            token: verificationToken,
+          }),
+        });
+
+        const verifyData = await verifyRes.json();
+
+        console.log("✅ Email verification response:", verifyData);
+
+        if (verifyRes.ok) {
+          toast.success("Account Created & Email verified automatically (Dev Mode)");
+        } else {
+          toast.warning("User created but email verification failed");
+        }
+      } catch (verifyErr) {
+        console.error("Verification error:", verifyErr);
+        toast.warning("User created but email verification failed");
+      }
+    }
+
+
+
+    // toast.success("Account created successfully")
 
     setTimeout(() => {
       router.push("/auth/login")

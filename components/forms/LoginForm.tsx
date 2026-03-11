@@ -11,6 +11,7 @@ import { FaFacebook } from "react-icons/fa"
 import { roboto } from "@/lib/fonts"
 import { toast } from "sonner"
 import { API_BASE_URL } from "@/lib/constants"
+import { Checkbox } from "../ui/checkbox"
 
 export default function LoginForm() {
     const router = useRouter();
@@ -29,50 +30,52 @@ export default function LoginForm() {
         }))
     }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  
+ const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
 
-  if (!formData.email || !formData.password || !formData.restaurantId) {
+    if (!formData.email || !formData.password || !formData.restaurantId) {
   toast.error("Please fill all fields");
   return;
 }
 
   try {
-    setIsLoading(true)
+    setIsLoading(true);
 
-    const res = await fetch(`${API_BASE_URL}/v1/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: formData.email,
-        password: formData.password,
+    const res = await fetch(
+      `${API_BASE_URL}/v1/auth/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
          restaurantId: formData.restaurantId,
-      }),
-    })
+        }),
+      }
+    );
 
-    const data = await res.json()
-
+    const data = await res.json();
+console.log("data  from backend stored in local storage", data);
     if (!res.ok) {
-      throw new Error(data?.message || "Login failed")
+      throw new Error(data?.message || "Login failed");
     }
 
-    localStorage.setItem("isAuth", "true")
-    localStorage.setItem("user", JSON.stringify(data))
+   localStorage.setItem("auth", JSON.stringify(data.data));
 
-    toast.success("Login successful")
+    toast.success("Login successful");
 
     setTimeout(() => {
-      router.push("/")
-    }, 1000)
-
+      router.push("/");
+    }, 1000);
   } catch (error: any) {
-    toast.error(error.message || "Something went wrong")
+    toast.error(error.message || "Something went wrong");
   } finally {
-    setIsLoading(false)
+    setIsLoading(false);
   }
-}
+};
     return (
         <div className="w-full lg:mr-[79px]">
             {/* Header */}
@@ -119,6 +122,16 @@ export default function LoginForm() {
                         required
                     />
                 </div>
+  <div className="flex items-center justify-between text-sm my-7">
+              <label className="flex items-center gap-2 cursor-pointer text-gray-500">
+                <Checkbox checked />
+                Remember me
+              </label>
+
+              <Link href="/auth/forgot-password" className="text-primary hover:underline">
+                Forgot Password?
+              </Link>
+            </div>
 
                 {/* Login Button */}
                 <Button
