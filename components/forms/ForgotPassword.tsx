@@ -41,17 +41,25 @@ if (!res.ok) {
   throw new Error(data?.message || "Failed to send reset link");
 }
 
-const resetToken = data?.data?.resetToken;
+// const resetToken = data?.data?.resetToken;
 
-if (resetToken) {
-  const generatedUrl = `${window.location.origin}/auth/reset-password/${resetToken}?email=${encodeURIComponent(email)}&restaurantId=${restaurantId}`;
+// if (resetToken) {
+//   const generatedUrl = `${window.location.origin}/auth/reset-password/${resetToken}?email=${encodeURIComponent(email)}&restaurantId=${restaurantId}`;
 
-  setResetUrl(generatedUrl);
+//   setResetUrl(generatedUrl);
 
-  toast.success("Reset link generated (Dev Mode)");
-} else {
-  toast.success("If account exists, reset instructions are sent");
-}
+//   toast.success("Reset link generated (Dev Mode)");
+// } else {
+//   toast.success("If account exists, reset instructions are sent");
+// }
+
+
+toast.success("If the account exists, you can now reset your password");
+
+window.location.href = `/auth/reset-password?email=${encodeURIComponent(
+  email
+)}&restaurantId=${restaurantId}`;
+
   } catch (error: any) {
     toast.error(error.message || "Something went wrong");
   } finally {
