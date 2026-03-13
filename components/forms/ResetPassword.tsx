@@ -15,7 +15,10 @@ const ResetPassword = () => {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [restaurantId, setRestaurantId] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [countdown, setCountdown] = useState(60);
 
   /* ================= GET DATA FROM URL ================= */
 
@@ -26,6 +29,56 @@ const ResetPassword = () => {
     if (emailFromUrl) setEmail(emailFromUrl);
     if (restaurantIdFromUrl) setRestaurantId(restaurantIdFromUrl);
   }, [searchParams]);
+
+  /* ================= COUNTDOWN TIMER ================= */
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  /* ================= RESEND OTP ================= */
+
+  const handleResendOtp = async () => {
+    if (!email || !restaurantId) {
+      toast.error("Missing email or restaurant id");
+      return;
+    }
+
+    try {
+      setIsResending(true);
+
+      const res = await fetch(`${API_BASE_URL}/v1/auth/resend-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          restaurantId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Failed to resend OTP");
+      }
+
+      toast.success("OTP resent successfully");
+
+      setCountdown(60);
+    } catch (error: any) {
+      toast.error(error.message || "Something went wrong");
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   /* ================= RESET PASSWORD ================= */
 
@@ -79,7 +132,6 @@ const ResetPassword = () => {
       setTimeout(() => {
         router.push("/auth/login");
       }, 1200);
-
     } catch (error: any) {
       toast.error(error.message || "Something went wrong");
     } finally {
@@ -123,6 +175,26 @@ const ResetPassword = () => {
           onChange={(e) => setOtp(e.target.value)}
           required
         />
+
+        {/* RESEND OTP */}
+        <div className="flex justify-between items-center text-sm">
+
+          {countdown > 0 ? (
+            <span className="text-muted-foreground">
+              Resend OTP in {countdown}s
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={isResending}
+              className="text-primary hover:underline"
+            >
+              {isResending ? "Sending..." : "Resend OTP"}
+            </button>
+          )}
+
+        </div>
 
         {/* New Password */}
         <Input
