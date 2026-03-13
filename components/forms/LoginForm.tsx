@@ -111,7 +111,7 @@ console.log("data  from backend stored in local storage", data);
                         required
                     />
                 </div>
-  <div className="relative">
+                <div className="relative">
                     <Input
                         id="restaurantId"
                         name="restaurantId"
