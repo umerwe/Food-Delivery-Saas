@@ -1,28 +1,41 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-export default function SelectPickupTimeSection() {
-  const [selectedDate, setSelectedDate] = useState(1)
-  const [selectedTime, setSelectedTime] = useState("7:00 AM")
+interface Props {
+  pickupDate: Date | null;
+  setPickupDate: (value: Date) => void;
+  pickupTime: string | null;
+  setPickupTime: (value: string) => void;
+}
 
+export default function SelectPickupTimeSection({
+  pickupDate,
+  setPickupDate,
+  pickupTime,
+  setPickupTime,
+}: Props) {
   const timeSlots = [
-    { time: "ASAP", available: true, isSpecial: true },
+    { time: "ASAP", available: true },
     { time: "7:00 AM", available: true },
-    { time: "7:00 AM", available: false },
-    { time: "7:00 AM", available: false },
-    { time: "7:00 AM", available: false },
-    { time: "7:00 AM", available: false },
-    { time: "7:00 AM", available: false },
-    { time: "7:00 AM", available: true },
-  ]
+    { time: "8:00 AM", available: false },
+    { time: "9:00 AM", available: false },
+    { time: "10:00 AM", available: false },
+    { time: "11:00 AM", available: false },
+    { time: "12:00 PM", available: false },
+    { time: "1:00 PM", available: true },
+  ];
 
-  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
-  const paddedDates = [
-    ...Array(0).fill(null), // Adjust padding based on the month start day
-    ...Array.from({ length: 31 }, (_, i) => i + 1)
-  ]
+  const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+  // ✅ Dynamic current month/year
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  const dates = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   return (
     <section className="space-y-[22px] max-w-[420px]">
@@ -30,24 +43,33 @@ export default function SelectPickupTimeSection() {
         Select Pickup Time
       </h2>
 
-      {/* Choose Date Section */}
+      {/* DATE */}
       <div className="space-y-[14px]">
-        <h3 className="text-xl font-medium text-gray-900">Choose date</h3>
+        <h3 className="text-xl font-medium text-gray-900">
+          Choose date
+        </h3>
 
-        <div className="bg-white px-[29px]">
+        <div className="bg-white px-[29px] py-4 rounded-xl shadow-sm">
+          {/* Header */}
           <div className="flex items-center justify-between border-b-2 border-gray-200 pb-[21px] mb-[16px]">
-            <span className="text-sm text-gray-600">January 2022</span>
+            <span className="text-sm text-gray-600">
+              {today.toLocaleString("default", {
+                month: "long",
+                year: "numeric",
+              })}
+            </span>
+
             <div className="flex gap-6">
-              <button className="text-gray-600 hover:text-gray-900 transition-colors">
+              <button className="text-gray-600 hover:text-gray-900">
                 <ChevronLeft size={16} />
               </button>
-              <button className="text-gray-600 hover:text-gray-900 transition-colors">
+              <button className="text-gray-600 hover:text-gray-900">
                 <ChevronRight size={16} />
               </button>
             </div>
           </div>
 
-          {/* Weekday Headers */}
+          {/* Weekdays */}
           <div className="grid grid-cols-7 gap-1 mb-4">
             {weekDays.map((day) => (
               <div
@@ -59,42 +81,53 @@ export default function SelectPickupTimeSection() {
             ))}
           </div>
 
-          {/* Calendar Grid */}
+          {/* Dates */}
           <div className="grid grid-cols-7 gap-y-4">
-            {paddedDates.map((date, index) => (
-              <div key={index} className="flex justify-center items-center">
-                {date ? (
+            {dates.map((date) => {
+              const fullDate = new Date(currentYear, currentMonth, date);
+
+              return (
+                <div key={date} className="flex justify-center items-center">
                   <button
-                    onClick={() => setSelectedDate(date)}
-                    className={`w-9 h-9 rounded-full text-sm font-medium transition-all ${date === selectedDate
-                      ? "bg-primary text-white shadow-md shadow-primary/20"
-                      : "text-gray-600 hover:bg-gray-50"
-                      }`}
+                    onClick={() => setPickupDate(fullDate)}
+                    className={`w-9 h-9 rounded-full text-sm font-medium transition-all ${
+                      pickupDate?.getDate() === date &&
+                      pickupDate?.getMonth() === currentMonth &&
+                      pickupDate?.getFullYear() === currentYear
+                        ? "bg-orange-500 text-white shadow-md"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`}
                   >
                     {date}
                   </button>
-                ) : (
-                  <div className="w-9 h-9" />
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Choose Pickup Time Section */}
+      {/* TIME */}
       <div className="space-y-[16px] mt-[52px]">
-        <h3 className="text-xl font-medium text-gray-900">Choose Pickup Time</h3>
+        <h3 className="text-xl font-medium text-gray-900">
+          Choose Pickup Time
+        </h3>
 
         <div className="grid grid-cols-4 gap-3">
-          {timeSlots.map((slot, index) => (
+          {timeSlots.map((slot) => (
             <button
-              key={index}
-              onClick={() => slot.available && setSelectedTime(slot.time)}
-              className={`h-[48px] rounded-[10px] text-sm font-medium transition-all border-2 ${slot.available
-                ? "border-blue text-blue bg-white hover:bg-blue/5"
-                : "border-primary/40 text-primary bg-white opacity-80"
-                }`}
+              key={slot.time}
+              onClick={() => {
+                if (!slot.available) return;
+                setPickupTime(slot.time);
+              }}
+              className={`h-[48px] rounded-[10px] text-sm font-medium transition-all border-2 ${
+                slot.available
+                  ? pickupTime === slot.time
+                    ? "border-orange-500 bg-orange-500 text-white shadow-md"
+                    : "border-gray-200 text-gray-700 bg-white hover:border-orange-400 hover:text-orange-500"
+                  : "border-gray-200 text-gray-400 bg-gray-100 cursor-not-allowed"
+              }`}
             >
               {slot.time}
             </button>
@@ -102,5 +135,5 @@ export default function SelectPickupTimeSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
