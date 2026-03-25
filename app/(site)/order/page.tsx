@@ -58,11 +58,11 @@ export default function OrderStatusPage() {
                     </div>
                 </div>
 
-                <div className="lg:col-span-5">
+                {/* <div className="lg:col-span-5">
                     <CartSummarySection
                         title="Order Details"
                     />
-                </div>
+                </div> */}
             </div>
         </div>
     )

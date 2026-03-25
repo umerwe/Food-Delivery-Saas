@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { poppins } from "@/lib/fonts";
 import { Toaster } from "sonner";
+import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
   title: "Home | Food",
@@ -13,15 +14,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
-       <Toaster position="top-right" richColors />
-      <body className={`${poppins.className}`}>
-        {children}
-      </body>
+      <body className={poppins.className}>
+  <AuthProvider>
+    <Toaster position="top-right" richColors />
+    {children}
+  </AuthProvider>
+</body>
     </html>
   );
 }

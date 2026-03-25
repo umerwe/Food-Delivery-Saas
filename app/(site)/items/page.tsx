@@ -1,16 +1,16 @@
 import React, { Suspense } from "react";
-import CheckoutPage from "./CheckoutPage";
+import ItemsPage from "./ItemsPage";
 
 const page = () => {
   return (
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center text-gray-500">
-          Loading checkout...
+          Loading items...
         </div>
       }
     >
-      <CheckoutPage />
+      <ItemsPage />
     </Suspense>
   );
 };

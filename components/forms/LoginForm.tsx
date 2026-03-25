@@ -12,10 +12,12 @@ import { roboto } from "@/lib/fonts"
 import { toast } from "sonner"
 import { API_BASE_URL } from "@/lib/constants"
 import { Checkbox } from "../ui/checkbox"
+import { useAuthContext } from "@/context/AuthContext"
 
 export default function LoginForm() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false)
+    const { login } = useAuthContext();
     const [formData, setFormData] = useState({
         email: "",
         password: "",
@@ -58,12 +60,11 @@ export default function LoginForm() {
     );
 
     const data = await res.json();
-console.log("data  from backend stored in local storage", data);
     if (!res.ok) {
       throw new Error(data?.message || "Login failed");
     }
 
-   localStorage.setItem("auth", JSON.stringify(data.data));
+login(data.data);
 
     toast.success("Login successful");
 

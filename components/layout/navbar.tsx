@@ -1,56 +1,23 @@
 "use client"
 
 import Image from "next/image"
-import { Search, ShoppingBag, User, ChevronDown, LogOut } from "lucide-react"
+import { Search, ShoppingBag, User, ChevronDown, LogOut, HelpCircle, Settings } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { useAuthContext } from "@/context/AuthContext"
 
 const Navbar = () => {
-  const [isAuth, setIsAuth] = useState(false)
-  const [userName, setUserName] = useState("")
+ const { user, logout } = useAuthContext();
+
+const isAuth = !!user;
+const userName = `${user?.profile?.firstName || ""} ${user?.profile?.lastName || ""}`.trim();
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
 
-const loadUser = () => {
-  const authRaw = localStorage.getItem("auth")
-
-  if (!authRaw) {
-    setIsAuth(false)
-    setUserName("")
-    return
-  }
-
-  try {
-    const auth = JSON.parse(authRaw)
-
-    const firstName = auth?.user?.profile?.firstName || ""
-    const lastName = auth?.user?.profile?.lastName || ""
-
-    setUserName(`${firstName} ${lastName}`.trim())
-    setIsAuth(true)
-  } catch (err) {
-    console.error("Invalid auth data", err)
-  }
-}
-
-useEffect(() => {
-  loadUser()
-
-  const handleAuthUpdate = () => loadUser()
-
-  window.addEventListener("authUpdated", handleAuthUpdate)
-  window.addEventListener("storage", handleAuthUpdate)
-
-  return () => {
-    window.removeEventListener("authUpdated", handleAuthUpdate)
-    window.removeEventListener("storage", handleAuthUpdate)
-  }
-}, [])
-  // close dropdown if clicked outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -66,14 +33,11 @@ useEffect(() => {
   }, [])
 
   const handleLogout = () => {
-    localStorage.removeItem("auth")
+logout();
+toast.success("Logged out successfully");
 
-    toast.success("Logged out successfully")
-
-    setDropdownOpen(false)
-    setIsAuth(false)
-
-    router.push("/auth/login")
+setDropdownOpen(false);
+router.push("/auth/login");
   }
 
   return (
@@ -122,28 +86,93 @@ useEffect(() => {
               <ChevronDown size={16} />
             </button>
 
-            {dropdownOpen && (
-              <div  style={{zIndex:'99999'}} className="absolute right-0 mt-3 w-[180px] rounded-xl bg-white shadow-lg border border-gray-100 overflow-hidden">
+           {dropdownOpen && (
+  <div
+    style={{ zIndex: "99999" }}
+    className="absolute right-0 mt-4 w-[300px] rounded-2xl bg-white shadow-xl border border-gray-100 overflow-hidden"
+  >
+    {/* HEADER */}
+    <div className="flex items-center gap-3 p-4 bg-gray-100">
+      <div className="relative w-12 h-12 rounded-full overflow-hidden">
+        <Image
+          src={
+            user?.profile?.avatarUrl?.startsWith("http")
+              ? user.profile.avatarUrl
+              : "/profile-user.png"
+          }
+          alt="avatar"
+          fill
+          className="object-cover"
+        />
+      </div>
 
-                <Link
-                  href="/profile"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-gray-50 transition"
-                  onClick={() => setDropdownOpen(false)}
-                >
-                  <User size={16} />
-                  Profile
-                </Link>
+      <div>
+        <p className="font-semibold text-gray-900 text-sm">
+          {userName || "User"}
+        </p>
+        <p className="text-xs text-gray-500">
+          {user?.email}
+        </p>
+      </div>
+    </div>
 
-                <button
-                  onClick={handleLogout}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-sm hover:bg-red-50 text-red-600 transition"
-                >
-                  <LogOut size={16} />
-                  Logout
-                </button>
+    {/* MENU */}
+    <div className="py-2">
 
-              </div>
-            )}
+      <Link
+        href="/profile"
+        onClick={() => setDropdownOpen(false)}
+        className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
+            <User size={16} />
+          </div>
+          <span className="text-sm text-gray-700">My Profile</span>
+        </div>
+        <ChevronDown className="rotate-[-90deg]" size={16} />
+      </Link>
+
+      <button
+        className="flex w-full items-center justify-between px-4 py-3 hover:bg-gray-50 transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
+            <Settings size={16} />
+          </div>
+          <span className="text-sm text-gray-700">Account Settings</span>
+        </div>
+        <ChevronDown className="rotate-[-90deg]" size={16} />
+      </button>
+
+      <button
+        className="flex w-full items-center justify-between px-4 py-3 hover:bg-gray-50 transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
+            <HelpCircle size={16} />
+          </div>
+          <span className="text-sm text-gray-700">Help Center</span>
+        </div>
+        <ChevronDown className="rotate-[-90deg]" size={16} />
+      </button>
+    </div>
+
+    {/* DIVIDER */}
+    <div className="border-t border-gray-200" />
+
+    {/* LOGOUT */}
+    <button
+      onClick={handleLogout}
+      className="flex w-full items-center gap-3 px-4 py-4 text-sm text-gray-700 hover:bg-red-50 transition"
+    >
+      <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
+        <LogOut size={16} />
+      </div>
+      Logout
+    </button>
+  </div>
+)}
           </div>
         ) : (
           <Link
