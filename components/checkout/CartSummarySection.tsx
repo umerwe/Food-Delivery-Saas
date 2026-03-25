@@ -44,7 +44,7 @@ export default function CartSummarySection({
     0
   );
 
-  const deliveryFee = 5;
+  const deliveryFee = 0;
   const taxes = 0;
   const discount = 0;
 

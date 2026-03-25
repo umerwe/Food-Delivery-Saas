@@ -108,7 +108,7 @@ const clearCart = async () => {
   try {
     await del(`/v1/cart?customerId=${customerId}`);
     setCartItems([]);
-    toast.success("Cart cleared");
+    // toast.success("Cart cleared");
   } catch (err) {
     toast.error("Failed to clear cart");
   }
@@ -161,7 +161,7 @@ const handlePlaceOrder = async () => {
     // ✅ 3. checkout
     const res = await post(`/v1/cart/checkout?customerId=${customerId}`, {
       orderTime: new Date().toISOString(),
-      paymentMethod: paymentMethod === "card" ? "STRIPE" : "COD",
+      paymentMethod: paymentMethod === "card" ? "COD" : "COD",
       customerNote: note,
     });
 

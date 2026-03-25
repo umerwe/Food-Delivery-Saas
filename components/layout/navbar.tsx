@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { Search, ShoppingBag, User, ChevronDown, LogOut, HelpCircle, Settings } from "lucide-react"
+import { Search, ShoppingBag, User, ChevronDown, LogOut, HelpCircle, Settings, ShoppingCart } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -132,6 +132,21 @@ router.push("/auth/login");
         </div>
         <ChevronDown className="rotate-[-90deg]" size={16} />
       </Link>
+
+<Link
+        href="/orders-history"
+        onClick={() => setDropdownOpen(false)}
+        className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
+            <ShoppingCart size={16} />
+          </div>
+          <span className="text-sm text-gray-700">My Orders</span>
+        </div>
+        <ChevronDown className="rotate-[-90deg]" size={16} />
+      </Link>
+
 
       <button
         className="flex w-full items-center justify-between px-4 py-3 hover:bg-gray-50 transition"
