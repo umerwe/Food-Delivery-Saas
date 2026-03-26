@@ -211,7 +211,7 @@ export default function CartSummarySection({
   onClick={onPlaceOrder}
   disabled={placingOrder} // ✅ disable while loading
   variant="primary"
-  className="w-full h-[54px] rounded-[10px] text-base font-medium shadow-lg shadow-primary/20 mt-[15px] disabled:opacity-50"
+  className="cursor-pointer w-full h-[54px] rounded-[10px] text-base font-medium shadow-lg shadow-primary/20 mt-[15px] disabled:opacity-50"
 >
   {placingOrder ? "Placing Order..." : "Place Order"} {/* ✅ text change */}
 </Button>

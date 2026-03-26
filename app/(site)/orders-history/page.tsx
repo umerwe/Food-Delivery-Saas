@@ -1,197 +1,351 @@
 "use client";
 
 import Image from "next/image";
-import { Star } from "lucide-react";
-
-const orders = [
-  {
-    id: "#48291",
-    name: "McDonald's® (Paris Hotel De Ville)",
-    price: 45.5,
-    status: "Delivered",
-    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd",
-    items:
-      "Menu Beef BBQ - 1 Vande (x2), Garden Vegetable Salad (x1), Coca Cola Zero (x2)",
-    rating: 4,
-    review: false,
-  },
-  {
-    id: "#48291",
-    name: "La Piazza Ristorante",
-    price: 45.5,
-    status: "Delivered",
-    image: "https://images.unsplash.com/photo-1594007654729-407eedc4be65",
-    items:
-      "Menu Beef BBQ - 1 Vande (x2), Garden Vegetable Salad (x1), Coca Cola Zero (x2)",
-    rating: 0,
-    review: true,
-  },
-  {
-    id: "#48291",
-    name: "Sushi World",
-    price: 45.5,
-    status: "Delivered",
-    image: "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351",
-    items:
-      "Menu Beef BBQ - 1 Vande (x2), Garden Vegetable Salad (x1), Coca Cola Zero (x2)",
-    rating: 4,
-    review: false,
-  },
-  {
-    id: "#48291",
-    name: "Green Garden Salads",
-    price: 45.5,
-    status: "Cancelled",
-    image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
-    items:
-      "Menu Beef BBQ - 1 Vande (x2), Garden Vegetable Salad (x1), Coca Cola Zero (x2)",
-    rating: 0,
-    review: false,
-  },
-];
-
+import { Star, RefreshCw, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import useApi from "@/hooks/useApi";
+import { useAuthContext } from "@/context/AuthContext";
+import Link from "next/link";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import useBranchSelector from "@/hooks/useBranchSelector";
+import BranchPopup from "@/components/popups/BranchPopup";
 export default function Page() {
+  const { token } = useAuthContext();
+  const { get, post } = useApi(token);
+const router = useRouter();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+ const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<any>(null);
+  const [pendingOrder, setPendingOrder] = useState<any>(null);
+const {
+  showBranchPopup,
+  setShowBranchPopup,
+  branches,
+  loadingBranches,
+  fetchBranches,
+  selectBranch,
+} = useBranchSelector(() => handleReorder(pendingOrder));
+  // ================= REORDER FUNCTION =================
+  const handleReorder = async (order: any) => {
+  try {
+    if (!order?.itemsPreview?.length) return;
+
+    setReorderingId(order.id);
+
+    const authRaw = localStorage.getItem("auth");
+    const auth = authRaw ? JSON.parse(authRaw) : null;
+
+    const customerId = auth?.user?.id;
+    let branchId = auth?.user?.branchId;
+
+    if (!customerId) {
+      toast.error("User not found");
+      return;
+    }
+
+    // ❗ If no branch → STOP (same behavior as your other flow)
+    if (!branchId) {
+  setPendingOrder(order);
+  await fetchBranches();
+  return;
+}
+
+    // ✅ Add each item via API
+    for (const item of order.itemsPreview) {
+      await post(`/v1/cart/items?customerId=${customerId}`, {
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        branchId,
+        note: "",
+      });
+    }
+
+    toast.success("Reorder successful!");
+
+    // ✅ redirect to checkout
+    router.push("/checkout");
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Reorder failed");
+  } finally {
+    setReorderingId(null);
+  }
+};
+  // ================= FETCH ORDERS =================
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if(!token){
+        return
+      }
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await get(`/v1/orders?page=${page}&limit=10`);
+
+        if (!res || res.success === false) {
+          setError(res?.message || "Failed to fetch orders");
+          setOrders([]);
+          return;
+        }
+
+        setOrders(res.data || []);
+        setMeta(res.meta);
+      } catch (err) {
+        console.error(err);
+        setError("Something went wrong");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, [page, token]);
+
+  // ================= FORMAT DATE =================
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleString();
+  };
+
+  // ================= STATUS MAP =================
+  const mapStatus = (status: string) => {
+    switch (status) {
+      case "DELIVERED":
+        return "Delivered";
+      case "CANCELLED":
+        return "Cancelled";
+      case "PLACED":
+        return "Processing";
+      case "CONFIRMED":
+      case "PREPARING":
+      case "PICKED_UP":
+        return "Delivered";
+      default:
+        return status;
+    }
+  };
+
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
 
-        {/* TITLE */}
         <h1 className="text-lg sm:text-[22px] font-semibold text-gray-900 mb-5 sm:mb-6">
           Your Order History
         </h1>
 
-        {/* LIST */}
-        <div className="space-y-4 sm:space-y-5">
-          {orders.map((order, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[#F2F2F2]"
-            >
+        {/* ================= LOADING ================= */}
+        {loading && (
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white p-4 rounded-xl animate-pulse">
+                <div className="h-20 bg-gray-200 rounded" />
+              </div>
+            ))}
+          </div>
+        )}
 
-              {/* TOP SECTION */}
-              <div className="flex flex-col sm:flex-row gap-4 p-4">
+        {/* ================= ERROR ================= */}
+        {!loading && error && (
+          <div className="text-center py-10">
+            <p className="text-red-500 font-medium">{error}</p>
+          </div>
+        )}
 
-                {/* IMAGE */}
-                <div className="relative w-full sm:w-[110px] h-[180px] sm:h-[90px] rounded-xl overflow-hidden shrink-0">
-                  <Image
-                    src={order.image}
-                    alt={order.name}
-                    fill
-                    className="object-cover"
-                  />
+        {/* ================= EMPTY ================= */}
+        {!loading && !error && orders.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            No orders found
+          </div>
+        )}
 
-                  <span
-                    className={`absolute top-2 left-2 text-[11px] px-2 py-[3px] rounded-md font-medium ${
-                      order.status === "Delivered"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-200 text-gray-600"
-                    }`}
-                  >
-                    {order.status}
-                  </span>
-                </div>
+        {/* ================= LIST ================= */}
+        {!loading && !error && orders.length > 0 && (
+          <div className="space-y-4 sm:space-y-5">
+            {orders.map((order) => {
+              const firstItem = order.itemsPreview?.[0];
 
-                {/* CONTENT */}
-                <div className="flex-1">
+              return (
+                <div
+                  key={order.id}
+                  className="bg-white rounded-2xl shadow-sm overflow-hidden border border-[#F2F2F2]"
+                >
+                  <div className="flex flex-col sm:flex-row gap-4 p-4">
 
-                  {/* HEADER */}
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                    {/* IMAGE */}
+                    <div className="relative w-full sm:w-[110px] h-[180px] sm:h-[90px] rounded-xl overflow-hidden shrink-0">
+                      <Image
+                        src={firstItem?.imageUrl || "/placeholder.png"}
+                        alt={firstItem?.menuItemName || "order"}
+                        fill
+                        className="object-cover"
+                      />
 
-                    <div className="min-w-0">
-                      <h2 className="text-[14px] sm:text-[15px] font-semibold text-gray-900 leading-tight break-words">
-                        {order.name}
-                      </h2>
+                      <span className="absolute top-2 left-2 text-[11px] px-2 py-[3px] rounded-md font-medium bg-green-100 text-green-700">
+                        {mapStatus(order.status)}
+                      </span>
+                    </div>
 
-                      <p className="text-[11px] text-gray-400 mt-[2px]">
-                        Order {order.id} · Oct 24, 2023 at 8:45 PM
+                    {/* CONTENT */}
+                    <div className="flex-1">
+
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+
+                        <div>
+                          <h2 className="text-[14px] sm:text-[15px] font-semibold text-gray-900">
+                            {order.branch?.name || "Restaurant"}
+                          </h2>
+
+                          <p className="text-[11px] text-gray-400 mt-[2px]">
+                            Order #{order.id.slice(-6)} ·{" "}
+                            {formatDate(order.createdAt)}
+                          </p>
+                        </div>
+
+                        <p className="text-[14px] sm:text-[15px] font-semibold text-gray-900">
+                          Rs {order.totalAmount}
+                        </p>
+                      </div>
+
+                      {/* ITEMS */}
+                      <p className="text-[12px] text-gray-500 mt-2">
+                        <span className="font-medium text-gray-600">
+                          Items:
+                        </span>{" "}
+                        {order.itemsPreview
+                          ?.map(
+                            (item: any) =>
+                              `${item.menuItemName} (x${item.quantity})`
+                          )
+                          .join(", ")}
                       </p>
+
+                      {/* ACTIONS */}
+                      <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mt-3">
+                        <Link
+                          href={`/order?orderId=${order.id}`}
+                          className="w-full sm:w-auto text-[12px] px-3 py-[7px] border border-primary text-primary rounded-md hover:bg-orange-50"
+                        >
+                          View Details
+                        </Link>
+
+  <button
+                          onClick={() => handleReorder(order)}
+                          disabled={reorderingId === order.id}
+                          className="cursor-pointer text-xs px-3 py-1 bg-primary text-white rounded-[8px] flex items-center gap-1 disabled:opacity-60"
+                        >
+                          {reorderingId === order.id ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Reordering...
+                            </>
+                          ) : (
+                            "Reorder"
+                          )}
+                        </button>
+                      </div>
                     </div>
-
-                    {/* PRICE (moves under on mobile) */}
-                    <p className="text-[14px] sm:text-[15px] font-semibold text-gray-900">
-                      ${order.price.toFixed(2)}
-                    </p>
                   </div>
 
-                  {/* ITEMS */}
-                  <p className="text-[12px] text-gray-500 mt-2 leading-relaxed break-words">
-                    <span className="font-medium text-gray-600">Items:</span>{" "}
-                    {order.items}
-                  </p>
+                  {/* BOTTOM */}
+                 <div className="bg-[#f6f6f6] border-t border-[#f2f2f2] px-4 py-3 flex justify-between items-center">
 
-                  {/* ACTIONS */}
-                  <div className="flex flex-col sm:flex-row sm:justify-end gap-2 mt-3">
-                    <button className="w-full sm:w-auto text-[12px] px-3 py-[7px] border border-primary text-primary rounded-md hover:bg-orange-50 transition">
-                      View Details
-                    </button>
+  {order.status === "PLACED" ? (
+    order.review ? (
+      <>
+        {/* ✅ Already reviewed */}
+        <span className="text-[12px] text-gray-400">
+          You rated this order
+        </span>
 
-                    <button
-                      disabled={order.status === "Cancelled"}
-                      className={`w-full sm:w-auto text-[12px] px-3 py-[7px] rounded-md text-white transition ${
-                        order.status === "Cancelled"
-                          ? "bg-primary cursor-not-allowed"
-                          : "bg-primary hover:bg-orange-600"
-                      }`}
-                    >
-                      Reorder
-                    </button>
-                  </div>
+        <div className="flex gap-[2px]">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Star
+              key={star}
+              size={14}
+              className={
+                star <= order.review.rating
+                  ? "text-[#EC5834] fill-[#EC5834]"
+                  : "text-gray-300"
+              }
+            />
+          ))}
+        </div>
+      </>
+    ) : (
+      <>
+        {/* ❌ No review */}
+        <span className="text-[12px] text-gray-400">
+          How was your food?
+        </span>
+
+        <button
+          onClick={() =>
+            router.push(`/order/write-review?orderId=${order.id}`)
+          }
+          className="text-xs text-primary font-medium cursor-pointer"
+        >
+          Write Review
+        </button>
+      </>
+    )
+  ) : (
+    <span className="text-[12px] text-gray-400">
+      Order is being processed
+    </span>
+  )}
+</div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        )}
 
-              {/* BOTTOM BAR */}
-              <div className="bg-[#f6f6f6] border-t border-[#F2F2F2] flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 px-4 py-3">
+        {/* ================= PAGINATION ================= */}
+        {!loading && meta && meta.totalPages > 1 && (
+          <div className="flex justify-center mt-6 gap-2 flex-wrap">
 
-                {order.review ? (
-                  <span className="text-[12px] text-primary cursor-pointer hover:underline">
-                    Write a review
-                  </span>
-                ) : order.status === "Delivered" ? (
-                  <>
-                    <span className="text-[12px] text-gray-400">
-                      How was your food?
-                    </span>
-
-                    <div className="flex gap-[2px]">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          size={14}
-                          className={
-                            star <= order.rating
-                              ? "fill-orange-400 text-orange-400"
-                              : "text-gray-300"
-                          }
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-[12px] text-gray-400">
-                    Order was cancelled
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* PAGINATION */}
-        <div className="flex flex-wrap justify-center mt-6 sm:mt-8 gap-2">
-          {["<", "1", "2", "3", "4", "5", "...", "9", ">"].map((p, i) => (
             <button
-              key={i}
-              className={`w-8 h-8 text-sm rounded-md border flex items-center justify-center ${
-                p === "1"
-                  ? "bg-primary text-white border-primary"
-                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-              }`}
+              disabled={!meta.hasPrevious}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1 border rounded disabled:opacity-50"
             >
-              {p}
+              {"<"}
             </button>
-          ))}
-        </div>
+
+            {[...Array(meta.totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i + 1)}
+                className={`px-3 py-1 border rounded ${
+                  page === i + 1 ? "bg-primary text-white" : ""
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+
+            <button
+              disabled={!meta.hasNext}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1 border rounded disabled:opacity-50"
+            >
+              {">"}
+            </button>
+          </div>
+        )}
       </div>
+      <BranchPopup
+  show={showBranchPopup}
+  onClose={() => setShowBranchPopup(false)}
+  branches={branches}
+  loading={loadingBranches}
+  onSelect={selectBranch}
+/>
     </div>
   );
 }

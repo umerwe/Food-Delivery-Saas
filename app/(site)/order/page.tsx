@@ -75,16 +75,16 @@ export default function OrderStatusPage() {
   }));
 
   return (
-    <div className="max-w-[1400px] mx-auto mt-[36px] mb-[113px] px-6">
+    <div className="max-w-[1400px] mx-auto mt-[36px] mb-[113px] px-6 md:px-30 pt-5">
 
       {/* BACK */}
-      <Link
+      {/* <Link
         href="/"
         className="flex items-center gap-2 mb-[45px] hover:opacity-70 transition-opacity"
       >
         <ArrowLeft size={37} />
         <span className="text-xl font-semibold">Back</span>
-      </Link>
+      </Link> */}
 
       {/* ================= NOT FOUND ================= */}
       {!loading && notFound && (
@@ -167,7 +167,7 @@ export default function OrderStatusPage() {
 
                       <div className="pt-1">
                         <h3
-                          className={`text-[22px] font-medium mb-[4px] ${
+                          className={`text-[18px] font-medium mb-[4px] ${
                             step.active
                               ? "text-gray-900"
                               : "text-gray-400"
