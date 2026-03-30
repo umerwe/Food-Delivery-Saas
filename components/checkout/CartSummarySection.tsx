@@ -27,6 +27,11 @@ interface Props {
   clearCart: () => void;
   onPlaceOrder: () => void;
   placingOrder?: boolean;
+   couponCode?: string;
+  setCouponCode?: (val: string) => void;
+  onApplyCoupon?: () => void;
+  couponDiscount?: number;
+  validatingCoupon?: boolean;
 }
 
 export default function CartSummarySection({
@@ -36,7 +41,12 @@ export default function CartSummarySection({
   deleteItem,
   clearCart,
   onPlaceOrder,
-  placingOrder
+  placingOrder,
+   couponCode,
+  setCouponCode,
+  onApplyCoupon,
+  couponDiscount = 0,
+  validatingCoupon
 }: Props) {
   /* ================= CALCULATIONS ================= */
   const itemTotal = cartItems?.reduce(
@@ -46,7 +56,7 @@ export default function CartSummarySection({
 
   const deliveryFee = 0;
   const taxes = 0;
-  const discount = 0;
+  const discount = couponDiscount;
 
   const totalBeforeDiscount = itemTotal + deliveryFee + taxes;
   const finalTotal = totalBeforeDiscount - discount;
@@ -177,14 +187,32 @@ export default function CartSummarySection({
             <span>Rs {taxes?.toFixed(2)}</span>
           </div>
         </div>
+{/* ================= COUPON ================= */}
+<div className="flex gap-2 mt-4">
+  <input
+    type="text"
+    value={couponCode}
+    onChange={(e) => setCouponCode?.(e.target.value)}
+    placeholder="Enter coupon code"
+    className="flex-1 border rounded-md px-3 py-2 text-sm"
+  />
 
-        {/* 🚧 COMMENT THIS LATER IF NEEDED */}
-        {/* 
-        <div className="bg-primary/20 text-primary text-base p-4 rounded-md flex items-center gap-3 font-medium">
-          <TicketPercent width={19} height={19} />
-          Coupon Applied
-        </div>
-        */}
+  <Button
+    type="button"
+    onClick={onApplyCoupon}
+    disabled={validatingCoupon}
+    className="h-[42px] text-white"
+  >
+    {validatingCoupon ? "Applying..." : "Apply"}
+  </Button>
+</div>
+
+      {discount > 0 && (
+  <div className="bg-green-100 text-green-700 text-sm p-3 rounded-md flex items-center gap-2 font-medium">
+    <TicketPercent width={16} height={16} />
+    Coupon Applied
+  </div>
+)}
 
         <div className="space-y-[15px]">
           <div className="flex justify-between items-center text-sm text-gray-500 pt-[15px]">
@@ -192,14 +220,12 @@ export default function CartSummarySection({
             <span>Rs {totalBeforeDiscount?.toFixed(2)}</span>
           </div>
 
-          {/* 🚧 DISCOUNT (COMMENT IF NOT NEEDED) */}
-          {/* 
-          <div className="flex justify-between items-center text-sm text-gray-500 pb-[15px]">
-            <span>Discount</span>
-            <span>Rs {discount.toFixed(2)}</span>
-          </div>
-          */}
-
+       {discount > 0 && (
+  <div className="flex justify-between items-center text-sm text-green-600 pb-[15px]">
+    <span>Discount</span>
+    <span>- Rs {discount.toFixed(2)}</span>
+  </div>
+)}
           <div className="flex justify-between items-center text-[24px] font-medium text-gray-900">
             <span>Total</span>
             <span>Rs {finalTotal?.toFixed(2)}</span>

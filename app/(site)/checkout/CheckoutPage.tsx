@@ -14,7 +14,9 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
   const activeTab = type === "pickup" ? "pickup" : "delivery";
-
+const [couponCode, setCouponCode] = useState("");
+const [couponDiscount, setCouponDiscount] = useState(0);
+const [validatingCoupon, setValidatingCoupon] = useState(false);
 const { user, token } = useAuthContext();
 const { get, patch, del, post } = useApi(token);
 const [cartItems, setCartItems] = useState<any[]>([]);
@@ -260,7 +262,49 @@ const res = await post(`/v1/cart/checkout?customerId=${customerId}`, {
     setPlacingOrder(false);
   }
 };
-  
+  const subtotal = cartItems.reduce(
+  (acc, item) => acc + item.price * item.quantity,
+  0
+);
+
+const menuItemIds = cartItems.map((i) => i.menuItemId);
+
+const validateCoupon = async () => {
+  if (!couponCode) {
+    return toast.error("Enter coupon code");
+  }
+
+  try {
+    setValidatingCoupon(true);
+
+    const res = await post(`/v1/coupons/validate`, {
+      code: couponCode,
+      branchId: user?.branchId || user?.restaurantId, // adjust based on your model
+      subtotal,
+      menuItemIds,
+      categoryIds: [], // optional for now
+      customerId,
+    });
+
+    if (!res || res.error) {
+      setCouponDiscount(0);
+      return toast.error(res?.error || "Invalid coupon");
+    }
+
+    // ⚠️ adjust based on API response structure
+    const discount = res?.data?.discountAmount || 0;
+
+    setCouponDiscount(discount);
+
+    toast.success("Coupon applied");
+  } catch (err) {
+    console.error(err);
+    toast.error("Coupon validation failed");
+  } finally {
+    setValidatingCoupon(false);
+  }
+};
+
   return (
     <div className="max-w-[1400px] mx-auto mt-[63px] mb-[113px] px-4 md:px-30">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
@@ -303,6 +347,13 @@ const res = await post(`/v1/cart/checkout?customerId=${customerId}`, {
   clearCart={clearCart}
   onPlaceOrder={handlePlaceOrder}
    placingOrder={placingOrder}
+
+     couponCode={couponCode}
+  setCouponCode={setCouponCode}
+  onApplyCoupon={validateCoupon}
+  couponDiscount={couponDiscount}
+  validatingCoupon={validatingCoupon}
+
 />
         </div>
 
