@@ -3,19 +3,16 @@
 import Image from "next/image";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useApi from "@/hooks/useApi";
 import { useAuthContext } from "@/context/AuthContext";
-import useBranchSelector from "@/hooks/useBranchSelector";
-import BranchPopup from "@/components/popups/BranchPopup";
 
 export default function RestaurantCard({
   id,
   name,
   slug,
   image,
-  time,
+  
   price,
 }: any) {
   const router = useRouter();
@@ -23,48 +20,6 @@ export default function RestaurantCard({
   const { post } = useApi(token);
 
   const [loading, setLoading] = useState(false);
-
-const handleAddToCart = async () => {
-  try {
-    setLoading(true);
-
-    const auth = JSON.parse(localStorage.getItem("auth") || "{}");
-    const customerId = auth?.user?.id;
-    const branchId = auth?.user?.branchId;
-
-    // ✅ If no branch OR force selection flag
-    if (!branchId || showBranchPopup === false) {
-      await fetchBranches();
-      setShowBranchPopup(true);
-      return;
-    }
-
-    const res = await post(`/v1/cart/items?customerId=${customerId}`, {
-      menuItemId: id,
-      quantity: 1,
-      branchId,
-    });
-
-    if (!res || res.error) {
-      toast.error("Failed to add");
-      return;
-    }
-
-    toast.success("Added to cart");
-    router.push("/checkout");
-
-  } finally {
-    setLoading(false);
-  }
-};
-  const {
-    showBranchPopup,
-    setShowBranchPopup,
-    branches,
-    loadingBranches,
-    fetchBranches,
-    selectBranch,
-  } = useBranchSelector(handleAddToCart);
 
   const handleNavigateToDetails = () => {
   router.push(`/items/details?itemId=${id}&slug=${slug}`);
@@ -98,8 +53,7 @@ const handleAddToCart = async () => {
     src={image || "/placeholder.png"}
     alt={name}
     fill
-    className="object-contain p-2"
-     onClick={handleAddToCart}
+    className="object-cover p-2 rounded-2xl object-top"
   />
 
   {/* PLUS BUTTON */}
@@ -112,13 +66,7 @@ const handleAddToCart = async () => {
 </button>
 </div>
 
-      <BranchPopup
-        show={showBranchPopup}
-        onClose={() => setShowBranchPopup(false)}
-        branches={branches}
-        loading={loadingBranches}
-        onSelect={selectBranch}
-      />
+    
     </div>
   );
 }

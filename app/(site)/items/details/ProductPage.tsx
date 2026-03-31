@@ -178,24 +178,41 @@ export default function ProductPage() {
                 </div>
               ))}
             </div>
+{/* DIETARY */}
+<div className="mt-4">
+  <h4 className="font-medium text-sm mb-2 text-gray-700">
+    Dietary Preferences
+  </h4>
 
-            {/* DIETARY */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              {item.dietaryFlags?.map((f: string) => (
-                <span key={f} className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
-                  {f}
-                </span>
-              ))}
-            </div>
+  <div className="flex flex-wrap gap-2">
+    {item.dietaryFlags?.map((f: string) => (
+      <span
+        key={f}
+        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full"
+      >
+        {f}
+      </span>
+    ))}
+  </div>
+</div>
 
-            {/* ALLERGENS */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {item.allergenFlags?.map((f: string) => (
-                <span key={f} className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full">
-                  {f}
-                </span>
-              ))}
-            </div>
+{/* ALLERGENS */}
+<div className="mt-4">
+  <h4 className="font-medium text-sm mb-2 text-gray-700">
+    Allergen Information
+  </h4>
+
+  <div className="flex flex-wrap gap-2">
+    {item.allergenFlags?.map((f: string) => (
+      <span
+        key={f}
+        className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full"
+      >
+        {f}
+      </span>
+    ))}
+  </div>
+</div>
           </div>
         </div>
 
