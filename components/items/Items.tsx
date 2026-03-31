@@ -57,6 +57,7 @@ export default function ItemsListing({ categoryId, categories }: any) {
               key={item.id}
               id={item.id}
               name={item.name}
+              slug={item.slug}
               image={item.imageUrl}
               time={`${item.prepTimeMinutes} min`}
               price={item.basePrice}

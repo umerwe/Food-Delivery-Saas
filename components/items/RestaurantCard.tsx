@@ -13,6 +13,7 @@ import BranchPopup from "@/components/popups/BranchPopup";
 export default function RestaurantCard({
   id,
   name,
+  slug,
   image,
   time,
   price,
@@ -23,37 +24,39 @@ export default function RestaurantCard({
 
   const [loading, setLoading] = useState(false);
 
-  const handleAddToCart = async () => {
-    try {
-      setLoading(true);
+const handleAddToCart = async () => {
+  try {
+    setLoading(true);
 
-      const auth = JSON.parse(localStorage.getItem("auth") || "{}");
-      const customerId = auth?.user?.id;
-      const branchId = auth?.user?.branchId;
+    const auth = JSON.parse(localStorage.getItem("auth") || "{}");
+    const customerId = auth?.user?.id;
+    const branchId = auth?.user?.branchId;
 
-      if (!branchId) {
-        await fetchBranches();
-        return;
-      }
-
-      const res = await post(`/v1/cart/items?customerId=${customerId}`, {
-        menuItemId: id,
-        quantity: 1,
-        branchId,
-      });
-
-      if (!res || res.error) {
-        toast.error("Failed to add");
-        return;
-      }
-
-      toast.success("Added to cart");
-      router.push("/checkout");
-    } finally {
-      setLoading(false);
+    // ✅ If no branch OR force selection flag
+    if (!branchId || showBranchPopup === false) {
+      await fetchBranches();
+      setShowBranchPopup(true);
+      return;
     }
-  };
 
+    const res = await post(`/v1/cart/items?customerId=${customerId}`, {
+      menuItemId: id,
+      quantity: 1,
+      branchId,
+    });
+
+    if (!res || res.error) {
+      toast.error("Failed to add");
+      return;
+    }
+
+    toast.success("Added to cart");
+    router.push("/checkout");
+
+  } finally {
+    setLoading(false);
+  }
+};
   const {
     showBranchPopup,
     setShowBranchPopup,
@@ -62,6 +65,10 @@ export default function RestaurantCard({
     fetchBranches,
     selectBranch,
   } = useBranchSelector(handleAddToCart);
+
+  const handleNavigateToDetails = () => {
+  router.push(`/items/details?itemId=${id}&slug=${slug}`);
+};
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-5 flex justify-between items-center shadow-sm hover:shadow-md transition-all">
@@ -92,16 +99,17 @@ export default function RestaurantCard({
     alt={name}
     fill
     className="object-contain p-2"
+     onClick={handleAddToCart}
   />
 
   {/* PLUS BUTTON */}
-  <button
-    onClick={handleAddToCart}
-    disabled={loading}
-    className="absolute bottom-2 right-2 bg-[#EC5834] hover:bg-[#d94e2d] text-white p-2.5 rounded-full shadow-md transition"
-  >
-    <Plus size={16} />
-  </button>
+ <button
+  onClick={handleNavigateToDetails}
+  disabled={loading}
+  className="cursor-pointer absolute bottom-2 right-2 bg-[#EC5834] hover:bg-[#d94e2d] text-white p-2.5 rounded-full shadow-md transition"
+>
+  <Plus size={16} />
+</button>
 </div>
 
       <BranchPopup

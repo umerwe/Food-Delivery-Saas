@@ -6,7 +6,7 @@ import useApi from "@/hooks/useApi";
 import { useAuthContext } from "@/context/AuthContext";
 
 export default function useBranchSelector(onSelect?: () => void) {
-  const { token } = useAuthContext();
+  const { token, user, setUser } = useAuthContext();
   const { get } = useApi(token);
 
   const [showBranchPopup, setShowBranchPopup] = useState(false);
@@ -34,6 +34,7 @@ export default function useBranchSelector(onSelect?: () => void) {
 
   const selectBranch = async (branch: any) => {
     try {
+      // ---------------- UPDATE LOCAL STORAGE ----------------
       const authRaw = localStorage.getItem("auth");
       const auth = authRaw ? JSON.parse(authRaw) : null;
 
@@ -42,10 +43,20 @@ export default function useBranchSelector(onSelect?: () => void) {
         localStorage.setItem("auth", JSON.stringify(auth));
       }
 
+      // ---------------- UPDATE CONTEXT (IMPORTANT FIX) ----------------
+      setUser((prev: any) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          branchId: branch.id,
+        };
+      });
+
       toast.success("Branch selected");
       setShowBranchPopup(false);
 
-      // 🔥 resume flow
+      // 🔥 resume flow (retry API call etc.)
       if (onSelect) onSelect();
 
     } catch (err) {

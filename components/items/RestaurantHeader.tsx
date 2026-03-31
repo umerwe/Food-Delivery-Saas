@@ -3,14 +3,14 @@
 import Image from "next/image";
 import { Star, MapPin, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function RestaurantHeader() {
   const searchParams = useSearchParams();
   const categoryId = searchParams.get("categoryId");
-
+const router = useRouter();
   const { token } = useAuth();
   const { get } = useApi(token);
 
@@ -80,7 +80,7 @@ export default function RestaurantHeader() {
         </div>
 
         {/* BUTTON */}
-        <button className="bg-[#EC5834] hover:bg-[#d94e2d] transition text-white px-12 py-2.5 rounded-[10px] mb-5 text-sm font-medium">
+        <button onClick={()=>router.push("/reservetable")} className="cursor-pointer bg-[#EC5834] hover:bg-[#d94e2d] transition text-white px-12 py-2.5 rounded-[10px] mb-5 text-sm font-medium">
           Reserve Table
         </button>
 
