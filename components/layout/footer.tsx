@@ -5,10 +5,10 @@ import Link from "next/link";
 
 const Footer = ({ isHome = false }: { isHome?: boolean }) => {
   const quickLinks = [
-    { label: "Menu", href: "/menu" },
-    { label: "Gallery", href: "/gallery" },
+    // { label: "Menu", href: "/menu" },
+    { label: "Categories", href: "/#categories" },
     { label: "Contact", href: "/contact" },
-    { label: "Order Now", href: "/order" },
+    { label: "Order Now", href: "/categories" },
   ];
 
   const companyLinks = [

@@ -3,7 +3,7 @@ import { Search, ShoppingBag, Bike, MapPin } from 'lucide-react';
 
 const HeroSection = () => {
     return (
-        <main className="relative h-[600px] w-full flex items-center justify-center">
+        <main className="relative h-[630px] w-full flex items-center justify-center">
             <div className="absolute inset-0 z-0">
                 <Image
                     src="/hero.png"

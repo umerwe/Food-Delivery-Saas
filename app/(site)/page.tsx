@@ -11,7 +11,9 @@ const HomePage = () => {
   return (
     <div>
       <HeroSection />
-      <FoodCategorySection />
+      <section id="categories">
+        <FoodCategorySection />
+      </section>
       <WhyChooseUs />
       <AppPromo />
       <Stats />

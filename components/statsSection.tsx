@@ -9,16 +9,30 @@ const stats = [
 
 export default function Stats() {
   return (
-    <section className={`max-w-6xl mx-auto py-16 px-4 ${montserrat.className}`}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center text-primary">
+    <section className={`max-w-6xl mx-auto py-12 md:py-16 px-4 ${montserrat.className}`}>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center text-primary">
         {stats.map((stat, idx) => (
-          <div key={idx} className="flex flex-col gap-[12px]">
-            <span className="text-[56px] font-bold leading-[66%] h-[66px]">
+          <div key={idx} className="flex flex-col items-center gap-2 md:gap-3">
+            
+            {/* VALUE */}
+            <span className="
+              text-3xl sm:text-4xl md:text-[56px] 
+              font-bold 
+              leading-tight md:leading-[66%]
+              h-auto md:h-[66px]
+            ">
               {stat.value}
             </span>
-            <span className="font-semibold text-lg leading-[30%]">
+
+            {/* LABEL */}
+            <span className="
+              text-sm sm:text-base md:text-lg 
+              font-semibold 
+              leading-normal md:leading-[30%]
+            ">
               {stat.label}
             </span>
+
           </div>
         ))}
       </div>

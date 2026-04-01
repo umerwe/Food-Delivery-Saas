@@ -21,27 +21,68 @@ const features = [
   },
 ];
 
-const FeatureCard = ({ title, desc, img }: { title: string; desc: string; img: string }) => (
+const FeatureCard = ({
+  title,
+  desc,
+  img,
+}: {
+  title: string;
+  desc: string;
+  img: string;
+}) => (
   <div className="flex flex-col items-center text-center text-gray-800 p-4">
-    <div className="relative w-48 h-48 mb-4">
-      <Image src={img} alt={title} fill className="object-contain" />
+    
+    {/* IMAGE */}
+    <div className="relative w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 mb-4">
+      <Image src={img} alt={title} fill className="object-contain object-top" />
     </div>
-    <h3 className="text-[28px] font-bold leading-[30px] mb-2">
+
+    {/* TITLE */}
+    <h3 className="
+      text-xl sm:text-2xl md:text-[28px] 
+      font-bold 
+      leading-tight md:leading-[30px] 
+      mb-2
+    ">
       {title}
     </h3>
-    <p className="max-w-[314px] text-lg leading-relaxed">{desc}</p>
+
+    {/* DESCRIPTION */}
+    <p className="
+      text-sm sm:text-base md:text-lg 
+      leading-relaxed 
+      max-w-full md:max-w-[314px]
+    ">
+      {desc}
+    </p>
   </div>
 );
 
 export default function WhyChooseUs() {
   return (
-    <section className="py-[80px] px-4 max-w-[1400px] mx-auto">
-      <h2 className="text-[42px] font-semibold text-center leading-[30px] mb-[60px]">Why Choose Us</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-[135px]">
+    <section className="py-12 md:py-[80px] px-4 max-w-[1400px] mx-auto">
+      
+      {/* HEADING */}
+      <h2 className="
+        text-2xl sm:text-3xl md:text-[42px] 
+        font-semibold 
+        text-center 
+        leading-tight md:leading-[30px] 
+        mb-10 md:mb-[60px]
+      ">
+        Why Choose Us
+      </h2>
+
+      {/* GRID */}
+      <div className="
+        grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 
+        gap-10 sm:gap-12 md:gap-[135px]
+      ">
         {features.map((f) => (
           <FeatureCard key={f.id} {...f} />
         ))}
       </div>
+
     </section>
   );
 }
