@@ -14,7 +14,9 @@ export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
   const activeTab = type === "pickup" ? "pickup" : "delivery";
-
+const [couponCode, setCouponCode] = useState("");
+const [couponDiscount, setCouponDiscount] = useState(0);
+const [validatingCoupon, setValidatingCoupon] = useState(false);
 const { user, token } = useAuthContext();
 const { get, patch, del, post } = useApi(token);
 const [cartItems, setCartItems] = useState<any[]>([]);
@@ -61,12 +63,21 @@ useEffect(() => {
     phone: "",
     email: "",
   });
-
   const [paymentMethod, setPaymentMethod] = useState("card");
 const [placingOrder, setPlacingOrder] = useState(false);
   const [pickupDate, setPickupDate] = useState<number | null>(null);
   const [pickupTime, setPickupTime] = useState<string | null>(null);
+// ✅ PREFILL CUSTOMER FROM AUTH USER
+useEffect(() => {
+  if (!user) return;
 
+  setCustomer((prev) => ({
+    ...prev,
+    name: `${user.profile?.firstName || ""} ${user.profile?.lastName || ""}`.trim(),
+    phone: user.profile?.phone || "",
+    email: user.email || "",
+  }));
+}, [user]);
   // ✅ CART UPDATE
   const updateQuantity = async (id: string, type: "inc" | "dec") => {
   const item = cartItems.find((i) => i.id === id);
@@ -108,35 +119,88 @@ const clearCart = async () => {
   try {
     await del(`/v1/cart?customerId=${customerId}`);
     setCartItems([]);
-    toast.success("Cart cleared");
+    // toast.success("Cart cleared");
   } catch (err) {
     toast.error("Failed to clear cart");
   }
 };
 
-// ✅ SET ORDER TYPE
 const setOrderType = async () => {
   try {
-    await patch(`/v1/cart/order-type?customerId=${customerId}`, {
-      orderType: activeTab === "pickup" ? "PICKUP" : "DELIVERY",
+    const res = await patch(`/v1/cart/order-type?customerId=${customerId}`, {
+      orderType: activeTab === "pickup" ? "TAKEAWAY" : "DELIVERY",
     });
+
+    if (!res || res.error) {
+      toast.error(res?.error || "Failed to set order type");
+      return false;
+    }
+
+    return true;
   } catch (err) {
     console.error(err);
-    throw new Error("Failed to set order type");
+    toast.error("Failed to set order type");
+    return false;
   }
 };
 
-// ✅ SET ADDRESS (only for delivery)
 const setCartAddress = async () => {
-  if (activeTab !== "delivery") return;
+  if (activeTab !== "delivery") return true; // ✅ no-op but success
 
   try {
-    await patch(`/v1/cart/address?customerId=${customerId}`, {
+    const res = await patch(`/v1/cart/address?customerId=${customerId}`, {
       deliveryAddressId: selectedAddress,
     });
+
+    if (!res || res.error) {
+      toast.error(res?.error || "Failed to set address");
+      return false;
+    }
+
+    return true;
   } catch (err) {
     console.error(err);
-    throw new Error("Failed to set address");
+    toast.error("Failed to set address");
+    return false;
+  }
+};
+
+// ✅ BUILD ORDER TIME (handles pickup + delivery)
+const getOrderTime = () => {
+  if (activeTab === "delivery") {
+    return new Date().toISOString();
+  }
+
+  if (!pickupDate || !pickupTime) return null;
+
+  try {
+    const date = new Date(pickupDate);
+
+    // ✅ HANDLE ASAP
+    if (pickupTime === "ASAP") {
+      return new Date().toISOString();
+    }
+
+    // ✅ Parse "7:00 AM" / "1:00 PM"
+    const [time, modifier] = pickupTime.split(" ");
+    let [hours, minutes] = time.split(":").map(Number);
+
+    if (modifier === "PM" && hours !== 12) {
+      hours += 12;
+    }
+    if (modifier === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    date.setHours(hours);
+    date.setMinutes(minutes);
+    date.setSeconds(0);
+    date.setMilliseconds(0);
+
+    return date.toISOString();
+  } catch (err) {
+    console.error("Invalid pickup date/time", err);
+    return null;
   }
 };
 
@@ -151,6 +215,10 @@ const handlePlaceOrder = async () => {
     if (activeTab === "delivery" && !selectedAddress) {
       return toast.error("Please select address");
     }
+    // ✅ pickup validation
+if (activeTab === "pickup" && (!pickupDate || !pickupTime)) {
+  return toast.error("Please select pickup date and time");
+}
 
     // ✅ 1. set order type
     await setOrderType();
@@ -159,11 +227,18 @@ const handlePlaceOrder = async () => {
     await setCartAddress();
 
     // ✅ 3. checkout
-    const res = await post(`/v1/cart/checkout?customerId=${customerId}`, {
-      orderTime: new Date().toISOString(),
-      paymentMethod: paymentMethod === "card" ? "STRIPE" : "COD",
-      customerNote: note,
-    });
+  const orderTime = getOrderTime();
+
+if (!orderTime) {
+  return toast.error("Invalid order time");
+}
+
+// ✅ 3. checkout
+const res = await post(`/v1/cart/checkout?customerId=${customerId}`, {
+  orderTime,
+  paymentMethod: paymentMethod === "card" ? "COD" : "COD",
+  customerNote: note,
+});
 
     if (!res || res.error) {
       toast.error(res?.error || "Checkout failed");
@@ -187,9 +262,51 @@ const handlePlaceOrder = async () => {
     setPlacingOrder(false);
   }
 };
-  
+  const subtotal = cartItems.reduce(
+  (acc, item) => acc + item.price * item.quantity,
+  0
+);
+
+const menuItemIds = cartItems.map((i) => i.menuItemId);
+
+const validateCoupon = async () => {
+  if (!couponCode) {
+    return toast.error("Enter coupon code");
+  }
+
+  try {
+    setValidatingCoupon(true);
+
+    const res = await post(`/v1/coupons/validate`, {
+      code: couponCode,
+      branchId: user?.branchId || user?.restaurantId, // adjust based on your model
+      subtotal,
+      menuItemIds,
+      categoryIds: [], // optional for now
+      customerId,
+    });
+
+    if (!res || res.error) {
+      setCouponDiscount(0);
+      return toast.error(res?.error || "Invalid coupon");
+    }
+
+    // ⚠️ adjust based on API response structure
+    const discount = res?.data?.discountAmount || 0;
+
+    setCouponDiscount(discount);
+
+    toast.success("Coupon applied");
+  } catch (err) {
+    console.error(err);
+    toast.error("Coupon validation failed");
+  } finally {
+    setValidatingCoupon(false);
+  }
+};
+
   return (
-    <div className="max-w-[1400px] mx-auto mt-[63px] mb-[113px] px-4">
+    <div className="max-w-[1400px] mx-auto mt-[63px] mb-[113px] px-4 md:px-30">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
 
         <div className="lg:col-span-7 space-y-[38px]">
@@ -230,6 +347,13 @@ const handlePlaceOrder = async () => {
   clearCart={clearCart}
   onPlaceOrder={handlePlaceOrder}
    placingOrder={placingOrder}
+
+     couponCode={couponCode}
+  setCouponCode={setCouponCode}
+  onApplyCoupon={validateCoupon}
+  couponDiscount={couponDiscount}
+  validatingCoupon={validatingCoupon}
+
 />
         </div>
 

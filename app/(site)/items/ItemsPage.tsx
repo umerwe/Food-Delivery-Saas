@@ -1,8 +1,7 @@
 "use client";
 
-import CategoryTabs from "@/components/items/CategoryTabs";
-import ItemsListing from "@/components/items/Items";
-import PizzaBanner from "@/components/items/PizzaBanner";
+import RestaurantHeader from "@/components/items/RestaurantHeader";
+import ItemsLayout from "@/components/items/ItemsLayout";
 import { useSearchParams } from "next/navigation";
 
 export default function ItemsPage() {
@@ -10,10 +9,9 @@ export default function ItemsPage() {
   const categoryId = searchParams.get("categoryId") || "";
 
   return (
-    <div>
-      <PizzaBanner />
-      <CategoryTabs activeCategoryId={categoryId} />
-      <ItemsListing categoryId={categoryId} />
+    <div className="min-h-screen md:px-35">
+      <RestaurantHeader />
+      <ItemsLayout categoryId={categoryId} />
     </div>
   );
 }

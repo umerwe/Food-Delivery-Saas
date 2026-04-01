@@ -8,8 +8,8 @@ interface User {
   email: string;
   role: string;
   tenantId: string;
-  restaurantId: string;
-  branchId: string;
+  restaurantId?: string | null;
+  branchId?: string | null;
   profile?: {
     firstName: string;
     lastName: string;
@@ -25,6 +25,7 @@ interface AuthContextType {
   login: (data: any) => void;
   logout: () => void;
   loading: boolean;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -91,45 +92,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // ---------------- INIT AUTH ----------------
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const stored = getStoredAuth();
+useEffect(() => {
+  const initAuth = async () => {
+    try {
+      const stored = getStoredAuth();
 
-        if (!stored?.accessToken) {
+      if (!stored?.accessToken) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const me = await fetchMe(stored.accessToken);
+
+        const mergedUser = {
+          ...me,
+          restaurantId: stored?.user?.restaurantId ?? null,
+          branchId: stored?.user?.branchId ?? null,
+        };
+
+        setUser(mergedUser);
+        setToken(stored.accessToken);
+      } catch {
+        const newAccessToken = await refreshToken();
+
+        if (!newAccessToken) {
+          clearAuthStorage();
+          setUser(null);
+          setToken(null);
           setLoading(false);
           return;
         }
 
-        try {
-          const me = await fetchMe(stored.accessToken);
-          setUser(me);
-          setToken(stored.accessToken);
-        } catch {
-          const newAccessToken = await refreshToken();
+        const me = await fetchMe(newAccessToken);
 
-          if (!newAccessToken) {
-            clearAuthStorage();
-            setUser(null);
-            setToken(null);
-            setLoading(false);
-            return;
-          }
+        const stored = getStoredAuth();
 
-          const me = await fetchMe(newAccessToken);
-          setUser(me);
-          setToken(newAccessToken);
-        }
-      } catch (err) {
-        console.error("Auth init failed", err);
-      } finally {
-        setLoading(false);
+        const mergedUser = {
+          ...me,
+          restaurantId: stored?.user?.restaurantId ?? null,
+          branchId: stored?.user?.branchId ?? null,
+        };
+
+        setUser(mergedUser);
+        setToken(newAccessToken);
       }
-    };
+    } catch (err) {
+      console.error("Auth init failed", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    initAuth();
-  }, []);
-
+  initAuth();
+}, []);
+  
   // ---------------- ACTIONS ----------------
   const login = (data: any) => {
     saveAuth(data);
@@ -144,7 +161,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+   <AuthContext.Provider value={{ user, token, login, logout, loading, setUser }}>
       {children}
     </AuthContext.Provider>
   );

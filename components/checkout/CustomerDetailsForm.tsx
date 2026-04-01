@@ -23,50 +23,40 @@ const CustomerDetailsForm = ({ customer, setCustomer }: Props) => {
       <div className="space-y-[36px]">
 
         {/* Name */}
-        <div className="space-y-[16px]">
-          <label className="text-lg font-medium text-gray-900">
-            Name
-          </label>
-          <Input
-            value={customer.name} // ✅ controlled
-            onChange={(e) =>
-              setCustomer({ ...customer, name: e.target.value })
-            }
-            placeholder="Jhon Smith"
-            className="h-[55px] rounded-sm text-gray-900 placeholder:text-gray-900 bg-white focus-visible:bg-white border-3 border-gray-300 mt-[16px]"
-          />
-        </div>
+       <div className="space-y-[16px]">
+  <label className="text-md font-medium text-gray-900">
+    Name
+  </label>
+
+  <div className="h-[55px] flex items-center px-4 bg-gray-50 border border-gray-200 rounded-md text-gray-900 mt-3">
+    {customer.name || "—"}
+  </div>
+</div>
 
         {/* Contact */}
-        <div className="space-y-[16px]">
-          <label className="text-lg font-medium text-gray-900">
-            Contact
-          </label>
-          <Input
-            value={customer.phone} // ✅ controlled
-            onChange={(e) =>
-              setCustomer({ ...customer, phone: e.target.value })
-            }
-            placeholder="+92 3364 236672"
-            className="h-[55px] rounded-sm text-gray-900 placeholder:text-gray-900 bg-white focus-visible:bg-white border-3 border-gray-300 mt-[16px]"
-          />
-        </div>
+     <div className="space-y-[16px]">
+  <label className="text-md font-medium text-gray-900">
+    Contact
+  </label>
 
+  <div className="h-[55px] flex items-center px-4 bg-gray-50 border border-gray-200 rounded-md text-gray-900 mt-3">
+    {customer.phone || "—"}
+  </div>
+</div>
         {/* Email */}
-        <div className="space-y-[16px]">
-          <label className="text-lg font-medium text-gray-900">
-            Email
-          </label>
-          <Input
-            value={customer.email} // ✅ controlled
-            onChange={(e) =>
-              setCustomer({ ...customer, email: e.target.value })
-            }
-            placeholder="Jhonsmith@gmail.com"
-            className="h-[55px] rounded-sm text-gray-700 placeholder:text-gray-900 bg-white focus-visible:bg-white border-3 border-gray-300 mt-[16px]"
-          />
-        </div>
+      <div className="space-y-[16px]">
+  <label className="text-md font-medium text-gray-900">
+    Email
+  </label>
 
+  <div className="h-[55px] flex items-center px-4 bg-gray-50 border border-gray-200 rounded-md text-gray-700 mt-3">
+    {customer.email || "—"}
+  </div>
+</div>
+
+<p className="text-sm text-gray-500 mt-2">
+  These details are automatically filled from your account.
+</p>
       </div>
     </section>
   )
