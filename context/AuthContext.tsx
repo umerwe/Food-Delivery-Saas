@@ -16,6 +16,7 @@ interface User {
     avatarUrl: string;
     phone?: string | null;
     bio?: string;
+    createdAt?: string;
   };
 }
 

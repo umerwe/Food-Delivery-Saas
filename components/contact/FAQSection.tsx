@@ -7,8 +7,10 @@ import {
   FaEnvelope,
   FaPhoneAlt,
 } from "react-icons/fa";
+import { useRouter } from "next/navigation";
 
 export default function FAQSection() {
+  const router = useRouter();
   return (
     <section className="bg-[#F4F4F4] py-16 px-6 md:px-12 lg:px-20">
       <div className="max-w-[1150px] mx-auto grid lg:grid-cols-[1fr_360px] gap-10">
@@ -74,7 +76,7 @@ export default function FAQSection() {
             </div>
 
             {/* CTA */}
-            <button className="mt-6 w-full bg-orange-500 text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition">
+            <button onClick={()=>router.push('/contact/chat')} className="cursor-pointer mt-6 w-full bg-orange-500 text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition">
               Start Live Consultation
             </button>
           </div>
