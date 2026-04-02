@@ -1,12 +1,14 @@
-import ChatUI from '@/components/contact/LiveChat'
-import React from 'react'
+import ChatUI from "@/components/contact/LiveChat";
+import React, { Suspense } from "react";
 
-const page = () => {
+const Page = () => {
   return (
     <div>
-      <ChatUI />
+      <Suspense fallback={<p>Loading chat...</p>}>
+        <ChatUI />
+      </Suspense>
     </div>
-  )
-}
+  );
+};
 
-export default page
+export default Page;
