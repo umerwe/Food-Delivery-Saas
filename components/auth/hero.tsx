@@ -1,5 +1,5 @@
 import Image from "next/image"
-
+// @ts-ignore
 export function AuthHero() {
   return (
     <div className="hidden lg:flex w-1/2 relative">
