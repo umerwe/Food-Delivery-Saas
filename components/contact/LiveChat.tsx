@@ -29,12 +29,34 @@ const [creatingThread, setCreatingThread] = useState(false);
     activeThreadRef.current = activeThread;
   }, [activeThread]);
 
-  const ensureOrderThread = async (orderId: string) => {
-  if (!orderId) return;
+  const createGeneralThread = async () => {
+  if (creatingThread) return;
+
+  console.log("📡 CREATING GENERAL THREAD");
 
   setCreatingThread(true);
 
-  // 1️⃣ Check if thread already exists
+  const res = await api.post("/v1/chat/threads", {
+    message: "Hi, I need support.",
+    subject: "General Support",
+  });
+
+  if (res?.success) {
+    const newThread = res.data;
+
+    setThreads([newThread]);
+    setActiveThread(newThread);
+  }
+
+  setCreatingThread(false);
+};
+
+
+  const ensureOrderThread = async (orderId: string) => {
+  if (!orderId || creatingThread) return; // ✅ prevent duplicate calls
+
+  setCreatingThread(true);
+
   const existing = threads.find((t) => t.orderId === orderId);
 
   if (existing) {
@@ -43,8 +65,7 @@ const [creatingThread, setCreatingThread] = useState(false);
     return;
   }
 
-  // 2️⃣ Create new thread
-  const shortId = orderId.slice(-6).toUpperCase(); // nice UX
+  const shortId = orderId.slice(-6).toUpperCase();
   const subject = `Order #${shortId}`;
 
   const res = await api.post("/v1/chat/threads", {
@@ -55,20 +76,31 @@ const [creatingThread, setCreatingThread] = useState(false);
 
   if (res?.success) {
     const newThread = res.data;
-
-    // add to list (top)
     setThreads((prev) => [newThread, ...prev]);
-
     setActiveThread(newThread);
   }
 
   setCreatingThread(false);
 };
-useEffect(() => {
-  if (!orderId || threads.length === 0) return;
 
-  ensureOrderThread(orderId);
-}, [orderId, threads]);
+
+useEffect(() => {
+  console.log("🔥 EFFECT RUNNING", { orderId, threads });
+
+  if (!token) return;
+
+  // ✅ CASE 1: Order-based thread
+  if (orderId) {
+    ensureOrderThread(orderId);
+  }
+
+  // ✅ CASE 2: General support thread
+  else if (threads.length === 0 && !creatingThread) {
+    createGeneralThread();
+  }
+
+}, [orderId, threads.length, token]);
+
   const formatTime = (date: string) =>
     new Date(date).toLocaleTimeString([], {
       hour: "2-digit",

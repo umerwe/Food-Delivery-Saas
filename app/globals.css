@@ -174,3 +174,6 @@
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
   background-color: #d6d3d1;
 }
+button{
+  cursor: pointer;
+}

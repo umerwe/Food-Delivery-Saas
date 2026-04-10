@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface Category {
   id: string;
@@ -15,9 +16,9 @@ interface Category {
 
 export default function ExploreCategories() {
   const router = useRouter();
-  const { token } = useAuth();
-  const { get } = useApi(token);
-
+  
+const { token, user, loading: authLoading } = useAuth();
+  const { get , post} = useApi(token);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,6 +58,62 @@ export default function ExploreCategories() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+  if (!authLoading && !user) {
+    router.push("/auth/login");
+  }
+}, [authLoading, user]);
+
+const isUserAlreadyInOrder = async (code: string) => {
+  try {
+    const res = await get(`/v1/group-orders?search=${code}`);
+    const order = res?.data?.find((o: any) => o.inviteCode === code);
+
+    if (!order) return false;
+
+    // ✅ if user is host
+    if (order.hostUserId === user?.id) return true;
+
+    // ✅ if user already participant
+    const exists = order.participants?.some(
+      (p: any) => p.userId === user?.id
+    );
+
+    return exists;
+  } catch (err) {
+    console.error("Check participant error", err);
+    return false;
+  }
+};
+
+const handleJoinGroupOrder = async (inviteCode: string) => {
+  const res = await post("/v1/group-orders/join", { inviteCode });
+
+  if (!res || res.error) {
+    // ✅ show real backend message
+    toast.error(res?.message || "Failed to join group order");
+
+    // optional debug (very useful in dev)
+    console.log("Join error details:", res?.details);
+
+    return false;
+  }
+
+  return true;
+};
+
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+
+  if (code) {
+    localStorage.setItem("groupOrderCode", code);
+  }
+}, []);
 
   useEffect(() => {
     fetchCategories(1);
@@ -104,9 +161,24 @@ export default function ExploreCategories() {
               return (
                 <div
                   key={item.id}
-                  onClick={() =>
-                    router.push(`/items?categoryId=${item.id}`)
-                  }
+              onClick={async () => {
+  const code = localStorage.getItem("groupOrderCode");
+
+  if (code) {
+    // ✅ check first
+    const alreadyIn = await isUserAlreadyInOrder(code);
+
+    if (!alreadyIn) {
+      const joined = await handleJoinGroupOrder(code);
+
+      if (!joined) return;
+    }
+
+    router.push(`/items?categoryId=${item.id}&code=${code}`);
+  } else {
+    router.push(`/items?categoryId=${item.id}`);
+  }
+}}
                className="flex flex-col items-center cursor-pointer group w-[120px]"
                 >
                   {/* Circle Image */}
