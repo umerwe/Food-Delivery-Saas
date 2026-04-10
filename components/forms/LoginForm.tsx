@@ -35,7 +35,10 @@ export default function LoginForm() {
     phone: "",
     restaurantId: "",
   })
-
+const getGroupOrderCode = () => {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("groupOrderCode");
+};
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
 
@@ -81,8 +84,15 @@ export default function LoginForm() {
       login(data.data)
 
       toast.success("Login successful")
+const code = getGroupOrderCode();
 
-      setTimeout(() => router.push("/"), 1000)
+setTimeout(() => {
+  if (code) {
+    router.push("/categories");
+  } else {
+    router.push("/");
+  }
+}, 1000);
     } catch (error: any) {
       toast.error(error.message || "Something went wrong")
     } finally {
@@ -123,7 +133,15 @@ export default function LoginForm() {
 
       toast.success("Guest session started")
 
-      setTimeout(() => router.push("/"), 1000)
+   const code = getGroupOrderCode();
+
+setTimeout(() => {
+  if (code) {
+    router.push("/categories");
+  } else {
+    router.push("/");
+  }
+}, 1000);
     } catch (error: any) {
       toast.error(error.message || "Something went wrong")
     } finally {

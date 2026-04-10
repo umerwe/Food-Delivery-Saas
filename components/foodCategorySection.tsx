@@ -171,15 +171,27 @@ return (
     )}
 
     {/* CTA */}
-    <div className="flex justify-center sm:justify-end mt-[30px] sm:mt-[60px] mb-[50px] sm:mb-[80px]">
-      <Button
-        variant="primary"
-        className="w-full sm:w-auto"
-        onClick={() => router.push("/categories")}
-      >
-        Order Now
-      </Button>
-    </div>
+   <div className="flex flex-col sm:flex-row justify-center sm:justify-end gap-3 mt-[30px] sm:mt-[60px] mb-[50px] sm:mb-[80px]">
+
+  {/* Group Order (Secondary CTA) */}
+  <Button
+    variant="ghost"
+    className="w-full sm:w-auto bg-orange-50 text-primary border border-orange-200 hover:bg-orange-100 transition rounded-full"
+    onClick={() => router.push("/group-order")}
+  >
+    Group Order
+  </Button>
+
+  {/* Order Now (Primary CTA) */}
+  <Button
+    variant="primary"
+    className="w-full sm:w-auto "
+    onClick={() => router.push("/categories")}
+  >
+    Order Now
+  </Button>
+
+</div>
 
     {/* Banners */}
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">

@@ -1,0 +1,121 @@
+"use client";
+
+import Image from "next/image";
+import { Trash2, Plus, Minus } from "lucide-react";
+import useApi from "@/hooks/useApi";
+import { useAuth } from "@/hooks/useAuth";
+import useGroupOrder from "@/hooks/useGroupOrder";
+
+export default function UserCard({ participant, orderId, isHost }: any) {
+  const { token } = useAuth();
+  const { del, patch } = useApi(token);
+
+  const user = participant?.user;
+  const items = participant?.items || [];
+
+  const handleDelete = async (itemId: string) => {
+    await del(`/v1/group-orders/${orderId}/items/${itemId}`);
+    location.reload();
+  };
+
+  const updateQty = async (item: any, qty: number) => {
+    if (qty < 1) return;
+
+    await patch(`/v1/group-orders/${orderId}/items/${item.id}`, {
+      quantity: qty,
+    });
+
+    location.reload();
+  };
+const { canEditItems, participant: currentUserParticipant } = useGroupOrder();
+  const picking = items.length === 0;
+const isCurrentUser = participant?.userId === currentUserParticipant?.userId;
+const canEdit = canEditItems && isCurrentUser;
+  return (
+    <div className={`bg-white rounded-2xl p-5 shadow-md border border-gray-100 transition hover:shadow-lg hover:-translate-y-[2px] ${picking ? "border-dashed border-gray-300 bg-gray-50" : ""}`}>
+
+      <div className="flex items-center justify-between">
+
+        <div className="flex items-center gap-3">
+
+          <div className="w-12 h-12 rounded-full overflow-hidden relative border border-gray-200">
+            <Image
+              src={user?.avatarUrl || "https://i.pravatar.cc/150"}
+              alt={user?.firstName}
+              fill
+              className="object-cover"
+            />
+          </div>
+
+          <div>
+            <p className="font-semibold text-gray-900">
+              {user?.firstName} {user?.lastName} {isHost && "(Host)"}
+            </p>
+
+            {picking && (
+              <p className="text-sm text-orange-500 mt-1">
+                Picking Items...
+              </p>
+            )}
+          </div>
+        </div>
+
+        {!picking && (
+          <span className="text-xs bg-teal-100 text-teal-700 px-3 py-1 rounded-full font-medium">
+            READY
+          </span>
+        )}
+      </div>
+
+      {!picking && (
+        <div className="mt-5 space-y-3">
+          {items.map((item: any) => (
+            <div key={item.id} className="flex items-center justify-between">
+
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-md overflow-hidden relative border border-gray-200">
+                  <Image
+                    src={item.menuItem?.imageUrl}
+                    alt=""
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <p className="text-sm text-gray-700 font-medium">
+                  {item.menuItem?.name}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+
+                {/* QTY */}
+                <div className="flex items-center gap-2 border rounded-full px-2 py-1">
+                  <button onClick={() => updateQty(item, item.quantity - 1)}  disabled={!canEdit}>
+                    <Minus className="w-3 h-3" />
+                  </button>
+
+                  <span className="text-sm">{item.quantity}</span>
+
+                  <button onClick={() => updateQty(item, item.quantity + 1)}  disabled={!canEdit}>
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+
+                {/* DELETE */}
+                 <button
+  disabled={!canEdit}
+  onClick={() => handleDelete(item.id)}
+  className={`text-red-500 ${!canEdit && "opacity-40 cursor-not-allowed"}`}
+>
+                
+                  <Trash2 className="w-4 h-4" />
+                </button>
+
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

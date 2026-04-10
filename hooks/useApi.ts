@@ -59,7 +59,7 @@ export default function useApi(token: string | null) {
   return {
     loading,
     get: (endpoint: string) => request(endpoint, "GET"),
-    post: (endpoint: string, body: any) => request(endpoint, "POST", body),
+    post: (endpoint: string, body?: any) => request(endpoint, "POST", body),
     patch: (endpoint: string, body: any) => request(endpoint, "PATCH", body),
     del: (endpoint: string) => request(endpoint, "DELETE"),
   }

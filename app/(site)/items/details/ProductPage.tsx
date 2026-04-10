@@ -9,6 +9,7 @@ import { useAuthContext } from "@/context/AuthContext";
 import { toast } from "sonner";
 import useBranchSelector from "@/hooks/useBranchSelector";
 import BranchPopup from "@/components/popups/BranchPopup";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function ProductPage() {
   const params = useSearchParams();
@@ -73,48 +74,101 @@ export default function ProductPage() {
   );
 
   const totalPrice = (basePrice + modifiersTotal) * qty;
+const { user } = useAuth();
+const customerId = user?.id;
+const branchId = user?.branchId;
 
   /* ---------------- ADD TO CART ---------------- */
   const handleAddToCart = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const auth = JSON.parse(localStorage.getItem("auth") || "{}");
-      const customerId = auth?.user?.id;
-      const branchId = auth?.user?.branchId;
+    const groupCode = localStorage.getItem("groupOrderCode");
 
-      if (!branchId || showBranchPopup === false) {
-        await fetchBranches();
-        setShowBranchPopup(true);
-        return;
-      }
-
-      const res = await post(`/v1/cart/items?customerId=${customerId}`, {
-        menuItemId: item.id,
-        quantity: qty,
-        branchId,
-        variationId: selectedVariation?.id || null,
-        modifiers: Object.values(selectedModifiers)
-          .flat()
-          .map((m: any) => ({
-            modifierId: m.id,
-            quantity: 1,
-          })),
-        note: instructions,
-      });
-
-      if (!res || res.error) {
-        toast.error("Failed to add");
-        return;
-      }
-
-      toast.success("Added to cart");
-      router.push("/checkout");
-    } finally {
-      setLoading(false);
+    // 🔥 ONLY enforce branch selection for normal flow
+    if (!groupCode && (!branchId || showBranchPopup === false)) {
+      await fetchBranches();
+      setShowBranchPopup(true);
+      return;
     }
-  };
 
+    // 🔥 COMMON BASE PAYLOAD
+    const basePayload = {
+      menuItemId: item.id,
+      quantity: qty,
+      variationId: selectedVariation?.id || null,
+      modifiers: Object.values(selectedModifiers)
+        .flat()
+        .map((m: any) => ({
+          modifierId: m.id,
+          quantity: 1,
+        })),
+      note: instructions,
+    };
+
+    let res;
+
+    // ================= GROUP ORDER FLOW =================
+    if (groupCode) {
+      // ❗ Resolve group order ID from code
+      const groupOrdersRes = await get("/v1/group-orders");
+
+      if (!groupOrdersRes || groupOrdersRes.error) {
+        toast.error("Failed to fetch group order");
+        return;
+      }
+
+      const groupOrder = groupOrdersRes.data?.find(
+        (o: any) => o.inviteCode === groupCode
+      );
+
+      if (!groupOrder) {
+        toast.error("Invalid group order");
+        return;
+      }
+
+      // 🔥 ADD ITEM TO GROUP ORDER (NO branchId)
+      res = await post(
+        `/v1/group-orders/${groupOrder.id}/items`,
+        basePayload
+      );
+
+    } else {
+      // ================= NORMAL CART FLOW =================
+      const payload = {
+        ...basePayload,
+        branchId,
+      };
+
+      res = await post(
+        `/v1/cart/items?customerId=${customerId}`,
+        payload
+      );
+    }
+console.log("res is", res);
+if (!res || res.error) {
+  toast.error(res?.error || res?.message || "Failed to add");
+  return;
+}
+
+    toast.success(
+      groupCode ? "Added to group order" : "Added to cart"
+    );
+
+    // 🔥 REDIRECT BASED ON FLOW
+    if (groupCode) {
+      router.push("/group-order/lobby"); // or lobby later
+    } else {
+      router.push("/checkout");
+    }
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Something went wrong");
+  } finally {
+    setLoading(false);
+  }
+};
   const {
     showBranchPopup,
     setShowBranchPopup,
