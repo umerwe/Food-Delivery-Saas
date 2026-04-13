@@ -79,21 +79,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const fetchMe = async (token: string) => {
-    const res = await fetch(`${API_BASE_URL}/v1/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+const fetchMe = async (token: string) => {
+  const res = await fetch(`${API_BASE_URL}/v1/auth/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-    if (!res.ok) throw new Error("Unauthorized");
+  if (res.status === 401) {
+    throw new Error("UNAUTHORIZED");
+  }
 
-    const data = await res.json();
-    return data.data;
-  };
+  if (!res.ok) {
+    throw new Error("FETCH_ME_FAILED");
+  }
 
+  const data = await res.json();
+  return data.data;
+};
   // ---------------- INIT AUTH ----------------
-useEffect(() => {
+
+  useEffect(() => {
   const initAuth = async () => {
     try {
       const stored = getStoredAuth();
@@ -114,7 +120,18 @@ useEffect(() => {
 
         setUser(mergedUser);
         setToken(stored.accessToken);
-      } catch {
+      } catch (error: unknown) {
+        // ✅ Safely check error type
+        const isUnauthorized =
+          error instanceof Error && error.message === "UNAUTHORIZED";
+
+        if (!isUnauthorized) {
+          console.error("Non-auth error during fetchMe:", error);
+          setLoading(false);
+          return;
+        }
+
+        // 🔄 Try refresh only for 401
         const newAccessToken = await refreshToken();
 
         if (!newAccessToken) {
@@ -126,20 +143,19 @@ useEffect(() => {
         }
 
         const me = await fetchMe(newAccessToken);
-
-        const stored = getStoredAuth();
+        const updatedStored = getStoredAuth();
 
         const mergedUser = {
           ...me,
-          restaurantId: stored?.user?.restaurantId ?? null,
-          branchId: stored?.user?.branchId ?? null,
+          restaurantId: updatedStored?.user?.restaurantId ?? null,
+          branchId: updatedStored?.user?.branchId ?? null,
         };
 
         setUser(mergedUser);
         setToken(newAccessToken);
       }
-    } catch (err) {
-      console.error("Auth init failed", err);
+    } catch (error) {
+      console.error("Auth init failed", error);
     } finally {
       setLoading(false);
     }
@@ -147,7 +163,6 @@ useEffect(() => {
 
   initAuth();
 }, []);
-  
   // ---------------- ACTIONS ----------------
   const login = (data: any) => {
     saveAuth(data);
