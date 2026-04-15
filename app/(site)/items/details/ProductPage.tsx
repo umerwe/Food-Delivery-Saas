@@ -290,7 +290,7 @@ if (!res || res.error) {
           </div>
 
           <p className="text-sm text-gray-600">
-            Experience the ultimate crunch. Two 4oz aged beef patties smashed to perfection, topped with molten Vermont cheddar, heirloom tomatoes, and secret sauce on a toasted brioche.
+         {item.description}
           </p>
 
           <div className="text-2xl font-bold text-orange-500">

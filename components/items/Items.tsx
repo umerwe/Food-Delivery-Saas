@@ -17,7 +17,6 @@ export default function ItemsListing({ categoryId, categories }: any) {
 
     try {
       setLoading(true);
-
       const res = await get(`/v1/menu/items?categoryId=${catId}`);
       setItems(res?.data || []);
     } catch (err) {
@@ -34,14 +33,12 @@ export default function ItemsListing({ categoryId, categories }: any) {
     }
   }, [categoryId, token]);
 
-  /* ✅ FIND CATEGORY NAME FROM SHARED STATE */
   const activeCategory = useMemo(() => {
     return categories.find((c: any) => c.id === categoryId);
   }, [categories, categoryId]);
 
   return (
     <div>
-      {/* ✅ REAL CATEGORY TITLE */}
       <h2 className="text-xl font-semibold mb-6 mt-4">
         {activeCategory?.name || "Menu"}
       </h2>
@@ -51,17 +48,9 @@ export default function ItemsListing({ categoryId, categories }: any) {
       ) : items.length === 0 ? (
         <p className="text-gray-400">No items found</p>
       ) : (
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-5">
           {items.map((item) => (
-            <RestaurantCard
-              key={item.id}
-              id={item.id}
-              name={item.name}
-              slug={item.slug}
-              image={item.imageUrl}
-              time={`${item.prepTimeMinutes} min`}
-              price={item.basePrice}
-            />
+            <RestaurantCard key={item.id} item={item} />
           ))}
         </div>
       )}
