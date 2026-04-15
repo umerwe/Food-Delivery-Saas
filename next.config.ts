@@ -17,6 +17,19 @@ const nextConfig: NextConfig = {
         hostname: "i.pravatar.cc",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "pngtree.com",
+        pathname: "/**",
+      },
+      
+      {
+        protocol: "https",
+        hostname: "deliveryway.s3.eu-west-2.amazonaws.com",
+        pathname: "/**",
+      },
+      
+      
        {
         protocol: "https",
         hostname: "i.ibb.co",

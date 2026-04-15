@@ -35,7 +35,8 @@ const { token, user, loading: authLoading } = useAuth();
     try {
       const stored = getStoredAuth();
       const restaurantId = stored?.user?.restaurantId;
-
+console.log("res id", restaurantId);
+console.log("tok is", token);
       if (!restaurantId || !token) return;
 
       if (pageNumber === 1) setLoading(true);
