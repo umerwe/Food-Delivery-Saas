@@ -3,6 +3,9 @@ import "./globals.css";
 import { poppins } from "@/lib/fonts";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
+import BranchSelect from "@/components/ui/BranchSelect";
+import BranchPopup from "@/components/popups/BranchPopup";
+import RequiredBranchSelectionModal from "@/components/forms/RequiredBranchSelectionModal";
 
 export const metadata: Metadata = {
   title: "Home | Food",
@@ -22,6 +25,7 @@ export default function RootLayout({
       <body className={poppins.className}>
   <AuthProvider>
     <Toaster position="top-right" richColors />
+
     {children}
   </AuthProvider>
 </body>

@@ -91,7 +91,7 @@ return (
       <div className="flex items-center gap-3 sm:gap-[16.5px]">
         <Button
           variant="link"
-          className="text-[#F15A2B] font-bold text-sm sm:text-lg p-0"
+          className="text-primary font-bold text-sm sm:text-lg p-0"
           onClick={() => router.push("/categories")}
         >
           View All
@@ -102,14 +102,14 @@ return (
         <div className="hidden sm:flex gap-2">
           <div
             onClick={scrollLeft}
-            className="w-[50px] h-[50px] lg:w-[76px] lg:h-[76px] rounded-full bg-[#F15A2B] flex items-center justify-center text-white shadow-lg shadow-[#FFB20E4A] cursor-pointer"
+            className="w-[50px] h-[50px] lg:w-[76px] lg:h-[76px] rounded-full bg-primary flex items-center justify-center text-white shadow-lg shadow-[#FFB20E4A] cursor-pointer"
           >
             <ChevronLeft size={24} className="lg:w-[40px] lg:h-[40px]" />
           </div>
 
           <div
             onClick={scrollRight}
-            className="w-[50px] h-[50px] lg:w-[76px] lg:h-[76px] rounded-full bg-[#F15A2B] flex items-center justify-center text-white shadow-lg shadow-[#FFB20E4A] cursor-pointer"
+            className="w-[50px] h-[50px] lg:w-[76px] lg:h-[76px] rounded-full bg-primary flex items-center justify-center text-white shadow-lg shadow-[#FFB20E4A] cursor-pointer"
           >
             <ChevronRight size={24} className="lg:w-[40px] lg:h-[40px]" />
           </div>
@@ -150,7 +150,7 @@ return (
                 }
               >
                 <div className="flex flex-col items-center gap-3 sm:gap-4 cursor-pointer group">
-                  <div className="relative w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] lg:w-[200px] lg:h-[200px] rounded-full overflow-hidden border-2 sm:border-4 border-transparent group-hover:border-[#F15A2B] transition-all">
+                  <div className="relative w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] lg:w-[200px] lg:h-[200px] rounded-full overflow-hidden border-2 sm:border-4 border-transparent group-hover:border-primary transition-all">
                     <Image
                       src={image}
                       alt={item.name}
