@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
@@ -8,17 +7,16 @@ export default function CategorySidebar({
   activeCategoryId,
   categories = [],
   loading,
+  loadingMore,
+  hasMore,
+  search,
+  onSearchChange,
+  onLoadMore,
 }: any) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-
-  const filteredCategories = categories.filter((cat: any) =>
-    cat.name.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="bg-white rounded-2xl py-4 pr-4">
-
       <h2 className="font-semibold text-xl mb-4">Full menu</h2>
 
       {/* SEARCH */}
@@ -30,7 +28,7 @@ export default function CategorySidebar({
 
         <input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => onSearchChange?.(e.target.value)}
           placeholder="Search Menu"
           className="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-100 text-sm outline-none"
         />
@@ -39,33 +37,41 @@ export default function CategorySidebar({
       {/* LIST */}
       <div className="space-y-2 pr-1">
         {loading ? (
-          <p className="text-sm text-gray-400 text-center py-4">
-            Loading...
-          </p>
-        ) : filteredCategories.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">Loading...</p>
+        ) : categories.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">
             No categories found
           </p>
         ) : (
-          filteredCategories.map((cat: any) => {
-            const isActive = activeCategoryId === cat.id;
+          <>
+            {categories.map((cat: any) => {
+              const isActive = String(activeCategoryId) === String(cat.id);
 
-            return (
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => router.push(`/items?categoryId=${cat.id}`)}
+                  className={`w-full text-left px-5 py-3 rounded-full transition font-medium ${
+                    isActive
+                      ? "bg-[#EC5834] text-white"
+                      : "text-gray-800 hover:bg-gray-100"
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+
+            {hasMore && (
               <button
-                key={cat.id}
-                onClick={() =>
-                  router.push(`/items?categoryId=${cat.id}`)
-                }
-                className={`w-full text-left px-5 py-3 rounded-full transition font-medium ${
-                  isActive
-                    ? "bg-[#EC5834] text-white"
-                    : "text-gray-800 hover:bg-gray-100"
-                }`}
+                onClick={onLoadMore}
+                disabled={loadingMore}
+                className="w-full mt-3 px-5 py-3 rounded-full border border-[#EC5834] text-[#EC5834] font-medium hover:bg-orange-50 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {cat.name}
+                {loadingMore ? "Loading..." : "Load More"}
               </button>
-            );
-          })
+            )}
+          </>
         )}
       </div>
     </div>

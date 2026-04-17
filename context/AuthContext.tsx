@@ -16,7 +16,7 @@ interface User {
     avatarUrl: string;
     phone?: string | null;
     bio?: string;
-    createdAt?: string;
+     createdAt?: string;
   };
 }
 
@@ -52,32 +52,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   // ---------------- API HELPERS ----------------
+ 
   const refreshToken = async () => {
-    const stored = getStoredAuth();
-    if (!stored?.refreshToken) return false;
+  const stored = getStoredAuth();
+  if (!stored?.refreshToken) return false;
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/v1/auth/refresh`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          refreshToken: stored.refreshToken,
-        }),
-      });
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        refreshToken: stored.refreshToken,
+      }),
+    });
 
-      if (!res.ok) return false;
+    if (!res.ok) return false;
 
-      const data = await res.json();
-      saveAuth(data.data);
+    const data = await res.json();
 
-      return data.data.accessToken;
-    } catch (err) {
-      console.error("Refresh token failed", err);
-      return false;
-    }
-  };
+    const mergedData = {
+      ...data.data,
+      user: {
+        ...stored.user, // ✅ preserve old user data
+      },
+    };
+
+    saveAuth(mergedData);
+
+    return mergedData.accessToken;
+  } catch (err) {
+    console.error("Refresh token failed", err);
+    return false;
+  }
+};
 
 const fetchMe = async (token: string) => {
   const res = await fetch(`${API_BASE_URL}/v1/auth/me`, {
@@ -97,8 +106,8 @@ const fetchMe = async (token: string) => {
   const data = await res.json();
   return data.data;
 };
-  // ---------------- INIT AUTH ----------------
 
+  // ---------------- INIT AUTH ----------------
   useEffect(() => {
   const initAuth = async () => {
     try {

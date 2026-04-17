@@ -17,7 +17,7 @@ export default function ReserveTablePage() {
   const { token, user } = useAuth();
   const { post, get, loading } = useApi(token);
 
-  const [success, setSuccess] = useState(false);
+ const [success, setSuccess] = useState(false);
   const [reservationData, setReservationData] = useState<any>(null);
 
   const [date, setDate] = useState("");
