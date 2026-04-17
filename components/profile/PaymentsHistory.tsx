@@ -1,243 +1,451 @@
 "use client";
 
-import Image from "next/image";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import useApi from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
+import PaginationSection from "../ui/PaginationComponent";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Clock,
+  Search,
+  ArrowDownLeft,
+  ArrowUpRight,
+} from "lucide-react";
+import Balance from "./Balance";
 
-type TransactionItem = {
-  id: number;
-  title: string;
-  subtitle: string;
-  date: string;
-  points: string;
-  type: "earned" | "redeemed" | "bonus";
-  image?: string;
-  iconBg?: string;
-  iconText?: string;
+type PaymentItem = {
+  id: string;
+  orderId: string;
+  amount: string;
+  status: string;
+  paymentMethod: string;
+  type: string;
+  createdAt: string;
+  order?: { status?: string };
 };
 
-const groupedTransactions: {
-  month: string;
-  items: TransactionItem[];
-}[] = [
-  {
-    month: "October 2023",
-    items: [
-      {
-        id: 1,
-        title: "The Alchemist's Table",
-        subtitle: "Dining Experience",
-        date: "Oct 24, 2023",
-        points: "+850",
-        type: "earned",
-        image: "/images/points/alchemist-table.png",
-      },
-      {
-        id: 2,
-        title: "Wine Tasting Event Ticket",
-        subtitle: "Redemption",
-        date: "Oct 18, 2023",
-        points: "-2,500",
-        type: "redeemed",
-        iconBg: "bg-[#FDECEC]",
-        iconText: "🎟️",
-      },
-      {
-        id: 3,
-        title: "Lumière Brasserie",
-        subtitle: "Dinner for Two",
-        date: "Oct 12, 2023",
-        points: "+1,200",
-        type: "earned",
-        image: "/images/points/lumiere-brasserie.png",
-      },
-    ],
-  },
-  {
-    month: "September 2023",
-    items: [
-      {
-        id: 4,
-        title: "Sugar & Spice Atelier",
-        subtitle: "Bakery Purchase",
-        date: "Sep 28, 2023",
-        points: "+145",
-        type: "earned",
-        image: "/images/points/sugar-spice.png",
-      },
-      {
-        id: 5,
-        title: "Monthly Membership Bonus",
-        subtitle: "Loyalty Reward",
-        date: "Sep 01, 2023",
-        points: "+500",
-        type: "bonus",
-        iconBg: "bg-[#D9ECF4]",
-        iconText: "✦",
-      },
-    ],
-  },
-];
-
-const getPointsColor = (type: TransactionItem["type"]) => {
-  if (type === "redeemed") return "text-[#D91F26]";
-  return "text-[#18A957]";
+type WalletItem = {
+  id: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  note: string;
+  createdAt: string;
 };
-
-const getPointsLabel = (type: TransactionItem["type"]) => {
-  if (type === "redeemed") return "REDEEMED";
-  if (type === "bonus") return "BONUS";
-  return "EARNED";
-};
-
-function TransactionAvatar({ item }: { item: TransactionItem }) {
-  if (item.image) {
-    return (
-      <div className="relative h-[42px] w-[42px] overflow-hidden rounded-[12px] bg-[#F4F4F4] shrink-0">
-        <Image
-          src={item.image}
-          alt={item.title}
-          fill
-          className="object-cover"
-          sizes="42px"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] ${item.iconBg || "bg-[#F4F4F4]"}`}
-    >
-      <span className="text-[15px]">{item.iconText || "•"}</span>
-    </div>
-  );
-}
 
 export default function PaymentsHistory() {
+  const { token, restaurantId } = useAuth();
+  const api = useApi(token);
+
+  const [tab, setTab] = useState<"payments" | "wallet">("wallet");
+
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+
+  const [payments, setPayments] = useState<PaymentItem[]>([]);
+  const [wallet, setWallet] = useState<WalletItem[]>([]);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletCurrency, setWalletCurrency] = useState("USD");
+
+  const [meta, setMeta] = useState<any>({});
+  const [loading, setLoading] = useState(false);
+
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 500);
+
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const fetchPayments = async () => {
+    setLoading(true);
+
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (status) params.set("status", status);
+    if (restaurantId) params.set("restaurantId", restaurantId);
+
+    const res = await api.get(`/v1/payments?${params.toString()}`);
+
+    if (!res?.error) {
+      setPayments(res?.data || []);
+      setMeta(res?.meta || {});
+    }
+
+    setLoading(false);
+  };
+
+  const fetchWallet = async () => {
+    setLoading(true);
+
+    const res = await api.get(`/v1/customer-app/wallet`);
+
+    if (!res?.error) {
+      setWallet(res?.data?.history || []);
+      setWalletBalance(res?.data?.balance || 0);
+      setWalletCurrency(res?.data?.currency || "USD");
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (tab === "payments") fetchPayments();
+    else fetchWallet();
+  }, [tab, page, debouncedSearch, status, token]);
+
+  useEffect(() => {
+    const handler = () => fetchWallet();
+
+    window.addEventListener("wallet-updated", handler);
+
+    return () =>
+      window.removeEventListener("wallet-updated", handler);
+  }, []);
+
+  const filteredWallet = useMemo(() => {
+    let data = [...wallet];
+
+    if (debouncedSearch) {
+      data = data.filter((i) =>
+        i.note?.toLowerCase().includes(debouncedSearch.toLowerCase())
+      );
+    }
+
+    if (status) {
+      data = data.filter((i) => i.type === status);
+    }
+
+    return data;
+  }, [wallet, debouncedSearch, status]);
+
+  const title =
+    tab === "payments" ? "Payments History" : "Wallet History";
+
+  const subtitle =
+    tab === "payments"
+      ? "Track all payment transactions."
+      : "Monitor wallet credits & debits.";
+
   return (
-    <section className="mx-auto w-full px-4 md:px-40  pb-[100px] pt-[20px]">
+    <section className="mx-auto w-full px-4 pb-[100px] pt-[20px] md:px-40">
       <div className="rounded-[28px] bg-[#FAFAFA] p-5 md:p-8">
+        {/* HEADER */}
         <div className="mb-7">
-          <h1 className="text-[34px] font-semibold leading-tight text-[#171717]">
-            Points History
+          <h1 className="text-[34px] font-semibold text-[#171717]">
+            {title}
           </h1>
-          <p className="mt-1 text-[14px] text-[#7C7C7C]">
-            Review your culinary journey and earned rewards.
-          </p>
+
+          <p className="text-[14px] text-[#7C7C7C]">{subtitle}</p>
         </div>
 
-        <div className="mb-8 rounded-[14px] bg-[#DC2B2F] px-4 py-5 text-white shadow-[0_10px_30px_rgba(220,43,47,0.20)] md:px-5 md:py-6">
-          <p className="text-[11px] uppercase tracking-[0.08em] text-white/80">
-            Current Balance
-          </p>
+        {/* BALANCE */}
+        <Balance
+          balance={walletBalance}
+          currency={walletCurrency}
+          loyaltyPoints={wallet.length || 0}
+        />
 
-          <div className="mt-2 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-[44px] font-semibold leading-none">$1,245.50</h2>
+        {/* TABS */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          <Button
+            onClick={() => {
+              setTab("payments");
+              setStatus("");
+              setPage(1);
+            }}
+            className={`h-9 rounded-full px-4 text-[13px] ${
+              tab === "payments"
+                ? "text-white"
+                : "border bg-white text-[#171717]"
+            }`}
+            style={
+              tab === "payments"
+                ? { background: "var(--primary)" }
+                : {}
+            }
+          >
+            Payments
+          </Button>
 
-              <div className="mt-12">
-                <p className="text-[12px] text-white/85">Loyalty Points</p>
-                <p className="text-[24px] font-semibold leading-none">2,450 pts</p>
-              </div>
+          <Button
+            onClick={() => {
+              setTab("wallet");
+              setStatus("");
+              setPage(1);
+            }}
+            className={`h-9 rounded-full px-4 text-[13px] ${
+              tab === "wallet"
+                ? "text-white"
+                : "border bg-white text-[#171717]"
+            }`}
+            style={
+              tab === "wallet"
+                ? { background: "#0F766E" }
+                : {}
+            }
+          >
+            Wallet
+          </Button>
+        </div>
+
+        {/* FILTERS */}
+        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex w-full items-center gap-3 md:flex-1">
+            <div className="relative w-full">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+
+              <Input
+                placeholder={
+                  tab === "payments"
+                    ? "Search by order id"
+                    : "Search wallet note"
+                }
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 rounded-full border-none bg-[#F5F5F5] pl-10 pr-4 focus-visible:ring-0"
+              />
             </div>
 
-            <div className="md:self-end">
-              <Button className="h-[38px] rounded-full bg-white px-5 text-[13px] font-medium text-[#DC2B2F] hover:bg-white/90">
-                Add Funds
-              </Button>
-            </div>
+            <Button
+              className="h-10 shrink-0 rounded-full bg-primary px-6 text-white"
+              onClick={() => {
+                setDebouncedSearch(search.trim());
+                setPage(1);
+              }}
+            >
+              Search
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Select
+              value={status || "ALL"}
+              onValueChange={(val) => {
+                setStatus(val === "ALL" ? "" : val);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="!h-10 min-w-[150px] rounded-full border-none bg-[#F5F5F5] px-4">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="ALL">All</SelectItem>
+
+                {tab === "payments" ? (
+                  <>
+                    <SelectItem value="PAID">Paid</SelectItem>
+                    <SelectItem value="PENDING">
+                      Pending
+                    </SelectItem>
+                    <SelectItem value="FAILED">Failed</SelectItem>
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="CREDIT">
+                      Credit
+                    </SelectItem>
+                    <SelectItem value="DEBIT">Debit</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        <div className="space-y-8">
-          {groupedTransactions.map((group) => (
-            <div key={group.month}>
-              <div className="mb-5 flex items-center gap-4">
-                <h3 className="shrink-0 text-[28px] font-semibold leading-none text-[#1A1A1A]">
-                  {group.month}
-                </h3>
-                <div className="h-px w-full bg-[#E6E6E6]" />
-              </div>
+        {/* LIST */}
+        <div className="space-y-3">
+          {loading ? (
+            <p className="py-10 text-center text-gray-400">
+              Loading...
+            </p>
+          ) : tab === "payments" ? (
+            payments.length === 0 ? (
+              <p className="py-10 text-center text-gray-400">
+                No payments found
+              </p>
+            ) : (
+              payments.map((item) => {
+                const date = new Date(item.createdAt);
 
-              <div className="space-y-3">
-                {group.items.map((item) => (
+                const statusStyles: Record<string, string> = {
+                  PAID: "bg-green-50 text-green-700",
+                  PENDING: "bg-amber-50 text-amber-700",
+                  FAILED: "bg-red-50 text-red-700",
+                };
+
+                const methodStyles: Record<string, string> = {
+                  COD: "bg-blue-50 text-blue-700",
+                  STRIPE: "bg-violet-50 text-violet-700",
+                  CARD: "bg-violet-50 text-violet-700",
+                };
+
+                return (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between rounded-[14px] bg-white px-4 py-4 shadow-[0_1px_0_rgba(0,0,0,0.03)]"
+                    className="rounded-2xl bg-white px-4 py-4 shadow-[0_1px_0_rgba(0,0,0,0.03)]"
                   >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <TransactionAvatar item={item} />
+                    <div className="flex items-center justify-between gap-4">
+                      {/* LEFT */}
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#F5F5F5]">
+                          <Clock
+                            size={18}
+                            className="text-zinc-500"
+                          />
+                        </div>
 
-                      <div className="min-w-0">
-                        <p className="truncate text-[15px] font-semibold text-[#171717]">
-                          {item.title}
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate font-semibold text-[#171717]">
+                              {item.paymentMethod} • {item.type}
+                            </p>
+
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                methodStyles[
+                                  item.paymentMethod
+                                ] ||
+                                "bg-zinc-100 text-zinc-700"
+                              }`}
+                            >
+                              {item.paymentMethod}
+                            </span>
+                          </div>
+
+                          <p className="truncate text-xs text-gray-500">
+                            Order #{item.orderId}
+                          </p>
+
+                          <p className="mt-0.5 text-[11px] text-gray-400">
+                            {date.toLocaleDateString()} •{" "}
+                            {date.toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* RIGHT */}
+                      <div className="shrink-0 text-right">
+                        <p className="text-[22px] font-semibold leading-none text-primary">
+                          Rs. {item.amount}
                         </p>
-                        <p className="truncate text-[12px] text-[#8C8C8C]">
-                          {item.subtitle} • {item.date}
-                        </p>
+
+                        <div className="mt-2 flex flex-col items-end gap-1">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                              statusStyles[item.status] ||
+                              "bg-zinc-100 text-zinc-700"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+
+                          <span className="text-[11px] text-gray-400">
+                            {item.order?.status || "Order"}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  </div>
+                );
+              })
+            )
+          ) : filteredWallet.length === 0 ? (
+            <p className="py-10 text-center text-gray-400">
+              No wallet history found
+            </p>
+          ) : (
+            filteredWallet.map((item) => {
+              const isCredit = item.type === "CREDIT";
 
-                    <div className="ml-4 text-right">
-                      <p
-                        className={`text-[26px] font-semibold leading-none ${getPointsColor(item.type)}`}
-                      >
-                        {item.points}
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between rounded-2xl bg-white p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                        isCredit
+                          ? "bg-green-50"
+                          : "bg-red-50"
+                      }`}
+                    >
+                      {isCredit ? (
+                        <ArrowDownLeft
+                          size={18}
+                          className="text-green-600"
+                        />
+                      ) : (
+                        <ArrowUpRight
+                          size={18}
+                          className="text-red-600"
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="font-semibold">
+                        {item.note}
                       </p>
-                      <p className="mt-1 text-[10px] font-semibold tracking-[0.14em] text-[#B1B1B1]">
-                        {getPointsLabel(item.type)}
+
+                      <p className="text-xs text-gray-500">
+                        Balance After: {item.balanceAfter}
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          ))}
+
+                  <p
+                    className={`font-semibold ${
+                      isCredit
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {isCredit ? "+" : "-"} Rs. {item.amount}
+                  </p>
+                </div>
+              );
+            })
+          )}
         </div>
 
-        <div className="mt-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <p className="text-[13px] text-[#8B8B8B]">
-            Showing 1–5 of 142 transactions
-          </p>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[#E8E8E8] bg-white text-[#4B4B4B] transition hover:bg-[#F7F7F7]"
-            >
-              <ChevronLeft size={16} />
-            </button>
-
-            <button
-              type="button"
-              className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-[#BE1E2D] text-sm font-semibold text-white"
-            >
-              1
-            </button>
-
-            <button
-              type="button"
-              className="flex h-[34px] w-[34px] items-center justify-center rounded-full text-sm font-medium text-[#242424] transition hover:bg-[#F4F4F4]"
-            >
-              2
-            </button>
-
-            <button
-              type="button"
-              className="flex h-[34px] w-[34px] items-center justify-center rounded-full text-sm font-medium text-[#242424] transition hover:bg-[#F4F4F4]"
-            >
-              3
-            </button>
-
-            <button
-              type="button"
-              className="flex h-[34px] w-[34px] items-center justify-center rounded-full border border-[#E8E8E8] bg-white text-[#4B4B4B] transition hover:bg-[#F7F7F7]"
-            >
-              <ChevronRight size={16} />
-            </button>
+        {/* PAGINATION */}
+        {tab === "payments" && (
+          <div className="mt-10">
+            <PaginationSection
+              page={meta?.page || page}
+              totalPages={meta?.totalPages || 1}
+              total={meta?.total || 0}
+              limit={limit}
+              hasNext={meta?.hasNext}
+              hasPrevious={meta?.hasPrevious}
+              onPageChange={setPage}
+            />
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

@@ -64,16 +64,17 @@ export default function ProductPage() {
   };
 
   /* ---------------- PRICE CALC ---------------- */
-  const basePrice = selectedVariation
-    ? Number(selectedVariation.price)
-    : Number(item?.basePrice || 0);
+const basePrice = Number(item?.basePrice || 0);
 
+const variationPrice = selectedVariation
+  ? Number(selectedVariation.price || 0)
+  : 0;
+  
   const modifiersTotal = Object.values(selectedModifiers).flat().reduce(
     (acc: number, m: any) => acc + Number(m.priceDelta || 0),
     0
   );
-
-  const totalPrice = (basePrice + modifiersTotal) * qty;
+const totalPrice = (basePrice + variationPrice + modifiersTotal) * qty;
 const { user } = useAuth();
 const customerId = user?.id;
 const branchId = user?.branchId;
@@ -199,7 +200,9 @@ if (!res || res.error) {
           {/* EXTRA INFO (minimal, no UI break) */}
           <div className="text-xs text-gray-400">
             <p>SKU: {item.sku}</p>
-            <p>Prep Time: {item.prepTimeMinutes} mins</p>
+          {item.prepTimeMinutes ? (
+  <p>Prep Time: {item.prepTimeMinutes} mins</p>
+) : null}
           </div>
 
           {/* INGREDIENTS */}
@@ -283,7 +286,7 @@ if (!res || res.error) {
             </h1>
 
             <div className="flex gap-2 text-sm text-gray-500 mt-2">
-              <span className="text-orange-500 font-medium">★ 4.8</span>
+              <span className="text-primary font-medium">★ 4.8</span>
               <span>(150 reviews)</span>
               <span>• 20–25 mins delivery</span>
             </div>
@@ -293,43 +296,53 @@ if (!res || res.error) {
          {item.description}
           </p>
 
-          <div className="text-2xl font-bold text-orange-500">
+          <div className="text-2xl font-bold text-primary">
             ${totalPrice.toFixed(2)}
           </div>
 
-          {/* VARIATIONS (base added inside same UI) */}
-          <div>
-            <p className="font-medium mb-2">Select Size</p>
+        {/* VARIATIONS */}
+<div>
+  <p className="font-medium mb-2">Size</p>
 
-            <div className="flex gap-3 flex-wrap">
-              {/* BASE */}
-              <button
-                onClick={() => setSelectedVariation(null)}
-                className={`px-4 py-2 rounded-xl border ${
-                  !selectedVariation ? "border-orange-500" : "border-gray-200"
-                }`}
-              >
-                Base (${item.basePrice})
-              </button>
+<div className="grid grid-cols-2 gap-3">
+    {item.variations?.map((v: any) => (
+      <label
+        key={v.id}
+        className={`flex justify-between items-center border rounded-xl px-4 py-3 cursor-pointer ${
+          selectedVariation?.id === v.id
+            ? "border-primary"
+            : "border-gray-200"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <input
+            type="radio"
+            name="size"
+            checked={selectedVariation?.id === v.id}
+            onChange={() => setSelectedVariation(v)}
+          />
+          <span>{v.name}</span>
+        </div>
 
-              {item.variations?.map((v: any) => (
-                <button
-                  key={v.id}
-                  onClick={() => setSelectedVariation(v)}
-                  className={`px-4 py-2 rounded-xl border ${
-                    selectedVariation?.id === v.id
-                      ? "border-orange-500"
-                      : "border-gray-200"
-                  }`}
-                >
-                  {v.name} (+${v.price})
-                </button>
-              ))}
-            </div>
-          </div>
+        <span className="text-primary">
+          {Number(v.price) > 0 ? `+$${v.price}` : ""}
+        </span>
+      </label>
+    ))}
+  </div>
+</div>
 
           {/* MODIFIERS */}
-          {item.modifierLinks?.map((group: any) => (
+        
+        {item.modifierLinks
+  ?.filter((group: any) => {
+    // 👇 adjust depending on your API structure
+    return (
+      !group.variationId || 
+      group.variationId === selectedVariation?.id
+    );
+  })
+  .map((group: any) => (
             <div key={group.id}>
               <p className="font-medium mb-2">
                 {group.modifierGroup.name}
@@ -355,7 +368,7 @@ if (!res || res.error) {
                       {m.name}
                     </div>
 
-                    <span className="text-orange-500">
+                    <span className="text-primary">
                       +${m.priceDelta}
                     </span>
                   </label>
@@ -385,7 +398,7 @@ if (!res || res.error) {
 
             <button
               onClick={handleAddToCart}
-              className="flex-1 bg-orange-500 text-white py-3 rounded-full"
+              className="flex-1 bg-primary text-white py-3 rounded-full"
             >
               Add to Cart | ${totalPrice.toFixed(2)}
             </button>
