@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +17,7 @@ export default function ReserveTablePage() {
   const { token, user } = useAuth();
   const { post, get, loading } = useApi(token);
 
-  const [success, setSuccess] = useState(false);
+ const [success, setSuccess] = useState(false);
   const [reservationData, setReservationData] = useState<any>(null);
 
   const [date, setDate] = useState("");
@@ -28,7 +28,22 @@ export default function ReserveTablePage() {
   const [selectedBranch, setSelectedBranch] = useState<any>(null);
 
   const customerId = user?.id;
+useEffect(() => {
+  const prefillSelectedBranch = async () => {
+    if (!user?.branchId) return;
 
+    try {
+      const res = await get(`/v1/branches/${user.branchId}`);
+      if (res?.data) {
+        setSelectedBranch(res.data);
+      }
+    } catch (error) {
+      console.error("Failed to prefill selected branch:", error);
+    }
+  };
+
+  prefillSelectedBranch();
+}, [user?.branchId]);
   /* ---------------- FETCH ---------------- */
   const fetchBranches = async ({ search = "", page = 1 }) => {
     return await get(

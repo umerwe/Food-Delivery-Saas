@@ -1,3 +1,4 @@
+'use client';
 import HeroSection from '@/components/heroSection';
 import FoodCategorySection from '@/components/foodCategorySection';
 import WhyChooseUs from '@/components/whyChooseUsSection';
@@ -6,8 +7,12 @@ import Stats from '@/components/statsSection';
 import BlogSection from '@/components/blogSection';
 import NewsletterSection from '@/components/newsLetterSection';
 import Footer from '@/components/layout/footer';
+import { useAuth } from '@/hooks/useAuth';
+import RequiredBranchSelectionModal from '@/components/forms/RequiredBranchSelectionModal';
 
 const HomePage = () => {
+  const { user, token } = useAuth();
+ 
   return (
     <div>
       <HeroSection />
@@ -20,6 +25,9 @@ const HomePage = () => {
       <BlogSection />
       <NewsletterSection />
       <Footer isHome={true} />
+        {user && token && !user?.branchId && (
+        <RequiredBranchSelectionModal />
+      )}
     </div>
   );
 };

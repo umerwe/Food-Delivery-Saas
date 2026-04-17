@@ -26,11 +26,11 @@ const HeroSection = () => {
                 <div className="bg-white rounded-2xl shadow-xl w-full p-6 md:p-8">
                     {/* Tabs */}
                     <div className="flex gap-4 mb-6">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-[#F17228]/10 text-[#F17228] rounded-md font-bold">
+                        <button className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-md font-semibold">
                             <Bike size={20} />
                             Delivery
                         </button>
-                        <button className="flex items-center gap-2 px-4 py-2 text-[#757575] font-bold hover:bg-gray-50 rounded-md transition-all">
+                        <button className="flex items-center gap-2 px-4 py-2 text-[#757575] font-semibold hover:bg-gray-50 rounded-md transition-all">
                             <ShoppingBag size={20} />
                             Pickup
                         </button>

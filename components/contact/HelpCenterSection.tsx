@@ -70,7 +70,7 @@ function HelpCard({ icon, title, description }: HelpCardProps) {
     <div className="bg-white rounded-[14px] p-6 shadow-sm hover:shadow-md transition duration-300 border border-gray-100">
 
       {/* ICON */}
-      <div className="text-orange-500 text-[18px] mb-4">
+      <div className="text-primary text-[18px] mb-4">
         {icon}
       </div>
 
@@ -85,7 +85,7 @@ function HelpCard({ icon, title, description }: HelpCardProps) {
       </p>
 
       {/* CTA */}
-      <button className="text-orange-500 text-[12px] font-semibold tracking-wide flex items-center gap-1 hover:gap-2 transition-all">
+      <button className="text-primary text-[12px] font-semibold tracking-wide flex items-center gap-1 hover:gap-2 transition-all">
         EXPLORE →
       </button>
     </div>

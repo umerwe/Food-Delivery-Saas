@@ -33,7 +33,7 @@ export default function EditorialSection() {
             the precision of a master chef’s garnish.
           </p>
 
-          <button className="mt-6 text-orange-500 font-semibold text-[14px] hover:underline">
+          <button className="mt-6 text-primary font-semibold text-[14px] hover:underline">
             View Our Compliance Philosophy
           </button>
 

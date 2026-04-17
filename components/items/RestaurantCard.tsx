@@ -23,12 +23,15 @@ export default function RestaurantCard({ item }: any) {
   const [qty, setQty] = useState(1);
   const [selectedVariation, setSelectedVariation] = useState<any>(null);
   const [selectedModifiers, setSelectedModifiers] = useState<any>({});
-  const [selectedBranch, setSelectedBranch] = useState<any>(null);
+
+  const [selectedBranch, setSelectedBranch] = useState<any>(
+  user?.branchId ? { id: user.branchId } : null
+);
+const [branchId, setBranchId] = useState(user?.branchId || "");
 
   const [animateCart, setAnimateCart] = useState(false);
 
   const customerId = user?.id;
-const [branchId, setBranchId] = useState("");
   const hasOptions =
     item?.variations?.length > 0 || item?.modifierLinks?.length > 0;
 
@@ -77,7 +80,7 @@ const [branchId, setBranchId] = useState("");
       auth.user.branchId = branch.id;
       localStorage.setItem("auth", JSON.stringify(auth));
     }
-setBranchId(branch.id);
+    setBranchId(branch.id);
     setUser((prev: any) => ({
       ...prev,
       branchId: branch.id,
@@ -92,7 +95,7 @@ setBranchId(branch.id);
       setLoading(true);
 
       const groupCode = localStorage.getItem("groupOrderCode");
-      const finalBranchId = branchId || selectedBranch?.id;
+     const finalBranchId = branchId || selectedBranch?.id || user?.branchId;
 
       if (!groupCode && !finalBranchId) {
         toast.error("Please select a branch");
@@ -136,7 +139,7 @@ setBranchId(branch.id);
 }
 
       toast.success("Added to cart");
-
+router.push('/checkout');
       setAnimateCart(true);
       setTimeout(() => setAnimateCart(false), 700);
 
@@ -149,13 +152,22 @@ setBranchId(branch.id);
   }
 
   /* ---------------- CLICK + ---------------- */
-  const handlePlusClick = () => {
-    if (!hasOptions) {
-      handleAddToCart();
-    } else {
+ const handlePlusClick = () => {
+  const groupCode = localStorage.getItem("groupOrderCode");
+  const existingBranchId = branchId || selectedBranch?.id || user?.branchId;
+
+  if (!hasOptions) {
+    if (!groupCode && !existingBranchId) {
       setOpen(true);
+      return;
     }
-  };
+
+    handleAddToCart();
+    return;
+  }
+
+  setOpen(true);
+};
 
   const handleNavigateToDetails = () => {
     router.push(`/items/details?itemId=${item.id}&slug=${item.slug}`);

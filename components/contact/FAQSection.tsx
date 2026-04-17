@@ -76,7 +76,7 @@ export default function FAQSection() {
             </div>
 
             {/* CTA */}
-            <button onClick={()=>router.push('/contact/chat')} className="cursor-pointer mt-6 w-full bg-orange-500 text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition">
+            <button onClick={()=>router.push('/contact/chat')} className="cursor-pointer mt-6 w-full bg-primary text-white py-3 rounded-lg font-medium hover:bg-orange-600 transition">
               Start Live Consultation
             </button>
           </div>
