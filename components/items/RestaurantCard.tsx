@@ -1,19 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { Plus, Info } from "lucide-react";
-import { useState } from "react";
+import { Plus, Info, Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useApi from "@/hooks/useApi";
 import { useAuthContext } from "@/context/AuthContext";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import AsyncSelect from "@/components/ui/AsyncSelect";
 
 export default function RestaurantCard({ item }: any) {
   const router = useRouter();
-  const { token, setUser } = useAuthContext();
+  const { token } = useAuthContext();
   const { post, get } = useApi(token);
   const { user } = useAuth();
 
@@ -21,33 +20,58 @@ export default function RestaurantCard({ item }: any) {
   const [open, setOpen] = useState(false);
 
   const [qty, setQty] = useState(1);
-  const [selectedVariation, setSelectedVariation] = useState<any>(null);
+  const [selectedVariation, setSelectedVariation] = useState<any>(
+    item?.variations?.length > 0 ? item.variations[0] : null
+  );
   const [selectedModifiers, setSelectedModifiers] = useState<any>({});
-
-  const [selectedBranch, setSelectedBranch] = useState<any>(
-  user?.branchId ? { id: user.branchId } : null
-);
-const [branchId, setBranchId] = useState(user?.branchId || "");
-
   const [animateCart, setAnimateCart] = useState(false);
 
   const customerId = user?.id;
+  const branchId = user?.branchId;
+
   const hasOptions =
     item?.variations?.length > 0 || item?.modifierLinks?.length > 0;
 
   /* ---------------- PRICE ---------------- */
-  const basePrice = selectedVariation
-    ? Number(selectedVariation.price)
-    : Number(item?.basePrice || 0);
+  const basePrice = Number(item?.basePrice || 0);
+
+  const variationPrice = selectedVariation
+    ? Number(selectedVariation.price || 0)
+    : 0;
 
   const modifiersTotal = Object.values(selectedModifiers)
     .flat()
     .reduce((acc: number, m: any) => acc + Number(m.priceDelta || 0), 0);
 
-  const totalPrice = (basePrice + modifiersTotal) * qty;
+  const totalPrice = (basePrice + variationPrice + modifiersTotal) * qty;
+
+  /* ---------------- FILTER MODIFIERS ---------------- */
+  const filteredModifierLinks = useMemo(() => {
+    if (!item?.modifierLinks?.length) return [];
+
+    return item.modifierLinks.filter((group: any) => {
+      const groupName = group?.modifierGroup?.name?.trim()?.toLowerCase();
+
+      // if variations exist, skip modifier group named "size"
+      if (item?.variations?.length > 0 && groupName === "size") {
+        return false;
+      }
+
+      // optional variation-aware filtering
+      if (group?.variationId && selectedVariation?.id) {
+        return group.variationId === selectedVariation.id;
+      }
+
+      return true;
+    });
+  }, [item?.modifierLinks, item?.variations, selectedVariation]);
 
   /* ---------------- MODIFIERS ---------------- */
-  const handleModifierChange = (groupId: string, modifier: any, checked: boolean) => {
+  const handleModifierChange = (
+    groupId: string,
+    modifier: any,
+    checked: boolean
+  ) => {
     setSelectedModifiers((prev: any) => {
       const current = prev[groupId] || [];
 
@@ -62,42 +86,14 @@ const [branchId, setBranchId] = useState(user?.branchId || "");
     });
   };
 
-  /* ---------------- FETCH BRANCHES ---------------- */
-  const fetchBranches = async ({ search = "", page = 1 }) => {
-    return await get(
-      `/v1/branches?restaurantId=${item.restaurantId}&search=${search}&page=${page}`
-    );
-  };
-
-  /* ---------------- SELECT BRANCH ---------------- */
-  const handleBranchSelect = (branch: any) => {
-    setSelectedBranch(branch);
-
-    const authRaw = localStorage.getItem("auth");
-    const auth = authRaw ? JSON.parse(authRaw) : null;
-
-    if (auth?.user) {
-      auth.user.branchId = branch.id;
-      localStorage.setItem("auth", JSON.stringify(auth));
-    }
-    setBranchId(branch.id);
-    setUser((prev: any) => ({
-      ...prev,
-      branchId: branch.id,
-    }));
-
-    toast.success("Branch selected");
-  };
-
   /* ---------------- ADD TO CART ---------------- */
   async function handleAddToCart() {
     try {
       setLoading(true);
 
       const groupCode = localStorage.getItem("groupOrderCode");
-     const finalBranchId = branchId || selectedBranch?.id || user?.branchId;
 
-      if (!groupCode && !finalBranchId) {
+      if (!groupCode && !branchId) {
         toast.error("Please select a branch");
         return;
       }
@@ -122,52 +118,55 @@ const [branchId, setBranchId] = useState(user?.branchId || "");
           (o: any) => o.inviteCode === groupCode
         );
 
-        res = await post(
-          `/v1/group-orders/${groupOrder.id}/items`,
-          basePayload
-        );
+        if (!groupOrder) {
+          toast.error("Invalid group order");
+          return;
+        }
+
+        res = await post(`/v1/group-orders/${groupOrder.id}/items`, basePayload);
       } else {
         res = await post(`/v1/cart/items?customerId=${customerId}`, {
           ...basePayload,
-          branchId: finalBranchId,
+          branchId,
         });
       }
 
-    if (!res || res.error) {
-  toast.error(res?.error || "Failed to add to cart");
-  return;
-}
+      if (!res || res.error) {
+        toast.error(res?.error || "Failed to add to cart");
+        return;
+      }
 
       toast.success("Added to cart");
-router.push('/checkout');
+      router.push("/checkout");
+
       setAnimateCart(true);
       setTimeout(() => setAnimateCart(false), 700);
 
       setOpen(false);
     } catch (err) {
-      toast.error("Error");
+      console.error(err);
+      toast.error("Something went wrong");
     } finally {
       setLoading(false);
     }
   }
 
   /* ---------------- CLICK + ---------------- */
- const handlePlusClick = () => {
-  const groupCode = localStorage.getItem("groupOrderCode");
-  const existingBranchId = branchId || selectedBranch?.id || user?.branchId;
+  const handlePlusClick = () => {
+    const groupCode = localStorage.getItem("groupOrderCode");
 
-  if (!hasOptions) {
-    if (!groupCode && !existingBranchId) {
-      setOpen(true);
+    if (!hasOptions) {
+      if (!groupCode && !branchId) {
+        toast.error("Please select a branch first");
+        return;
+      }
+
+      handleAddToCart();
       return;
     }
 
-    handleAddToCart();
-    return;
-  }
-
-  setOpen(true);
-};
+    setOpen(true);
+  };
 
   const handleNavigateToDetails = () => {
     router.push(`/items/details?itemId=${item.id}&slug=${item.slug}`);
@@ -181,27 +180,28 @@ router.push('/checkout');
   return (
     <>
       {/* CARD */}
-      <div className="group relative rounded-2xl p-[1px] bg-gradient-to-br from-gray-200 to-gray-50 from-orange-200 to-orange-50 transition">
-        <div className="bg-white/90 rounded-2xl p-4 flex justify-between gap-4 shadow hover:shadow-lg transition">
-
+      <div className="group relative rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-lg">
+        <div className="flex justify-between gap-4">
           <div className="flex-1">
-            <h3 className="font-semibold text-sm">{item.name}</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{item.name}</h3>
 
-            <p className="text-xs text-gray-500 mb-2">
+            <p className="mb-2 text-xs text-gray-500">
               {truncatedDesc || "Fresh premium item"}
             </p>
 
-            <p className="font-semibold text-sm">${item.basePrice}</p>
+            <p className="text-sm font-semibold text-gray-900">
+              ${Number(item.basePrice || 0).toFixed(2)}
+            </p>
 
             <button
               onClick={handleNavigateToDetails}
-              className="text-xs text-orange-500 mt-2 flex items-center gap-1"
+              className="mt-2 flex items-center gap-1 text-xs text-primary"
             >
               <Info size={14} /> Item Info
             </button>
           </div>
 
-          <div className="relative w-[120px] h-[110px] rounded-xl overflow-hidden">
+          <div className="relative h-[110px] w-[120px] overflow-hidden rounded-xl">
             <Image
               src={item.imageUrl || "/placeholder.png"}
               alt={item.name}
@@ -211,114 +211,140 @@ router.push('/checkout');
 
             <button
               onClick={handlePlusClick}
-              className="absolute bottom-2 right-2 bg-orange-500 text-white p-2 rounded-full"
+              disabled={loading}
+              className="absolute bottom-2 right-2 rounded-full bg-primary p-2 text-white shadow-sm transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              <Plus size={14} />
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             </button>
           </div>
         </div>
 
         {animateCart && (
-          <div className="absolute right-6 bottom-6 w-3 h-3 bg-orange-500 rounded-full animate-bounce" />
+          <div className="absolute bottom-6 right-6 h-3 w-3 animate-bounce rounded-full bg-primary" />
         )}
       </div>
 
       {/* MODAL */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md rounded-2xl p-6 max-h-[95vh] overflow-auto">
-
-          <h2 className="text-lg font-semibold mb-3">{item.name}</h2>
-
-          {/* BRANCH */}
-            <div className="mb-4">
-              <p className="text-sm font-medium mb-2">Select Branch</p>
-              <AsyncSelect
-                value={selectedBranch}
-                onChange={handleBranchSelect}
-                placeholder="Choose branch"
-                fetchOptions={fetchBranches}
-              />
-            </div>
-        
+        <DialogContent className="max-h-[95vh] max-w-md overflow-auto rounded-2xl p-6">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">{item.name}</h2>
 
           {/* VARIATIONS */}
           {item.variations?.length > 0 && (
-            <div className="mb-4">
-              <p className="font-medium mb-2">Choose Option</p>
-              <div className="flex gap-2 flex-wrap">
+            <div className="mb-5">
+              <p className="mb-2 font-medium text-gray-900">Size</p>
+
+              <div className="grid grid-cols-1 gap-3">
                 {item.variations.map((v: any) => (
-                  <button
+                  <label
                     key={v.id}
-                    onClick={() => setSelectedVariation(v)}
-                    className={`px-3 py-1 rounded-full text-sm border ${
+                    className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
                       selectedVariation?.id === v.id
-                        ? "bg-orange-500 text-white"
-                        : ""
+                        ? "border-primary bg-primary/5"
+                        : "border-gray-200 bg-white"
                     }`}
                   >
-                    {v.name} (+${v.price})
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 🔥 MODIFIERS BACK */}
-          {item.modifierLinks?.map((group: any) => (
-            <div key={group.id} className="mb-4">
-              <p className="font-medium mb-2">
-                {group.modifierGroup.name}
-              </p>
-
-              <div className="space-y-2">
-                {group.modifierGroup.modifiers.map((m: any) => (
-                  <label
-                    key={m.id}
-                    className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg text-sm cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <input
-                        type="checkbox"
-                        onChange={(e) =>
-                          handleModifierChange(
-                            group.modifierGroup.id,
-                            m,
-                            e.target.checked
-                          )
-                        }
+                        type="radio"
+                        name={`size-${item.id}`}
+                        checked={selectedVariation?.id === v.id}
+                        onChange={() => setSelectedVariation(v)}
+                        className="accent-[var(--primary)]"
                       />
-                      {m.name}
-                    </span>
+                      <span className="text-sm font-medium text-gray-800">
+                        {v.name}
+                      </span>
+                    </div>
 
-                    <span className="text-orange-500">
-                      +${m.priceDelta}
+                    <span className="text-sm font-semibold text-primary">
+                      {Number(v.price) > 0 ? `+$${Number(v.price).toFixed(0)}` : "+$0"}
                     </span>
                   </label>
                 ))}
               </div>
             </div>
+          )}
+
+          {/* MODIFIERS */}
+          {filteredModifierLinks.map((group: any) => (
+            <div key={group.id} className="mb-5">
+              <p className="mb-2 font-medium text-gray-900">
+                {group.modifierGroup.name}
+              </p>
+
+              <div className="space-y-2">
+                {group.modifierGroup.modifiers.map((m: any) => {
+                  const checked =
+                    (selectedModifiers[group.modifierGroup.id] || []).some(
+                      (selected: any) => selected.id === m.id
+                    );
+
+                  return (
+                    <label
+                      key={m.id}
+                      className="flex cursor-pointer items-center justify-between rounded-xl bg-gray-50 px-3 py-3 text-sm"
+                    >
+                      <span className="flex items-center gap-2 text-gray-800">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) =>
+                            handleModifierChange(
+                              group.modifierGroup.id,
+                              m,
+                              e.target.checked
+                            )
+                          }
+                          className="accent-[var(--primary)]"
+                        />
+                        {m.name}
+                      </span>
+
+                      <span className="font-medium text-primary">
+                        +${Number(m.priceDelta || 0).toFixed(0)}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
           ))}
 
-          {/* QTY + PRICE */}
-          <div className="flex justify-between mb-4">
-            <div className="flex bg-gray-100 rounded-full px-3">
-              <button onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
-              <span className="px-4">{qty}</span>
-              <button onClick={() => setQty(qty + 1)}>+</button>
+          {/* QTY + TOTAL */}
+          <div className="mb-5 flex items-center justify-between">
+            <div className="flex items-center rounded-full bg-gray-100 px-3 py-1.5">
+              <button
+                onClick={() => setQty(Math.max(1, qty - 1))}
+                className="px-2 text-lg text-gray-700"
+                disabled={loading}
+              >
+                −
+              </button>
+              <span className="px-4 text-sm font-semibold text-gray-900">{qty}</span>
+              <button
+                onClick={() => setQty(qty + 1)}
+                className="px-2 text-lg text-gray-700"
+                disabled={loading}
+              >
+                +
+              </button>
             </div>
 
-            <div className="font-semibold text-orange-500">
+            <div className="text-lg font-semibold text-primary">
               ${totalPrice.toFixed(2)}
             </div>
           </div>
 
+          {/* CTA */}
           <button
             onClick={handleAddToCart}
-            className="w-full bg-orange-500 text-white py-3 rounded-full"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            Add to Cart
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            {loading ? "Processing..." : "Add to Cart"}
           </button>
-
         </DialogContent>
       </Dialog>
     </>

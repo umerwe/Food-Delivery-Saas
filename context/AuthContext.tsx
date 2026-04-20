@@ -3,6 +3,18 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { API_BASE_URL } from "@/lib/constants";
 
+interface Branch {
+  id: string;
+  name: string;
+  isActive?: boolean;
+  address?: {
+    area?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+  };
+}
+
 interface User {
   id: string;
   email: string;
@@ -10,13 +22,14 @@ interface User {
   tenantId: string;
   restaurantId?: string | null;
   branchId?: string | null;
+  branch?: Branch | null;
   profile?: {
     firstName: string;
     lastName: string;
     avatarUrl: string;
     phone?: string | null;
     bio?: string;
-     createdAt?: string;
+    createdAt?: string;
   };
 }
 
@@ -36,7 +49,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // ---------------- STORAGE HELPERS ----------------
   const getStoredAuth = () => {
     const stored = localStorage.getItem("auth");
     if (!stored) return null;
@@ -51,128 +63,126 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.removeItem("auth");
   };
 
-  // ---------------- API HELPERS ----------------
- 
   const refreshToken = async () => {
-  const stored = getStoredAuth();
-  if (!stored?.refreshToken) return false;
+    const stored = getStoredAuth();
+    if (!stored?.refreshToken) return false;
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/v1/auth/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        refreshToken: stored.refreshToken,
-      }),
-    });
-
-    if (!res.ok) return false;
-
-    const data = await res.json();
-
-    const mergedData = {
-      ...data.data,
-      user: {
-        ...stored.user, // ✅ preserve old user data
-      },
-    };
-
-    saveAuth(mergedData);
-
-    return mergedData.accessToken;
-  } catch (err) {
-    console.error("Refresh token failed", err);
-    return false;
-  }
-};
-
-const fetchMe = async (token: string) => {
-  const res = await fetch(`${API_BASE_URL}/v1/auth/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (res.status === 401) {
-    throw new Error("UNAUTHORIZED");
-  }
-
-  if (!res.ok) {
-    throw new Error("FETCH_ME_FAILED");
-  }
-
-  const data = await res.json();
-  return data.data;
-};
-
-  // ---------------- INIT AUTH ----------------
-  useEffect(() => {
-  const initAuth = async () => {
     try {
-      const stored = getStoredAuth();
+      const res = await fetch(`${API_BASE_URL}/v1/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          refreshToken: stored.refreshToken,
+        }),
+      });
 
-      if (!stored?.accessToken) {
-        setLoading(false);
-        return;
-      }
+      if (!res.ok) return false;
 
-      try {
-        const me = await fetchMe(stored.accessToken);
+      const data = await res.json();
 
-        const mergedUser = {
-          ...me,
-          restaurantId: stored?.user?.restaurantId ?? null,
-          branchId: stored?.user?.branchId ?? null,
-        };
+      const mergedData = {
+        ...data.data,
+        user: {
+          ...stored.user,
+        },
+      };
 
-        setUser(mergedUser);
-        setToken(stored.accessToken);
-      } catch (error: unknown) {
-        // ✅ Safely check error type
-        const isUnauthorized =
-          error instanceof Error && error.message === "UNAUTHORIZED";
+      saveAuth(mergedData);
 
-        if (!isUnauthorized) {
-          console.error("Non-auth error during fetchMe:", error);
-          setLoading(false);
-          return;
-        }
-
-        // 🔄 Try refresh only for 401
-        const newAccessToken = await refreshToken();
-
-        if (!newAccessToken) {
-          clearAuthStorage();
-          setUser(null);
-          setToken(null);
-          setLoading(false);
-          return;
-        }
-
-        const me = await fetchMe(newAccessToken);
-        const updatedStored = getStoredAuth();
-
-        const mergedUser = {
-          ...me,
-          restaurantId: updatedStored?.user?.restaurantId ?? null,
-          branchId: updatedStored?.user?.branchId ?? null,
-        };
-
-        setUser(mergedUser);
-        setToken(newAccessToken);
-      }
-    } catch (error) {
-      console.error("Auth init failed", error);
-    } finally {
-      setLoading(false);
+      return mergedData.accessToken;
+    } catch (err) {
+      console.error("Refresh token failed", err);
+      return false;
     }
   };
 
-  initAuth();
-}, []);
-  // ---------------- ACTIONS ----------------
+  const fetchMe = async (token: string) => {
+    const res = await fetch(`${API_BASE_URL}/v1/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (res.status === 401) {
+      throw new Error("UNAUTHORIZED");
+    }
+
+    if (!res.ok) {
+      throw new Error("FETCH_ME_FAILED");
+    }
+
+    const data = await res.json();
+    return data.data;
+  };
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const stored = getStoredAuth();
+
+        if (!stored?.accessToken) {
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const me = await fetchMe(stored.accessToken);
+
+          const mergedUser: User = {
+            ...me,
+            restaurantId: stored?.user?.restaurantId ?? me?.restaurantId ?? null,
+            branchId: stored?.user?.branchId ?? me?.branchId ?? null,
+            branch: stored?.user?.branch ?? me?.branch ?? null,
+          };
+
+          setUser(mergedUser);
+          setToken(stored.accessToken);
+        } catch (error: unknown) {
+          const isUnauthorized =
+            error instanceof Error && error.message === "UNAUTHORIZED";
+
+          if (!isUnauthorized) {
+            console.error("Non-auth error during fetchMe:", error);
+            setLoading(false);
+            return;
+          }
+
+          const newAccessToken = await refreshToken();
+
+          if (!newAccessToken) {
+            clearAuthStorage();
+            setUser(null);
+            setToken(null);
+            setLoading(false);
+            return;
+          }
+
+          const me = await fetchMe(newAccessToken);
+          const updatedStored = getStoredAuth();
+
+          const mergedUser: User = {
+            ...me,
+            restaurantId:
+              updatedStored?.user?.restaurantId ?? me?.restaurantId ?? null,
+            branchId: updatedStored?.user?.branchId ?? me?.branchId ?? null,
+            branch: updatedStored?.user?.branch ?? me?.branch ?? null,
+          };
+
+          setUser(mergedUser);
+          setToken(newAccessToken);
+        }
+      } catch (error) {
+        console.error("Auth init failed", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
+  }, []);
+
   const login = (data: any) => {
     saveAuth(data);
     setToken(data.accessToken);
@@ -186,7 +196,9 @@ const fetchMe = async (token: string) => {
   };
 
   return (
-   <AuthContext.Provider value={{ user, token, login, logout, loading, setUser }}>
+    <AuthContext.Provider
+      value={{ user, token, login, logout, loading, setUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

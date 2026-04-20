@@ -7,8 +7,6 @@ import TestimonialsSection from "./Testimonials";
 import useApi from "@/hooks/useApi";
 import { useAuthContext } from "@/context/AuthContext";
 import { toast } from "sonner";
-import useBranchSelector from "@/hooks/useBranchSelector";
-import BranchPopup from "@/components/popups/BranchPopup";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function ProductPage() {
@@ -86,12 +84,6 @@ const branchId = user?.branchId;
 
     const groupCode = localStorage.getItem("groupOrderCode");
 
-    // 🔥 ONLY enforce branch selection for normal flow
-    if (!groupCode && (!branchId || showBranchPopup === false)) {
-      await fetchBranches();
-      setShowBranchPopup(true);
-      return;
-    }
 
     // 🔥 COMMON BASE PAYLOAD
     const basePayload = {
@@ -170,14 +162,6 @@ if (!res || res.error) {
     setLoading(false);
   }
 };
-  const {
-    showBranchPopup,
-    setShowBranchPopup,
-    branches,
-    loadingBranches,
-    fetchBranches,
-    selectBranch,
-  } = useBranchSelector(handleAddToCart);
 
   if (!item) return <p className="p-10">Loading...</p>;
 
@@ -408,13 +392,7 @@ if (!res || res.error) {
 
       <TestimonialsSection />
 
-      <BranchPopup
-        show={showBranchPopup}
-        onClose={() => setShowBranchPopup(false)}
-        branches={branches}
-        loading={loadingBranches}
-        onSelect={selectBranch}
-      />
+     
     </>
   );
 }

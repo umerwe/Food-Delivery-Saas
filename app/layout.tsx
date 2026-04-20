@@ -3,9 +3,6 @@ import "./globals.css";
 import { poppins } from "@/lib/fonts";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
-import BranchSelect from "@/components/ui/BranchSelect";
-import BranchPopup from "@/components/popups/BranchPopup";
-import RequiredBranchSelectionModal from "@/components/forms/RequiredBranchSelectionModal";
 
 export const metadata: Metadata = {
   title: "Home | Food",

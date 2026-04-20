@@ -8,7 +8,7 @@ import BlogSection from '@/components/blogSection';
 import NewsletterSection from '@/components/newsLetterSection';
 import Footer from '@/components/layout/footer';
 import { useAuth } from '@/hooks/useAuth';
-import RequiredBranchSelectionModal from '@/components/forms/RequiredBranchSelectionModal';
+import RequiredBranchSelectionModal from '@/components/branch-selector/RequiredBranchSelectionModal';
 
 const HomePage = () => {
   const { user, token } = useAuth();
