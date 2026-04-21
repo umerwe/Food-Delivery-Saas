@@ -164,7 +164,18 @@ if (!res || res.error) {
 };
 
   if (!item) return <p className="p-10">Loading...</p>;
+const hasIngredients =
+  item?.ingredients && String(item.ingredients).trim() !== "";
 
+const hasNutritionalInformation =
+  item?.nutritionalInformation &&
+  String(item.nutritionalInformation).trim() !== "";
+
+const hasDietaryFlags =
+  Array.isArray(item?.dietaryFlags) && item.dietaryFlags.length > 0;
+
+const hasAllergenFlags =
+  Array.isArray(item?.allergenFlags) && item.allergenFlags.length > 0;
   return (
     <>
       <div className="mx-auto px-4 sm:px-6 md:px-10 lg:px-40 py-6 md:py-10 grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
@@ -189,72 +200,71 @@ if (!res || res.error) {
 ) : null}
           </div>
 
-          {/* INGREDIENTS */}
-          <div>
-            <h3 className="font-semibold mb-2">Ingredients</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Our beef is 100% pasture-raised, aged for 21 days for maximum flavor density. We use Vermont white cheddar, heirloom beefsteak tomatoes from local farms, wild-grown crisp lettuce, and our proprietary butter-toasted brioche bun.
-            </p>
-          </div>
+                  {/* INGREDIENTS */}
+          {hasIngredients ? (
+            <div>
+              <h3 className="font-semibold mb-2">Ingredients</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {item.ingredients}
+              </p>
+            </div>
+          ) : null}
 
           {/* NUTRITION */}
-          <div>
-            <h3 className="font-semibold text-lg mb-3">Nutritional Information</h3>
-            <div className="text-sm text-gray-600 rounded-xl overflow-hidden">
-              <div className="flex justify-between py-2 text-xs uppercase text-gray-400 bg-gray-50">
-                <span>Metric</span>
-                <span>Per Serving (14oz)</span>
-              </div>
+        
+                  {/* NUTRITION + FLAGS */}
+          {hasNutritionalInformation || hasDietaryFlags || hasAllergenFlags ? (
+            <div>
+              {hasNutritionalInformation ? (
+                <>
+                  <h3 className="font-semibold text-lg mb-3">
+                    Nutritional Information
+                  </h3>
+                  <div className="text-sm text-gray-600 rounded-xl bg-gray-50 p-4 leading-relaxed">
+                    {item.nutritionalInformation}
+                  </div>
+                </>
+              ) : null}
 
-              {[
-                ["Energy", "1,120 kcal"],
-                ["Protein", "68g"],
-                ["Total Fat", "84g"],
-                ["Carbohydrates", "0g"],
-                ["Sodium", "840mg"],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between py-3">
-                  <span>{k}</span>
-                  <span>{v}</span>
+              {hasDietaryFlags ? (
+                <div className="mt-4">
+                  <h4 className="font-medium text-sm mb-2 text-gray-700">
+                    Dietary Preferences
+                  </h4>
+
+                  <div className="flex flex-wrap gap-2">
+                    {item.dietaryFlags.map((f: string) => (
+                      <span
+                        key={f}
+                        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full"
+                      >
+                        {f}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              ) : null}
+
+              {hasAllergenFlags ? (
+                <div className="mt-4">
+                  <h4 className="font-medium text-sm mb-2 text-gray-700">
+                    Allergen Information
+                  </h4>
+
+                  <div className="flex flex-wrap gap-2">
+                    {item.allergenFlags.map((f: string) => (
+                      <span
+                        key={f}
+                        className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full"
+                      >
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
-{/* DIETARY */}
-<div className="mt-4">
-  <h4 className="font-medium text-sm mb-2 text-gray-700">
-    Dietary Preferences
-  </h4>
-
-  <div className="flex flex-wrap gap-2">
-    {item.dietaryFlags?.map((f: string) => (
-      <span
-        key={f}
-        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full"
-      >
-        {f}
-      </span>
-    ))}
-  </div>
-</div>
-
-{/* ALLERGENS */}
-<div className="mt-4">
-  <h4 className="font-medium text-sm mb-2 text-gray-700">
-    Allergen Information
-  </h4>
-
-  <div className="flex flex-wrap gap-2">
-    {item.allergenFlags?.map((f: string) => (
-      <span
-        key={f}
-        className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full"
-      >
-        {f}
-      </span>
-    ))}
-  </div>
-</div>
-          </div>
+          ) : null}
         </div>
 
         {/* RIGHT */}

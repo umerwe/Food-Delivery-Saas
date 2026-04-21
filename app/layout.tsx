@@ -3,6 +3,7 @@ import "./globals.css";
 import { poppins } from "@/lib/fonts";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
+import OrderNowFloatingButton from "@/components/ui/OrderNowFloatingButton";
 
 export const metadata: Metadata = {
   title: "Home | Food",
