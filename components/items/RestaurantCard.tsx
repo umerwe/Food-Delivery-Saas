@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Plus, Info, Loader2 } from "lucide-react";
+import { Plus, Info, Loader2, Eye, EyeOff } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useApi from "@/hooks/useApi";
@@ -15,7 +15,7 @@ export default function RestaurantCard({ item }: any) {
   const { token } = useAuthContext();
   const { post, get } = useApi(token);
   const { user } = useAuth();
-
+const [showInfoBox, setShowInfoBox] = useState(false);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -177,6 +177,15 @@ export default function RestaurantCard({ item }: any) {
       ? item.description.slice(0, 90) + "..."
       : item?.description;
 
+      const hasIngredients =
+  item?.ingredients && String(item.ingredients).trim() !== "";
+
+const hasNutritionalInformation =
+  item?.nutritionalInformation &&
+  String(item.nutritionalInformation).trim() !== "";
+
+const hasInfoBoxContent = hasIngredients || hasNutritionalInformation;
+
   return (
     <>
       {/* CARD */}
@@ -188,17 +197,54 @@ export default function RestaurantCard({ item }: any) {
             <p className="mb-2 text-xs text-gray-500">
               {truncatedDesc || "Fresh premium item"}
             </p>
-
+         
             <p className="text-sm font-semibold text-gray-900">
               ${Number(item.basePrice || 0).toFixed(2)}
             </p>
+{hasInfoBoxContent ? (
+  <div className="mt-3">
+    <div className="flex justify-end">
+      <button
+        type="button"
+        onClick={() => setShowInfoBox((prev) => !prev)}
+        className="rounded-full border border-gray-200 bg-gray-50 p-2 text-gray-500 transition hover:text-primary"
+      >
+        {showInfoBox ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
 
+    {showInfoBox ? (
+      <div className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+        <div className="space-y-2 text-xs text-gray-600">
+          {hasIngredients ? (
+            <div>
+              <span className="font-medium text-gray-800">
+                Ingredients:
+              </span>{" "}
+              {item.ingredients}
+            </div>
+          ) : null}
+
+          {hasNutritionalInformation ? (
+            <div>
+              <span className="font-medium text-gray-800">
+                Nutritional Info:
+              </span>{" "}
+              {item.nutritionalInformation}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    ) : null}
+  </div>
+) : null}
             <button
               onClick={handleNavigateToDetails}
               className="mt-2 flex items-center gap-1 text-xs text-primary"
             >
               <Info size={14} /> Item Info
             </button>
+            
           </div>
 
           <div className="relative h-[110px] w-[120px] overflow-hidden rounded-xl">
