@@ -8,7 +8,8 @@ import BlogSection from '@/components/blogSection';
 import NewsletterSection from '@/components/newsLetterSection';
 import Footer from '@/components/layout/footer';
 import { useAuth } from '@/hooks/useAuth';
-import RequiredBranchSelectionModal from '@/components/forms/RequiredBranchSelectionModal';
+import RequiredBranchSelectionModal from '@/components/branch-selector/RequiredBranchSelectionModal';
+import OrderNowFloatingButton from '@/components/ui/OrderNowFloatingButton';
 
 const HomePage = () => {
   const { user, token } = useAuth();
@@ -27,7 +28,10 @@ const HomePage = () => {
       <Footer isHome={true} />
         {user && token && !user?.branchId && (
         <RequiredBranchSelectionModal />
+        
       )}
+      
+            <OrderNowFloatingButton />
     </div>
   );
 };

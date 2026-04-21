@@ -8,6 +8,8 @@ import {
   Plus,
   Home,
   Building2,
+  ArrowUpRight,
+  Wallet,
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "../ui/button";
@@ -30,7 +32,9 @@ export default function ProfileForm() {
   const [isEditing, setIsEditing] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
-
+const [walletBalance, setWalletBalance] = useState(0);
+const [walletCurrency, setWalletCurrency] = useState("USD");
+const [walletTxns, setWalletTxns] = useState(0);
   const [updating, setUpdating] = useState(false);
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
@@ -63,7 +67,23 @@ export default function ProfileForm() {
     });
 
     fetchAddresses();
+    fetchWallet();
   }, [user, token]);
+
+  const fetchWallet = async () => {
+  try {
+    const res = await get("/v1/customer-app/wallet");
+
+    if (!res?.error) {
+      setWalletBalance(res?.data?.balance || 0);
+      setWalletCurrency(res?.data?.currency || "USD");
+      setWalletTxns(res?.data?.history?.length || 0);
+    }
+  } catch (error) {
+    console.error(error);
+    toast.error("Failed to load wallet");
+  }
+};
 
   const fetchAddresses = async () => {
     try {
@@ -352,29 +372,60 @@ export default function ProfileForm() {
         )}
       </div>
 
-      {/* BALANCE */}
-      <div className="bg-primary rounded-[20px] p-6 text-white h-full">
-        <p className="uppercase text-[11px] tracking-wide text-white/80 font-normal">
-          Current Balance
-        </p>
+     {/* BALANCE */}
+<div
+  className="rounded-[20px] p-6 text-white h-full"
+  style={{
+    background:
+      "linear-gradient(135deg, var(--primary), #a91114)",
+  }}
+>
+  <div className="flex items-center justify-between">
+    <div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center">
+      <Wallet size={20} />
+    </div>
 
-        <h3 className="text-[44px] font-semibold mt-4">
-          $1,245.50
-        </h3>
+    <Link
+      href="/payments-history"
+      className="px-3 py-1.5 rounded-full bg-white text-red-600 text-sm font-medium hover:bg-white"
+    >
+      View Wallet
+    </Link>
+  </div>
 
-        <div className="flex items-end justify-between mt-12 gap-4">
-          <div>
-            <p className="text-sm text-white/80 font-normal">
-              Loyalty Points
-            </p>
-            <p className="font-medium text-xl">2,450 pts</p>
-          </div>
+  <p className="uppercase text-[11px] tracking-[0.18em] text-white/75 mt-5 font-normal">
+    Current Balance
+  </p>
 
-          <Link href="/payments-history" className="px-3 py-1.5 rounded-full bg-white text-red-600 hover:bg-white font-medium text-sm">
-            Payments History
-          </Link>
-        </div>
-      </div>
+  <h3 className="text-[38px] md:text-[42px] font-semibold mt-2 leading-none">
+    {walletCurrency} {Number(walletBalance || 0).toFixed(2)}
+  </h3>
+
+  <div className="grid grid-cols-2 gap-3 mt-8">
+    <div className="rounded-2xl bg-white/10 px-4 py-3">
+      <p className="text-[11px] uppercase text-white/70">
+        Transactions
+      </p>
+      <p className="text-[22px] font-semibold mt-1">
+        {walletTxns}
+      </p>
+    </div>
+
+    <div className="rounded-2xl bg-white/10 px-4 py-3">
+      <p className="text-[11px] uppercase text-white/70">
+        Status
+      </p>
+      <p className="text-[16px] font-medium mt-2 flex items-center gap-1">
+        Active
+        <ArrowUpRight size={14} />
+      </p>
+    </div>
+  </div>
+
+  <p className="text-xs text-white/70 mt-5">
+    Manage wallet funds & payment activity anytime.
+  </p>
+</div>
     </div>
 
     {/* ROW 2 */}

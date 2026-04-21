@@ -9,7 +9,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import useApi from "@/hooks/useApi";
 import { toast } from "sonner";
 import { useAuthContext } from "@/context/AuthContext";
-
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import { useAuth } from "@/hooks/useAuth";
 export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
@@ -23,7 +25,13 @@ const [cartItems, setCartItems] = useState<any[]>([]);
 const [loadingCart, setLoadingCart] = useState(false);
 const router = useRouter();
 const customerId = user?.id;
-
+const [stripePayment, setStripePayment] = useState<any>({
+  open: false,
+  clientSecret: "",
+  publishableKey: "",
+  paymentId: "",
+  orderId: "",
+});
 
   const fetchCart = async () => {
   try {
@@ -236,7 +244,12 @@ if (!orderTime) {
 // ✅ 3. checkout
 const res = await post(`/v1/cart/checkout?customerId=${customerId}`, {
   orderTime,
-  paymentMethod: paymentMethod === "card" ? "COD" : "COD",
+  paymentMethod:
+    paymentMethod === "card"
+      ? "STRIPE"
+      : paymentMethod === "wallet"
+      ? "WALLET"
+      : "COD",
   customerNote: note,
 });
 
@@ -247,13 +260,55 @@ const res = await post(`/v1/cart/checkout?customerId=${customerId}`, {
 
     const orderId = res?.data?.id;
 
-    toast.success("Order placed successfully");
+if (!orderId) {
+  return toast.error("Invalid order response");
+}
 
-    // ✅ clear cart
-    await clearCart();
+// ✅ COD → direct success
+if (paymentMethod === "card") {
+  // STRIPE FLOW
 
-    // ✅ redirect
-    router.push(`/order?success=true&orderId=${orderId}`);
+  const attemptRes = await post(
+    `/v1/payments/orders/${orderId}/attempts`,
+    {
+      paymentMethod: "STRIPE",
+      currency: "USD",
+      note: "Order payment",
+    }
+  );
+
+  if (!attemptRes?.success) {
+    return toast.error("Failed to initiate payment");
+  }
+
+  const payment = attemptRes?.data;
+
+  // 🔥 open stripe modal (we’ll build below)
+  setStripePayment({
+    open: true,
+    clientSecret: payment?.providerData?.clientSecret,
+    publishableKey: payment?.providerData?.publishableKey,
+    paymentId: payment?.id,
+    orderId,
+  });
+
+  return;
+}
+
+// ✅ WALLET (optional)
+if (paymentMethod === "wallet") {
+  toast.success("Paid using wallet");
+
+  await clearCart();
+  router.push(`/order?success=true&orderId=${orderId}`);
+  return;
+}
+
+// ✅ COD
+toast.success("Order placed successfully");
+
+await clearCart();
+router.push(`/order?success=true&orderId=${orderId}`);
 
   } catch (err) {
     console.error(err);
@@ -358,6 +413,108 @@ const validateCoupon = async () => {
         </div>
 
       </div>
+
+      {stripePayment.open && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 ">
+    <div className="bg-white rounded-2xl p-6 w-[400px] max-h-[90vh] overflow-auto">
+      <h2 className="text-lg font-semibold mb-4">
+        Complete Payment
+      </h2>
+
+      <Elements
+        stripe={loadStripe(stripePayment.publishableKey)}
+        options={{ clientSecret: stripePayment.clientSecret }}
+      >
+        <OrderStripeCheckout
+          clientSecret={stripePayment.clientSecret}
+          paymentId={stripePayment.paymentId}
+          onSuccess={async () => {
+            setStripePayment({ open: false });
+
+            await clearCart();
+            router.push(
+              `/order?success=true&orderId=${stripePayment.orderId}`
+            );
+          }}
+          onFail={() => {
+            setStripePayment({ open: false });
+          }}
+        />
+      </Elements>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
+
+
+
+
+
+
+
+
+const OrderStripeCheckout = ({
+  clientSecret,
+  paymentId,
+  onSuccess,
+  onFail,
+}: any) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+  const {token} = useAuth();
+  const { post } = useApi(token);
+
+  const handlePay = async () => {
+    if (!stripe || !elements) return;
+
+    setLoading(true);
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      redirect: "if_required",
+    });
+
+    if (error) {
+      await post(`/v1/payments/${paymentId}/fail`, {
+        note: error.message,
+      });
+
+      toast.error(error.message || "Payment failed");
+      setLoading(false);
+      onFail();
+      return;
+    }
+
+    if (paymentIntent?.status === "succeeded") {
+      await post(`/v1/payments/${paymentId}/mark-paid`, {
+        providerRef: paymentIntent.id,
+        providerData: paymentIntent,
+        note: "Stripe success",
+      });
+
+      toast.success("Payment successful");
+      onSuccess();
+    }
+
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+
+      <button
+        onClick={handlePay}
+        disabled={loading}
+        className="w-full h-11 rounded-xl text-white"
+        style={{ background: "var(--primary)" }}
+      >
+        {loading ? "Processing..." : "Pay Now"}
+      </button>
+    </div>
+  );
+};

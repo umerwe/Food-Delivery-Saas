@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation"
 import { useAuthContext } from "@/context/AuthContext"
 import { useAuth } from "@/hooks/useAuth"
 import useApi from "@/hooks/useApi"
+import BranchSwitcher from "../branch-selector/BranchSwitcher"
 
 type MenuItem = {
   id: string
@@ -295,7 +296,7 @@ const Navbar = () => {
               <ShoppingBag size={18} className="text-primary" />
               <span className="text-primary font-semibold">Cart</span>
             </Link>
-
+ <BranchSwitcher />
             {/* USER */}
             {isAuth ? (
               <div ref={dropdownRef} className="relative">

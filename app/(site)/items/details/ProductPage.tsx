@@ -7,8 +7,6 @@ import TestimonialsSection from "./Testimonials";
 import useApi from "@/hooks/useApi";
 import { useAuthContext } from "@/context/AuthContext";
 import { toast } from "sonner";
-import useBranchSelector from "@/hooks/useBranchSelector";
-import BranchPopup from "@/components/popups/BranchPopup";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function ProductPage() {
@@ -64,16 +62,17 @@ export default function ProductPage() {
   };
 
   /* ---------------- PRICE CALC ---------------- */
-  const basePrice = selectedVariation
-    ? Number(selectedVariation.price)
-    : Number(item?.basePrice || 0);
+const basePrice = Number(item?.basePrice || 0);
 
+const variationPrice = selectedVariation
+  ? Number(selectedVariation.price || 0)
+  : 0;
+  
   const modifiersTotal = Object.values(selectedModifiers).flat().reduce(
     (acc: number, m: any) => acc + Number(m.priceDelta || 0),
     0
   );
-
-  const totalPrice = (basePrice + modifiersTotal) * qty;
+const totalPrice = (basePrice + variationPrice + modifiersTotal) * qty;
 const { user } = useAuth();
 const customerId = user?.id;
 const branchId = user?.branchId;
@@ -85,12 +84,6 @@ const branchId = user?.branchId;
 
     const groupCode = localStorage.getItem("groupOrderCode");
 
-    // 🔥 ONLY enforce branch selection for normal flow
-    if (!groupCode && (!branchId || showBranchPopup === false)) {
-      await fetchBranches();
-      setShowBranchPopup(true);
-      return;
-    }
 
     // 🔥 COMMON BASE PAYLOAD
     const basePayload = {
@@ -169,17 +162,20 @@ if (!res || res.error) {
     setLoading(false);
   }
 };
-  const {
-    showBranchPopup,
-    setShowBranchPopup,
-    branches,
-    loadingBranches,
-    fetchBranches,
-    selectBranch,
-  } = useBranchSelector(handleAddToCart);
 
   if (!item) return <p className="p-10">Loading...</p>;
+const hasIngredients =
+  item?.ingredients && String(item.ingredients).trim() !== "";
 
+const hasNutritionalInformation =
+  item?.nutritionalInformation &&
+  String(item.nutritionalInformation).trim() !== "";
+
+const hasDietaryFlags =
+  Array.isArray(item?.dietaryFlags) && item.dietaryFlags.length > 0;
+
+const hasAllergenFlags =
+  Array.isArray(item?.allergenFlags) && item.allergenFlags.length > 0;
   return (
     <>
       <div className="mx-auto px-4 sm:px-6 md:px-10 lg:px-40 py-6 md:py-10 grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
@@ -199,75 +195,76 @@ if (!res || res.error) {
           {/* EXTRA INFO (minimal, no UI break) */}
           <div className="text-xs text-gray-400">
             <p>SKU: {item.sku}</p>
-            <p>Prep Time: {item.prepTimeMinutes} mins</p>
+          {item.prepTimeMinutes ? (
+  <p>Prep Time: {item.prepTimeMinutes} mins</p>
+) : null}
           </div>
 
-          {/* INGREDIENTS */}
-          <div>
-            <h3 className="font-semibold mb-2">Ingredients</h3>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              Our beef is 100% pasture-raised, aged for 21 days for maximum flavor density. We use Vermont white cheddar, heirloom beefsteak tomatoes from local farms, wild-grown crisp lettuce, and our proprietary butter-toasted brioche bun.
-            </p>
-          </div>
+                  {/* INGREDIENTS */}
+          {hasIngredients ? (
+            <div>
+              <h3 className="font-semibold mb-2">Ingredients</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {item.ingredients}
+              </p>
+            </div>
+          ) : null}
 
           {/* NUTRITION */}
-          <div>
-            <h3 className="font-semibold text-lg mb-3">Nutritional Information</h3>
-            <div className="text-sm text-gray-600 rounded-xl overflow-hidden">
-              <div className="flex justify-between py-2 text-xs uppercase text-gray-400 bg-gray-50">
-                <span>Metric</span>
-                <span>Per Serving (14oz)</span>
-              </div>
+        
+                  {/* NUTRITION + FLAGS */}
+          {hasNutritionalInformation || hasDietaryFlags || hasAllergenFlags ? (
+            <div>
+              {hasNutritionalInformation ? (
+                <>
+                  <h3 className="font-semibold text-lg mb-3">
+                    Nutritional Information
+                  </h3>
+                  <div className="text-sm text-gray-600 rounded-xl bg-gray-50 p-4 leading-relaxed">
+                    {item.nutritionalInformation}
+                  </div>
+                </>
+              ) : null}
 
-              {[
-                ["Energy", "1,120 kcal"],
-                ["Protein", "68g"],
-                ["Total Fat", "84g"],
-                ["Carbohydrates", "0g"],
-                ["Sodium", "840mg"],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between py-3">
-                  <span>{k}</span>
-                  <span>{v}</span>
+              {hasDietaryFlags ? (
+                <div className="mt-4">
+                  <h4 className="font-medium text-sm mb-2 text-gray-700">
+                    Dietary Preferences
+                  </h4>
+
+                  <div className="flex flex-wrap gap-2">
+                    {item.dietaryFlags.map((f: string) => (
+                      <span
+                        key={f}
+                        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full"
+                      >
+                        {f}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              ) : null}
+
+              {hasAllergenFlags ? (
+                <div className="mt-4">
+                  <h4 className="font-medium text-sm mb-2 text-gray-700">
+                    Allergen Information
+                  </h4>
+
+                  <div className="flex flex-wrap gap-2">
+                    {item.allergenFlags.map((f: string) => (
+                      <span
+                        key={f}
+                        className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full"
+                      >
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
-{/* DIETARY */}
-<div className="mt-4">
-  <h4 className="font-medium text-sm mb-2 text-gray-700">
-    Dietary Preferences
-  </h4>
-
-  <div className="flex flex-wrap gap-2">
-    {item.dietaryFlags?.map((f: string) => (
-      <span
-        key={f}
-        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full"
-      >
-        {f}
-      </span>
-    ))}
-  </div>
-</div>
-
-{/* ALLERGENS */}
-<div className="mt-4">
-  <h4 className="font-medium text-sm mb-2 text-gray-700">
-    Allergen Information
-  </h4>
-
-  <div className="flex flex-wrap gap-2">
-    {item.allergenFlags?.map((f: string) => (
-      <span
-        key={f}
-        className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full"
-      >
-        {f}
-      </span>
-    ))}
-  </div>
-</div>
-          </div>
+          ) : null}
         </div>
 
         {/* RIGHT */}
@@ -283,7 +280,7 @@ if (!res || res.error) {
             </h1>
 
             <div className="flex gap-2 text-sm text-gray-500 mt-2">
-              <span className="text-orange-500 font-medium">★ 4.8</span>
+              <span className="text-primary font-medium">★ 4.8</span>
               <span>(150 reviews)</span>
               <span>• 20–25 mins delivery</span>
             </div>
@@ -293,43 +290,53 @@ if (!res || res.error) {
          {item.description}
           </p>
 
-          <div className="text-2xl font-bold text-orange-500">
+          <div className="text-2xl font-bold text-primary">
             ${totalPrice.toFixed(2)}
           </div>
 
-          {/* VARIATIONS (base added inside same UI) */}
-          <div>
-            <p className="font-medium mb-2">Select Size</p>
+        {/* VARIATIONS */}
+<div>
+  <p className="font-medium mb-2">Size</p>
 
-            <div className="flex gap-3 flex-wrap">
-              {/* BASE */}
-              <button
-                onClick={() => setSelectedVariation(null)}
-                className={`px-4 py-2 rounded-xl border ${
-                  !selectedVariation ? "border-orange-500" : "border-gray-200"
-                }`}
-              >
-                Base (${item.basePrice})
-              </button>
+<div className="grid grid-cols-2 gap-3">
+    {item.variations?.map((v: any) => (
+      <label
+        key={v.id}
+        className={`flex justify-between items-center border rounded-xl px-4 py-3 cursor-pointer ${
+          selectedVariation?.id === v.id
+            ? "border-primary"
+            : "border-gray-200"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <input
+            type="radio"
+            name="size"
+            checked={selectedVariation?.id === v.id}
+            onChange={() => setSelectedVariation(v)}
+          />
+          <span>{v.name}</span>
+        </div>
 
-              {item.variations?.map((v: any) => (
-                <button
-                  key={v.id}
-                  onClick={() => setSelectedVariation(v)}
-                  className={`px-4 py-2 rounded-xl border ${
-                    selectedVariation?.id === v.id
-                      ? "border-orange-500"
-                      : "border-gray-200"
-                  }`}
-                >
-                  {v.name} (+${v.price})
-                </button>
-              ))}
-            </div>
-          </div>
+        <span className="text-primary">
+          {Number(v.price) > 0 ? `+$${v.price}` : ""}
+        </span>
+      </label>
+    ))}
+  </div>
+</div>
 
           {/* MODIFIERS */}
-          {item.modifierLinks?.map((group: any) => (
+        
+        {item.modifierLinks
+  ?.filter((group: any) => {
+    // 👇 adjust depending on your API structure
+    return (
+      !group.variationId || 
+      group.variationId === selectedVariation?.id
+    );
+  })
+  .map((group: any) => (
             <div key={group.id}>
               <p className="font-medium mb-2">
                 {group.modifierGroup.name}
@@ -355,7 +362,7 @@ if (!res || res.error) {
                       {m.name}
                     </div>
 
-                    <span className="text-orange-500">
+                    <span className="text-primary">
                       +${m.priceDelta}
                     </span>
                   </label>
@@ -385,7 +392,7 @@ if (!res || res.error) {
 
             <button
               onClick={handleAddToCart}
-              className="flex-1 bg-orange-500 text-white py-3 rounded-full"
+              className="flex-1 bg-primary text-white py-3 rounded-full"
             >
               Add to Cart | ${totalPrice.toFixed(2)}
             </button>
@@ -395,13 +402,7 @@ if (!res || res.error) {
 
       <TestimonialsSection />
 
-      <BranchPopup
-        show={showBranchPopup}
-        onClose={() => setShowBranchPopup(false)}
-        branches={branches}
-        loading={loadingBranches}
-        onSelect={selectBranch}
-      />
+     
     </>
   );
 }

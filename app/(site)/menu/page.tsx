@@ -1,0 +1,48 @@
+"use client";
+
+import { useCallback, useState } from "react";
+import SignatureSelectionContent from "@/components/signature-selection/SignatureSelectionContent";
+import OrderCartSidebar from "@/components/signature-selection/OrderCartSidebar";
+import { useAuth } from "@/hooks/useAuth";
+
+export default function SignatureSelectionPage() {
+const { restaurantId, user, loading } = useAuth();
+  const [cartRefreshKey, setCartRefreshKey] = useState(0);
+
+  const handleCartRefresh = useCallback(() => {
+    setCartRefreshKey((prev) => prev + 1);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-[#777]">Loading...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen overflow-x-hidden">
+      <div className="mx-auto overflow-x-hidden">
+        <div className="grid min-h-screen grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 overflow-x-hidden">
+            <SignatureSelectionContent
+              restaurantId={restaurantId}
+              customerId={user?.id}
+              branchId={user?.branchId}
+              onCartRefresh={handleCartRefresh}
+            />
+          </div>
+
+          <div className="min-w-0">
+            <OrderCartSidebar
+              customerId={user?.id}
+              cartRefreshKey={cartRefreshKey}
+              onCartRefresh={handleCartRefresh}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
