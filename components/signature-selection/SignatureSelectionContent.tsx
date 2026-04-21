@@ -193,26 +193,26 @@ export default function SignatureSelectionContent({
   };
 
   const filteredModifierLinks = useMemo(() => {
-    if (!selectedItem?.modifierLinks?.length) return [];
+  if (!selectedItem?.modifierLinks?.length) return [];
 
-    return selectedItem.modifierLinks.filter((group) => {
-      const groupName = group?.modifierGroup?.name?.trim()?.toLowerCase();
+  return selectedItem.modifierLinks.filter((group) => {
+    const groupName = group?.modifierGroup?.name?.trim()?.toLowerCase();
 
-      if (selectedItem?.variations?.length > 0 && groupName === "size") {
-        return false;
-      }
+    if ((selectedItem?.variations?.length ?? 0) > 0 && groupName === "size") {
+      return false;
+    }
 
-      if (group?.variationId && selectedVariation?.id) {
-        return group.variationId === selectedVariation.id;
-      }
+    if (group?.variationId && selectedVariation?.id) {
+      return group.variationId === selectedVariation.id;
+    }
 
-      if (group?.variationId && !selectedVariation?.id) {
-        return false;
-      }
+    if (group?.variationId && !selectedVariation?.id) {
+      return false;
+    }
 
-      return true;
-    });
-  }, [selectedItem, selectedVariation]);
+    return true;
+  });
+}, [selectedItem, selectedVariation]);
 
   const openItemModal = (item: MenuItem) => {
     const defaultVariation = getDefaultVariation(item);
