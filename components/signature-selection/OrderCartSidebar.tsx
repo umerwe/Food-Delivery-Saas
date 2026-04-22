@@ -147,7 +147,7 @@ export default function OrderCartSidebar({
   };
 
   return (
-    <aside className="border-l border-black/5 bg-white/95 px-4 py-5 backdrop-blur-sm sm:px-6 xl:sticky xl:top-0 xl:h-screen xl:overflow-y-auto shadow-[-12px_0_32px_0_rgba(26,28,28,0.04)]">
+    <aside className="border-l border-black/5 bg-white/95 px-4 py-5 backdrop-blur-sm sm:px-6 xl:sticky xl:top-0  shadow-[-12px_0_32px_0_rgba(26,28,28,0.04)]">
       <div className="mx-auto flex h-full max-w-[320px] flex-col">
         <div className="mb-6 flex items-center justify-between gap-3">
           <h2 className="text-[22px] font-bold tracking-[-0.02em] text-[#1f1f1f]">

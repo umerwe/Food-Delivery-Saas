@@ -8,7 +8,6 @@ import {
   Loader2,
   Minus,
   Plus,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import useApi from "@/hooks/useApi";
@@ -22,10 +21,19 @@ type SignatureSelectionContentProps = {
   onCartRefresh?: () => void;
 };
 
+type ItemPriceOverride = {
+  id?: string;
+  menuItemId?: string;
+  price?: string | number;
+  priceDelta?: string | number;
+};
+
 type MenuVariation = {
   id: string;
+  categoryId?: string;
   name: string;
   price: string | number;
+  sortOrder?: number;
   isDefault?: boolean;
   isActive?: boolean;
 };
@@ -35,17 +43,24 @@ type Modifier = {
   name: string;
   priceDelta?: string | number;
   isActive?: boolean;
+  itemPriceOverrides?: ItemPriceOverride[];
 };
 
 type ModifierGroup = {
   id: string;
   name: string;
+  description?: string;
+  minSelect?: number;
+  maxSelect?: number;
+  isRequired?: boolean;
+  sortOrder?: number;
   modifiers: Modifier[];
 };
 
 type ModifierLink = {
   id: string;
   variationId?: string | null;
+  sortOrder?: number;
   modifierGroup: ModifierGroup;
 };
 
@@ -57,6 +72,13 @@ type MenuItem = {
   imageUrl?: string;
   basePrice?: string | number;
   isActive?: boolean;
+  categoryId?: string;
+  category?: {
+    id: string;
+    name?: string;
+    variations?: MenuVariation[];
+    modifierLinks?: ModifierLink[];
+  };
   variations?: MenuVariation[];
   modifierLinks?: ModifierLink[];
 };
@@ -115,7 +137,13 @@ export default function SignatureSelectionContent({
         return;
       }
 
-      const menuData: MenuRecord[] = (res?.data || []).filter(
+      const rawMenus = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.data?.data)
+        ? res.data.data
+        : [];
+
+      const menuData: MenuRecord[] = rawMenus.filter(
         (m: MenuRecord) => m?.isActive !== false
       );
 
@@ -141,6 +169,92 @@ export default function SignatureSelectionContent({
     [menus, activeMenuId]
   );
 
+  const getItemVariations = (item?: MenuItem | null): MenuVariation[] => {
+    if (!item) return [];
+
+    const rawVariations = [
+      ...(Array.isArray(item?.variations) ? item.variations : []),
+      ...(Array.isArray(item?.category?.variations)
+        ? item.category.variations
+        : []),
+    ];
+
+    const map = new Map<string, MenuVariation>();
+
+    rawVariations.forEach((variation) => {
+      if (!variation?.id || variation?.isActive === false) return;
+      const key = String(variation.id);
+
+      if (!map.has(key)) {
+        map.set(key, variation);
+      }
+    });
+
+    return Array.from(map.values()).sort(
+      (a, b) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0)
+    );
+  };
+
+  const getItemModifierLinks = (item?: MenuItem | null): ModifierLink[] => {
+    if (!item) return [];
+
+    const rawLinks = [
+      ...(Array.isArray(item?.modifierLinks) ? item.modifierLinks : []),
+      ...(Array.isArray(item?.category?.modifierLinks)
+        ? item.category.modifierLinks
+        : []),
+    ];
+
+    const map = new Map<string, ModifierLink>();
+
+    rawLinks.forEach((link: any, index: number) => {
+      const modifierGroupId = String(link?.modifierGroup?.id || "");
+      if (!modifierGroupId) return;
+
+      const dedupeKey = `${String(link?.variationId || "common")}::${modifierGroupId}`;
+
+      if (!map.has(dedupeKey)) {
+        map.set(dedupeKey, {
+          ...link,
+          id: link?.id || dedupeKey || `modifier-link-${index}`,
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort(
+      (a, b) =>
+        Number(a?.sortOrder ?? a?.modifierGroup?.sortOrder ?? 0) -
+        Number(b?.sortOrder ?? b?.modifierGroup?.sortOrder ?? 0)
+    );
+  };
+
+  const getModifierEffectivePrice = (modifier: Modifier, itemId?: string) => {
+    const baseDelta = Number(modifier?.priceDelta || 0);
+
+    if (!itemId || !Array.isArray(modifier?.itemPriceOverrides)) {
+      return baseDelta;
+    }
+
+    const matchedOverride = modifier.itemPriceOverrides.find(
+      (override) => String(override?.menuItemId || "") === String(itemId)
+    );
+
+    if (!matchedOverride) return baseDelta;
+
+    if (
+      matchedOverride?.priceDelta !== undefined &&
+      matchedOverride?.priceDelta !== null
+    ) {
+      return Number(matchedOverride.priceDelta || 0);
+    }
+
+    if (matchedOverride?.price !== undefined && matchedOverride?.price !== null) {
+      return Number(matchedOverride.price || 0);
+    }
+
+    return baseDelta;
+  };
+
   const products = useMemo(() => {
     if (!activeMenu?.items?.length) return [];
 
@@ -149,16 +263,21 @@ export default function SignatureSelectionContent({
       .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
       .map((entry) => {
         const item = entry.menuItem as MenuItem;
+        const variations = getItemVariations(item);
+        const defaultVariation =
+          variations.find((v) => v.isDefault) || variations[0] || null;
 
         return {
           id: item.id,
           name: item.name,
           slug: item.slug,
-          price: Number(item.basePrice || 0),
+          price:
+            Number(item.basePrice || 0) +
+            Number(defaultVariation?.price || 0),
           image: item.imageUrl || "/placeholder.png",
           description: item.description || "",
-          variations: (item.variations || []).filter((v) => v.isActive !== false),
-          modifierLinks: item.modifierLinks || [],
+          variations,
+          modifierLinks: getItemModifierLinks(item),
           raw: item,
         };
       });
@@ -187,32 +306,64 @@ export default function SignatureSelectionContent({
   };
 
   const getDefaultVariation = (item: MenuItem) => {
-    const variations = (item.variations || []).filter((v) => v.isActive !== false);
+    const variations = getItemVariations(item);
     if (!variations.length) return null;
     return variations.find((v) => v.isDefault) || variations[0];
   };
 
+  const getVisibleModifierLinks = (
+    item?: MenuItem | null,
+    variation?: MenuVariation | null
+  ) => {
+    const links = getItemModifierLinks(item);
+    const hasVariations = getItemVariations(item).length > 0;
+
+    return links.filter((link) => {
+      const groupName = link?.modifierGroup?.name?.trim()?.toLowerCase();
+
+      if (hasVariations && groupName === "size") {
+        return false;
+      }
+
+      if (link?.variationId) {
+        return String(link.variationId) === String(variation?.id || "");
+      }
+
+      return true;
+    });
+  };
+
   const filteredModifierLinks = useMemo(() => {
-  if (!selectedItem?.modifierLinks?.length) return [];
+    return getVisibleModifierLinks(selectedItem, selectedVariation);
+  }, [selectedItem, selectedVariation]);
 
-  return selectedItem.modifierLinks.filter((group) => {
-    const groupName = group?.modifierGroup?.name?.trim()?.toLowerCase();
+  const sanitizeSelectedModifiersForVisibleGroups = (
+    prev: Record<string, Modifier[]>,
+    visibleLinks: ModifierLink[]
+  ) => {
+    const visibleGroupIds = new Set(
+      visibleLinks.map((link) => String(link?.modifierGroup?.id || ""))
+    );
 
-    if ((selectedItem?.variations?.length ?? 0) > 0 && groupName === "size") {
-      return false;
-    }
+    const next: Record<string, Modifier[]> = {};
 
-    if (group?.variationId && selectedVariation?.id) {
-      return group.variationId === selectedVariation.id;
-    }
+    Object.entries(prev || {}).forEach(([groupId, modifiers]) => {
+      if (!visibleGroupIds.has(String(groupId))) return;
+      next[groupId] = modifiers;
+    });
 
-    if (group?.variationId && !selectedVariation?.id) {
-      return false;
-    }
+    return next;
+  };
 
-    return true;
-  });
-}, [selectedItem, selectedVariation]);
+  useEffect(() => {
+    if (!selectedItem) return;
+
+    const visibleLinks = getVisibleModifierLinks(selectedItem, selectedVariation);
+
+    setSelectedModifiers((prev) =>
+      sanitizeSelectedModifiersForVisibleGroups(prev, visibleLinks)
+    );
+  }, [selectedVariation?.id, selectedItem?.id]);
 
   const openItemModal = (item: MenuItem) => {
     const defaultVariation = getDefaultVariation(item);
@@ -232,28 +383,92 @@ export default function SignatureSelectionContent({
     const variationPrice = variation ? Number(variation.price || 0) : 0;
     const modifiersTotal = Object.values(modifiersMap || {})
       .flat()
-      .reduce((acc: number, m: Modifier) => acc + Number(m.priceDelta || 0), 0);
+      .reduce(
+        (acc: number, m: Modifier) =>
+          acc + getModifierEffectivePrice(m, item?.id),
+        0
+      );
 
     return basePrice + variationPrice + modifiersTotal;
   };
 
-  const handleModifierChange = (
-    groupId: string,
-    modifier: Modifier,
-    checked: boolean
-  ) => {
-    setSelectedModifiers((prev) => {
-      const current = prev[groupId] || [];
+  const getGroupValidation = (group: ModifierGroup) => {
+    const minSelect = Number(group?.minSelect ?? 0);
+    const maxSelect =
+      group?.maxSelect !== undefined && group?.maxSelect !== null
+        ? Number(group.maxSelect)
+        : undefined;
+    const isRequired = Boolean(group?.isRequired);
 
-      if (checked) {
-        return { ...prev, [groupId]: [...current, modifier] };
-      }
+    return {
+      minSelect: Math.max(isRequired ? 1 : 0, minSelect),
+      maxSelect,
+      isRequired,
+    };
+  };
 
-      return {
+  const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
+    const groupId = String(group.id);
+    const current = selectedModifiers[groupId] || [];
+    const { maxSelect } = getGroupValidation(group);
+    const alreadySelected = current.some((m) => m.id === modifier.id);
+
+    if (maxSelect === 1) {
+      setSelectedModifiers((prev) => ({
+        ...prev,
+        [groupId]: alreadySelected ? [] : [modifier],
+      }));
+      return;
+    }
+
+    if (alreadySelected) {
+      setSelectedModifiers((prev) => ({
         ...prev,
         [groupId]: current.filter((m) => m.id !== modifier.id),
-      };
-    });
+      }));
+      return;
+    }
+
+    if (maxSelect && current.length >= maxSelect) {
+      toast.error(`You can select up to ${maxSelect} option(s) for ${group.name}`);
+      return;
+    }
+
+    setSelectedModifiers((prev) => ({
+      ...prev,
+      [groupId]: [...current, modifier],
+    }));
+  };
+
+  const validateSelections = (
+    item: MenuItem,
+    modifiersMap: Record<string, Modifier[]>,
+    variation?: MenuVariation | null
+  ) => {
+    const visibleLinks = getVisibleModifierLinks(item, variation);
+
+    for (const link of visibleLinks) {
+      const group = link?.modifierGroup;
+      const groupId = String(group?.id || "");
+      const selected = modifiersMap[groupId] || [];
+      const { minSelect, maxSelect } = getGroupValidation(group);
+
+      if (minSelect > 0 && selected.length < minSelect) {
+        toast.error(
+          `${group?.name || "This group"} requires at least ${minSelect} selection(s)`
+        );
+        return false;
+      }
+
+      if (maxSelect && selected.length > maxSelect) {
+        toast.error(
+          `${group?.name || "This group"} allows at most ${maxSelect} selection(s)`
+        );
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const addToCart = async (
@@ -272,6 +487,12 @@ export default function SignatureSelectionContent({
       return;
     }
 
+    const safeModifiersMap = modifiersMap || {};
+
+    if (!validateSelections(item, safeModifiersMap, variation)) {
+      return;
+    }
+
     try {
       setAddingId(item.id);
 
@@ -280,7 +501,7 @@ export default function SignatureSelectionContent({
         quantity,
         variationId: variation?.id || null,
         branchId,
-        modifiers: Object.values(modifiersMap || {})
+        modifiers: Object.values(safeModifiersMap)
           .flat()
           .map((m) => ({
             modifierId: m.id,
@@ -307,8 +528,8 @@ export default function SignatureSelectionContent({
   };
 
   const handleAddClick = (item: MenuItem) => {
-    const variations = (item.variations || []).filter((v) => v.isActive !== false);
-    const modifiers = item.modifierLinks || [];
+    const variations = getItemVariations(item);
+    const modifiers = getItemModifierLinks(item);
     const hasOptions = variations.length > 0 || modifiers.length > 0;
 
     if (hasOptions) {
@@ -425,7 +646,7 @@ export default function SignatureSelectionContent({
                         </h3>
 
                         <span className="shrink-0 pt-0.5 text-[18px] font-semibold text-primary">
-                          ${product.price.toFixed(2)}
+                          ${Number(product.price || 0).toFixed(2)}
                         </span>
                       </div>
 
@@ -476,99 +697,136 @@ export default function SignatureSelectionContent({
                     Select variation, modifiers, and quantity
                   </p>
                 </div>
-
-                <button
-                  onClick={() => setModalOpen(false)}
-                  className="rounded-full p-2 text-[#777] transition hover:bg-[#f5f5f5] hover:text-[#222]"
-                >
-                  <X className="h-4 w-4" />
-                </button>
               </div>
 
-              {!!selectedItem.variations?.filter((v) => v.isActive !== false).length && (
+              {!!getItemVariations(selectedItem).length && (
                 <div className="mb-5">
                   <p className="mb-2 font-medium text-gray-900">Size</p>
 
                   <div className="grid grid-cols-1 gap-3">
-                    {selectedItem.variations
-                      ?.filter((v) => v.isActive !== false)
-                      .map((variation) => (
-                        <label
-                          key={variation.id}
-                          className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
-                            selectedVariation?.id === variation.id
-                              ? "border-primary bg-primary/5"
-                              : "border-gray-200 bg-white"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name={`size-${selectedItem.id}`}
-                              checked={selectedVariation?.id === variation.id}
-                              onChange={() => setSelectedVariation(variation)}
-                              className="accent-[var(--primary)]"
-                            />
-                            <span className="text-sm font-medium text-gray-800">
-                              {variation.name}
-                            </span>
-                          </div>
-
-                          <span className="text-sm font-semibold text-primary">
-                            {Number(variation.price) > 0
-                              ? `+$${Number(variation.price).toFixed(2)}`
-                              : "+$0.00"}
+                    {getItemVariations(selectedItem).map((variation) => (
+                      <label
+                        key={variation.id}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
+                          selectedVariation?.id === variation.id
+                            ? "border-primary bg-primary/5"
+                            : "border-gray-200 bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name={`size-${selectedItem.id}`}
+                            checked={selectedVariation?.id === variation.id}
+                            onChange={() => setSelectedVariation(variation)}
+                            className="accent-[var(--primary)]"
+                          />
+                          <span className="text-sm font-medium text-gray-800">
+                            {variation.name}
                           </span>
-                        </label>
-                      ))}
+                        </div>
+
+                        <span className="text-sm font-semibold text-primary">
+                          {Number(variation.price) > 0
+                            ? `+$${Number(variation.price).toFixed(2)}`
+                            : "+$0.00"}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {filteredModifierLinks.map((group) => (
-                <div key={group.id} className="mb-5">
-                  <p className="mb-2 font-medium text-gray-900">
-                    {group.modifierGroup?.name}
-                  </p>
+              {filteredModifierLinks.map((link) => {
+                const group = link.modifierGroup;
+                const groupId = String(group?.id || "");
+                const selectedInGroup = selectedModifiers[groupId] || [];
+                const { minSelect, maxSelect, isRequired } =
+                  getGroupValidation(group);
 
-                  <div className="space-y-2">
-                    {(group.modifierGroup?.modifiers || [])
-                      .filter((m) => m.isActive !== false)
-                      .map((modifier) => {
-                        const checked = (
-                          selectedModifiers[group.modifierGroup.id] || []
-                        ).some((selected) => selected.id === modifier.id);
+                return (
+                  <div
+                    key={`${String(link?.variationId || "common")}-${groupId}`}
+                    className="mb-5"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {group?.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {maxSelect === 1
+                            ? isRequired
+                              ? "Select 1 required option"
+                              : "Select up to 1 option"
+                            : maxSelect
+                            ? `Select ${
+                                minSelect > 0
+                                  ? `${minSelect}-${maxSelect}`
+                                  : `up to ${maxSelect}`
+                              }`
+                            : minSelect > 0
+                            ? `Select at least ${minSelect}`
+                            : "Optional"}
+                        </p>
+                      </div>
 
-                        return (
-                          <label
-                            key={modifier.id}
-                            className="flex cursor-pointer items-center justify-between rounded-xl bg-gray-50 px-3 py-3 text-sm"
-                          >
-                            <span className="flex items-center gap-2 text-gray-800">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) =>
-                                  handleModifierChange(
-                                    group.modifierGroup.id,
-                                    modifier,
-                                    e.target.checked
-                                  )
-                                }
-                                className="accent-[var(--primary)]"
-                              />
-                              {modifier.name}
-                            </span>
+                      <span className="text-xs text-gray-500">
+                        {selectedInGroup.length}
+                        {maxSelect ? ` / ${maxSelect}` : ""}
+                      </span>
+                    </div>
 
-                            <span className="font-medium text-primary">
-                              +${Number(modifier.priceDelta || 0).toFixed(2)}
-                            </span>
-                          </label>
-                        );
-                      })}
+                    <div className="space-y-2">
+                      {(group?.modifiers || [])
+                        .filter((m) => m.isActive !== false)
+                        .map((modifier) => {
+                          const checked = selectedInGroup.some(
+                            (selected) => selected.id === modifier.id
+                          );
+
+                          const disableBecauseMaxReached =
+                            !checked &&
+                            !!maxSelect &&
+                            selectedInGroup.length >= maxSelect;
+
+                          const effectivePrice = getModifierEffectivePrice(
+                            modifier,
+                            selectedItem.id
+                          );
+
+                          return (
+                            <label
+                              key={modifier.id}
+                              className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-3 text-sm ${
+                                disableBecauseMaxReached
+                                  ? "bg-gray-100 opacity-70"
+                                  : "bg-gray-50"
+                              }`}
+                            >
+                              <span className="flex items-center gap-2 text-gray-800">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={disableBecauseMaxReached}
+                                  onChange={() =>
+                                    handleModifierToggle(group, modifier)
+                                  }
+                                  className="accent-[var(--primary)]"
+                                />
+                                {modifier.name}
+                              </span>
+
+                              <span className="font-medium text-primary">
+                                +${effectivePrice.toFixed(2)}
+                              </span>
+                            </label>
+                          );
+                        })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div className="mb-5 flex items-center justify-between">
                 <div className="flex items-center rounded-full bg-gray-100 px-3 py-1.5">
