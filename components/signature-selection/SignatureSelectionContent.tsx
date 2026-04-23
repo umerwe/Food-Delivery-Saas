@@ -24,6 +24,15 @@ type SignatureSelectionContentProps = {
 type ItemPriceOverride = {
   id?: string;
   menuItemId?: string;
+  modifierId?: string;
+  price?: string | number;
+  priceDelta?: string | number;
+};
+
+type VariationPriceOverride = {
+  id?: string;
+  variationId?: string;
+  modifierId?: string;
   price?: string | number;
   priceDelta?: string | number;
 };
@@ -32,18 +41,31 @@ type MenuVariation = {
   id: string;
   categoryId?: string;
   name: string;
-  price: string | number;
+  description?: string;
+  price?: string | number;
   sortOrder?: number;
   isDefault?: boolean;
   isActive?: boolean;
+  modifierPriceOverrides?: VariationPriceOverride[];
 };
 
 type Modifier = {
   id: string;
   name: string;
+  description?: string | null;
   priceDelta?: string | number;
+  sortOrder?: number;
   isActive?: boolean;
   itemPriceOverrides?: ItemPriceOverride[];
+  variationPriceOverrides?: VariationPriceOverride[];
+};
+
+type RawModifierLink = {
+  id?: string;
+  modifierGroupId?: string;
+  modifierId?: string;
+  sortOrder?: number;
+  modifier?: Modifier;
 };
 
 type ModifierGroup = {
@@ -54,7 +76,9 @@ type ModifierGroup = {
   maxSelect?: number;
   isRequired?: boolean;
   sortOrder?: number;
-  modifiers: Modifier[];
+  isActive?: boolean;
+  modifiers?: Modifier[];
+  modifierLinks?: RawModifierLink[];
 };
 
 type ModifierLink = {
@@ -81,6 +105,7 @@ type MenuItem = {
   };
   variations?: MenuVariation[];
   modifierLinks?: ModifierLink[];
+  modifierGroups?: ModifierGroup[];
 };
 
 type MenuRecord = {
@@ -94,6 +119,19 @@ type MenuRecord = {
     sortOrder?: number;
     menuItem?: MenuItem;
   }[];
+};
+
+type SelectedModifiersMap = Record<string, Modifier[]>;
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const sortBySortOrder = <T extends { sortOrder?: number }>(items: T[]) => {
+  return [...items].sort(
+    (a, b) => toNumber(a?.sortOrder, 0) - toNumber(b?.sortOrder, 0)
+  );
 };
 
 export default function SignatureSelectionContent({
@@ -120,9 +158,8 @@ export default function SignatureSelectionContent({
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [selectedVariation, setSelectedVariation] =
     useState<MenuVariation | null>(null);
-  const [selectedModifiers, setSelectedModifiers] = useState<
-    Record<string, Modifier[]>
-  >({});
+  const [selectedModifiers, setSelectedModifiers] =
+    useState<SelectedModifiersMap>({});
   const [qty, setQty] = useState(1);
 
   const fetchMenus = async () => {
@@ -132,6 +169,7 @@ export default function SignatureSelectionContent({
       setLoadingMenus(true);
 
       const res = await get(`/v1/menus?restaurantId=${restaurantId}`);
+
       if (!res || res.error) {
         toast.error(res?.error || "Failed to fetch menus");
         return;
@@ -144,16 +182,20 @@ export default function SignatureSelectionContent({
         : [];
 
       const menuData: MenuRecord[] = rawMenus.filter(
-        (m: MenuRecord) => m?.isActive !== false
+        (menu: MenuRecord) => menu?.isActive !== false
       );
 
       setMenus(menuData);
 
-      if (!activeMenuId && menuData.length > 0) {
-        setActiveMenuId(menuData[0].id);
+      if (menuData.length > 0) {
+        setActiveMenuId((prev) =>
+          prev && menuData.some((menu) => menu.id === prev) ? prev : menuData[0].id
+        );
+      } else {
+        setActiveMenuId("");
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error("Failed to fetch menus:", error);
       toast.error("Failed to fetch menus");
     } finally {
       setLoadingMenus(false);
@@ -169,146 +211,188 @@ export default function SignatureSelectionContent({
     [menus, activeMenuId]
   );
 
+  const normalizeVariation = (raw: any): MenuVariation | null => {
+    if (!raw?.id) return null;
+    if (raw?.isActive === false) return null;
+
+    return {
+      id: String(raw.id),
+      categoryId: raw?.categoryId,
+      name: String(raw?.name || ""),
+      description: raw?.description || "",
+      price: raw?.price ?? 0,
+      sortOrder: toNumber(raw?.sortOrder, 0),
+      isDefault: Boolean(raw?.isDefault),
+      isActive: raw?.isActive !== false,
+      modifierPriceOverrides: Array.isArray(raw?.modifierPriceOverrides)
+        ? raw.modifierPriceOverrides
+        : [],
+    };
+  };
+
+  const normalizeModifier = (raw: any): Modifier | null => {
+    if (!raw?.id) return null;
+    if (raw?.isActive === false) return null;
+
+    return {
+      id: String(raw.id),
+      name: String(raw?.name || ""),
+      description: raw?.description ?? null,
+      priceDelta: raw?.priceDelta ?? 0,
+      sortOrder: toNumber(raw?.sortOrder, 0),
+      isActive: raw?.isActive !== false,
+      itemPriceOverrides: Array.isArray(raw?.itemPriceOverrides)
+        ? raw.itemPriceOverrides
+        : [],
+      variationPriceOverrides: Array.isArray(raw?.variationPriceOverrides)
+        ? raw.variationPriceOverrides
+        : [],
+    };
+  };
+
   const getItemVariations = (item?: MenuItem | null): MenuVariation[] => {
     if (!item) return [];
 
     const rawVariations = [
       ...(Array.isArray(item?.variations) ? item.variations : []),
-      ...(Array.isArray(item?.category?.variations)
-        ? item.category.variations
-        : []),
+      ...(Array.isArray(item?.category?.variations) ? item.category.variations : []),
     ];
 
-    const map = new Map<string, MenuVariation>();
+    const deduped = new Map<string, MenuVariation>();
 
-    rawVariations.forEach((variation) => {
-      if (!variation?.id || variation?.isActive === false) return;
-      const key = String(variation.id);
+    for (const raw of rawVariations) {
+      const normalized = normalizeVariation(raw);
+      if (!normalized) continue;
 
-      if (!map.has(key)) {
-        map.set(key, variation);
+      if (!deduped.has(normalized.id)) {
+        deduped.set(normalized.id, normalized);
       }
-    });
+    }
 
-    return Array.from(map.values()).sort(
-      (a, b) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0)
-    );
+    return sortBySortOrder(Array.from(deduped.values()));
+  };
+
+  const getNormalizedModifiersFromGroup = (group: any): Modifier[] => {
+    const directModifiers = Array.isArray(group?.modifiers) ? group.modifiers : [];
+    const fromModifierLinks = Array.isArray(group?.modifierLinks)
+      ? group.modifierLinks.map((link: any) => link?.modifier).filter(Boolean)
+      : [];
+
+    const rawModifiers = [...directModifiers, ...fromModifierLinks];
+    const deduped = new Map<string, Modifier>();
+
+    for (const raw of rawModifiers) {
+      const normalized = normalizeModifier(raw);
+      if (!normalized) continue;
+
+      if (!deduped.has(normalized.id)) {
+        deduped.set(normalized.id, normalized);
+      }
+    }
+
+    return sortBySortOrder(Array.from(deduped.values()));
+  };
+
+  const normalizeGroup = (group: any): ModifierGroup | null => {
+    if (!group?.id) return null;
+    if (group?.isActive === false) return null;
+
+    return {
+      id: String(group.id),
+      name: String(group?.name || ""),
+      description: group?.description || "",
+      minSelect: group?.minSelect,
+      maxSelect: group?.maxSelect,
+      isRequired: Boolean(group?.isRequired),
+      sortOrder: toNumber(group?.sortOrder, 0),
+      isActive: group?.isActive !== false,
+      modifiers: getNormalizedModifiersFromGroup(group),
+      modifierLinks: Array.isArray(group?.modifierLinks) ? group.modifierLinks : [],
+    };
   };
 
   const getItemModifierLinks = (item?: MenuItem | null): ModifierLink[] => {
     if (!item) return [];
 
-    const rawLinks = [
-      ...(Array.isArray(item?.modifierLinks) ? item.modifierLinks : []),
-      ...(Array.isArray(item?.category?.modifierLinks)
-        ? item.category.modifierLinks
-        : []),
-    ];
-
-    const map = new Map<string, ModifierLink>();
-
-    rawLinks.forEach((link: any, index: number) => {
-      const modifierGroupId = String(link?.modifierGroup?.id || "");
-      if (!modifierGroupId) return;
-
-      const dedupeKey = `${String(link?.variationId || "common")}::${modifierGroupId}`;
-
-      if (!map.has(dedupeKey)) {
-        map.set(dedupeKey, {
-          ...link,
-          id: link?.id || dedupeKey || `modifier-link-${index}`,
-        });
-      }
-    });
-
-    return Array.from(map.values()).sort(
-      (a, b) =>
-        Number(a?.sortOrder ?? a?.modifierGroup?.sortOrder ?? 0) -
-        Number(b?.sortOrder ?? b?.modifierGroup?.sortOrder ?? 0)
-    );
-  };
-
-  const getModifierEffectivePrice = (modifier: Modifier, itemId?: string) => {
-    const baseDelta = Number(modifier?.priceDelta || 0);
-
-    if (!itemId || !Array.isArray(modifier?.itemPriceOverrides)) {
-      return baseDelta;
-    }
-
-    const matchedOverride = modifier.itemPriceOverrides.find(
-      (override) => String(override?.menuItemId || "") === String(itemId)
-    );
-
-    if (!matchedOverride) return baseDelta;
-
-    if (
-      matchedOverride?.priceDelta !== undefined &&
-      matchedOverride?.priceDelta !== null
-    ) {
-      return Number(matchedOverride.priceDelta || 0);
-    }
-
-    if (matchedOverride?.price !== undefined && matchedOverride?.price !== null) {
-      return Number(matchedOverride.price || 0);
-    }
-
-    return baseDelta;
-  };
-
-  const products = useMemo(() => {
-    if (!activeMenu?.items?.length) return [];
-
-    return activeMenu.items
-      .filter((entry) => entry?.menuItem && entry.menuItem.isActive !== false)
-      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
-      .map((entry) => {
-        const item = entry.menuItem as MenuItem;
-        const variations = getItemVariations(item);
-        const defaultVariation =
-          variations.find((v) => v.isDefault) || variations[0] || null;
+    const normalizedFromItemModifierLinks: ModifierLink[] = (
+      Array.isArray(item?.modifierLinks) ? item.modifierLinks : []
+    )
+      .map((link: any, index: number) => {
+        const normalizedGroup = normalizeGroup(link?.modifierGroup);
+        if (!normalizedGroup) return null;
 
         return {
-          id: item.id,
-          name: item.name,
-          slug: item.slug,
-          price:
-            Number(item.basePrice || 0) +
-            Number(defaultVariation?.price || 0),
-          image: item.imageUrl || "/placeholder.png",
-          description: item.description || "",
-          variations,
-          modifierLinks: getItemModifierLinks(item),
-          raw: item,
+          id: String(link?.id || `item-link-${normalizedGroup.id}-${index}`),
+          variationId: link?.variationId ? String(link.variationId) : null,
+          sortOrder: toNumber(
+            link?.sortOrder ?? normalizedGroup.sortOrder ?? 0,
+            0
+          ),
+          modifierGroup: normalizedGroup,
         };
-      });
-  }, [activeMenu]);
+      })
+      .filter(Boolean) as ModifierLink[];
 
-  const startDragging = (pageX: number) => {
-    if (!scrollRef.current) return;
-    setIsDown(true);
-    setStartX(pageX - scrollRef.current.offsetLeft);
-    setScrollLeftStart(scrollRef.current.scrollLeft);
+    const normalizedFromCategoryModifierLinks: ModifierLink[] = (
+      Array.isArray(item?.category?.modifierLinks) ? item.category.modifierLinks : []
+    )
+      .map((link: any, index: number) => {
+        const normalizedGroup = normalizeGroup(link?.modifierGroup);
+        if (!normalizedGroup) return null;
+
+        return {
+          id: String(link?.id || `category-link-${normalizedGroup.id}-${index}`),
+          variationId: link?.variationId ? String(link.variationId) : null,
+          sortOrder: toNumber(
+            link?.sortOrder ?? normalizedGroup.sortOrder ?? 0,
+            0
+          ),
+          modifierGroup: normalizedGroup,
+        };
+      })
+      .filter(Boolean) as ModifierLink[];
+
+    const normalizedFromModifierGroups: ModifierLink[] = (
+      Array.isArray(item?.modifierGroups) ? item.modifierGroups : []
+    )
+      .map((group: any, index: number) => {
+        const normalizedGroup = normalizeGroup(group);
+        if (!normalizedGroup) return null;
+
+        return {
+          id: `group-${normalizedGroup.id}-${index}`,
+          variationId: null,
+          sortOrder: toNumber(normalizedGroup.sortOrder, 0),
+          modifierGroup: normalizedGroup,
+        };
+      })
+      .filter(Boolean) as ModifierLink[];
+
+    const deduped = new Map<string, ModifierLink>();
+
+    for (const link of [
+      ...normalizedFromItemModifierLinks,
+      ...normalizedFromCategoryModifierLinks,
+      ...normalizedFromModifierGroups,
+    ]) {
+      const groupId = String(link?.modifierGroup?.id || "");
+      if (!groupId) continue;
+
+      const key = `${String(link?.variationId || "common")}::${groupId}`;
+
+      if (!deduped.has(key)) {
+        deduped.set(key, link);
+      }
+    }
+
+    return sortBySortOrder(Array.from(deduped.values()));
   };
 
-  const stopDragging = () => setIsDown(false);
-
-  const onMouseMove = (pageX: number) => {
-    if (!isDown || !scrollRef.current) return;
-    const x = pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX) * 1.1;
-    scrollRef.current.scrollLeft = scrollLeftStart - walk;
-  };
-
-  const scrollMenu = (direction: "left" | "right") => {
-    if (!scrollRef.current) return;
-    const amount = direction === "left" ? -220 : 220;
-    scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
-  };
-
-  const getDefaultVariation = (item: MenuItem) => {
+  const getDefaultVariation = (item?: MenuItem | null) => {
     const variations = getItemVariations(item);
     if (!variations.length) return null;
-    return variations.find((v) => v.isDefault) || variations[0];
+
+    return variations.find((variation) => variation.isDefault) || variations[0];
   };
 
   const getVisibleModifierLinks = (
@@ -319,7 +403,9 @@ export default function SignatureSelectionContent({
     const hasVariations = getItemVariations(item).length > 0;
 
     return links.filter((link) => {
-      const groupName = link?.modifierGroup?.name?.trim()?.toLowerCase();
+      const groupName = String(link?.modifierGroup?.name || "")
+        .trim()
+        .toLowerCase();
 
       if (hasVariations && groupName === "size") {
         return false;
@@ -333,76 +419,97 @@ export default function SignatureSelectionContent({
     });
   };
 
-  const filteredModifierLinks = useMemo(() => {
-    return getVisibleModifierLinks(selectedItem, selectedVariation);
-  }, [selectedItem, selectedVariation]);
-
-  const sanitizeSelectedModifiersForVisibleGroups = (
-    prev: Record<string, Modifier[]>,
-    visibleLinks: ModifierLink[]
+  const getModifierEffectivePrice = (
+    modifier: Modifier,
+    itemId?: string,
+    variation?: MenuVariation | null
   ) => {
-    const visibleGroupIds = new Set(
-      visibleLinks.map((link) => String(link?.modifierGroup?.id || ""))
-    );
+    const variationId = String(variation?.id || "");
 
-    const next: Record<string, Modifier[]> = {};
+    const variationOverrideFromModifier = Array.isArray(
+      modifier?.variationPriceOverrides
+    )
+      ? modifier.variationPriceOverrides.find(
+          (override) =>
+            String(override?.variationId || "") === variationId
+        )
+      : null;
 
-    Object.entries(prev || {}).forEach(([groupId, modifiers]) => {
-      if (!visibleGroupIds.has(String(groupId))) return;
-      next[groupId] = modifiers;
-    });
+    if (variationOverrideFromModifier) {
+      if (
+        variationOverrideFromModifier?.priceDelta !== undefined &&
+        variationOverrideFromModifier?.priceDelta !== null
+      ) {
+        return toNumber(variationOverrideFromModifier.priceDelta, 0);
+      }
 
-    return next;
-  };
+      if (
+        variationOverrideFromModifier?.price !== undefined &&
+        variationOverrideFromModifier?.price !== null
+      ) {
+        return toNumber(variationOverrideFromModifier.price, 0);
+      }
+    }
 
-  useEffect(() => {
-    if (!selectedItem) return;
+    const variationOverrideFromVariation = Array.isArray(
+      variation?.modifierPriceOverrides
+    )
+      ? variation.modifierPriceOverrides.find(
+          (override) =>
+            String(override?.modifierId || "") === String(modifier?.id || "")
+        )
+      : null;
 
-    const visibleLinks = getVisibleModifierLinks(selectedItem, selectedVariation);
+    if (variationOverrideFromVariation) {
+      if (
+        variationOverrideFromVariation?.priceDelta !== undefined &&
+        variationOverrideFromVariation?.priceDelta !== null
+      ) {
+        return toNumber(variationOverrideFromVariation.priceDelta, 0);
+      }
 
-    setSelectedModifiers((prev) =>
-      sanitizeSelectedModifiersForVisibleGroups(prev, visibleLinks)
-    );
-  }, [selectedVariation?.id, selectedItem?.id]);
+      if (
+        variationOverrideFromVariation?.price !== undefined &&
+        variationOverrideFromVariation?.price !== null
+      ) {
+        return toNumber(variationOverrideFromVariation.price, 0);
+      }
+    }
 
-  const openItemModal = (item: MenuItem) => {
-    const defaultVariation = getDefaultVariation(item);
-    setSelectedItem(item);
-    setSelectedVariation(defaultVariation);
-    setSelectedModifiers({});
-    setQty(1);
-    setModalOpen(true);
-  };
+    const itemOverride = Array.isArray(modifier?.itemPriceOverrides)
+      ? modifier.itemPriceOverrides.find(
+          (override) =>
+            String(override?.menuItemId || "") === String(itemId || "")
+        )
+      : null;
 
-  const getCalculatedPrice = (
-    item: MenuItem,
-    variation?: MenuVariation | null,
-    modifiersMap?: Record<string, Modifier[]>
-  ) => {
-    const basePrice = Number(item?.basePrice || 0);
-    const variationPrice = variation ? Number(variation.price || 0) : 0;
-    const modifiersTotal = Object.values(modifiersMap || {})
-      .flat()
-      .reduce(
-        (acc: number, m: Modifier) =>
-          acc + getModifierEffectivePrice(m, item?.id),
-        0
-      );
+    if (itemOverride) {
+      if (
+        itemOverride?.priceDelta !== undefined &&
+        itemOverride?.priceDelta !== null
+      ) {
+        return toNumber(itemOverride.priceDelta, 0);
+      }
 
-    return basePrice + variationPrice + modifiersTotal;
+      if (itemOverride?.price !== undefined && itemOverride?.price !== null) {
+        return toNumber(itemOverride.price, 0);
+      }
+    }
+
+    return toNumber(modifier?.priceDelta, 0);
   };
 
   const getGroupValidation = (group: ModifierGroup) => {
-    const minSelect = Number(group?.minSelect ?? 0);
-    const maxSelect =
+    const rawMin = toNumber(group?.minSelect, 0);
+    const rawMax =
       group?.maxSelect !== undefined && group?.maxSelect !== null
-        ? Number(group.maxSelect)
+        ? toNumber(group.maxSelect, 0)
         : undefined;
     const isRequired = Boolean(group?.isRequired);
 
     return {
-      minSelect: Math.max(isRequired ? 1 : 0, minSelect),
-      maxSelect,
+      minSelect: Math.max(isRequired ? 1 : 0, rawMin),
+      maxSelect: rawMax,
       isRequired,
     };
   };
@@ -442,7 +549,7 @@ export default function SignatureSelectionContent({
 
   const validateSelections = (
     item: MenuItem,
-    modifiersMap: Record<string, Modifier[]>,
+    modifiersMap: SelectedModifiersMap,
     variation?: MenuVariation | null
   ) => {
     const visibleLinks = getVisibleModifierLinks(item, variation);
@@ -450,17 +557,17 @@ export default function SignatureSelectionContent({
     for (const link of visibleLinks) {
       const group = link?.modifierGroup;
       const groupId = String(group?.id || "");
-      const selected = modifiersMap[groupId] || [];
+      const selectedInGroup = modifiersMap[groupId] || [];
       const { minSelect, maxSelect } = getGroupValidation(group);
 
-      if (minSelect > 0 && selected.length < minSelect) {
+      if (minSelect > 0 && selectedInGroup.length < minSelect) {
         toast.error(
           `${group?.name || "This group"} requires at least ${minSelect} selection(s)`
         );
         return false;
       }
 
-      if (maxSelect && selected.length > maxSelect) {
+      if (maxSelect && selectedInGroup.length > maxSelect) {
         toast.error(
           `${group?.name || "This group"} allows at most ${maxSelect} selection(s)`
         );
@@ -471,11 +578,96 @@ export default function SignatureSelectionContent({
     return true;
   };
 
+  const sanitizeSelectedModifiersForVisibleGroups = (
+    prev: SelectedModifiersMap,
+    visibleLinks: ModifierLink[]
+  ) => {
+    const visibleGroupIds = new Set(
+      visibleLinks.map((link) => String(link?.modifierGroup?.id || ""))
+    );
+
+    const next: SelectedModifiersMap = {};
+
+    for (const [groupId, modifiers] of Object.entries(prev || {})) {
+      if (visibleGroupIds.has(String(groupId))) {
+        next[groupId] = modifiers;
+      }
+    }
+
+    return next;
+  };
+
+  const products = useMemo(() => {
+    if (!activeMenu?.items?.length) return [];
+
+    return activeMenu.items
+      .filter((entry) => entry?.menuItem && entry.menuItem.isActive !== false)
+      .sort((a, b) => toNumber(a?.sortOrder, 0) - toNumber(b?.sortOrder, 0))
+      .map((entry) => {
+        const item = entry.menuItem as MenuItem;
+        const variations = getItemVariations(item);
+        const defaultVariation =
+          variations.find((variation) => variation.isDefault) || variations[0] || null;
+
+        return {
+          id: item.id,
+          name: item.name,
+          slug: item.slug,
+          price: toNumber(item.basePrice, 0) + toNumber(defaultVariation?.price, 0),
+          image: item.imageUrl || "/placeholder.png",
+          description: item.description || "",
+          variations,
+          modifierLinks: getItemModifierLinks(item),
+          raw: item,
+        };
+      });
+  }, [activeMenu]);
+
+  const filteredModifierLinks = useMemo(() => {
+    return getVisibleModifierLinks(selectedItem, selectedVariation);
+  }, [selectedItem, selectedVariation]);
+
+  useEffect(() => {
+    if (!selectedItem) return;
+
+    const visibleLinks = getVisibleModifierLinks(selectedItem, selectedVariation);
+
+    setSelectedModifiers((prev) =>
+      sanitizeSelectedModifiersForVisibleGroups(prev, visibleLinks)
+    );
+  }, [selectedItem, selectedVariation]);
+
+  const openItemModal = (item: MenuItem) => {
+    const defaultVariation = getDefaultVariation(item);
+
+    setSelectedItem(item);
+    setSelectedVariation(defaultVariation);
+    setSelectedModifiers({});
+    setQty(1);
+    setModalOpen(true);
+  };
+
+  const getCalculatedPrice = (
+    item: MenuItem,
+    variation?: MenuVariation | null,
+    modifiersMap?: SelectedModifiersMap
+  ) => {
+    const basePrice = toNumber(item?.basePrice, 0);
+    const variationPrice = toNumber(variation?.price, 0);
+    const modifiersTotal = Object.values(modifiersMap || {})
+      .flat()
+      .reduce((acc, modifier) => {
+        return acc + getModifierEffectivePrice(modifier, item?.id, variation);
+      }, 0);
+
+    return basePrice + variationPrice + modifiersTotal;
+  };
+
   const addToCart = async (
     item: MenuItem,
     quantity = 1,
     variation?: MenuVariation | null,
-    modifiersMap?: Record<string, Modifier[]>
+    modifiersMap?: SelectedModifiersMap
   ) => {
     if (!customerId) {
       toast.error("Customer not found");
@@ -503,8 +695,8 @@ export default function SignatureSelectionContent({
         branchId,
         modifiers: Object.values(safeModifiersMap)
           .flat()
-          .map((m) => ({
-            modifierId: m.id,
+          .map((modifier) => ({
+            modifierId: modifier.id,
             quantity: 1,
           })),
       };
@@ -519,8 +711,8 @@ export default function SignatureSelectionContent({
       toast.success("Added to cart");
       setModalOpen(false);
       onCartRefresh?.();
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error("Add to cart failed:", error);
       toast.error("Something went wrong");
     } finally {
       setAddingId(null);
@@ -538,6 +730,31 @@ export default function SignatureSelectionContent({
     }
 
     addToCart(item, 1, null, {});
+  };
+
+  const startDragging = (pageX: number) => {
+    if (!scrollRef.current) return;
+
+    setIsDown(true);
+    setStartX(pageX - scrollRef.current.offsetLeft);
+    setScrollLeftStart(scrollRef.current.scrollLeft);
+  };
+
+  const stopDragging = () => setIsDown(false);
+
+  const onMouseMove = (pageX: number) => {
+    if (!isDown || !scrollRef.current) return;
+
+    const x = pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 1.1;
+    scrollRef.current.scrollLeft = scrollLeftStart - walk;
+  };
+
+  const scrollMenu = (direction: "left" | "right") => {
+    if (!scrollRef.current) return;
+
+    const amount = direction === "left" ? -220 : 220;
+    scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
   };
 
   const totalModalPrice = selectedItem
@@ -646,7 +863,7 @@ export default function SignatureSelectionContent({
                         </h3>
 
                         <span className="shrink-0 pt-0.5 text-[18px] font-semibold text-primary">
-                          ${Number(product.price || 0).toFixed(2)}
+                          ${toNumber(product.price, 0).toFixed(2)}
                         </span>
                       </div>
 
@@ -684,9 +901,21 @@ export default function SignatureSelectionContent({
         `}</style>
       </section>
 
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+      <Dialog
+        open={modalOpen}
+        onOpenChange={(nextOpen) => {
+          setModalOpen(nextOpen);
+
+          if (!nextOpen) {
+            setSelectedItem(null);
+            setSelectedVariation(null);
+            setSelectedModifiers({});
+            setQty(1);
+          }
+        }}
+      >
         <DialogContent className="max-h-[95vh] max-w-md overflow-auto rounded-2xl p-6">
-          {selectedItem && (
+          {selectedItem ? (
             <>
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -699,7 +928,7 @@ export default function SignatureSelectionContent({
                 </div>
               </div>
 
-              {!!getItemVariations(selectedItem).length && (
+              {getItemVariations(selectedItem).length > 0 ? (
                 <div className="mb-5">
                   <p className="mb-2 font-medium text-gray-900">Size</p>
 
@@ -727,15 +956,13 @@ export default function SignatureSelectionContent({
                         </div>
 
                         <span className="text-sm font-semibold text-primary">
-                          {Number(variation.price) > 0
-                            ? `+$${Number(variation.price).toFixed(2)}`
-                            : "+$0.00"}
+                          +${toNumber(variation.price, 0).toFixed(2)}
                         </span>
                       </label>
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {filteredModifierLinks.map((link) => {
                 const group = link.modifierGroup;
@@ -744,6 +971,12 @@ export default function SignatureSelectionContent({
                 const { minSelect, maxSelect, isRequired } =
                   getGroupValidation(group);
 
+                const groupModifiers = Array.isArray(group?.modifiers)
+                  ? group.modifiers.filter((modifier) => modifier?.isActive !== false)
+                  : [];
+
+                if (!groupModifiers.length) return null;
+
                 return (
                   <div
                     key={`${String(link?.variationId || "common")}-${groupId}`}
@@ -751,20 +984,16 @@ export default function SignatureSelectionContent({
                   >
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-medium text-gray-900">
-                          {group?.name}
-                        </p>
+                        <p className="font-medium text-gray-900">{group?.name}</p>
                         <p className="text-xs text-gray-500">
                           {maxSelect === 1
                             ? isRequired
                               ? "Select 1 required option"
                               : "Select up to 1 option"
                             : maxSelect
-                            ? `Select ${
-                                minSelect > 0
-                                  ? `${minSelect}-${maxSelect}`
-                                  : `up to ${maxSelect}`
-                              }`
+                            ? minSelect > 0
+                              ? `Select ${minSelect}-${maxSelect}`
+                              : `Select up to ${maxSelect}`
                             : minSelect > 0
                             ? `Select at least ${minSelect}`
                             : "Optional"}
@@ -778,51 +1007,51 @@ export default function SignatureSelectionContent({
                     </div>
 
                     <div className="space-y-2">
-                      {(group?.modifiers || [])
-                        .filter((m) => m.isActive !== false)
-                        .map((modifier) => {
-                          const checked = selectedInGroup.some(
-                            (selected) => selected.id === modifier.id
-                          );
+                      {groupModifiers.map((modifier) => {
+                        const checked = selectedInGroup.some(
+                          (selected) => selected.id === modifier.id
+                        );
 
-                          const disableBecauseMaxReached =
-                            !checked &&
-                            !!maxSelect &&
-                            selectedInGroup.length >= maxSelect;
+                        const disableBecauseMaxReached =
+                          !checked &&
+                          !!maxSelect &&
+                          selectedInGroup.length >= maxSelect;
 
-                          const effectivePrice = getModifierEffectivePrice(
-                            modifier,
-                            selectedItem.id
-                          );
+                        const effectivePrice = getModifierEffectivePrice(
+                          modifier,
+                          selectedItem.id,
+                          selectedVariation
+                        );
 
-                          return (
-                            <label
-                              key={modifier.id}
-                              className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-3 text-sm ${
-                                disableBecauseMaxReached
-                                  ? "bg-gray-100 opacity-70"
-                                  : "bg-gray-50"
-                              }`}
-                            >
-                              <span className="flex items-center gap-2 text-gray-800">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={disableBecauseMaxReached}
-                                  onChange={() =>
-                                    handleModifierToggle(group, modifier)
-                                  }
-                                  className="accent-[var(--primary)]"
-                                />
-                                {modifier.name}
-                              </span>
+                        const inputType = maxSelect === 1 ? "radio" : "checkbox";
 
-                              <span className="font-medium text-primary">
-                                +${effectivePrice.toFixed(2)}
-                              </span>
-                            </label>
-                          );
-                        })}
+                        return (
+                          <label
+                            key={modifier.id}
+                            className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-3 text-sm ${
+                              disableBecauseMaxReached
+                                ? "bg-gray-100 opacity-70"
+                                : "bg-gray-50"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 text-gray-800">
+                              <input
+                                type={inputType}
+                                name={`modifier-group-${groupId}`}
+                                checked={checked}
+                                disabled={disableBecauseMaxReached}
+                                onChange={() => handleModifierToggle(group, modifier)}
+                                className="accent-[var(--primary)]"
+                              />
+                              {modifier.name}
+                            </span>
+
+                            <span className="font-medium text-primary">
+                              +${effectivePrice.toFixed(2)}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -868,13 +1097,13 @@ export default function SignatureSelectionContent({
                 disabled={addingId === selectedItem.id}
                 className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {addingId === selectedItem.id && (
+                {addingId === selectedItem.id ? (
                   <Loader2 size={16} className="animate-spin" />
-                )}
+                ) : null}
                 {addingId === selectedItem.id ? "Processing..." : "Add to Cart"}
               </button>
             </>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </>
