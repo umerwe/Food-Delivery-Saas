@@ -928,41 +928,52 @@ export default function SignatureSelectionContent({
                 </div>
               </div>
 
-              {getItemVariations(selectedItem).length > 0 ? (
-                <div className="mb-5">
-                  <p className="mb-2 font-medium text-gray-900">Size</p>
+          {getItemVariations(selectedItem).length > 0 ? (
+  <div className="mb-5">
+    <p className="mb-2 font-medium text-gray-900">Size</p>
 
-                  <div className="grid grid-cols-1 gap-3">
-                    {getItemVariations(selectedItem).map((variation) => (
-                      <label
-                        key={variation.id}
-                        className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
-                          selectedVariation?.id === variation.id
-                            ? "border-primary bg-primary/5"
-                            : "border-gray-200 bg-white"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name={`size-${selectedItem.id}`}
-                            checked={selectedVariation?.id === variation.id}
-                            onChange={() => setSelectedVariation(variation)}
-                            className="accent-[var(--primary)]"
-                          />
-                          <span className="text-sm font-medium text-gray-800">
-                            {variation.name}
-                          </span>
-                        </div>
+    <div className="grid grid-cols-1 gap-3">
+      {getItemVariations(selectedItem).map((variation) => (
+        <label
+          key={variation.id}
+          className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
+            selectedVariation?.id === variation.id
+              ? "border-primary bg-primary/5"
+              : "border-gray-200 bg-white"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <input
+                type="radio"
+                name={`size-${selectedItem.id}`}
+                checked={selectedVariation?.id === variation.id}
+                onChange={() => setSelectedVariation(variation)}
+                className="mt-1 accent-[var(--primary)]"
+              />
 
-                        <span className="text-sm font-semibold text-primary">
-                          +${toNumber(variation.price, 0).toFixed(2)}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              <div>
+                <p className="text-sm font-medium text-gray-800">
+                  {variation.name}
+                </p>
+
+                {variation.description ? (
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    {variation.description}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <span className="shrink-0 text-sm font-semibold text-primary">
+              +${toNumber(variation.price, 0).toFixed(2)}
+            </span>
+          </div>
+        </label>
+      ))}
+    </div>
+  </div>
+) : null}
 
               {filteredModifierLinks.map((link) => {
                 const group = link.modifierGroup;

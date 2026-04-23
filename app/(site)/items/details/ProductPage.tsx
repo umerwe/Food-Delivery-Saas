@@ -779,39 +779,50 @@ export default function ProductPage() {
             ${totalPrice.toFixed(2)}
           </div>
 
-          {itemVariations.length > 0 ? (
-            <div>
-              <p className="mb-2 font-medium">Size</p>
+       {itemVariations.length > 0 ? (
+  <div>
+    <p className="mb-2 font-medium">Size</p>
 
-              <div className="grid grid-cols-2 gap-3">
-                {itemVariations.map((variation) => (
-                  <label
-                    key={variation.id}
-                    className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 ${
-                      selectedVariation?.id === variation.id
-                        ? "border-primary bg-primary/5"
-                        : "border-gray-200"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="size"
-                        checked={selectedVariation?.id === variation.id}
-                        onChange={() => setSelectedVariation(variation)}
-                        className="accent-[var(--primary)]"
-                      />
-                      <span>{variation.name}</span>
-                    </div>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {itemVariations.map((variation) => (
+        <label
+          key={variation.id}
+          className={`cursor-pointer rounded-xl border px-4 py-3 ${
+            selectedVariation?.id === variation.id
+              ? "border-primary bg-primary/5"
+              : "border-gray-200"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <input
+                type="radio"
+                name="size"
+                checked={selectedVariation?.id === variation.id}
+                onChange={() => setSelectedVariation(variation)}
+                className="mt-1 accent-[var(--primary)]"
+              />
 
-                    <span className="text-primary">
-                      +${toNumber(variation.price, 0).toFixed(2)}
-                    </span>
-                  </label>
-                ))}
+              <div>
+                <p className="font-medium text-gray-900">{variation.name}</p>
+
+                {variation.description ? (
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    {variation.description}
+                  </p>
+                ) : null}
               </div>
             </div>
-          ) : null}
+
+            <span className="shrink-0 text-primary font-medium">
+              +${toNumber(variation.price, 0).toFixed(2)}
+            </span>
+          </div>
+        </label>
+      ))}
+    </div>
+  </div>
+) : null}
 
           {filteredModifierLinks.map((link) => {
             const group = link.modifierGroup;
