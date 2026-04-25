@@ -498,20 +498,17 @@ export default function RestaurantCard({ item }: any) {
 
     return true;
   };
+const resolvedItemPrice = selectedVariation
+  ? toNumber(selectedVariation?.price, 0)
+  : toNumber(item?.basePrice, 0);
 
-  const basePrice = toNumber(item?.basePrice, 0);
-  const variationPrice = selectedVariation ? toNumber(selectedVariation?.price, 0) : 0;
+const modifiersTotal = Object.values(selectedModifiers)
+  .flat()
+  .reduce((acc, modifier) => {
+    return acc + getModifierEffectivePrice(modifier, item?.id, selectedVariation);
+  }, 0);
 
-  const modifiersTotal = Object.values(selectedModifiers)
-    .flat()
-    .reduce((acc, modifier) => {
-      return (
-        acc +
-        getModifierEffectivePrice(modifier, item?.id, selectedVariation)
-      );
-    }, 0);
-
-  const totalPrice = (basePrice + variationPrice + modifiersTotal) * qty;
+const totalPrice = (resolvedItemPrice + modifiersTotal) * qty;
 
   async function handleAddToCart() {
     try {
@@ -626,9 +623,9 @@ export default function RestaurantCard({ item }: any) {
 
   const hasInfoBoxContent = hasIngredients || hasNutritionalInformation;
 
-  const displayCardPrice =
-    basePrice + toNumber(getDefaultVariation(item)?.price, 0);
-
+const displayCardPrice = getDefaultVariation(item)
+  ? toNumber(getDefaultVariation(item)?.price, 0)
+  : toNumber(item?.basePrice, 0);
   return (
     <>
       <div className="group relative rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-lg">
@@ -761,9 +758,9 @@ export default function RestaurantCard({ item }: any) {
               </div>
             </div>
 
-            <span className="shrink-0 text-sm font-semibold text-primary">
-              +${toNumber(variation.price, 0).toFixed(2)}
-            </span>
+          <span className="shrink-0 text-sm font-semibold text-primary">
+  ${toNumber(variation.price, 0).toFixed(2)}
+</span>
           </div>
         </label>
       ))}

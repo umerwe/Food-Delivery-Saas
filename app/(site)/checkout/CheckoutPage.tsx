@@ -12,6 +12,59 @@ import { useAuthContext } from "@/context/AuthContext";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/hooks/useAuth";
+
+
+
+
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getSelectedModifierTotal = (cartItem: any) => {
+  const selectedModifiers = Array.isArray(cartItem?.modifiers)
+    ? cartItem.modifiers
+    : [];
+
+  const modifierGroups = Array.isArray(cartItem?.menuItem?.modifierGroups)
+    ? cartItem.menuItem.modifierGroups
+    : [];
+
+  const modifierPriceMap = new Map<string, number>();
+
+  modifierGroups.forEach((group: any) => {
+    const modifiers = Array.isArray(group?.modifiers) ? group.modifiers : [];
+
+    modifiers.forEach((modifier: any) => {
+      if (!modifier?.id) return;
+      modifierPriceMap.set(String(modifier.id), toNumber(modifier.priceDelta, 0));
+    });
+  });
+
+  return selectedModifiers.reduce((acc: number, selected: any) => {
+    const modifierId = String(selected?.modifierId || "");
+    const quantity = toNumber(selected?.quantity, 1);
+
+    return acc + toNumber(modifierPriceMap.get(modifierId), 0) * quantity;
+  }, 0);
+};
+
+const getCartItemUnitPrice = (cartItem: any) => {
+  const resolvedItemPrice = toNumber(
+    cartItem?.unitPrice ??
+      cartItem?.price ??
+      cartItem?.menuItem?.unitPrice ??
+      cartItem?.menuItem?.selectedVariation?.price ??
+      0,
+    0
+  );
+
+  return resolvedItemPrice + getSelectedModifierTotal(cartItem);
+};
+
+
+
 export default function CheckoutPage() {
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
@@ -41,15 +94,23 @@ const [stripePayment, setStripePayment] = useState<any>({
 
     const items = res?.data?.items || [];
 
-  const formatted = items.map((i: any) => ({
-  id: i.id, // cart item id
-  menuItemId: i.menuItemId, // ✅ IMPORTANT
-  quantity: i.quantity,
-  name: i.menuItem.name,
-  price: Number(i.menuItem.unitPrice),
-  desc: i.menuItem.description,
-  img: i.menuItem.imageUrl,
-}));
+ const formatted = items.map((i: any) => {
+  const quantity = toNumber(i.quantity, 1);
+  const unitPrice = getCartItemUnitPrice(i);
+
+  return {
+    id: i.id,
+    menuItemId: i.menuItemId,
+    quantity,
+    name: i.menuItem?.name || "Untitled Item",
+    price: unitPrice,
+    unitPrice,
+    lineTotal: unitPrice * quantity,
+    desc: i.menuItem?.description || "",
+    img: i.menuItem?.imageUrl || "",
+    selectedVariationName: i.menuItem?.selectedVariation?.name || "",
+  };
+});
 
     setCartItems(formatted);
   } catch (err) {
@@ -317,8 +378,9 @@ router.push(`/order?success=true&orderId=${orderId}`);
     setPlacingOrder(false);
   }
 };
-  const subtotal = cartItems.reduce(
-  (acc, item) => acc + item.price * item.quantity,
+
+const subtotal = cartItems.reduce(
+  (acc, item) => acc + Number(item.lineTotal ?? item.price * item.quantity),
   0
 );
 
