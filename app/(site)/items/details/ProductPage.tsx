@@ -532,18 +532,19 @@ export default function ProductPage() {
     return true;
   };
 
-  const basePrice = toNumber(item?.basePrice, 0);
-  const variationPrice = selectedVariation ? toNumber(selectedVariation?.price, 0) : 0;
+const resolvedItemPrice = selectedVariation
+  ? toNumber(selectedVariation?.price, 0)
+  : toNumber(item?.basePrice, 0);
 
-  const modifiersTotal = Object.values(selectedModifiers)
-    .flat()
-    .reduce((acc, modifier) => {
-      return acc + getModifierEffectivePrice(modifier, item?.id, selectedVariation);
-    }, 0);
+const modifiersTotal = Object.values(selectedModifiers)
+  .flat()
+  .reduce((acc, modifier) => {
+    return acc + getModifierEffectivePrice(modifier, item?.id, selectedVariation);
+  }, 0);
 
-  const totalPrice = (basePrice + variationPrice + modifiersTotal) * qty;
+const totalPrice = (resolvedItemPrice + modifiersTotal) * qty;
 
-  const handleAddToCart = async () => {
+const handleAddToCart = async () => {
     try {
       setLoading(true);
 
@@ -814,9 +815,9 @@ export default function ProductPage() {
               </div>
             </div>
 
-            <span className="shrink-0 text-primary font-medium">
-              +${toNumber(variation.price, 0).toFixed(2)}
-            </span>
+           <span className="shrink-0 font-medium text-primary">
+  ${toNumber(variation.price, 0).toFixed(2)}
+</span>
           </div>
         </label>
       ))}

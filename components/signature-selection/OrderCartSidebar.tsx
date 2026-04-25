@@ -13,15 +13,63 @@ type CartItem = {
   menuItemId?: string;
   quantity: number;
   name: string;
-  price: number;
+  unitPrice: number;
+  lineTotal: number;
   desc?: string;
   img?: string;
+  selectedVariationName?: string;
 };
 
 type OrderCartSidebarProps = {
   customerId?: string;
   cartRefreshKey: number;
   onCartRefresh?: () => void;
+};
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getSelectedModifierTotal = (cartItem: any) => {
+  const selectedModifiers = Array.isArray(cartItem?.modifiers)
+    ? cartItem.modifiers
+    : [];
+
+  const modifierGroups = Array.isArray(cartItem?.menuItem?.modifierGroups)
+    ? cartItem.menuItem.modifierGroups
+    : [];
+
+  const modifierPriceMap = new Map<string, number>();
+
+  modifierGroups.forEach((group: any) => {
+    const modifiers = Array.isArray(group?.modifiers) ? group.modifiers : [];
+
+    modifiers.forEach((modifier: any) => {
+      if (!modifier?.id) return;
+      modifierPriceMap.set(String(modifier.id), toNumber(modifier.priceDelta, 0));
+    });
+  });
+
+  return selectedModifiers.reduce((acc: number, selected: any) => {
+    const modifierId = String(selected?.modifierId || "");
+    const quantity = toNumber(selected?.quantity, 1);
+
+    return acc + toNumber(modifierPriceMap.get(modifierId), 0) * quantity;
+  }, 0);
+};
+
+const getCartItemUnitPrice = (cartItem: any) => {
+  const resolvedItemPrice = toNumber(
+    cartItem?.unitPrice ??
+      cartItem?.price ??
+      cartItem?.menuItem?.unitPrice ??
+      cartItem?.menuItem?.selectedVariation?.price ??
+      0,
+    0
+  );
+
+  return resolvedItemPrice + getSelectedModifierTotal(cartItem);
 };
 
 export default function OrderCartSidebar({
@@ -44,28 +92,30 @@ export default function OrderCartSidebar({
       setLoadingCart(true);
 
       const res = await get(`/v1/cart?customerId=${customerId}`);
+
       if (!res || res.error) {
         setCartItems([]);
         return;
       }
 
-      const items = res?.data?.items || [];
+      const items = Array.isArray(res?.data?.items) ? res.data.items : [];
 
-      const formatted: CartItem[] = items.map((i: any) => ({
-        id: i.id,
-        menuItemId: i.menuItemId,
-        quantity: Number(i.quantity || 1),
-        name: i.menuItem?.name || "Untitled Item",
-        price: Number(
-          i.unitPrice ??
-            i.price ??
-            i.menuItem?.unitPrice ??
-            i.menuItem?.basePrice ??
-            0
-        ),
-        desc: i.menuItem?.description || "",
-        img: i.menuItem?.imageUrl || "",
-      }));
+      const formatted: CartItem[] = items.map((item: any) => {
+        const quantity = toNumber(item.quantity, 1);
+        const unitPrice = getCartItemUnitPrice(item);
+
+        return {
+          id: item.id,
+          menuItemId: item.menuItemId,
+          quantity,
+          name: item.menuItem?.name || "Untitled Item",
+          unitPrice,
+          lineTotal: unitPrice * quantity,
+          desc: item.menuItem?.description || "",
+          img: item.menuItem?.imageUrl || "",
+          selectedVariationName: item.menuItem?.selectedVariation?.name || "",
+        };
+      });
 
       setCartItems(formatted);
     } catch (err) {
@@ -86,7 +136,7 @@ export default function OrderCartSidebar({
   );
 
   const subtotal = useMemo(
-    () => cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0),
+    () => cartItems.reduce((acc, item) => acc + item.lineTotal, 0),
     [cartItems]
   );
 
@@ -110,7 +160,15 @@ export default function OrderCartSidebar({
       }
 
       setCartItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i))
+        prev.map((i) =>
+          i.id === id
+            ? {
+                ...i,
+                quantity: newQty,
+                lineTotal: i.unitPrice * newQty,
+              }
+            : i
+        )
       );
 
       onCartRefresh?.();
@@ -147,7 +205,7 @@ export default function OrderCartSidebar({
   };
 
   return (
-    <aside className="border-l border-black/5 bg-white/95 px-4 py-5 backdrop-blur-sm sm:px-6 xl:sticky xl:top-0  shadow-[-12px_0_32px_0_rgba(26,28,28,0.04)]">
+    <aside className="border-l border-black/5 bg-white/95 px-4 py-5 backdrop-blur-sm sm:px-6 xl:sticky xl:top-0 shadow-[-12px_0_32px_0_rgba(26,28,28,0.04)]">
       <div className="mx-auto flex h-full max-w-[320px] flex-col">
         <div className="mb-6 flex items-center justify-between gap-3">
           <h2 className="text-[22px] font-bold tracking-[-0.02em] text-[#1f1f1f]">
@@ -192,6 +250,12 @@ export default function OrderCartSidebar({
                           <h3 className="line-clamp-2 text-[13px] font-medium leading-5 text-[#222]">
                             {item.name}
                           </h3>
+
+                          {item.selectedVariationName ? (
+                            <p className="mt-0.5 text-[11px] text-[#888]">
+                              {item.selectedVariationName}
+                            </p>
+                          ) : null}
                         </div>
 
                         <button
@@ -227,7 +291,7 @@ export default function OrderCartSidebar({
                         </div>
 
                         <span className="shrink-0 text-[13px] font-medium text-[#222]">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          ${item.lineTotal.toFixed(2)}
                         </span>
                       </div>
                     </div>

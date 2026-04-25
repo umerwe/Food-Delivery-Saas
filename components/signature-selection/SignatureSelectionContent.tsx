@@ -613,7 +613,9 @@ export default function SignatureSelectionContent({
           id: item.id,
           name: item.name,
           slug: item.slug,
-          price: toNumber(item.basePrice, 0) + toNumber(defaultVariation?.price, 0),
+          price: defaultVariation
+  ? toNumber(defaultVariation?.price, 0)
+  : toNumber(item.basePrice, 0),
           image: item.imageUrl || "/placeholder.png",
           description: item.description || "",
           variations,
@@ -648,20 +650,22 @@ export default function SignatureSelectionContent({
   };
 
   const getCalculatedPrice = (
-    item: MenuItem,
-    variation?: MenuVariation | null,
-    modifiersMap?: SelectedModifiersMap
-  ) => {
-    const basePrice = toNumber(item?.basePrice, 0);
-    const variationPrice = toNumber(variation?.price, 0);
-    const modifiersTotal = Object.values(modifiersMap || {})
-      .flat()
-      .reduce((acc, modifier) => {
-        return acc + getModifierEffectivePrice(modifier, item?.id, variation);
-      }, 0);
+  item: MenuItem,
+  variation?: MenuVariation | null,
+  modifiersMap?: SelectedModifiersMap
+) => {
+  const resolvedItemPrice = variation
+    ? toNumber(variation?.price, 0)
+    : toNumber(item?.basePrice, 0);
 
-    return basePrice + variationPrice + modifiersTotal;
-  };
+  const modifiersTotal = Object.values(modifiersMap || {})
+    .flat()
+    .reduce((acc, modifier) => {
+      return acc + getModifierEffectivePrice(modifier, item?.id, variation);
+    }, 0);
+
+  return resolvedItemPrice + modifiersTotal;
+};
 
   const addToCart = async (
     item: MenuItem,
@@ -965,8 +969,9 @@ export default function SignatureSelectionContent({
               </div>
             </div>
 
-            <span className="shrink-0 text-sm font-semibold text-primary">
-              +${toNumber(variation.price, 0).toFixed(2)}
+             <span className="shrink-0 text-sm font-semibold text-primary">
+  ${toNumber(variation.price, 0).toFixed(2)}
+
             </span>
           </div>
         </label>
