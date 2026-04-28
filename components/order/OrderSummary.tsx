@@ -44,7 +44,7 @@ export default function OrderSummary({
 
                 <div className="flex justify-between">
                   <p className="text-base font-medium text-primary">
-                    Rs {item.unitPrice}
+                    ${item.unitPrice}
                   </p>
 
                   <div className="text-sm text-gray-700">
@@ -66,7 +66,7 @@ export default function OrderSummary({
         <div className="space-y-4 text-gray-500 text-sm">
           <div className="flex justify-between">
             <span>Item Total</span>
-            <span>Rs {order?.subtotal}</span>
+            <span>${order?.subtotal}</span>
           </div>
 
           <div className="flex justify-between">
@@ -74,7 +74,7 @@ export default function OrderSummary({
               <span>Delivery Fee</span>
               <Info size={14} />
             </div>
-            <span>Rs {order?.deliveryFee}</span>
+            <span>${order?.deliveryFee}</span>
           </div>
 
           <div className="flex justify-between">
@@ -82,7 +82,7 @@ export default function OrderSummary({
               <span>Taxes</span>
               <Info size={14} />
             </div>
-            <span>Rs {order?.taxAmount}</span>
+            <span>${order?.taxAmount}</span>
           </div>
         </div>
 
@@ -96,12 +96,12 @@ export default function OrderSummary({
         <div className="space-y-[10px] pt-[10px]">
           <div className="flex justify-between text-sm text-gray-500">
             <span>Discount</span>
-            <span>Rs {order?.discountAmount}</span>
+            <span>${order?.discountAmount}</span>
           </div>
 
           <div className="flex justify-between text-lg font-semibold text-gray-900">
             <span>Total</span>
-            <span>Rs {order?.totalAmount}</span>
+            <span>${order?.totalAmount}</span>
           </div>
         </div>
 
