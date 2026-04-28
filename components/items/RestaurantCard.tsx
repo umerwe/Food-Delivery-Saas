@@ -758,9 +758,11 @@ const displayCardPrice = getDefaultVariation(item)
               </div>
             </div>
 
-          <span className="shrink-0 text-sm font-semibold text-primary">
-  ${toNumber(variation.price, 0).toFixed(2)}
-</span>
+       {toNumber(variation.price, 0) > 0 ? (
+  <span className="shrink-0 text-sm font-semibold text-primary">
+    ${toNumber(variation.price, 0).toFixed(2)}
+  </span>
+) : null}
           </div>
         </label>
       ))}
@@ -848,9 +850,11 @@ const displayCardPrice = getDefaultVariation(item)
                           {modifier.name}
                         </span>
 
-                        <span className="font-medium text-primary">
-                          +${effectivePrice.toFixed(2)}
-                        </span>
+                      {effectivePrice > 0 ? (
+  <span className="font-medium text-primary">
+    +${effectivePrice.toFixed(2)}
+  </span>
+) : null}
                       </label>
                     );
                   })}
