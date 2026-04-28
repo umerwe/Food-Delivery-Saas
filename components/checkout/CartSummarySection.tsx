@@ -145,12 +145,12 @@ export default function CartSummarySection({
                     <div className="flex justify-between py-[4px]">
                       <div>
                         <p className="text-base font-medium text-primary">
-                          Rs {lineTotal.toFixed(2)}
+                          ${lineTotal.toFixed(2)}
                         </p>
 
                         {item.quantity > 1 ? (
                           <p className="text-[11px] text-gray-400">
-                            Rs {unitPrice.toFixed(2)} each
+                            ${unitPrice.toFixed(2)} each
                           </p>
                         ) : null}
                       </div>
@@ -158,7 +158,7 @@ export default function CartSummarySection({
                       <div className="flex items-center gap-[12px]">
                         <button
                           onClick={() => updateQuantity(item.id, "dec")}
-                          className="flex h-[20px] w-[20px] items-center justify-center rounded-sm border border-gray-900 text-gray-900 transition-colors hover:border-primary hover:text-primary"
+                          className="flex h-[20px] w-[20px] items-center justify-center rounded-sm border border-gray-900 text-gray-900 transition-colo$hover:border-primary hover:text-primary"
                         >
                           <Minus size={13} strokeWidth={3} />
                         </button>
@@ -169,7 +169,7 @@ export default function CartSummarySection({
 
                         <button
                           onClick={() => updateQuantity(item.id, "inc")}
-                          className="flex h-[20px] w-[20px] items-center justify-center rounded-sm border border-gray-900 text-gray-900 transition-colors hover:border-primary hover:text-primary"
+                          className="flex h-[20px] w-[20px] items-center justify-center rounded-sm border border-gray-900 text-gray-900 transition-colo$hover:border-primary hover:text-primary"
                         >
                           <Plus size={13} strokeWidth={3} />
                         </button>
@@ -191,7 +191,7 @@ export default function CartSummarySection({
         <div className="space-y-4 text-sm text-gray-500">
           <div className="flex items-center justify-between">
             <span>Item Total</span>
-            <span>Rs {itemTotal?.toFixed(2)}</span>
+            <span>${itemTotal?.toFixed(2)}</span>
           </div>
 
           <div className="flex items-center justify-between">
@@ -199,7 +199,7 @@ export default function CartSummarySection({
               <span>Delivery Fee | 12.9 kms</span>
               <Info size={16} />
             </div>
-            <span>Rs {deliveryFee?.toFixed(2)}</span>
+            <span>${deliveryFee?.toFixed(2)}</span>
           </div>
 
           <div className="flex items-center justify-between">
@@ -207,7 +207,7 @@ export default function CartSummarySection({
               <span>Taxes and Charges</span>
               <Info size={16} />
             </div>
-            <span>Rs {taxes?.toFixed(2)}</span>
+            <span>${taxes?.toFixed(2)}</span>
           </div>
         </div>
 
@@ -240,19 +240,19 @@ export default function CartSummarySection({
         <div className="space-y-[15px]">
           <div className="flex items-center justify-between pt-[15px] text-sm text-gray-500">
             <span>Total</span>
-            <span>Rs {totalBeforeDiscount?.toFixed(2)}</span>
+            <span>${totalBeforeDiscount?.toFixed(2)}</span>
           </div>
 
           {discount > 0 && (
             <div className="flex items-center justify-between pb-[15px] text-sm text-green-600">
               <span>Discount</span>
-              <span>- Rs {discount.toFixed(2)}</span>
+              <span>- ${discount.toFixed(2)}</span>
             </div>
           )}
 
           <div className="flex items-center justify-between text-[24px] font-medium text-gray-900">
             <span>Total</span>
-            <span>Rs {finalTotal?.toFixed(2)}</span>
+            <span>${finalTotal?.toFixed(2)}</span>
           </div>
         </div>
 
