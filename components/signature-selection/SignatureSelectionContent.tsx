@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  Download,
+  Eye,
   Loader2,
   Minus,
   Plus,
@@ -13,6 +15,7 @@ import { toast } from "sonner";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import AsyncSelect from "@/components/ui/AsyncSelect";
 
 type SignatureSelectionContentProps = {
   restaurantId?: string | null;
@@ -60,6 +63,10 @@ type Modifier = {
   variationPriceOverrides?: VariationPriceOverride[];
 };
 
+type SelectedModifier = Modifier & {
+  selectedQuantity: number;
+};
+
 type RawModifierLink = {
   id?: string;
   modifierGroupId?: string;
@@ -95,8 +102,16 @@ type MenuItem = {
   description?: string;
   imageUrl?: string;
   basePrice?: string | number;
+  unitPrice?: string | number;
+  price?: string | number;
   isActive?: boolean;
+  supportsSplitPizza?: boolean;
   categoryId?: string;
+  ingredients?: string | null;
+  nutritionalInformation?: string | null;
+  allergenFlags?: string[];
+  dietaryFlags?: string[];
+  allergenPdfUrl?: string | null;
   category?: {
     id: string;
     name?: string;
@@ -106,6 +121,7 @@ type MenuItem = {
   variations?: MenuVariation[];
   modifierLinks?: ModifierLink[];
   modifierGroups?: ModifierGroup[];
+  categoryModifierGroups?: ModifierGroup[];
 };
 
 type MenuRecord = {
@@ -121,7 +137,7 @@ type MenuRecord = {
   }[];
 };
 
-type SelectedModifiersMap = Record<string, Modifier[]>;
+type SelectedModifiersMap = Record<string, SelectedModifier[]>;
 
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
@@ -132,6 +148,17 @@ const sortBySortOrder = <T extends { sortOrder?: number }>(items: T[]) => {
   return [...items].sort(
     (a, b) => toNumber(a?.sortOrder, 0) - toNumber(b?.sortOrder, 0)
   );
+};
+
+const hasText = (value: unknown) => {
+  const text = String(value ?? "").trim();
+  return text !== "" && text.toLowerCase() !== "null";
+};
+
+const normalizeApiList = (res: any) => {
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  return [];
 };
 
 export default function SignatureSelectionContent({
@@ -161,6 +188,21 @@ export default function SignatureSelectionContent({
   const [selectedModifiers, setSelectedModifiers] =
     useState<SelectedModifiersMap>({});
   const [qty, setQty] = useState(1);
+  const [note, setNote] = useState("");
+
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoItem, setInfoItem] = useState<MenuItem | null>(null);
+
+  const [splitPizzaEnabled, setSplitPizzaEnabled] = useState(false);
+  const [splitPizzaItem, setSplitPizzaItem] = useState<any>(null);
+  const [splitPizzaVariation, setSplitPizzaVariation] =
+    useState<MenuVariation | null>(null);
+  const [splitPizzaModifiers, setSplitPizzaModifiers] =
+    useState<SelectedModifiersMap>({});
+
+  const selectedItemSupportsSplitPizza = Boolean(
+    selectedItem?.supportsSplitPizza
+  );
 
   const fetchMenus = async () => {
     if (!restaurantId) return;
@@ -189,7 +231,9 @@ export default function SignatureSelectionContent({
 
       if (menuData.length > 0) {
         setActiveMenuId((prev) =>
-          prev && menuData.some((menu) => menu.id === prev) ? prev : menuData[0].id
+          prev && menuData.some((menu) => menu.id === prev)
+            ? prev
+            : menuData[0].id
         );
       } else {
         setActiveMenuId("");
@@ -255,7 +299,9 @@ export default function SignatureSelectionContent({
 
     const rawVariations = [
       ...(Array.isArray(item?.variations) ? item.variations : []),
-      ...(Array.isArray(item?.category?.variations) ? item.category.variations : []),
+      ...(Array.isArray(item?.category?.variations)
+        ? item.category.variations
+        : []),
     ];
 
     const deduped = new Map<string, MenuVariation>();
@@ -273,7 +319,10 @@ export default function SignatureSelectionContent({
   };
 
   const getNormalizedModifiersFromGroup = (group: any): Modifier[] => {
-    const directModifiers = Array.isArray(group?.modifiers) ? group.modifiers : [];
+    const directModifiers = Array.isArray(group?.modifiers)
+      ? group.modifiers
+      : [];
+
     const fromModifierLinks = Array.isArray(group?.modifierLinks)
       ? group.modifierLinks.map((link: any) => link?.modifier).filter(Boolean)
       : [];
@@ -307,7 +356,9 @@ export default function SignatureSelectionContent({
       sortOrder: toNumber(group?.sortOrder, 0),
       isActive: group?.isActive !== false,
       modifiers: getNormalizedModifiersFromGroup(group),
-      modifierLinks: Array.isArray(group?.modifierLinks) ? group.modifierLinks : [],
+      modifierLinks: Array.isArray(group?.modifierLinks)
+        ? group.modifierLinks
+        : [],
     };
   };
 
@@ -334,14 +385,18 @@ export default function SignatureSelectionContent({
       .filter(Boolean) as ModifierLink[];
 
     const normalizedFromCategoryModifierLinks: ModifierLink[] = (
-      Array.isArray(item?.category?.modifierLinks) ? item.category.modifierLinks : []
+      Array.isArray(item?.category?.modifierLinks)
+        ? item.category.modifierLinks
+        : []
     )
       .map((link: any, index: number) => {
         const normalizedGroup = normalizeGroup(link?.modifierGroup);
         if (!normalizedGroup) return null;
 
         return {
-          id: String(link?.id || `category-link-${normalizedGroup.id}-${index}`),
+          id: String(
+            link?.id || `category-link-${normalizedGroup.id}-${index}`
+          ),
           variationId: link?.variationId ? String(link.variationId) : null,
           sortOrder: toNumber(
             link?.sortOrder ?? normalizedGroup.sortOrder ?? 0,
@@ -368,12 +423,31 @@ export default function SignatureSelectionContent({
       })
       .filter(Boolean) as ModifierLink[];
 
+    const normalizedFromCategoryModifierGroups: ModifierLink[] = (
+      Array.isArray(item?.categoryModifierGroups)
+        ? item.categoryModifierGroups
+        : []
+    )
+      .map((group: any, index: number) => {
+        const normalizedGroup = normalizeGroup(group);
+        if (!normalizedGroup) return null;
+
+        return {
+          id: `category-group-${normalizedGroup.id}-${index}`,
+          variationId: null,
+          sortOrder: toNumber(normalizedGroup.sortOrder, 0),
+          modifierGroup: normalizedGroup,
+        };
+      })
+      .filter(Boolean) as ModifierLink[];
+
     const deduped = new Map<string, ModifierLink>();
 
     for (const link of [
       ...normalizedFromItemModifierLinks,
       ...normalizedFromCategoryModifierLinks,
       ...normalizedFromModifierGroups,
+      ...normalizedFromCategoryModifierGroups,
     ]) {
       const groupId = String(link?.modifierGroup?.id || "");
       if (!groupId) continue;
@@ -430,8 +504,7 @@ export default function SignatureSelectionContent({
       modifier?.variationPriceOverrides
     )
       ? modifier.variationPriceOverrides.find(
-          (override) =>
-            String(override?.variationId || "") === variationId
+          (override) => String(override?.variationId || "") === variationId
         )
       : null;
 
@@ -501,10 +574,12 @@ export default function SignatureSelectionContent({
 
   const getGroupValidation = (group: ModifierGroup) => {
     const rawMin = toNumber(group?.minSelect, 0);
+
     const rawMax =
       group?.maxSelect !== undefined && group?.maxSelect !== null
         ? toNumber(group.maxSelect, 0)
         : undefined;
+
     const isRequired = Boolean(group?.isRequired);
 
     return {
@@ -514,22 +589,40 @@ export default function SignatureSelectionContent({
     };
   };
 
-  const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
+  const handleModifierToggle = (
+    group: ModifierGroup,
+    modifier: Modifier,
+    scope: "main" | "split" = "main"
+  ) => {
     const groupId = String(group.id);
-    const current = selectedModifiers[groupId] || [];
+
+    const selectionMap =
+      scope === "main" ? selectedModifiers : splitPizzaModifiers;
+
+    const setSelectionMap =
+      scope === "main" ? setSelectedModifiers : setSplitPizzaModifiers;
+
+    const current = selectionMap[groupId] || [];
     const { maxSelect } = getGroupValidation(group);
     const alreadySelected = current.some((m) => m.id === modifier.id);
 
     if (maxSelect === 1) {
-      setSelectedModifiers((prev) => ({
+      setSelectionMap((prev) => ({
         ...prev,
-        [groupId]: alreadySelected ? [] : [modifier],
+        [groupId]: alreadySelected
+          ? []
+          : [
+              {
+                ...modifier,
+                selectedQuantity: 1,
+              },
+            ],
       }));
       return;
     }
 
     if (alreadySelected) {
-      setSelectedModifiers((prev) => ({
+      setSelectionMap((prev) => ({
         ...prev,
         [groupId]: current.filter((m) => m.id !== modifier.id),
       }));
@@ -541,9 +634,41 @@ export default function SignatureSelectionContent({
       return;
     }
 
-    setSelectedModifiers((prev) => ({
+    setSelectionMap((prev) => ({
       ...prev,
-      [groupId]: [...current, modifier],
+      [groupId]: [
+        ...current,
+        {
+          ...modifier,
+          selectedQuantity: 1,
+        },
+      ],
+    }));
+  };
+
+  const handleModifierQuantityChange = (
+    groupId: string,
+    modifierId: string,
+    type: "inc" | "dec",
+    scope: "main" | "split" = "main"
+  ) => {
+    const setSelectionMap =
+      scope === "main" ? setSelectedModifiers : setSplitPizzaModifiers;
+
+    setSelectionMap((prev) => ({
+      ...prev,
+      [groupId]: (prev[groupId] || []).map((modifier) => {
+        if (modifier.id !== modifierId) return modifier;
+
+        const currentQty = Math.max(1, toNumber(modifier.selectedQuantity, 1));
+        const nextQty =
+          type === "inc" ? currentQty + 1 : Math.max(1, currentQty - 1);
+
+        return {
+          ...modifier,
+          selectedQuantity: nextQty,
+        };
+      }),
     }));
   };
 
@@ -597,6 +722,59 @@ export default function SignatureSelectionContent({
     return next;
   };
 
+  const buildModifiersPayload = (modifiersMap: SelectedModifiersMap) => {
+    return Object.values(modifiersMap)
+      .flat()
+      .map((modifier) => ({
+        modifierId: modifier.id,
+        quantity: Math.max(1, toNumber(modifier.selectedQuantity, 1)),
+      }));
+  };
+
+  const getModifiersTotal = (
+    item: MenuItem,
+    variation?: MenuVariation | null,
+    modifiersMap?: SelectedModifiersMap
+  ) => {
+    return Object.values(modifiersMap || {})
+      .flat()
+      .reduce((acc, modifier) => {
+        const modifierPrice = getModifierEffectivePrice(
+          modifier,
+          item?.id,
+          variation
+        );
+
+        const modifierQty = Math.max(
+          1,
+          toNumber(modifier.selectedQuantity, 1)
+        );
+
+        return acc + modifierPrice * modifierQty;
+      }, 0);
+  };
+
+  const getCalculatedPrice = (
+    item: MenuItem,
+    variation?: MenuVariation | null,
+    modifiersMap?: SelectedModifiersMap,
+    splitItem?: MenuItem | null,
+    splitVariation?: MenuVariation | null,
+    splitModifiersMap?: SelectedModifiersMap
+  ) => {
+    const resolvedItemPrice = variation
+      ? toNumber(variation?.price, 0)
+      : toNumber(item?.basePrice ?? item?.unitPrice ?? item?.price, 0);
+
+    const modifiersTotal = getModifiersTotal(item, variation, modifiersMap);
+
+    const splitModifiersTotal = splitItem
+      ? getModifiersTotal(splitItem, splitVariation, splitModifiersMap)
+      : 0;
+
+    return resolvedItemPrice + modifiersTotal + splitModifiersTotal;
+  };
+
   const products = useMemo(() => {
     if (!activeMenu?.items?.length) return [];
 
@@ -605,17 +783,20 @@ export default function SignatureSelectionContent({
       .sort((a, b) => toNumber(a?.sortOrder, 0) - toNumber(b?.sortOrder, 0))
       .map((entry) => {
         const item = entry.menuItem as MenuItem;
+
         const variations = getItemVariations(item);
         const defaultVariation =
-          variations.find((variation) => variation.isDefault) || variations[0] || null;
+          variations.find((variation) => variation.isDefault) ||
+          variations[0] ||
+          null;
 
         return {
           id: item.id,
           name: item.name,
           slug: item.slug,
           price: defaultVariation
-  ? toNumber(defaultVariation?.price, 0)
-  : toNumber(item.basePrice, 0),
+            ? toNumber(defaultVariation?.price, 0)
+            : toNumber(item.basePrice ?? item.unitPrice ?? item.price, 0),
           image: item.imageUrl || "/placeholder.png",
           description: item.description || "",
           variations,
@@ -629,6 +810,11 @@ export default function SignatureSelectionContent({
     return getVisibleModifierLinks(selectedItem, selectedVariation);
   }, [selectedItem, selectedVariation]);
 
+  const splitPizzaModifierLinks = useMemo(() => {
+    if (!splitPizzaEnabled || !splitPizzaItem) return [];
+    return getVisibleModifierLinks(splitPizzaItem, splitPizzaVariation);
+  }, [splitPizzaEnabled, splitPizzaItem, splitPizzaVariation]);
+
   useEffect(() => {
     if (!selectedItem) return;
 
@@ -639,33 +825,87 @@ export default function SignatureSelectionContent({
     );
   }, [selectedItem, selectedVariation]);
 
+  useEffect(() => {
+    if (selectedItemSupportsSplitPizza) return;
+
+    setSplitPizzaEnabled(false);
+    setSplitPizzaItem(null);
+    setSplitPizzaVariation(null);
+    setSplitPizzaModifiers({});
+  }, [selectedItemSupportsSplitPizza]);
+
+  useEffect(() => {
+    if (!splitPizzaEnabled || !splitPizzaItem) {
+      setSplitPizzaModifiers({});
+      return;
+    }
+
+    setSplitPizzaModifiers((prev) =>
+      sanitizeSelectedModifiersForVisibleGroups(prev, splitPizzaModifierLinks)
+    );
+  }, [splitPizzaEnabled, splitPizzaItem, splitPizzaModifierLinks]);
+
+  const fetchPizzaItems = async ({
+    search,
+    page,
+  }: {
+    search: string;
+    page: number;
+  }) => {
+    const resolvedSearch = search?.trim() || "pizza";
+
+    const res = await get(
+      `/v1/menu/items?search=${encodeURIComponent(resolvedSearch)}&page=${page}`
+    );
+
+    const data = normalizeApiList(res).filter((menuItem: any) => {
+      if (!menuItem?.id) return false;
+      if (String(menuItem.id) === String(selectedItem?.id)) return false;
+
+      const name = String(menuItem?.name || "").toLowerCase();
+      const categoryName = String(menuItem?.category?.name || "").toLowerCase();
+
+      return name.includes("pizza") || categoryName.includes("pizza");
+    });
+
+    return {
+      data,
+      meta: res?.data?.meta || res?.meta,
+    };
+  };
+
   const openItemModal = (item: MenuItem) => {
     const defaultVariation = getDefaultVariation(item);
 
     setSelectedItem(item);
     setSelectedVariation(defaultVariation);
     setSelectedModifiers({});
+    setSplitPizzaEnabled(false);
+    setSplitPizzaItem(null);
+    setSplitPizzaVariation(null);
+    setSplitPizzaModifiers({});
     setQty(1);
+    setNote("");
     setModalOpen(true);
   };
 
-  const getCalculatedPrice = (
-  item: MenuItem,
-  variation?: MenuVariation | null,
-  modifiersMap?: SelectedModifiersMap
-) => {
-  const resolvedItemPrice = variation
-    ? toNumber(variation?.price, 0)
-    : toNumber(item?.basePrice, 0);
+  const handleSplitPizzaToggle = (checked: boolean) => {
+    if (!selectedItemSupportsSplitPizza) return;
 
-  const modifiersTotal = Object.values(modifiersMap || {})
-    .flat()
-    .reduce((acc, modifier) => {
-      return acc + getModifierEffectivePrice(modifier, item?.id, variation);
-    }, 0);
+    setSplitPizzaEnabled(checked);
 
-  return resolvedItemPrice + modifiersTotal;
-};
+    if (!checked) {
+      setSplitPizzaItem(null);
+      setSplitPizzaVariation(null);
+      setSplitPizzaModifiers({});
+    }
+  };
+
+  const handleSplitPizzaItemChange = (item: any) => {
+    setSplitPizzaItem(item);
+    setSplitPizzaVariation(getDefaultVariation(item));
+    setSplitPizzaModifiers({});
+  };
 
   const addToCart = async (
     item: MenuItem,
@@ -689,22 +929,54 @@ export default function SignatureSelectionContent({
       return;
     }
 
+    if (splitPizzaEnabled) {
+      if (!splitPizzaItem?.id) {
+        toast.error("Please select the other pizza half");
+        return;
+      }
+
+      if (
+        !validateSelections(
+          splitPizzaItem,
+          splitPizzaModifiers,
+          splitPizzaVariation
+        )
+      ) {
+        return;
+      }
+    }
+
     try {
       setAddingId(item.id);
+ const splitSections =
+  splitPizzaEnabled && splitPizzaItem?.id
+    ? [
+        {
+          slot: "LEFT",
+          menuItemId: item.id,
+          modifiers: buildModifiersPayload(selectedModifiers),
+        },
+        {
+          slot: "RIGHT",
+          menuItemId: splitPizzaItem.id,
+          modifiers: buildModifiersPayload(splitPizzaModifiers),
+        },
+      ]
+    : undefined;
 
-      const payload = {
+
+      const payload: any = {
         menuItemId: item.id,
         quantity,
         variationId: variation?.id || null,
         branchId,
-        modifiers: Object.values(safeModifiersMap)
-          .flat()
-          .map((modifier) => ({
-            modifierId: modifier.id,
-            quantity: 1,
-          })),
+        note: note.trim() || "",
+        modifiers: buildModifiersPayload(safeModifiersMap),
       };
 
+        if (splitSections) {
+        payload.sections = splitSections;
+      }
       const res = await post(`/v1/cart/items?customerId=${customerId}`, payload);
 
       if (!res || res.error) {
@@ -726,7 +998,11 @@ export default function SignatureSelectionContent({
   const handleAddClick = (item: MenuItem) => {
     const variations = getItemVariations(item);
     const modifiers = getItemModifierLinks(item);
-    const hasOptions = variations.length > 0 || modifiers.length > 0;
+
+    const hasOptions =
+      variations.length > 0 ||
+      modifiers.length > 0 ||
+      Boolean(item?.supportsSplitPizza);
 
     if (hasOptions) {
       openItemModal(item);
@@ -734,6 +1010,23 @@ export default function SignatureSelectionContent({
     }
 
     addToCart(item, 1, null, {});
+  };
+
+  const openInfoModal = (item: MenuItem) => {
+    setInfoItem(item);
+    setInfoOpen(true);
+  };
+
+  const hasInfoContent = (item?: MenuItem | null) => {
+    if (!item) return false;
+
+    return (
+      hasText(item.ingredients) ||
+      hasText(item.nutritionalInformation) ||
+      (Array.isArray(item.allergenFlags) && item.allergenFlags.length > 0) ||
+      (Array.isArray(item.dietaryFlags) && item.dietaryFlags.length > 0) ||
+      hasText(item.allergenPdfUrl)
+    );
   };
 
   const startDragging = (pageX: number) => {
@@ -762,8 +1055,185 @@ export default function SignatureSelectionContent({
   };
 
   const totalModalPrice = selectedItem
-    ? getCalculatedPrice(selectedItem, selectedVariation, selectedModifiers) * qty
+    ? getCalculatedPrice(
+        selectedItem,
+        selectedVariation,
+        selectedModifiers,
+        splitPizzaEnabled ? splitPizzaItem : null,
+        splitPizzaVariation,
+        splitPizzaModifiers
+      ) * qty
     : 0;
+
+  const renderModifierGroups = ({
+    links,
+    selectionMap,
+    item,
+    variation,
+    scope,
+  }: {
+    links: ModifierLink[];
+    selectionMap: SelectedModifiersMap;
+    item: MenuItem;
+    variation?: MenuVariation | null;
+    scope: "main" | "split";
+  }) => {
+    return links.map((link) => {
+      const group = link.modifierGroup;
+      const groupId = String(group?.id || "");
+      const selectedInGroup = selectionMap[groupId] || [];
+      const { minSelect, maxSelect, isRequired } = getGroupValidation(group);
+
+      const groupModifiers = Array.isArray(group?.modifiers)
+        ? group.modifiers.filter((modifier) => modifier?.isActive !== false)
+        : [];
+
+      if (!groupModifiers.length) return null;
+
+      return (
+        <div
+          key={`${scope}-${String(link?.variationId || "common")}-${groupId}`}
+          className="mb-5"
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div>
+              <p className="font-medium text-gray-900">{group?.name}</p>
+              <p className="text-xs text-gray-500">
+                {maxSelect === 1
+                  ? isRequired
+                    ? "Select 1 required option"
+                    : "Select up to 1 option"
+                  : maxSelect
+                  ? minSelect > 0
+                    ? `Select ${minSelect}-${maxSelect}`
+                    : `Select up to ${maxSelect}`
+                  : minSelect > 0
+                  ? `Select at least ${minSelect}`
+                  : "Optional"}
+              </p>
+            </div>
+
+            <span className="text-xs text-gray-500">
+              {selectedInGroup.length}
+              {maxSelect ? ` / ${maxSelect}` : ""}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {groupModifiers.map((modifier) => {
+              const selectedModifier = selectedInGroup.find(
+                (selected) => selected.id === modifier.id
+              );
+
+              const checked = Boolean(selectedModifier);
+
+              const disableBecauseMaxReached =
+                !checked && !!maxSelect && selectedInGroup.length >= maxSelect;
+
+              const effectivePrice = getModifierEffectivePrice(
+                modifier,
+                item.id,
+                variation
+              );
+
+              const inputType = maxSelect === 1 ? "radio" : "checkbox";
+
+              const selectedQty = Math.max(
+                1,
+                toNumber(selectedModifier?.selectedQuantity, 1)
+              );
+
+              return (
+                <div
+                  key={modifier.id}
+                  className={`rounded-xl px-3 py-3 text-sm ${
+                    disableBecauseMaxReached
+                      ? "bg-gray-100 opacity-70"
+                      : checked
+                      ? "bg-primary/5 ring-1 ring-primary/20"
+                      : "bg-gray-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-gray-800">
+                      <input
+                        type={inputType}
+                        name={`${scope}-modifier-group-${groupId}`}
+                        checked={checked}
+                        disabled={disableBecauseMaxReached}
+                        onChange={() =>
+                          handleModifierToggle(group, modifier, scope)
+                        }
+                        className="mt-1 accent-[var(--primary)]"
+                      />
+
+                      <span className="min-w-0">
+                        <span className="block truncate">{modifier.name}</span>
+
+                        {modifier.description ? (
+                          <span className="mt-1 block text-xs text-gray-500">
+                            {modifier.description}
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+
+                    {effectivePrice > 0 ? (
+                      <span className="shrink-0 font-medium text-primary">
+                        +${effectivePrice.toFixed(2)}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {checked ? (
+                    <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-2 py-1.5">
+                      <span className="text-xs text-gray-500">Quantity</span>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleModifierQuantityChange(
+                              groupId,
+                              modifier.id,
+                              "dec",
+                              scope
+                            )
+                          }
+                          className="flex h-6 w-6 items-center justify-center rounded border border-gray-300 text-gray-700 hover:border-primary hover:text-primary"
+                        >
+                          <Minus size={12} strokeWidth={3} />
+                        </button>
+
+                        <span className="w-5 text-center text-sm font-semibold text-gray-900">
+                          {selectedQty}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleModifierQuantityChange(
+                              groupId,
+                              modifier.id,
+                              "inc",
+                              scope
+                            )
+                          }
+                          className="flex h-6 w-6 items-center justify-center rounded border border-gray-300 text-gray-700 hover:border-primary hover:text-primary"
+                        >
+                          <Plus size={12} strokeWidth={3} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    });
+  };
 
   return (
     <>
@@ -857,6 +1327,17 @@ export default function SignatureSelectionContent({
                         className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                         unoptimized
                       />
+
+                      {hasInfoContent(product.raw) ? (
+                        <button
+                          type="button"
+                          onClick={() => openInfoModal(product.raw)}
+                          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm backdrop-blur transition hover:bg-primary hover:text-white"
+                          title="View ingredients and allergens"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      ) : null}
                     </div>
 
                     <div className="p-4">
@@ -906,6 +1387,116 @@ export default function SignatureSelectionContent({
       </section>
 
       <Dialog
+        open={infoOpen}
+        onOpenChange={(nextOpen) => {
+          setInfoOpen(nextOpen);
+
+          if (!nextOpen) {
+            setInfoItem(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-md overflow-auto rounded-2xl p-6">
+          {infoItem ? (
+            <>
+              <h2 className="mb-1 text-lg font-semibold text-gray-900">
+                Product Information
+              </h2>
+
+              <p className="mb-5 text-sm text-gray-500">{infoItem.name}</p>
+
+              <div className="space-y-5">
+                <div>
+                  <h3 className="mb-2 font-semibold text-gray-900">
+                    Ingredients
+                  </h3>
+
+                  {hasText(infoItem.ingredients) ? (
+                    <p className="text-sm leading-relaxed text-gray-600">
+                      {infoItem.ingredients}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-400">
+                      Ingredients information is not available.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="mb-2 font-semibold text-gray-900">
+                    Allergens
+                  </h3>
+
+                  {Array.isArray(infoItem.allergenFlags) &&
+                  infoItem.allergenFlags.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {infoItem.allergenFlags.map((flag: string) => (
+                        <span
+                          key={flag}
+                          className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-600"
+                        >
+                          {flag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">
+                      Allergen information is not available.
+                    </p>
+                  )}
+
+                  {hasText(infoItem.allergenPdfUrl) ? (
+                    <a
+                      href={String(infoItem.allergenPdfUrl)}
+                      download
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
+                    >
+                      <Download size={16} />
+                      Download allergen PDF
+                    </a>
+                  ) : null}
+                </div>
+
+                {hasText(infoItem.nutritionalInformation) ? (
+                  <div>
+                    <h3 className="mb-2 font-semibold text-gray-900">
+                      Nutritional Information
+                    </h3>
+
+                    <p className="text-sm leading-relaxed text-gray-600">
+                      {infoItem.nutritionalInformation}
+                    </p>
+                  </div>
+                ) : null}
+
+                {Array.isArray(infoItem.dietaryFlags) &&
+                infoItem.dietaryFlags.length > 0 ? (
+                  <div>
+                    <h3 className="mb-2 font-semibold text-gray-900">
+                      Dietary Preferences
+                    </h3>
+
+                    <div className="flex flex-wrap gap-2">
+                      {infoItem.dietaryFlags.map((flag: string) => (
+                        <span
+                          key={flag}
+                          className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700"
+                        >
+                          {flag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={modalOpen}
         onOpenChange={(nextOpen) => {
           setModalOpen(nextOpen);
@@ -914,7 +1505,12 @@ export default function SignatureSelectionContent({
             setSelectedItem(null);
             setSelectedVariation(null);
             setSelectedModifiers({});
+            setSplitPizzaEnabled(false);
+            setSplitPizzaItem(null);
+            setSplitPizzaVariation(null);
+            setSplitPizzaModifiers({});
             setQty(1);
+            setNote("");
           }
         }}
       >
@@ -932,150 +1528,163 @@ export default function SignatureSelectionContent({
                 </div>
               </div>
 
-          {getItemVariations(selectedItem).length > 0 ? (
-  <div className="mb-5">
-    <p className="mb-2 font-medium text-gray-900">Size</p>
+              {getItemVariations(selectedItem).length > 0 ? (
+                <div className="mb-5">
+                  <p className="mb-2 font-medium text-gray-900">Size</p>
 
-    <div className="grid grid-cols-1 gap-3">
-      {getItemVariations(selectedItem).map((variation) => (
-        <label
-          key={variation.id}
-          className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
-            selectedVariation?.id === variation.id
-              ? "border-primary bg-primary/5"
-              : "border-gray-200 bg-white"
-          }`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <input
-                type="radio"
-                name={`size-${selectedItem.id}`}
-                checked={selectedVariation?.id === variation.id}
-                onChange={() => setSelectedVariation(variation)}
-                className="mt-1 accent-[var(--primary)]"
-              />
+                  <div className="grid grid-cols-1 gap-3">
+                    {getItemVariations(selectedItem).map((variation) => (
+                      <label
+                        key={variation.id}
+                        className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
+                          selectedVariation?.id === variation.id
+                            ? "border-primary bg-primary/5"
+                            : "border-gray-200 bg-white"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="radio"
+                              name={`size-${selectedItem.id}`}
+                              checked={selectedVariation?.id === variation.id}
+                              onChange={() => setSelectedVariation(variation)}
+                              className="mt-1 accent-[var(--primary)]"
+                            />
 
-              <div>
-                <p className="text-sm font-medium text-gray-800">
-                  {variation.name}
-                </p>
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">
+                                {variation.name}
+                              </p>
 
-                {variation.description ? (
-                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                    {variation.description}
-                  </p>
+                              {variation.description ? (
+                                <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                                  {variation.description}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {toNumber(variation.price, 0) > 0 ? (
+                            <span className="shrink-0 text-sm font-semibold text-primary">
+                              ${toNumber(variation.price, 0).toFixed(2)}
+                            </span>
+                          ) : null}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div
+                className={`mb-5 rounded-2xl border border-gray-100 bg-gray-50 p-4 transition ${
+                  selectedItemSupportsSplitPizza
+                    ? ""
+                    : "pointer-events-none opacity-50"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      Enable split pizza
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {selectedItemSupportsSplitPizza
+                        ? "Choose another pizza half and optional modifiers."
+                        : "Split pizza is not available for this item."}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!selectedItemSupportsSplitPizza}
+                    onClick={() => handleSplitPizzaToggle(!splitPizzaEnabled)}
+                    className={`relative h-7 w-12 rounded-full transition ${
+                      splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
+                        splitPizzaEnabled ? "left-6" : "left-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {splitPizzaEnabled ? (
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <p className="mb-2 text-sm font-medium text-gray-900">
+                        Select other pizza half
+                      </p>
+
+                      <AsyncSelect
+                        value={splitPizzaItem}
+                        onChange={handleSplitPizzaItemChange}
+                        placeholder="Select pizza"
+                        fetchOptions={fetchPizzaItems}
+                        labelKey="name"
+                        valueKey="id"
+                      />
+                    </div>
+
+                    {splitPizzaItem ? (
+                      <div className="rounded-xl bg-white p-3">
+                        <p className="mb-3 text-sm font-semibold text-gray-900">
+                          Modifiers for {splitPizzaItem?.name}
+                        </p>
+
+                        {splitPizzaModifierLinks.length > 0 ? (
+                          <div>
+                            {renderModifierGroups({
+                              links: splitPizzaModifierLinks,
+                              selectionMap: splitPizzaModifiers,
+                              item: splitPizzaItem,
+                              variation: splitPizzaVariation,
+                              scope: "split",
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400">
+                            No modifiers available for this pizza.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
-            </div>
 
-             <span className="shrink-0 text-sm font-semibold text-primary">
-  ${toNumber(variation.price, 0).toFixed(2)}
+              {filteredModifierLinks.length > 0 ? (
+                <div>
+                  {renderModifierGroups({
+                    links: filteredModifierLinks,
+                    selectionMap: selectedModifiers,
+                    item: selectedItem,
+                    variation: selectedVariation,
+                    scope: "main",
+                  })}
+                </div>
+              ) : null}
 
-            </span>
-          </div>
-        </label>
-      ))}
-    </div>
-  </div>
-) : null}
+              <div className="mb-5">
+                <p className="mb-2 font-medium text-gray-900">
+                  Special Instructions
+                </p>
 
-              {filteredModifierLinks.map((link) => {
-                const group = link.modifierGroup;
-                const groupId = String(group?.id || "");
-                const selectedInGroup = selectedModifiers[groupId] || [];
-                const { minSelect, maxSelect, isRequired } =
-                  getGroupValidation(group);
-
-                const groupModifiers = Array.isArray(group?.modifiers)
-                  ? group.modifiers.filter((modifier) => modifier?.isActive !== false)
-                  : [];
-
-                if (!groupModifiers.length) return null;
-
-                return (
-                  <div
-                    key={`${String(link?.variationId || "common")}-${groupId}`}
-                    className="mb-5"
-                  >
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-gray-900">{group?.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {maxSelect === 1
-                            ? isRequired
-                              ? "Select 1 required option"
-                              : "Select up to 1 option"
-                            : maxSelect
-                            ? minSelect > 0
-                              ? `Select ${minSelect}-${maxSelect}`
-                              : `Select up to ${maxSelect}`
-                            : minSelect > 0
-                            ? `Select at least ${minSelect}`
-                            : "Optional"}
-                        </p>
-                      </div>
-
-                      <span className="text-xs text-gray-500">
-                        {selectedInGroup.length}
-                        {maxSelect ? ` / ${maxSelect}` : ""}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2">
-                      {groupModifiers.map((modifier) => {
-                        const checked = selectedInGroup.some(
-                          (selected) => selected.id === modifier.id
-                        );
-
-                        const disableBecauseMaxReached =
-                          !checked &&
-                          !!maxSelect &&
-                          selectedInGroup.length >= maxSelect;
-
-                        const effectivePrice = getModifierEffectivePrice(
-                          modifier,
-                          selectedItem.id,
-                          selectedVariation
-                        );
-
-                        const inputType = maxSelect === 1 ? "radio" : "checkbox";
-
-                        return (
-                          <label
-                            key={modifier.id}
-                            className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-3 text-sm ${
-                              disableBecauseMaxReached
-                                ? "bg-gray-100 opacity-70"
-                                : "bg-gray-50"
-                            }`}
-                          >
-                            <span className="flex items-center gap-2 text-gray-800">
-                              <input
-                                type={inputType}
-                                name={`modifier-group-${groupId}`}
-                                checked={checked}
-                                disabled={disableBecauseMaxReached}
-                                onChange={() => handleModifierToggle(group, modifier)}
-                                className="accent-[var(--primary)]"
-                              />
-                              {modifier.name}
-                            </span>
-
-                            <span className="font-medium text-primary">
-                              +${effectivePrice.toFixed(2)}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Add cooking notes, e.g. no onions, extra spicy..."
+                  className="h-24 w-full rounded-xl bg-gray-100 p-3 text-sm outline-none"
+                />
+              </div>
 
               <div className="mb-5 flex items-center justify-between">
                 <div className="flex items-center rounded-full bg-gray-100 px-3 py-1.5">
                   <button
+                    type="button"
                     onClick={() => setQty((prev) => Math.max(1, prev - 1))}
                     className="px-2 text-lg text-gray-700"
                     disabled={addingId === selectedItem.id}
@@ -1088,6 +1697,7 @@ export default function SignatureSelectionContent({
                   </span>
 
                   <button
+                    type="button"
                     onClick={() => setQty((prev) => prev + 1)}
                     className="px-2 text-lg text-gray-700"
                     disabled={addingId === selectedItem.id}
@@ -1102,6 +1712,7 @@ export default function SignatureSelectionContent({
               </div>
 
               <button
+                type="button"
                 onClick={() =>
                   addToCart(
                     selectedItem,
