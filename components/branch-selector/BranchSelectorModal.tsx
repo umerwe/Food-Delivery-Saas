@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaMapMarkerAlt,
@@ -12,6 +11,7 @@ import useApi from "@/hooks/useApi";
 import { useAuthContext } from "@/context/AuthContext";
 import { Branch, BranchApiResponse } from "../types/branch-selector";
 import { getBranchAddressText, persistSelectedBranch } from "../utils/branch-selector";
+import { usePathname } from "next/navigation";
 
 type BranchSelectorModalProps = {
   open: boolean;
@@ -39,8 +39,10 @@ export default function BranchSelectorModal({
   const { token, user, setUser } = useAuthContext();
   const api = useApi(token);
   const getRef = useRef(api.get);
+const pathname = usePathname();
+const isBlockedRoute = pathname === "/login";
 
-  useEffect(() => {
+useEffect(() => {
     getRef.current = api.get;
   }, [api.get]);
 
@@ -64,7 +66,9 @@ export default function BranchSelectorModal({
     return restaurantId || user?.restaurantId || user?.tenantId || null;
   }, [restaurantId, user]);
 
-  const canFetch = !!token && !!user && !!resolvedRestaurantId && open;
+
+  const canFetch =
+  !!token && !!user && !!resolvedRestaurantId && open && !isBlockedRoute;
 
   const buildUrl = useCallback(() => {
     const baseUrl =
@@ -182,7 +186,7 @@ export default function BranchSelectorModal({
     onClose();
   };
 
-  if (!open) return null;
+  if (!open || !user || !token || isBlockedRoute) return null;
 
   return (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-[#0A0D12]/55 p-4 backdrop-blur-[10px]">
