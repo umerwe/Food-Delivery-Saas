@@ -34,10 +34,15 @@ type ItemPriceOverride = {
 
 type VariationPriceOverride = {
   id?: string;
+  menuItemId?: string | null;
   variationId?: string;
   modifierId?: string;
   price?: string | number;
+  pickupPrice?: string | number | null;
+  displayText?: string | null;
   priceDelta?: string | number;
+  variation?: any;
+  modifierPriceOverrides?: VariationPriceOverride[];
 };
 
 type MenuVariation = {
@@ -46,14 +51,19 @@ type MenuVariation = {
   name: string;
   description?: string;
   price?: string | number;
+  pickupPrice?: string | number | null;
+  displayText?: string | null;
   sortOrder?: number;
   isDefault?: boolean;
   isActive?: boolean;
   modifierPriceOverrides?: VariationPriceOverride[];
+  itemPriceOverrides?: VariationPriceOverride[];
 };
 
 type Modifier = {
   id: string;
+  modifierGroupId?: string;
+  restaurantId?: string;
   name: string;
   description?: string | null;
   priceDelta?: string | number;
@@ -97,6 +107,9 @@ type ModifierLink = {
 
 type MenuItem = {
   id: string;
+  restaurantId?: string;
+  restaurantMenuId?: string;
+  menuLinks?: any[];
   name: string;
   slug?: string;
   description?: string;
@@ -116,12 +129,24 @@ type MenuItem = {
     id: string;
     name?: string;
     variations?: MenuVariation[];
+    variationLinks?: any[];
     modifierLinks?: ModifierLink[];
+    modifierGroups?: ModifierGroup[];
+    categoryModifierGroups?: any[];
   };
   variations?: MenuVariation[];
+  variationPriceOverrides?: VariationPriceOverride[];
   modifierLinks?: ModifierLink[];
   modifierGroups?: ModifierGroup[];
-  categoryModifierGroups?: ModifierGroup[];
+  categoryModifierGroups?: ModifierGroup[] | any[];
+  modifierPriceOverrides?: any[];
+  modifiers?: Modifier[];
+  splitPizza?: {
+    enabled?: boolean;
+    slots?: string[];
+    pricingRule?: string;
+    allowedFlavors?: any[];
+  };
 };
 
 type MenuRecord = {
@@ -159,6 +184,145 @@ const normalizeApiList = (res: any) => {
   if (Array.isArray(res?.data)) return res.data;
   if (Array.isArray(res?.data?.data)) return res.data.data;
   return [];
+};
+
+const normalizeArray = (value: any): any[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [];
+};
+
+const getId = (value: any) => {
+  if (value === undefined || value === null) return "";
+  return String(value);
+};
+
+const getOverrideAmount = (override?: any | null) => {
+  if (!override) return null;
+
+  if (override.priceDelta !== undefined && override.priceDelta !== null) {
+    return toNumber(override.priceDelta, 0);
+  }
+
+  if (override.price !== undefined && override.price !== null) {
+    return toNumber(override.price, 0);
+  }
+
+  return null;
+};
+
+const getOverrideMenuItemId = (override: any) =>
+  getId(override?.menuItemId || override?.menuItem?.id);
+
+const getOverrideVariationId = (override: any) =>
+  getId(override?.variationId || override?.variation?.id);
+
+const getOverrideModifierId = (override: any) =>
+  getId(override?.modifierId || override?.modifier?.id);
+
+const isGenericMenuItemOverride = (override: any) => {
+  const value = override?.menuItemId;
+  return value === null || value === undefined || value === "";
+};
+
+const findBestItemPriceOverride = ({
+  overrides,
+  menuItemId,
+  variationId,
+}: {
+  overrides?: any[];
+  menuItemId?: string;
+  variationId?: string;
+}) => {
+  if (!variationId || !Array.isArray(overrides)) return null;
+
+  const matching = overrides.filter(
+    (override) => getOverrideVariationId(override) === String(variationId)
+  );
+
+  if (!matching.length) return null;
+
+  if (menuItemId) {
+    const itemSpecific = matching.find(
+      (override) => getOverrideMenuItemId(override) === String(menuItemId)
+    );
+
+    if (itemSpecific) return itemSpecific;
+  }
+
+  return matching.find(isGenericMenuItemOverride) || matching[0];
+};
+
+const findBestModifierOverride = ({
+  overrides,
+  modifierId,
+  menuItemId,
+  variationId,
+}: {
+  overrides?: any[];
+  modifierId?: string;
+  menuItemId?: string;
+  variationId?: string;
+}) => {
+  if (!modifierId || !Array.isArray(overrides)) return null;
+
+  const normalizedModifierId = String(modifierId);
+  const normalizedMenuItemId = menuItemId ? String(menuItemId) : "";
+  const normalizedVariationId = variationId ? String(variationId) : "";
+
+  const matching = overrides.filter(
+    (override) => getOverrideModifierId(override) === normalizedModifierId
+  );
+
+  if (!matching.length) return null;
+
+  const isItemSpecific = (override: any) => {
+    if (!normalizedMenuItemId) return false;
+    return getOverrideMenuItemId(override) === normalizedMenuItemId;
+  };
+
+  const isExactVariation = (override: any) => {
+    if (!normalizedVariationId) return false;
+    return getOverrideVariationId(override) === normalizedVariationId;
+  };
+
+  const hasNoVariation = (override: any) => !getOverrideVariationId(override);
+
+  if (normalizedVariationId) {
+    const exactVariationMatches = matching.filter(isExactVariation);
+
+    if (normalizedMenuItemId) {
+      const exactItemVariation = exactVariationMatches.find(isItemSpecific);
+      if (exactItemVariation) return exactItemVariation;
+    }
+
+    const exactGenericVariation = exactVariationMatches.find(
+      isGenericMenuItemOverride
+    );
+    if (exactGenericVariation) return exactGenericVariation;
+
+    if (exactVariationMatches[0]) return exactVariationMatches[0];
+
+    const fallbackWithoutVariation = matching.filter(hasNoVariation);
+
+    if (normalizedMenuItemId) {
+      const itemFallback = fallbackWithoutVariation.find(isItemSpecific);
+      if (itemFallback) return itemFallback;
+    }
+
+    const genericFallback = fallbackWithoutVariation.find(
+      isGenericMenuItemOverride
+    );
+    if (genericFallback) return genericFallback;
+
+    return fallbackWithoutVariation[0] || null;
+  }
+
+  if (normalizedMenuItemId) {
+    const itemSpecific = matching.find(isItemSpecific);
+    if (itemSpecific) return itemSpecific;
+  }
+
+  return matching.find(isGenericMenuItemOverride) || matching[0];
 };
 
 export default function SignatureSelectionContent({
@@ -265,16 +429,24 @@ export default function SignatureSelectionContent({
       name: String(raw?.name || ""),
       description: raw?.description || "",
       price: raw?.price ?? 0,
+      pickupPrice: raw?.pickupPrice ?? null,
+      displayText: raw?.displayText ?? null,
       sortOrder: toNumber(raw?.sortOrder, 0),
       isDefault: Boolean(raw?.isDefault),
       isActive: raw?.isActive !== false,
       modifierPriceOverrides: Array.isArray(raw?.modifierPriceOverrides)
         ? raw.modifierPriceOverrides
         : [],
+      itemPriceOverrides: Array.isArray(raw?.itemPriceOverrides)
+        ? raw.itemPriceOverrides
+        : [],
     };
   };
 
-  const normalizeModifier = (raw: any): Modifier | null => {
+  const normalizeModifier = (
+    raw: any,
+    extra?: Partial<Modifier>
+  ): Modifier | null => {
     if (!raw?.id) return null;
     if (raw?.isActive === false) return null;
 
@@ -291,18 +463,47 @@ export default function SignatureSelectionContent({
       variationPriceOverrides: Array.isArray(raw?.variationPriceOverrides)
         ? raw.variationPriceOverrides
         : [],
+      ...extra,
     };
+  };
+
+  const getAllRawVariationSources = (item?: MenuItem | null) => {
+    if (!item) return [];
+
+    const fromVariationPriceOverrides = normalizeArray(item?.variationPriceOverrides)
+      .map((override) => ({
+        ...(override?.variation || {}),
+        id: override?.variationId || override?.variation?.id,
+        price: override?.price ?? override?.variation?.price,
+        pickupPrice: override?.pickupPrice ?? override?.variation?.pickupPrice,
+        displayText: override?.displayText ?? override?.variation?.displayText,
+        itemPriceOverrides: [
+          ...normalizeArray(override?.variation?.itemPriceOverrides),
+          override,
+        ],
+        modifierPriceOverrides: [
+          ...normalizeArray(override?.variation?.modifierPriceOverrides),
+          ...normalizeArray(override?.modifierPriceOverrides),
+        ],
+      }))
+      .filter((variation) => variation?.id);
+
+    const fromCategoryVariationLinks = normalizeArray(item?.category?.variationLinks)
+      .map((link) => link?.variation)
+      .filter(Boolean);
+
+    return [
+      ...normalizeArray(item?.variations),
+      ...fromVariationPriceOverrides,
+      ...normalizeArray(item?.category?.variations),
+      ...fromCategoryVariationLinks,
+    ];
   };
 
   const getItemVariations = (item?: MenuItem | null): MenuVariation[] => {
     if (!item) return [];
 
-    const rawVariations = [
-      ...(Array.isArray(item?.variations) ? item.variations : []),
-      ...(Array.isArray(item?.category?.variations)
-        ? item.category.variations
-        : []),
-    ];
+    const rawVariations = getAllRawVariationSources(item);
 
     const deduped = new Map<string, MenuVariation>();
 
@@ -362,6 +563,70 @@ export default function SignatureSelectionContent({
     };
   };
 
+  const getStandaloneItemModifiers = (
+    item: MenuItem,
+    linkedModifierIds: Set<string>
+  ) => {
+    const modifiersFromOverrides = normalizeArray(item?.modifierPriceOverrides)
+      .map((override) => {
+        const rawModifier = override?.modifier || {
+          id: override?.modifierId,
+          name: override?.name || "Modifier",
+          priceDelta: override?.priceDelta ?? 0,
+        };
+
+        const existingItemPriceOverrides = Array.isArray(
+          rawModifier?.itemPriceOverrides
+        )
+          ? rawModifier.itemPriceOverrides
+          : [];
+
+        return normalizeModifier(rawModifier, {
+          itemPriceOverrides: [
+            ...existingItemPriceOverrides,
+            {
+              menuItemId: item?.id,
+              modifierId: override?.modifierId || override?.modifier?.id,
+              priceDelta: override?.priceDelta,
+              price: override?.price,
+            },
+          ],
+          variationPriceOverrides: Array.isArray(rawModifier?.variationPriceOverrides)
+            ? rawModifier.variationPriceOverrides
+            : [],
+        });
+      })
+      .filter(Boolean) as Modifier[];
+
+    const directModifiers = normalizeArray(item?.modifiers)
+      .map((modifier) => normalizeModifier(modifier))
+      .filter(Boolean) as Modifier[];
+
+    const deduped = new Map<string, Modifier>();
+
+    [...modifiersFromOverrides, ...directModifiers].forEach((modifier) => {
+      if (!modifier?.id) return;
+      if (linkedModifierIds.has(String(modifier.id))) return;
+
+      const existing = deduped.get(String(modifier.id));
+
+      deduped.set(String(modifier.id), {
+        ...(existing || {}),
+        ...modifier,
+        itemPriceOverrides: [
+          ...normalizeArray(existing?.itemPriceOverrides),
+          ...normalizeArray(modifier?.itemPriceOverrides),
+        ],
+        variationPriceOverrides: [
+          ...normalizeArray(existing?.variationPriceOverrides),
+          ...normalizeArray(modifier?.variationPriceOverrides),
+        ],
+      });
+    });
+
+    return sortBySortOrder(Array.from(deduped.values()));
+  };
+
   const getItemModifierLinks = (item?: MenuItem | null): ModifierLink[] => {
     if (!item) return [];
 
@@ -407,11 +672,12 @@ export default function SignatureSelectionContent({
       })
       .filter(Boolean) as ModifierLink[];
 
-    const normalizedFromModifierGroups: ModifierLink[] = (
-      Array.isArray(item?.modifierGroups) ? item.modifierGroups : []
-    )
+    const normalizedFromModifierGroups: ModifierLink[] = [
+      ...normalizeArray(item?.modifierGroups),
+      ...normalizeArray(item?.category?.modifierGroups),
+    ]
       .map((group: any, index: number) => {
-        const normalizedGroup = normalizeGroup(group);
+        const normalizedGroup = normalizeGroup(group?.modifierGroup || group);
         if (!normalizedGroup) return null;
 
         return {
@@ -423,13 +689,12 @@ export default function SignatureSelectionContent({
       })
       .filter(Boolean) as ModifierLink[];
 
-    const normalizedFromCategoryModifierGroups: ModifierLink[] = (
-      Array.isArray(item?.categoryModifierGroups)
-        ? item.categoryModifierGroups
-        : []
-    )
+    const normalizedFromCategoryModifierGroups: ModifierLink[] = [
+      ...normalizeArray(item?.categoryModifierGroups),
+      ...normalizeArray(item?.category?.categoryModifierGroups),
+    ]
       .map((group: any, index: number) => {
-        const normalizedGroup = normalizeGroup(group);
+        const normalizedGroup = normalizeGroup(group?.modifierGroup || group);
         if (!normalizedGroup) return null;
 
         return {
@@ -457,6 +722,41 @@ export default function SignatureSelectionContent({
       if (!deduped.has(key)) {
         deduped.set(key, link);
       }
+    }
+
+    const linkedModifierIds = new Set<string>();
+
+    Array.from(deduped.values()).forEach((link) => {
+      normalizeArray(link?.modifierGroup?.modifiers).forEach((modifier) => {
+        if (modifier?.id) linkedModifierIds.add(String(modifier.id));
+      });
+    });
+
+    const standaloneModifiers = getStandaloneItemModifiers(
+      item,
+      linkedModifierIds
+    );
+
+    if (standaloneModifiers.length) {
+      const standaloneLink: ModifierLink = {
+        id: `standalone-modifiers-${item.id}`,
+        variationId: null,
+        sortOrder: 999,
+        modifierGroup: {
+          id: `standalone-modifiers-${item.id}`,
+          name: "Add-ons",
+          description: "Available add-ons for this item.",
+          minSelect: 0,
+          maxSelect: undefined,
+          isRequired: false,
+          sortOrder: 999,
+          isActive: true,
+          modifiers: standaloneModifiers,
+          modifierLinks: [],
+        },
+      };
+
+      deduped.set(`common::${standaloneLink.modifierGroup.id}`, standaloneLink);
     }
 
     return sortBySortOrder(Array.from(deduped.values()));
@@ -498,75 +798,47 @@ export default function SignatureSelectionContent({
     itemId?: string,
     variation?: MenuVariation | null
   ) => {
+    const modifierId = String(modifier?.id || "");
     const variationId = String(variation?.id || "");
 
-    const variationOverrideFromModifier = Array.isArray(
-      modifier?.variationPriceOverrides
-    )
-      ? modifier.variationPriceOverrides.find(
-          (override) => String(override?.variationId || "") === variationId
-        )
-      : null;
+    if (variationId) {
+      const modifierSideOverride = findBestModifierOverride({
+        overrides: modifier?.variationPriceOverrides,
+        modifierId,
+        menuItemId: itemId,
+        variationId,
+      });
 
-    if (variationOverrideFromModifier) {
-      if (
-        variationOverrideFromModifier?.priceDelta !== undefined &&
-        variationOverrideFromModifier?.priceDelta !== null
-      ) {
-        return toNumber(variationOverrideFromModifier.priceDelta, 0);
+      const modifierSideAmount = getOverrideAmount(modifierSideOverride);
+
+      if (modifierSideAmount !== null) {
+        return modifierSideAmount;
       }
 
-      if (
-        variationOverrideFromModifier?.price !== undefined &&
-        variationOverrideFromModifier?.price !== null
-      ) {
-        return toNumber(variationOverrideFromModifier.price, 0);
-      }
-    }
+      const variationSideOverride = findBestModifierOverride({
+        overrides: variation?.modifierPriceOverrides,
+        modifierId,
+        menuItemId: itemId,
+        variationId,
+      });
 
-    const variationOverrideFromVariation = Array.isArray(
-      variation?.modifierPriceOverrides
-    )
-      ? variation.modifierPriceOverrides.find(
-          (override) =>
-            String(override?.modifierId || "") === String(modifier?.id || "")
-        )
-      : null;
+      const variationSideAmount = getOverrideAmount(variationSideOverride);
 
-    if (variationOverrideFromVariation) {
-      if (
-        variationOverrideFromVariation?.priceDelta !== undefined &&
-        variationOverrideFromVariation?.priceDelta !== null
-      ) {
-        return toNumber(variationOverrideFromVariation.priceDelta, 0);
-      }
-
-      if (
-        variationOverrideFromVariation?.price !== undefined &&
-        variationOverrideFromVariation?.price !== null
-      ) {
-        return toNumber(variationOverrideFromVariation.price, 0);
+      if (variationSideAmount !== null) {
+        return variationSideAmount;
       }
     }
 
-    const itemOverride = Array.isArray(modifier?.itemPriceOverrides)
-      ? modifier.itemPriceOverrides.find(
-          (override) =>
-            String(override?.menuItemId || "") === String(itemId || "")
-        )
-      : null;
+    const itemOverride = findBestModifierOverride({
+      overrides: modifier?.itemPriceOverrides,
+      modifierId,
+      menuItemId: itemId,
+    });
 
-    if (itemOverride) {
-      if (
-        itemOverride?.priceDelta !== undefined &&
-        itemOverride?.priceDelta !== null
-      ) {
-        return toNumber(itemOverride.priceDelta, 0);
-      }
+    const itemAmount = getOverrideAmount(itemOverride);
 
-      if (itemOverride?.price !== undefined && itemOverride?.price !== null) {
-        return toNumber(itemOverride.price, 0);
-      }
+    if (itemAmount !== null) {
+      return itemAmount;
     }
 
     return toNumber(modifier?.priceDelta, 0);
@@ -646,32 +918,6 @@ export default function SignatureSelectionContent({
     }));
   };
 
-  const handleModifierQuantityChange = (
-    groupId: string,
-    modifierId: string,
-    type: "inc" | "dec",
-    scope: "main" | "split" = "main"
-  ) => {
-    const setSelectionMap =
-      scope === "main" ? setSelectedModifiers : setSplitPizzaModifiers;
-
-    setSelectionMap((prev) => ({
-      ...prev,
-      [groupId]: (prev[groupId] || []).map((modifier) => {
-        if (modifier.id !== modifierId) return modifier;
-
-        const currentQty = Math.max(1, toNumber(modifier.selectedQuantity, 1));
-        const nextQty =
-          type === "inc" ? currentQty + 1 : Math.max(1, currentQty - 1);
-
-        return {
-          ...modifier,
-          selectedQuantity: nextQty,
-        };
-      }),
-    }));
-  };
-
   const validateSelections = (
     item: MenuItem,
     modifiersMap: SelectedModifiersMap,
@@ -727,7 +973,7 @@ export default function SignatureSelectionContent({
       .flat()
       .map((modifier) => ({
         modifierId: modifier.id,
-        quantity: Math.max(1, toNumber(modifier.selectedQuantity, 1)),
+        quantity: 1,
       }));
   };
 
@@ -745,13 +991,25 @@ export default function SignatureSelectionContent({
           variation
         );
 
-        const modifierQty = Math.max(
-          1,
-          toNumber(modifier.selectedQuantity, 1)
-        );
-
-        return acc + modifierPrice * modifierQty;
+        return acc + modifierPrice;
       }, 0);
+  };
+
+  const getMenuItemBasePrice = (item?: MenuItem | null) => {
+    return toNumber(item?.basePrice ?? item?.unitPrice ?? item?.price, 0);
+  };
+
+  const getMenuItemResolvedPrice = (
+    item?: MenuItem | null,
+    variation?: MenuVariation | null
+  ) => {
+    if (!item) return 0;
+
+    if (variation?.id) {
+      return toNumber(variation.price, 0);
+    }
+
+    return getMenuItemBasePrice(item);
   };
 
   const getCalculatedPrice = (
@@ -759,20 +1017,20 @@ export default function SignatureSelectionContent({
     variation?: MenuVariation | null,
     modifiersMap?: SelectedModifiersMap,
     splitItem?: MenuItem | null,
-    splitVariation?: MenuVariation | null,
-    splitModifiersMap?: SelectedModifiersMap
+    splitVariation?: MenuVariation | null
   ) => {
-    const resolvedItemPrice = variation
-      ? toNumber(variation?.price, 0)
-      : toNumber(item?.basePrice ?? item?.unitPrice ?? item?.price, 0);
-
+    const resolvedItemPrice = getMenuItemResolvedPrice(item, variation);
     const modifiersTotal = getModifiersTotal(item, variation, modifiersMap);
 
-    const splitModifiersTotal = splitItem
-      ? getModifiersTotal(splitItem, splitVariation, splitModifiersMap)
+    const splitItemPrice = splitItem
+      ? getMenuItemResolvedPrice(splitItem, splitVariation || getDefaultVariation(splitItem))
       : 0;
 
-    return resolvedItemPrice + modifiersTotal + splitModifiersTotal;
+    const basePrice = splitItem
+      ? Math.max(resolvedItemPrice, splitItemPrice)
+      : resolvedItemPrice;
+
+    return basePrice + modifiersTotal;
   };
 
   const products = useMemo(() => {
@@ -794,9 +1052,7 @@ export default function SignatureSelectionContent({
           id: item.id,
           name: item.name,
           slug: item.slug,
-          price: defaultVariation
-            ? toNumber(defaultVariation?.price, 0)
-            : toNumber(item.basePrice ?? item.unitPrice ?? item.price, 0),
+          price: getMenuItemResolvedPrice(item, defaultVariation),
           image: item.imageUrl || "/placeholder.png",
           description: item.description || "",
           variations,
@@ -810,10 +1066,6 @@ export default function SignatureSelectionContent({
     return getVisibleModifierLinks(selectedItem, selectedVariation);
   }, [selectedItem, selectedVariation]);
 
-  const splitPizzaModifierLinks = useMemo(() => {
-    if (!splitPizzaEnabled || !splitPizzaItem) return [];
-    return getVisibleModifierLinks(splitPizzaItem, splitPizzaVariation);
-  }, [splitPizzaEnabled, splitPizzaItem, splitPizzaVariation]);
 
   useEffect(() => {
     if (!selectedItem) return;
@@ -834,16 +1086,6 @@ export default function SignatureSelectionContent({
     setSplitPizzaModifiers({});
   }, [selectedItemSupportsSplitPizza]);
 
-  useEffect(() => {
-    if (!splitPizzaEnabled || !splitPizzaItem) {
-      setSplitPizzaModifiers({});
-      return;
-    }
-
-    setSplitPizzaModifiers((prev) =>
-      sanitizeSelectedModifiersForVisibleGroups(prev, splitPizzaModifierLinks)
-    );
-  }, [splitPizzaEnabled, splitPizzaItem, splitPizzaModifierLinks]);
 
   const fetchPizzaItems = async ({
     search,
@@ -852,21 +1094,23 @@ export default function SignatureSelectionContent({
     search: string;
     page: number;
   }) => {
-    const resolvedSearch = search?.trim() || "pizza";
+    const queryParams = new URLSearchParams();
 
-    const res = await get(
-      `/v1/menu/items?search=${encodeURIComponent(resolvedSearch)}&page=${page}`
-    );
+    queryParams.set("page", String(page));
+    queryParams.set("supportsSplitPizza", "true");
 
-    const data = normalizeApiList(res).filter((menuItem: any) => {
-      if (!menuItem?.id) return false;
-      if (String(menuItem.id) === String(selectedItem?.id)) return false;
+    if (restaurantId) {
+      queryParams.set("restaurantId", String(restaurantId));
+    }
 
-      const name = String(menuItem?.name || "").toLowerCase();
-      const categoryName = String(menuItem?.category?.name || "").toLowerCase();
+    const resolvedSearch = search?.trim();
 
-      return name.includes("pizza") || categoryName.includes("pizza");
-    });
+    if (resolvedSearch) {
+      queryParams.set("search", resolvedSearch);
+    }
+
+    const res = await get(`/v1/menu/items?${queryParams.toString()}`);
+    const data = normalizeApiList(res);
 
     return {
       data,
@@ -902,8 +1146,8 @@ export default function SignatureSelectionContent({
   };
 
   const handleSplitPizzaItemChange = (item: any) => {
-    setSplitPizzaItem(item);
-    setSplitPizzaVariation(getDefaultVariation(item));
+    setSplitPizzaItem(item || null);
+    setSplitPizzaVariation(item ? getDefaultVariation(item) : null);
     setSplitPizzaModifiers({});
   };
 
@@ -929,40 +1173,26 @@ export default function SignatureSelectionContent({
       return;
     }
 
-    if (splitPizzaEnabled) {
-      if (!splitPizzaItem?.id) {
-        toast.error("Please select the other pizza half");
-        return;
-      }
-
-      if (
-        !validateSelections(
-          splitPizzaItem,
-          splitPizzaModifiers,
-          splitPizzaVariation
-        )
-      ) {
-        return;
-      }
+    if (splitPizzaEnabled && !splitPizzaItem?.id) {
+      toast.error("Please select the other pizza half");
+      return;
     }
 
     try {
       setAddingId(item.id);
- const splitSections =
-  splitPizzaEnabled && splitPizzaItem?.id
-    ? [
-        {
-          slot: "LEFT",
-          menuItemId: item.id,
-          modifiers: buildModifiersPayload(selectedModifiers),
-        },
-        {
-          slot: "RIGHT",
-          menuItemId: splitPizzaItem.id,
-          modifiers: buildModifiersPayload(splitPizzaModifiers),
-        },
-      ]
-    : undefined;
+      const splitSections =
+        splitPizzaEnabled && splitPizzaItem?.id
+          ? [
+              {
+                slot: "LEFT",
+                menuItemId: item.id,
+              },
+              {
+                slot: "RIGHT",
+                menuItemId: splitPizzaItem.id,
+              },
+            ]
+          : undefined;
 
 
       const payload: any = {
@@ -1060,8 +1290,7 @@ export default function SignatureSelectionContent({
         selectedVariation,
         selectedModifiers,
         splitPizzaEnabled ? splitPizzaItem : null,
-        splitPizzaVariation,
-        splitPizzaModifiers
+        splitPizzaVariation
       ) * qty
     : 0;
 
@@ -1138,10 +1367,6 @@ export default function SignatureSelectionContent({
 
               const inputType = maxSelect === 1 ? "radio" : "checkbox";
 
-              const selectedQty = Math.max(
-                1,
-                toNumber(selectedModifier?.selectedQuantity, 1)
-              );
 
               return (
                 <div
@@ -1178,55 +1403,12 @@ export default function SignatureSelectionContent({
                       </span>
                     </label>
 
-                    {effectivePrice > 0 ? (
+                    {toNumber(effectivePrice, 0) > 0 ? (
                       <span className="shrink-0 font-medium text-primary">
                         +${effectivePrice.toFixed(2)}
                       </span>
                     ) : null}
-                  </div>
-
-                  {checked ? (
-                    <div className="mt-3 flex items-center justify-between rounded-lg bg-white px-2 py-1.5">
-                      <span className="text-xs text-gray-500">Quantity</span>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleModifierQuantityChange(
-                              groupId,
-                              modifier.id,
-                              "dec",
-                              scope
-                            )
-                          }
-                          className="flex h-6 w-6 items-center justify-center rounded border border-gray-300 text-gray-700 hover:border-primary hover:text-primary"
-                        >
-                          <Minus size={12} strokeWidth={3} />
-                        </button>
-
-                        <span className="w-5 text-center text-sm font-semibold text-gray-900">
-                          {selectedQty}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleModifierQuantityChange(
-                              groupId,
-                              modifier.id,
-                              "inc",
-                              scope
-                            )
-                          }
-                          className="flex h-6 w-6 items-center justify-center rounded border border-gray-300 text-gray-700 hover:border-primary hover:text-primary"
-                        >
-                          <Plus size={12} strokeWidth={3} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
+                  </div>                </div>
               );
             })}
           </div>
@@ -1523,7 +1705,7 @@ export default function SignatureSelectionContent({
                     {selectedItem.name}
                   </h2>
                   <p className="mt-1 text-sm text-gray-500">
-                    Select variation, modifiers, and quantity
+                    Select variation, add-ons, and quantity
                   </p>
                 </div>
               </div>
@@ -1591,7 +1773,7 @@ export default function SignatureSelectionContent({
                     </p>
                     <p className="text-xs text-gray-500">
                       {selectedItemSupportsSplitPizza
-                        ? "Choose another pizza half and optional modifiers."
+                        ? "Choose another split-pizza item for the second half."
                         : "Split pizza is not available for this item."}
                     </p>
                   </div>
@@ -1622,7 +1804,7 @@ export default function SignatureSelectionContent({
                       <AsyncSelect
                         value={splitPizzaItem}
                         onChange={handleSplitPizzaItemChange}
-                        placeholder="Select pizza"
+                        placeholder="Select split-pizza item"
                         fetchOptions={fetchPizzaItems}
                         labelKey="name"
                         valueKey="id"
@@ -1631,25 +1813,35 @@ export default function SignatureSelectionContent({
 
                     {splitPizzaItem ? (
                       <div className="rounded-xl bg-white p-3">
-                        <p className="mb-3 text-sm font-semibold text-gray-900">
-                          Modifiers for {splitPizzaItem?.name}
+                        <p className="text-sm font-semibold text-gray-900">
+                          Selected second half
                         </p>
 
-                        {splitPizzaModifierLinks.length > 0 ? (
-                          <div>
-                            {renderModifierGroups({
-                              links: splitPizzaModifierLinks,
-                              selectionMap: splitPizzaModifiers,
-                              item: splitPizzaItem,
-                              variation: splitPizzaVariation,
-                              scope: "split",
-                            })}
+                        <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-gray-900">
+                              {splitPizzaItem?.name}
+                            </p>
+
+                            {splitPizzaItem?.description ? (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
+                                {splitPizzaItem.description}
+                              </p>
+                            ) : null}
                           </div>
-                        ) : (
-                          <p className="text-xs text-gray-400">
-                            No modifiers available for this pizza.
-                          </p>
-                        )}
+
+                          {getMenuItemResolvedPrice(
+                            splitPizzaItem,
+                            splitPizzaVariation || getDefaultVariation(splitPizzaItem)
+                          ) > 0 ? (
+                            <span className="shrink-0 font-medium text-primary">
+                              ${getMenuItemResolvedPrice(
+                                splitPizzaItem,
+                                splitPizzaVariation || getDefaultVariation(splitPizzaItem)
+                              ).toFixed(2)}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     ) : null}
                   </div>
