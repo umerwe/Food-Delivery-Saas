@@ -1759,94 +1759,85 @@ export default function SignatureSelectionContent({
                 </div>
               ) : null}
 
-              <div
-                className={`mb-5 rounded-2xl border border-gray-100 bg-gray-50 p-4 transition ${
-                  selectedItemSupportsSplitPizza
-                    ? ""
-                    : "pointer-events-none opacity-50"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      Enable split pizza
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {selectedItemSupportsSplitPizza
-                        ? "Choose another split-pizza item for the second half."
-                        : "Split pizza is not available for this item."}
-                    </p>
-                  </div>
+{selectedItemSupportsSplitPizza ? (
+  <div className="mb-5 rounded-2xl border border-gray-100 bg-gray-50 p-4 transition">
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="font-medium text-gray-900">Enable split pizza</p>
+        <p className="text-xs text-gray-500">
+          Choose another split-pizza item for the second half.
+        </p>
+      </div>
 
-                  <button
-                    type="button"
-                    disabled={!selectedItemSupportsSplitPizza}
-                    onClick={() => handleSplitPizzaToggle(!splitPizzaEnabled)}
-                    className={`relative h-7 w-12 rounded-full transition ${
-                      splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
-                        splitPizzaEnabled ? "left-6" : "left-1"
-                      }`}
-                    />
-                  </button>
-                </div>
+      <button
+        type="button"
+        onClick={() => handleSplitPizzaToggle(!splitPizzaEnabled)}
+        className={`relative h-7 w-12 rounded-full transition ${
+          splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
+        }`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
+            splitPizzaEnabled ? "left-6" : "left-1"
+          }`}
+        />
+      </button>
+    </div>
 
-                {splitPizzaEnabled ? (
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <p className="mb-2 text-sm font-medium text-gray-900">
-                        Select other pizza half
-                      </p>
+    {splitPizzaEnabled ? (
+      <div className="mt-4 space-y-4">
+        <div>
+          <p className="mb-2 text-sm font-medium text-gray-900">
+            Select other pizza half
+          </p>
 
-                      <AsyncSelect
-                        value={splitPizzaItem}
-                        onChange={handleSplitPizzaItemChange}
-                        placeholder="Select split-pizza item"
-                        fetchOptions={fetchPizzaItems}
-                        labelKey="name"
-                        valueKey="id"
-                      />
-                    </div>
+          <AsyncSelect
+            value={splitPizzaItem}
+            onChange={handleSplitPizzaItemChange}
+            placeholder="Select split-pizza item"
+            fetchOptions={fetchPizzaItems}
+            labelKey="name"
+            valueKey="id"
+          />
+        </div>
 
-                    {splitPizzaItem ? (
-                      <div className="rounded-xl bg-white p-3">
-                        <p className="text-sm font-semibold text-gray-900">
-                          Selected second half
-                        </p>
+        {splitPizzaItem ? (
+          <div className="rounded-xl bg-white p-3">
+            <p className="text-sm font-semibold text-gray-900">
+              Selected second half
+            </p>
 
-                        <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-gray-900">
-                              {splitPizzaItem?.name}
-                            </p>
+            <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-gray-900">
+                  {splitPizzaItem?.name}
+                </p>
 
-                            {splitPizzaItem?.description ? (
-                              <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
-                                {splitPizzaItem.description}
-                              </p>
-                            ) : null}
-                          </div>
-
-                          {getMenuItemResolvedPrice(
-                            splitPizzaItem,
-                            splitPizzaVariation || getDefaultVariation(splitPizzaItem)
-                          ) > 0 ? (
-                            <span className="shrink-0 font-medium text-primary">
-                              ${getMenuItemResolvedPrice(
-                                splitPizzaItem,
-                                splitPizzaVariation || getDefaultVariation(splitPizzaItem)
-                              ).toFixed(2)}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
+                {splitPizzaItem?.description ? (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
+                    {splitPizzaItem.description}
+                  </p>
                 ) : null}
               </div>
+
+              {getMenuItemResolvedPrice(
+                splitPizzaItem,
+                splitPizzaVariation || getDefaultVariation(splitPizzaItem)
+              ) > 0 ? (
+                <span className="shrink-0 font-medium text-primary">
+                  ${getMenuItemResolvedPrice(
+                    splitPizzaItem,
+                    splitPizzaVariation || getDefaultVariation(splitPizzaItem)
+                  ).toFixed(2)}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    ) : null}
+  </div>
+) : null}
 
               {filteredModifierLinks.length > 0 ? (
                 <div>
