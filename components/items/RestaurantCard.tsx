@@ -1086,23 +1086,32 @@ export default function RestaurantCard({ item }: any) {
   }
 
   const handlePlusClick = () => {
-    const groupCode =
-      typeof window !== "undefined"
-        ? localStorage.getItem("groupOrderCode")
-        : null;
+  if (loading) return;
 
-    if (!hasOptions) {
-      if (!groupCode && !branchId) {
-        toast.error("Please select a branch first");
-        return;
-      }
+  const groupCode =
+    typeof window !== "undefined"
+      ? localStorage.getItem("groupOrderCode")
+      : null;
 
-      handleAddToCart();
+  if (!hasOptions) {
+    if (!groupCode && !branchId) {
+      toast.error("Please select a branch first");
       return;
     }
 
-    setOpen(true);
-  };
+    handleAddToCart();
+    return;
+  }
+
+  setOpen(true);
+};
+
+const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+
+  event.preventDefault();
+  handlePlusClick();
+};
 
   const handleNavigateToDetails = () => {
     router.push(`/items/details?itemId=${item?.id}&slug=${item?.slug}`);
@@ -1137,8 +1146,14 @@ export default function RestaurantCard({ item }: any) {
 
   return (
     <>
-      <div className="group relative rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-lg">
-        <div className="flex justify-between gap-4">
+     <div
+  role="button"
+  tabIndex={0}
+  onClick={handlePlusClick}
+  onKeyDown={handleCardKeyDown}
+  className="group relative cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-primary/40 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+>
+     <div className="flex justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-sm font-semibold text-gray-900">
@@ -1148,7 +1163,10 @@ export default function RestaurantCard({ item }: any) {
               {hasInfoBoxContent ? (
                 <button
                   type="button"
-                  onClick={() => setInfoOpen(true)}
+                 onClick={(event) => {
+  event.stopPropagation();
+  setInfoOpen(true);
+}}
                   className="rounded-full border border-gray-200 bg-gray-50 p-1.5 text-gray-500 transition hover:text-primary"
                   title="View ingredients and allergens"
                 >
@@ -1167,7 +1185,10 @@ export default function RestaurantCard({ item }: any) {
 
             <button
               type="button"
-              onClick={handleNavigateToDetails}
+             onClick={(event) => {
+  event.stopPropagation();
+  handleNavigateToDetails();
+}}
               className="mt-2 flex items-center gap-1 text-xs text-primary"
             >
               <Info size={14} /> Item Info
@@ -1185,7 +1206,10 @@ export default function RestaurantCard({ item }: any) {
 
             <button
               type="button"
-              onClick={handlePlusClick}
+            onClick={(event) => {
+  event.stopPropagation();
+  handlePlusClick();
+}}
               disabled={loading}
               className="absolute bottom-2 right-2 rounded-full bg-primary p-2 text-white shadow-sm transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-70"
             >

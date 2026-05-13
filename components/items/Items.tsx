@@ -1,58 +1,578 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import RestaurantCard from "./RestaurantCard";
 import useApi from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 
-export default function ItemsListing({ categoryId, categories }: any) {
-  const { token } = useAuth();
+type MenuViewMode = "multiple" | "onePage";
+
+type ScrollTarget = {
+  id: string;
+  nonce: number;
+} | null;
+
+type ItemsListingProps = {
+  categoryId?: string;
+  categories?: any[];
+  viewMode?: MenuViewMode;
+  scrollTarget?: ScrollTarget;
+  onActiveCategoryChange?: (categoryId: string) => void;
+};
+
+type CategoryItemsState = {
+  items: any[];
+  page: number;
+  hasMore: boolean;
+  loading: boolean;
+  loadingMore: boolean;
+  loadedOnce: boolean;
+};
+
+const ITEMS_PAGE_LIMIT = 12;
+
+const createEmptyCategoryState = (): CategoryItemsState => ({
+  items: [],
+  page: 0,
+  hasMore: false,
+  loading: false,
+  loadingMore: false,
+  loadedOnce: false,
+});
+
+const normalizeApiArray = (res: any) => {
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  if (Array.isArray(res?.data?.items)) return res.data.items;
+  if (Array.isArray(res?.items)) return res.items;
+  return [];
+};
+
+const normalizeApiMeta = (res: any) => {
+  return (
+    res?.data?.pagination ||
+    res?.data?.meta ||
+    res?.data?.data?.pagination ||
+    res?.data?.data?.meta ||
+    res?.pagination ||
+    res?.meta ||
+    {}
+  );
+};
+
+const mergeUniqueById = (prev: any[], next: any[]) => {
+  const map = new Map<string, any>();
+
+  [...prev, ...next].forEach((item) => {
+    const id = String(item?.id || "");
+    if (!id) return;
+
+    map.set(id, item);
+  });
+
+  return Array.from(map.values());
+};
+
+const resolveHasNext = ({
+  meta,
+  page,
+  limit,
+  receivedCount,
+  totalLoaded,
+}: {
+  meta: any;
+  page: number;
+  limit: number;
+  receivedCount: number;
+  totalLoaded: number;
+}) => {
+  if (typeof meta?.hasNext === "boolean") return meta.hasNext;
+  if (typeof meta?.hasMore === "boolean") return meta.hasMore;
+
+  const total = Number(meta?.total ?? 0);
+  const totalPages = Number(meta?.totalPages ?? meta?.pages ?? 0);
+  const currentPage = Number(meta?.page ?? page);
+
+  if (totalPages > 0) return currentPage < totalPages;
+  if (total > 0) return totalLoaded < total;
+
+  return receivedCount >= limit;
+};
+
+export default function ItemsListing({
+  categoryId,
+  categories = [],
+  viewMode = "multiple",
+  scrollTarget,
+  onActiveCategoryChange,
+}: ItemsListingProps) {
+  const { token, restaurantId: authRestaurantId, user } = useAuth();
   const { get } = useApi(token);
 
-  const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [categoryItemsMap, setCategoryItemsMap] = useState<
+    Record<string, CategoryItemsState>
+  >({});
 
-  const fetchItems = async (catId: string) => {
-    if (!catId || !token) return;
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const inFlightRequestsRef = useRef<Set<string>>(new Set());
+
+  const getStoredRestaurantId = () => {
+    if (typeof window === "undefined") return null;
 
     try {
-      setLoading(true);
-      const res = await get(`/v1/menu/items?categoryId=${catId}`);
-      setItems(res?.data || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+      const auth = JSON.parse(localStorage.getItem("auth") || "{}");
+      return auth?.user?.restaurantId || null;
+    } catch {
+      return null;
     }
   };
 
-  useEffect(() => {
-    if (categoryId && token) {
-      setItems([]);
-      fetchItems(categoryId);
-    }
-  }, [categoryId, token]);
+  const restaurantId = useMemo(() => {
+    return (
+      authRestaurantId ||
+      user?.restaurantId ||
+      getStoredRestaurantId() ||
+      ""
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authRestaurantId, user?.restaurantId]);
+
+  const categoryIdsKey = useMemo(() => {
+    return categories.map((category) => String(category?.id || "")).join("|");
+  }, [categories]);
+
+  const activeCategoryId = useMemo(() => {
+    return String(categoryId || categories?.[0]?.id || "");
+  }, [categoryId, categories]);
 
   const activeCategory = useMemo(() => {
-    return categories.find((c: any) => c.id === categoryId);
-  }, [categories, categoryId]);
+    return (
+      categories.find(
+        (category: any) => String(category?.id || "") === activeCategoryId
+      ) || categories?.[0]
+    );
+  }, [categories, activeCategoryId]);
 
-  return (
-    <div>
-      <h2 className="text-xl font-semibold mb-6 mt-4">
-        {activeCategory?.name || "Menu"}
-      </h2>
+  const fetchCategoryItems = async ({
+    categoryId,
+    page = 1,
+    append = false,
+  }: {
+    categoryId: string;
+    page?: number;
+    append?: boolean;
+  }) => {
+    if (!categoryId || !token || !restaurantId) return;
 
-      {loading ? (
-        <p>Loading...</p>
-      ) : items.length === 0 ? (
-        <p className="text-gray-400">No items found</p>
-      ) : (
-        <div className="grid md:grid-cols-2 gap-5">
-          {items.map((item) => (
+    const requestKey = `${categoryId}:${page}`;
+
+    if (inFlightRequestsRef.current.has(requestKey)) return;
+
+    try {
+      inFlightRequestsRef.current.add(requestKey);
+
+      setCategoryItemsMap((prev) => {
+        const existing = prev[categoryId] || createEmptyCategoryState();
+
+        return {
+          ...prev,
+          [categoryId]: {
+            ...existing,
+            loading: !append,
+            loadingMore: append,
+            loadedOnce: append ? existing.loadedOnce : false,
+          },
+        };
+      });
+
+      const params = new URLSearchParams({
+        restaurantId: String(restaurantId),
+        categoryId: String(categoryId),
+        page: String(page),
+        limit: String(ITEMS_PAGE_LIMIT),
+        sortBy: "sortOrder",
+        sortOrder: "ASC",
+      });
+
+      const res = await get(`/v1/menu/items?${params.toString()}`);
+
+      const fetchedItems = normalizeApiArray(res);
+      const meta = normalizeApiMeta(res);
+
+      setCategoryItemsMap((prev) => {
+        const existing = prev[categoryId] || createEmptyCategoryState();
+
+        const nextItems = append
+          ? mergeUniqueById(existing.items, fetchedItems)
+          : fetchedItems;
+
+        return {
+          ...prev,
+          [categoryId]: {
+            items: nextItems,
+            page: Number(meta?.page ?? page),
+            hasMore: resolveHasNext({
+              meta,
+              page,
+              limit: ITEMS_PAGE_LIMIT,
+              receivedCount: fetchedItems.length,
+              totalLoaded: nextItems.length,
+            }),
+            loading: false,
+            loadingMore: false,
+            loadedOnce: true,
+          },
+        };
+      });
+    } catch (err) {
+      console.error("Failed to fetch category items:", err);
+
+      setCategoryItemsMap((prev) => {
+        const existing = prev[categoryId] || createEmptyCategoryState();
+
+        return {
+          ...prev,
+          [categoryId]: {
+            ...existing,
+            loading: false,
+            loadingMore: false,
+            loadedOnce: true,
+            hasMore: false,
+          },
+        };
+      });
+    } finally {
+      inFlightRequestsRef.current.delete(requestKey);
+    }
+  };
+
+  /* ================= MULTIPLE MODE: LOAD ACTIVE CATEGORY ================= */
+
+  useEffect(() => {
+    if (viewMode !== "multiple") return;
+    if (!activeCategoryId || !token || !restaurantId) return;
+
+    const state = categoryItemsMap[activeCategoryId];
+
+    if (state?.loadedOnce || state?.loading) return;
+
+    fetchCategoryItems({
+      categoryId: activeCategoryId,
+      page: 1,
+      append: false,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, activeCategoryId, token, restaurantId]);
+
+  /* ================= ONE PAGE MODE: LOAD EACH DISPLAYED CATEGORY ================= */
+
+  useEffect(() => {
+    if (viewMode !== "onePage") return;
+    if (!categories.length || !token || !restaurantId) return;
+
+    categories.forEach((category) => {
+      const id = String(category?.id || "");
+      if (!id) return;
+
+      const state = categoryItemsMap[id];
+
+      if (state?.loadedOnce || state?.loading) return;
+
+      fetchCategoryItems({
+        categoryId: id,
+        page: 1,
+        append: false,
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, categoryIdsKey, token, restaurantId]);
+
+  /* ================= PRUNE OLD CATEGORY STATES AFTER SEARCH ================= */
+
+  useEffect(() => {
+    if (!categories.length) return;
+
+    const validIds = new Set(categories.map((category) => String(category.id)));
+
+    setCategoryItemsMap((prev) => {
+      const next: Record<string, CategoryItemsState> = {};
+
+      Object.entries(prev).forEach(([id, state]) => {
+        if (validIds.has(String(id))) {
+          next[id] = state;
+        }
+      });
+
+      return next;
+    });
+  }, [categoryIdsKey, categories]);
+
+  /* ================= ONE PAGE SCROLL TARGET ================= */
+
+  useEffect(() => {
+    if (viewMode !== "onePage") return;
+    if (!scrollTarget?.id) return;
+
+    const el = sectionRefs.current[String(scrollTarget.id)];
+
+    if (!el) return;
+
+    window.requestAnimationFrame(() => {
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [viewMode, scrollTarget?.id, scrollTarget?.nonce]);
+
+  /* ================= ONE PAGE ACTIVE CATEGORY TRACKING ================= */
+
+  useEffect(() => {
+    if (viewMode !== "onePage") return;
+    if (!categories.length) return;
+
+    let frameId: number | null = null;
+
+    const getDocumentHeight = () => {
+      return Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.offsetHeight
+      );
+    };
+
+    const updateActiveCategory = () => {
+      frameId = null;
+
+      const categoryIds = categories
+        .map((category) => String(category?.id || ""))
+        .filter(Boolean);
+
+      if (!categoryIds.length) return;
+
+      const scrollTop = window.scrollY || window.pageYOffset || 0;
+      const viewportHeight =
+        window.innerHeight || document.documentElement.clientHeight || 0;
+      const documentHeight = getDocumentHeight();
+
+      const lastCategoryId = categoryIds[categoryIds.length - 1];
+
+      /*
+       * Important:
+       * At the bottom of the page, the last section can be too short to cross
+       * the normal activation line. In that case, force the last category active.
+       */
+      const isNearPageBottom =
+        scrollTop + viewportHeight >= documentHeight - 120;
+
+      if (isNearPageBottom) {
+        onActiveCategoryChange?.(lastCategoryId);
+        return;
+      }
+
+      /*
+       * Activation line:
+       * We do not use viewport center because short sections can flicker.
+       * This line behaves like a sticky-sidebar reading position.
+       */
+      const activationLine =
+        scrollTop + Math.min(220, Math.max(120, viewportHeight * 0.28));
+
+      let nextActiveId = categoryIds[0];
+
+      for (const id of categoryIds) {
+        const section = sectionRefs.current[id];
+
+        if (!section) continue;
+
+        const sectionTop =
+          section.getBoundingClientRect().top + scrollTop;
+
+        if (sectionTop <= activationLine) {
+          nextActiveId = id;
+        } else {
+          break;
+        }
+      }
+
+      onActiveCategoryChange?.(nextActiveId);
+    };
+
+    const scheduleUpdate = () => {
+      if (frameId !== null) return;
+      frameId = window.requestAnimationFrame(updateActiveCategory);
+    };
+
+    scheduleUpdate();
+
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [viewMode, categoryIdsKey, categories, onActiveCategoryChange]);
+
+  const handleLoadMoreItems = (categoryId: string) => {
+    const state = categoryItemsMap[categoryId] || createEmptyCategoryState();
+
+    if (state.loading || state.loadingMore || !state.hasMore) return;
+
+    fetchCategoryItems({
+      categoryId,
+      page: state.page + 1,
+      append: true,
+    });
+  };
+
+  const renderItemsGrid = ({
+    categoryId,
+    emptyLabel = "No items found",
+  }: {
+    categoryId: string;
+    emptyLabel?: string;
+  }) => {
+    const state = categoryItemsMap[categoryId] || createEmptyCategoryState();
+
+    if (state.loading && !state.items.length) {
+      return (
+        <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white text-sm text-gray-500">
+          <Loader2 size={18} className="mr-2 animate-spin text-primary" />
+          Loading items...
+        </div>
+      );
+    }
+
+    if (state.loadedOnce && state.items.length === 0) {
+      return (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
+          {emptyLabel}
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          {state.items.map((item) => (
             <RestaurantCard key={item.id} item={item} />
           ))}
         </div>
+
+        {state.hasMore ? (
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              onClick={() => handleLoadMoreItems(categoryId)}
+              disabled={state.loadingMore}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-primary px-6 text-sm font-semibold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {state.loadingMore ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Loading more...
+                </>
+              ) : (
+                "Load More Items"
+              )}
+            </button>
+          </div>
+        ) : null}
+      </>
+    );
+  };
+
+  if (viewMode === "onePage") {
+    return (
+      <div className="space-y-10">
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-semibold text-gray-900">Full Menu</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Items of all categories are shown.
+          </p>
+        </div>
+
+        {categories.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
+            No categories found
+          </div>
+        ) : (
+          categories.map((category: any) => {
+            const id = String(category?.id || "");
+            const state = categoryItemsMap[id] || createEmptyCategoryState();
+
+            if (!id) return null;
+
+            return (
+              <section
+                key={id}
+                ref={(el) => {
+                  sectionRefs.current[id] = el;
+                }}
+                data-category-id={id}
+                className="scroll-mt-24"
+              >
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">
+                      {category?.name || "Category"}
+                    </h2>
+
+                    {category?.description ? (
+                      <p className="mt-1 text-sm text-gray-500">
+                        {category.description}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <span className="w-fit rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+                    {state.items.length} item
+                    {state.items.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                {renderItemsGrid({
+                  categoryId: id,
+                  emptyLabel: "No items found in this category",
+                })}
+              </section>
+            );
+          })
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6 mt-1">
+        <h2 className="text-xl font-semibold text-gray-900">
+          {activeCategory?.name || "Menu"}
+        </h2>
+
+        {activeCategory?.description ? (
+          <p className="mt-1 text-sm text-gray-500">
+            {activeCategory.description}
+          </p>
+        ) : null}
+      </div>
+
+      {!activeCategoryId ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
+          Select a category to view items
+        </div>
+      ) : (
+        renderItemsGrid({
+          categoryId: activeCategoryId,
+          emptyLabel: "No items found",
+        })
       )}
     </div>
   );
