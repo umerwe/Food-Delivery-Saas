@@ -204,11 +204,7 @@ export default function CartSummarySection({
                       ) : null}
                     </div>
 
-                    {item.desc ? (
-                      <p className="line-clamp-2 text-xs text-gray-900">
-                        {item.desc}
-                      </p>
-                    ) : null}
+                 
 
                     {selectedAddons.length > 0 ? (
                       <div className="rounded-[10px] border border-gray-100 bg-gray-50 px-3 py-2">
