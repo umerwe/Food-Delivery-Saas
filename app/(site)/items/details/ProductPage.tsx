@@ -125,6 +125,255 @@ const normalizeArray = (value: any): any[] => {
   return Array.isArray(value) ? value : [];
 };
 
+/* ================= PRODUCT INFO HELPERS ================= */
+
+const titleizeConstant = (value: any) => {
+  return String(value || "")
+    .trim()
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getTenantSettings = (item: any) => {
+  return (
+    item?.restaurant?.tenant?.settings ||
+    item?.tenant?.settings ||
+    item?.restaurant?.settings ||
+    {}
+  );
+};
+
+const getProductLabelMap = (item: any) => {
+  const settings = getTenantSettings(item);
+  const labels = normalizeArray(settings?.productLabels);
+
+  const map = new Map<string, string>();
+
+  labels.forEach((entry: any) => {
+    const value = String(entry?.value || entry?.code || "").trim();
+    const label = String(entry?.label || entry?.name || "").trim();
+
+    if (value) {
+      map.set(value, label || titleizeConstant(value));
+    }
+  });
+
+  return map;
+};
+
+const getProductLabels = (item: any) => {
+  const labelMap = getProductLabelMap(item);
+
+  const rawLabels = [
+    ...normalizeArray(item?.labels),
+    ...normalizeArray(item?.dietaryFlags),
+  ];
+
+  const seen = new Set<string>();
+
+  return rawLabels
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .map((value) => ({
+      value,
+      label: labelMap.get(value) || titleizeConstant(value),
+    }));
+};
+
+const getAllergenTemplateMap = (item: any) => {
+  const settings = getTenantSettings(item);
+
+  const templates =
+    settings?.customerApp?.allergenAdditiveTemplates ||
+    settings?.allergenAdditiveTemplates ||
+    {};
+
+  const allergens = normalizeArray(templates?.allergens);
+  const additives = normalizeArray(templates?.additives);
+
+  const map = new Map<string, string>();
+
+  [...allergens, ...additives].forEach((entry: any) => {
+    const code = String(entry?.code || entry?.value || "").trim();
+    const label = String(entry?.label || entry?.name || "").trim();
+
+    if (code && label) {
+      map.set(code, label);
+    }
+  });
+
+  return map;
+};
+
+const getAllergenAdditives = (item: any) => {
+  const templateMap = getAllergenTemplateMap(item);
+  const seen = new Set<string>();
+
+  const directEntries = normalizeArray(item?.allergenAdditives)
+    .map((entry: any) => {
+      const code = String(entry?.code || entry?.value || "").trim();
+      const directLabel = String(entry?.label || entry?.name || "").trim();
+      const mappedLabel = code ? templateMap.get(code) : "";
+
+      return {
+        code,
+        label: directLabel || mappedLabel || "",
+      };
+    })
+    .filter((entry) => hasText(entry.label));
+
+  const codeEntries = [
+    ...normalizeArray(item?.allergenCodes),
+    ...normalizeArray(item?.allergenFlags),
+    ...normalizeArray(item?.additiveCodes),
+    ...normalizeArray(item?.additiveFlags),
+  ]
+    .map((code) => {
+      const normalizedCode = String(code || "").trim();
+      const mappedLabel = templateMap.get(normalizedCode) || "";
+
+      return {
+        code: normalizedCode,
+        label: mappedLabel,
+      };
+    })
+    .filter((entry) => hasText(entry.label));
+
+  return [...directEntries, ...codeEntries]
+    .filter((entry) => entry.label)
+    .filter((entry) => {
+      const key = entry.label.toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+};
+
+const hasProductInfoContent = (item: any) => {
+  return Boolean(
+    hasText(item?.ingredients) ||
+      hasText(item?.nutritionalInformation) ||
+      getProductLabels(item).length > 0 ||
+      getAllergenAdditives(item).length > 0 ||
+      hasText(item?.allergenPdfUrl)
+  );
+};
+
+function ProductInfoContent({ item }: { item: any }) {
+  const productLabels = getProductLabels(item);
+  const allergenAdditives = getAllergenAdditives(item);
+
+  const hasIngredients = hasText(item?.ingredients);
+  const hasNutritionalInformation = hasText(item?.nutritionalInformation);
+  const hasAllergenPdf = hasText(item?.allergenPdfUrl);
+
+  const hasAnyInfo =
+    hasIngredients ||
+    hasNutritionalInformation ||
+    productLabels.length > 0 ||
+    allergenAdditives.length > 0 ||
+    hasAllergenPdf;
+
+  if (!hasAnyInfo) {
+    return (
+      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+        <p className="text-sm font-medium text-gray-900">
+          No additional product information
+        </p>
+        <p className="mt-1 text-sm text-gray-500">
+          Details for ingredients, allergens, labels, and nutrition have not
+          been added yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {productLabels.length > 0 ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Product Labels
+          </h3>
+
+          <div className="flex flex-wrap gap-2">
+            {productLabels.map((label) => (
+              <span
+                key={label.value}
+                className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 ring-1 ring-green-100"
+              >
+                {label.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {allergenAdditives.length > 0 ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Allergens & Additives
+          </h3>
+
+          <div className="flex flex-wrap gap-2">
+            {allergenAdditives.map((entry) => (
+              <span
+                key={entry.label}
+                className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100"
+              >
+                {entry.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {hasIngredients ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Ingredients
+          </h3>
+          <p className="text-sm leading-relaxed text-gray-600">
+            {item.ingredients}
+          </p>
+        </div>
+      ) : null}
+
+      {hasNutritionalInformation ? (
+        <div className="rounded-2xl bg-gray-50 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Nutritional Information
+          </h3>
+          <p className="text-sm leading-relaxed text-gray-600">
+            {item.nutritionalInformation}
+          </p>
+        </div>
+      ) : null}
+
+      {hasAllergenPdf ? (
+        <a
+          href={String(item.allergenPdfUrl)}
+          download
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
+        >
+          <Download size={16} />
+          Download allergen PDF
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 const getId = (value: any) => {
   if (value === undefined || value === null) return "";
   return String(value);
@@ -345,30 +594,35 @@ const getVariationScopedModifierOverrides = (
   normalizeArray(menuItem?.variationPriceOverrides)
     .filter((entry) => getOverrideVariationId(entry) === variationId)
     .forEach((entry) => {
-      normalizeArray(entry?.modifierPriceOverrides).forEach((modifierOverride) => {
-        overrides.push({
-          ...modifierOverride,
-          menuItemId: entry?.menuItemId ?? menuItemId,
-          variationId,
-        });
-      });
+      normalizeArray(entry?.modifierPriceOverrides).forEach(
+        (modifierOverride) => {
+          overrides.push({
+            ...modifierOverride,
+            menuItemId: entry?.menuItemId ?? menuItemId,
+            variationId,
+          });
+        }
+      );
 
       normalizeArray(entry?.variation?.modifierPriceOverrides).forEach(
         (modifierOverride) => {
           overrides.push({
             ...modifierOverride,
-            variationId: getOverrideVariationId(modifierOverride) || variationId,
+            variationId:
+              getOverrideVariationId(modifierOverride) || variationId,
           });
         }
       );
     });
 
-  normalizeArray(variation?.modifierPriceOverrides).forEach((modifierOverride) => {
-    overrides.push({
-      ...modifierOverride,
-      variationId: getOverrideVariationId(modifierOverride) || variationId,
-    });
-  });
+  normalizeArray(variation?.modifierPriceOverrides).forEach(
+    (modifierOverride) => {
+      overrides.push({
+        ...modifierOverride,
+        variationId: getOverrideVariationId(modifierOverride) || variationId,
+      });
+    }
+  );
 
   getAllRawVariationSources(menuItem)
     .filter((rawVariation) => String(rawVariation?.id || "") === variationId)
@@ -377,22 +631,23 @@ const getVariationScopedModifierOverrides = (
         (modifierOverride) => {
           overrides.push({
             ...modifierOverride,
-            variationId: getOverrideVariationId(modifierOverride) || variationId,
+            variationId:
+              getOverrideVariationId(modifierOverride) || variationId,
           });
         }
       );
 
       normalizeArray(rawVariation?.itemPriceOverrides).forEach(
         (itemOverride) => {
-          normalizeArray(itemOverride?.variation?.modifierPriceOverrides).forEach(
-            (modifierOverride) => {
-              overrides.push({
-                ...modifierOverride,
-                variationId:
-                  getOverrideVariationId(modifierOverride) || variationId,
-              });
-            }
-          );
+          normalizeArray(
+            itemOverride?.variation?.modifierPriceOverrides
+          ).forEach((modifierOverride) => {
+            overrides.push({
+              ...modifierOverride,
+              variationId:
+                getOverrideVariationId(modifierOverride) || variationId,
+            });
+          });
         }
       );
     });
@@ -979,7 +1234,6 @@ export default function ProductPage() {
     return getVisibleModifierLinks(item, selectedVariation);
   }, [item, selectedVariation]);
 
-
   const itemSupportsSplitPizza = Boolean(item?.supportsSplitPizza);
 
   useEffect(() => {
@@ -988,13 +1242,6 @@ export default function ProductPage() {
     setSplitPizzaEnabled(false);
     setSplitPizzaItem(null);
   }, [itemSupportsSplitPizza]);
-
-  const hasIngredients = hasText(item?.ingredients);
-  const hasAllergenFlags =
-    Array.isArray(item?.allergenFlags) && item.allergenFlags.length > 0;
-  const hasDietaryFlags =
-    Array.isArray(item?.dietaryFlags) && item.dietaryFlags.length > 0;
-  const hasAllergenPdf = hasText(item?.allergenPdfUrl);
 
   useEffect(() => {
     if (!item) return;
@@ -1012,7 +1259,10 @@ export default function ProductPage() {
             .filter(Boolean)
             .map((modifier) => ({
               ...modifier,
-              selectedQuantity: Math.max(1, toNumber(modifier.selectedQuantity, 1)),
+              selectedQuantity: Math.max(
+                1,
+                toNumber(modifier.selectedQuantity, 1)
+              ),
             }));
 
           if (normalizedModifiers.length) {
@@ -1024,7 +1274,6 @@ export default function ProductPage() {
       return next;
     });
   }, [filteredModifierLinks, item]);
-
 
   const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
     const groupId = String(group.id);
@@ -1052,12 +1301,16 @@ export default function ProductPage() {
       if (alreadySelected) {
         if (minSelect > 0 && current.length <= minSelect) {
           toast.error(
-            `${group?.name || "This group"} requires at least ${minSelect} selection(s)`
+            `${
+              group?.name || "This group"
+            } requires at least ${minSelect} selection(s)`
           );
           return prev;
         }
 
-        const remaining = current.filter((selected) => selected.id !== modifier.id);
+        const remaining = current.filter(
+          (selected) => selected.id !== modifier.id
+        );
         const next = { ...prev };
 
         if (remaining.length) {
@@ -1071,7 +1324,9 @@ export default function ProductPage() {
 
       if (maxSelect && current.length >= maxSelect) {
         toast.error(
-          `You can select up to ${maxSelect} option(s) for ${group?.name || "this group"}`
+          `You can select up to ${maxSelect} option(s) for ${
+            group?.name || "this group"
+          }`
         );
         return prev;
       }
@@ -1104,7 +1359,9 @@ export default function ProductPage() {
 
       if (maxSelect && selected.length > maxSelect) {
         toast.error(
-          `${group?.name || "This group"} allows at most ${maxSelect} selection(s)`
+          `${
+            group?.name || "This group"
+          } allows at most ${maxSelect} selection(s)`
         );
         return false;
       }
@@ -1138,7 +1395,10 @@ export default function ProductPage() {
   };
 
   const getMenuItemBasePrice = (menuItem: any) => {
-    return toNumber(menuItem?.basePrice ?? menuItem?.unitPrice ?? menuItem?.price, 0);
+    return toNumber(
+      menuItem?.basePrice ?? menuItem?.unitPrice ?? menuItem?.price,
+      0
+    );
   };
 
   const getMenuItemResolvedPrice = (
@@ -1243,7 +1503,9 @@ export default function ProductPage() {
       if (!groupModifiers.length) return null;
 
       return (
-        <div key={`${scope}-${String(link?.variationId || "common")}-${groupId}`}>
+        <div
+          key={`${scope}-${String(link?.variationId || "common")}-${groupId}`}
+        >
           <div className="mb-2 flex items-center justify-between gap-3">
             <div>
               <p className="font-medium text-gray-900">{group?.name}</p>
@@ -1479,7 +1741,9 @@ export default function ProductPage() {
     return (
       <>
         <div className="mx-auto px-4 py-16 text-center sm:px-6 md:px-10 lg:px-40">
-          <h2 className="text-xl font-semibold text-gray-900">Item not found</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Item not found
+          </h2>
           <p className="mt-2 text-sm text-gray-500">
             We could not find the requested menu item.
           </p>
@@ -1522,14 +1786,16 @@ export default function ProductPage() {
                 {item?.name}
               </h1>
 
-              <button
-                type="button"
-                onClick={() => setInfoOpen(true)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-primary hover:text-white"
-                title="View ingredients and allergens"
-              >
-                <Eye size={18} />
-              </button>
+              {hasProductInfoContent(item) ? (
+                <button
+                  type="button"
+                  onClick={() => setInfoOpen(true)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-primary hover:text-white"
+                  title="View product information"
+                >
+                  <Eye size={18} />
+                </button>
+              ) : null}
             </div>
 
             <div className="mt-2 flex flex-wrap gap-2 text-sm text-gray-500">
@@ -1594,79 +1860,81 @@ export default function ProductPage() {
             </div>
           ) : null}
 
-{itemSupportsSplitPizza ? (
-  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 transition">
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <p className="font-medium text-gray-900">Enable split pizza</p>
-        <p className="text-xs text-gray-500">
-          Choose another split-pizza item for the second half.
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => handleSplitPizzaToggle(!splitPizzaEnabled)}
-        className={`relative h-7 w-12 rounded-full transition ${
-          splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
-        }`}
-      >
-        <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
-            splitPizzaEnabled ? "left-6" : "left-1"
-          }`}
-        />
-      </button>
-    </div>
-
-    {splitPizzaEnabled ? (
-      <div className="mt-4 space-y-4">
-        <div>
-          <p className="mb-2 text-sm font-medium text-gray-900">
-            Select other pizza half
-          </p>
-
-          <AsyncSelect
-            value={splitPizzaItem}
-            onChange={handleSplitPizzaItemChange}
-            placeholder="Select split-pizza item"
-            fetchOptions={fetchPizzaItems}
-            labelKey="name"
-            valueKey="id"
-          />
-        </div>
-
-        {splitPizzaItem ? (
-          <div className="rounded-xl bg-white p-3">
-            <p className="text-sm font-semibold text-gray-900">
-              Selected second half
-            </p>
-
-            <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
-              <div className="min-w-0">
-                <p className="truncate font-medium text-gray-900">
-                  {splitPizzaItem?.name}
-                </p>
-
-                {splitPizzaItem?.description ? (
-                  <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
-                    {splitPizzaItem.description}
+          {itemSupportsSplitPizza ? (
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 transition">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium text-gray-900">
+                    Enable split pizza
                   </p>
-                ) : null}
+                  <p className="text-xs text-gray-500">
+                    Choose another split-pizza item for the second half.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSplitPizzaToggle(!splitPizzaEnabled)}
+                  className={`relative h-7 w-12 rounded-full transition ${
+                    splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
+                      splitPizzaEnabled ? "left-6" : "left-1"
+                    }`}
+                  />
+                </button>
               </div>
 
-              {splitPizzaResolvedItemPrice > 0 ? (
-                <span className="shrink-0 font-medium text-primary">
-                  ${splitPizzaResolvedItemPrice.toFixed(2)}
-                </span>
+              {splitPizzaEnabled ? (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-gray-900">
+                      Select other pizza half
+                    </p>
+
+                    <AsyncSelect
+                      value={splitPizzaItem}
+                      onChange={handleSplitPizzaItemChange}
+                      placeholder="Select split-pizza item"
+                      fetchOptions={fetchPizzaItems}
+                      labelKey="name"
+                      valueKey="id"
+                    />
+                  </div>
+
+                  {splitPizzaItem ? (
+                    <div className="rounded-xl bg-white p-3">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Selected second half
+                      </p>
+
+                      <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-gray-900">
+                            {splitPizzaItem?.name}
+                          </p>
+
+                          {splitPizzaItem?.description ? (
+                            <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
+                              {splitPizzaItem.description}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        {splitPizzaResolvedItemPrice > 0 ? (
+                          <span className="shrink-0 font-medium text-primary">
+                            ${splitPizzaResolvedItemPrice.toFixed(2)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
             </div>
-          </div>
-        ) : null}
-      </div>
-    ) : null}
-  </div>
-) : null}
+          ) : null}
 
           {filteredModifierLinks.length > 0 ? (
             <div className="space-y-4">
@@ -1748,78 +2016,7 @@ export default function ProductPage() {
               </button>
             </div>
 
-            <div className="space-y-5">
-              <div>
-                <h3 className="mb-2 font-semibold text-gray-900">
-                  Ingredients
-                </h3>
-
-                {hasIngredients ? (
-                  <p className="text-sm leading-relaxed text-gray-600">
-                    {item.ingredients}
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-400">
-                    Ingredients information is not available.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <h3 className="mb-2 font-semibold text-gray-900">
-                  Allergens
-                </h3>
-
-                {hasAllergenFlags ? (
-                  <div className="flex flex-wrap gap-2">
-                    {item.allergenFlags.map((flag: string) => (
-                      <span
-                        key={flag}
-                        className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-600"
-                      >
-                        {flag}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400">
-                    Allergen information is not available.
-                  </p>
-                )}
-
-                {hasAllergenPdf ? (
-                  <a
-                    href={item.allergenPdfUrl}
-                    download
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
-                  >
-                    <Download size={16} />
-                    Download allergen PDF
-                  </a>
-                ) : null}
-              </div>
-
-              {hasDietaryFlags ? (
-                <div>
-                  <h3 className="mb-2 font-semibold text-gray-900">
-                    Dietary Preferences
-                  </h3>
-
-                  <div className="flex flex-wrap gap-2">
-                    {item.dietaryFlags.map((flag: string) => (
-                      <span
-                        key={flag}
-                        className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700"
-                      >
-                        {flag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
+            <ProductInfoContent item={item} />
           </div>
         </div>
       ) : null}

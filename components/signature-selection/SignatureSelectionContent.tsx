@@ -7,7 +7,9 @@ import {
   ChevronRight,
   Download,
   Eye,
+  List,
   Loader2,
+  Menu as MenuIcon,
   Minus,
   Plus,
 } from "lucide-react";
@@ -23,6 +25,8 @@ type SignatureSelectionContentProps = {
   branchId?: string | null;
   onCartRefresh?: () => void;
 };
+
+type MenuViewMode = "multiple" | "onePage";
 
 type ItemPriceOverride = {
   id?: string;
@@ -155,6 +159,7 @@ type MenuRecord = {
   slug?: string;
   description?: string;
   isActive?: boolean;
+  sortOrder?: number;
   items?: {
     id: string;
     sortOrder?: number;
@@ -162,7 +167,21 @@ type MenuRecord = {
   }[];
 };
 
+type ProductCardData = {
+  id: string;
+  name: string;
+  slug?: string;
+  price: number;
+  image: string;
+  description: string;
+  variations: MenuVariation[];
+  modifierLinks: ModifierLink[];
+  raw: MenuItem;
+};
+
 type SelectedModifiersMap = Record<string, SelectedModifier[]>;
+
+const MENU_PAGE_LIMIT = 20;
 
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
@@ -183,7 +202,47 @@ const hasText = (value: unknown) => {
 const normalizeApiList = (res: any) => {
   if (Array.isArray(res?.data)) return res.data;
   if (Array.isArray(res?.data?.data)) return res.data.data;
+  if (Array.isArray(res?.data?.items)) return res.data.items;
+  if (Array.isArray(res?.items)) return res.items;
   return [];
+};
+
+const normalizeApiMeta = (res: any) => {
+  return (
+    res?.data?.pagination ||
+    res?.data?.meta ||
+    res?.data?.data?.pagination ||
+    res?.data?.data?.meta ||
+    res?.pagination ||
+    res?.meta ||
+    {}
+  );
+};
+
+const resolveHasNext = ({
+  meta,
+  page,
+  limit,
+  receivedCount,
+  totalLoaded,
+}: {
+  meta: any;
+  page: number;
+  limit: number;
+  receivedCount: number;
+  totalLoaded: number;
+}) => {
+  if (typeof meta?.hasNext === "boolean") return meta.hasNext;
+  if (typeof meta?.hasMore === "boolean") return meta.hasMore;
+
+  const currentPage = Number(meta?.page ?? page);
+  const totalPages = Number(meta?.totalPages ?? meta?.pages ?? 0);
+  const total = Number(meta?.total ?? 0);
+
+  if (totalPages > 0) return currentPage < totalPages;
+  if (total > 0) return totalLoaded < total;
+
+  return receivedCount >= limit;
 };
 
 const normalizeArray = (value: any): any[] => {
@@ -336,12 +395,30 @@ export default function SignatureSelectionContent({
 
   const [menus, setMenus] = useState<MenuRecord[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string>("");
+  const [activeOnePageMenuId, setActiveOnePageMenuId] = useState<string>("");
   const [loadingMenus, setLoadingMenus] = useState(false);
+
+  const [viewMode, setViewMode] = useState<MenuViewMode>(() => {
+    if (typeof window === "undefined") return "multiple";
+
+    const stored = localStorage.getItem("signatureMenuViewMode");
+
+    return stored === "onePage" || stored === "multiple"
+      ? stored
+      : "multiple";
+  });
+
+  const [scrollTarget, setScrollTarget] = useState<{
+    id: string;
+    nonce: number;
+  } | null>(null);
 
   const [isDown, setIsDown] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeftStart, setScrollLeftStart] = useState(0);
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const menuSectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const [addingId, setAddingId] = useState<string | null>(null);
 
@@ -368,28 +445,81 @@ export default function SignatureSelectionContent({
     selectedItem?.supportsSplitPizza
   );
 
+  const menuIdsKey = useMemo(() => {
+    return menus.map((menu) => String(menu?.id || "")).join("|");
+  }, [menus]);
+
+  useEffect(() => {
+    localStorage.setItem("signatureMenuViewMode", viewMode);
+  }, [viewMode]);
+
+  const normalizeMenuRecords = (items: any[]): MenuRecord[] => {
+    const deduped = new Map<string, MenuRecord>();
+
+    items.forEach((menu: any) => {
+      if (!menu?.id) return;
+      if (menu?.isActive === false) return;
+
+      deduped.set(String(menu.id), {
+        ...menu,
+        id: String(menu.id),
+        sortOrder: toNumber(menu?.sortOrder, 0),
+        items: Array.isArray(menu?.items) ? menu.items : [],
+      });
+    });
+
+    return sortBySortOrder(Array.from(deduped.values()));
+  };
+
   const fetchMenus = async () => {
-    if (!restaurantId) return;
+    if (!restaurantId || !token) return;
 
     try {
       setLoadingMenus(true);
 
-      const res = await get(`/v1/menus?restaurantId=${restaurantId}`);
+      let page = 1;
+      let totalLoaded = 0;
+      let collected: any[] = [];
+      let shouldContinue = true;
 
-      if (!res || res.error) {
-        toast.error(res?.error || "Failed to fetch menus");
-        return;
+      while (shouldContinue) {
+        const params = new URLSearchParams({
+          restaurantId: String(restaurantId),
+          page: String(page),
+          limit: String(MENU_PAGE_LIMIT),
+          sortBy: "sortOrder",
+          sortOrder: "ASC",
+        });
+
+        const res = await get(`/v1/menus?${params.toString()}`);
+
+        if (!res || res.error) {
+          toast.error(res?.error || "Failed to fetch menus");
+          break;
+        }
+
+        const fetchedMenus = normalizeApiList(res);
+        const meta = normalizeApiMeta(res);
+
+        collected = [...collected, ...fetchedMenus];
+        totalLoaded += fetchedMenus.length;
+
+        shouldContinue = resolveHasNext({
+          meta,
+          page,
+          limit: MENU_PAGE_LIMIT,
+          receivedCount: fetchedMenus.length,
+          totalLoaded,
+        });
+
+        page += 1;
+
+        if (page > 30) {
+          shouldContinue = false;
+        }
       }
 
-      const rawMenus = Array.isArray(res?.data)
-        ? res.data
-        : Array.isArray(res?.data?.data)
-        ? res.data.data
-        : [];
-
-      const menuData: MenuRecord[] = rawMenus.filter(
-        (menu: MenuRecord) => menu?.isActive !== false
-      );
+      const menuData = normalizeMenuRecords(collected);
 
       setMenus(menuData);
 
@@ -399,8 +529,15 @@ export default function SignatureSelectionContent({
             ? prev
             : menuData[0].id
         );
+
+        setActiveOnePageMenuId((prev) =>
+          prev && menuData.some((menu) => menu.id === prev)
+            ? prev
+            : menuData[0].id
+        );
       } else {
         setActiveMenuId("");
+        setActiveOnePageMenuId("");
       }
     } catch (error) {
       console.error("Failed to fetch menus:", error);
@@ -412,12 +549,162 @@ export default function SignatureSelectionContent({
 
   useEffect(() => {
     fetchMenus();
-  }, [restaurantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantId, token]);
 
   const activeMenu = useMemo(
     () => menus.find((menu) => menu.id === activeMenuId) || menus[0] || null,
     [menus, activeMenuId]
   );
+
+  const activeChipMenuId = useMemo(() => {
+    if (viewMode === "onePage") {
+      return activeOnePageMenuId || menus?.[0]?.id || "";
+    }
+
+    return activeMenuId || menus?.[0]?.id || "";
+  }, [viewMode, activeOnePageMenuId, activeMenuId, menus]);
+
+  useEffect(() => {
+    if (!menus.length) {
+      setActiveOnePageMenuId("");
+      return;
+    }
+
+    const activeStillExists = menus.some(
+      (menu) => String(menu.id) === String(activeOnePageMenuId)
+    );
+
+    if (!activeOnePageMenuId || !activeStillExists) {
+      setActiveOnePageMenuId(String(menus[0].id));
+    }
+  }, [menus, activeOnePageMenuId]);
+
+  const handleViewModeChange = (nextMode: MenuViewMode) => {
+    setViewMode(nextMode);
+
+    if (nextMode === "onePage") {
+      const id = String(activeMenuId || activeOnePageMenuId || menus?.[0]?.id || "");
+
+      if (id) {
+        setActiveOnePageMenuId(id);
+        setScrollTarget({
+          id,
+          nonce: Date.now(),
+        });
+      }
+    }
+  };
+
+  const handleMenuClick = (menuId: string) => {
+    if (viewMode === "onePage") {
+      setActiveOnePageMenuId(menuId);
+      setScrollTarget({
+        id: menuId,
+        nonce: Date.now(),
+      });
+      return;
+    }
+
+    setActiveMenuId(menuId);
+  };
+
+  useEffect(() => {
+    if (viewMode !== "onePage") return;
+    if (!scrollTarget?.id) return;
+
+    const el = menuSectionRefs.current[String(scrollTarget.id)];
+
+    if (!el) return;
+
+    window.requestAnimationFrame(() => {
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [viewMode, scrollTarget?.id, scrollTarget?.nonce]);
+
+  useEffect(() => {
+    if (viewMode !== "onePage") return;
+    if (!menus.length) return;
+
+    let frameId: number | null = null;
+
+    const getDocumentHeight = () => {
+      return Math.max(
+        document.body.scrollHeight,
+        document.documentElement.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.offsetHeight
+      );
+    };
+
+    const updateActiveMenu = () => {
+      frameId = null;
+
+      const menuIds = menus
+        .map((menu) => String(menu?.id || ""))
+        .filter(Boolean);
+
+      if (!menuIds.length) return;
+
+      const scrollTop = window.scrollY || window.pageYOffset || 0;
+      const viewportHeight =
+        window.innerHeight || document.documentElement.clientHeight || 0;
+      const documentHeight = getDocumentHeight();
+
+      const lastMenuId = menuIds[menuIds.length - 1];
+
+      const isNearPageBottom =
+        scrollTop + viewportHeight >= documentHeight - 120;
+
+      if (isNearPageBottom) {
+        setActiveOnePageMenuId(lastMenuId);
+        return;
+      }
+
+      const activationLine =
+        scrollTop + Math.min(220, Math.max(120, viewportHeight * 0.28));
+
+      let nextActiveId = menuIds[0];
+
+      for (const id of menuIds) {
+        const section = menuSectionRefs.current[id];
+
+        if (!section) continue;
+
+        const sectionTop = section.getBoundingClientRect().top + scrollTop;
+
+        if (sectionTop <= activationLine) {
+          nextActiveId = id;
+        } else {
+          break;
+        }
+      }
+
+      setActiveOnePageMenuId(nextActiveId);
+    };
+
+    const scheduleUpdate = () => {
+      if (frameId !== null) return;
+      frameId = window.requestAnimationFrame(updateActiveMenu);
+    };
+
+    scheduleUpdate();
+
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [viewMode, menuIdsKey, menus]);
 
   const normalizeVariation = (raw: any): MenuVariation | null => {
     if (!raw?.id) return null;
@@ -470,7 +757,9 @@ export default function SignatureSelectionContent({
   const getAllRawVariationSources = (item?: MenuItem | null) => {
     if (!item) return [];
 
-    const fromVariationPriceOverrides = normalizeArray(item?.variationPriceOverrides)
+    const fromVariationPriceOverrides = normalizeArray(
+      item?.variationPriceOverrides
+    )
       .map((override) => ({
         ...(override?.variation || {}),
         id: override?.variationId || override?.variation?.id,
@@ -488,7 +777,9 @@ export default function SignatureSelectionContent({
       }))
       .filter((variation) => variation?.id);
 
-    const fromCategoryVariationLinks = normalizeArray(item?.category?.variationLinks)
+    const fromCategoryVariationLinks = normalizeArray(
+      item?.category?.variationLinks
+    )
       .map((link) => link?.variation)
       .filter(Boolean);
 
@@ -591,7 +882,9 @@ export default function SignatureSelectionContent({
               price: override?.price,
             },
           ],
-          variationPriceOverrides: Array.isArray(rawModifier?.variationPriceOverrides)
+          variationPriceOverrides: Array.isArray(
+            rawModifier?.variationPriceOverrides
+          )
             ? rawModifier.variationPriceOverrides
             : [],
         });
@@ -902,7 +1195,9 @@ export default function SignatureSelectionContent({
     }
 
     if (maxSelect && current.length >= maxSelect) {
-      toast.error(`You can select up to ${maxSelect} option(s) for ${group.name}`);
+      toast.error(
+        `You can select up to ${maxSelect} option(s) for ${group.name}`
+      );
       return;
     }
 
@@ -933,14 +1228,18 @@ export default function SignatureSelectionContent({
 
       if (minSelect > 0 && selectedInGroup.length < minSelect) {
         toast.error(
-          `${group?.name || "This group"} requires at least ${minSelect} selection(s)`
+          `${
+            group?.name || "This group"
+          } requires at least ${minSelect} selection(s)`
         );
         return false;
       }
 
       if (maxSelect && selectedInGroup.length > maxSelect) {
         toast.error(
-          `${group?.name || "This group"} allows at most ${maxSelect} selection(s)`
+          `${
+            group?.name || "This group"
+          } allows at most ${maxSelect} selection(s)`
         );
         return false;
       }
@@ -1023,7 +1322,10 @@ export default function SignatureSelectionContent({
     const modifiersTotal = getModifiersTotal(item, variation, modifiersMap);
 
     const splitItemPrice = splitItem
-      ? getMenuItemResolvedPrice(splitItem, splitVariation || getDefaultVariation(splitItem))
+      ? getMenuItemResolvedPrice(
+          splitItem,
+          splitVariation || getDefaultVariation(splitItem)
+        )
       : 0;
 
     const basePrice = splitItem
@@ -1033,10 +1335,10 @@ export default function SignatureSelectionContent({
     return basePrice + modifiersTotal;
   };
 
-  const products = useMemo(() => {
-    if (!activeMenu?.items?.length) return [];
+  const buildProductsForMenu = (menu?: MenuRecord | null): ProductCardData[] => {
+    if (!menu?.items?.length) return [];
 
-    return activeMenu.items
+    return menu.items
       .filter((entry) => entry?.menuItem && entry.menuItem.isActive !== false)
       .sort((a, b) => toNumber(a?.sortOrder, 0) - toNumber(b?.sortOrder, 0))
       .map((entry) => {
@@ -1060,17 +1362,32 @@ export default function SignatureSelectionContent({
           raw: item,
         };
       });
+  };
+
+  const products = useMemo(() => {
+    return buildProductsForMenu(activeMenu);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMenu]);
+
+  const onePageMenuSections = useMemo(() => {
+    return menus.map((menu) => ({
+      menu,
+      products: buildProductsForMenu(menu),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menus]);
 
   const filteredModifierLinks = useMemo(() => {
     return getVisibleModifierLinks(selectedItem, selectedVariation);
   }, [selectedItem, selectedVariation]);
 
-
   useEffect(() => {
     if (!selectedItem) return;
 
-    const visibleLinks = getVisibleModifierLinks(selectedItem, selectedVariation);
+    const visibleLinks = getVisibleModifierLinks(
+      selectedItem,
+      selectedVariation
+    );
 
     setSelectedModifiers((prev) =>
       sanitizeSelectedModifiersForVisibleGroups(prev, visibleLinks)
@@ -1085,7 +1402,6 @@ export default function SignatureSelectionContent({
     setSplitPizzaVariation(null);
     setSplitPizzaModifiers({});
   }, [selectedItemSupportsSplitPizza]);
-
 
   const fetchPizzaItems = async ({
     search,
@@ -1180,6 +1496,7 @@ export default function SignatureSelectionContent({
 
     try {
       setAddingId(item.id);
+
       const splitSections =
         splitPizzaEnabled && splitPizzaItem?.id
           ? [
@@ -1194,7 +1511,6 @@ export default function SignatureSelectionContent({
             ]
           : undefined;
 
-
       const payload: any = {
         menuItemId: item.id,
         quantity,
@@ -1204,9 +1520,10 @@ export default function SignatureSelectionContent({
         modifiers: buildModifiersPayload(safeModifiersMap),
       };
 
-        if (splitSections) {
+      if (splitSections) {
         payload.sections = splitSections;
       }
+
       const res = await post(`/v1/cart/items?customerId=${customerId}`, payload);
 
       if (!res || res.error) {
@@ -1367,7 +1684,6 @@ export default function SignatureSelectionContent({
 
               const inputType = maxSelect === 1 ? "radio" : "checkbox";
 
-
               return (
                 <div
                   key={modifier.id}
@@ -1408,7 +1724,8 @@ export default function SignatureSelectionContent({
                         +${effectivePrice.toFixed(2)}
                       </span>
                     ) : null}
-                  </div>                </div>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -1417,11 +1734,74 @@ export default function SignatureSelectionContent({
     });
   };
 
+  const renderProductCard = (product: ProductCardData) => {
+    const nameParts = product.name.split(" ");
+    const firstLine = nameParts.slice(0, 2).join(" ");
+    const secondLine = nameParts.slice(2).join(" ");
+
+    return (
+      <div
+        key={product.id}
+        className="group min-w-0 overflow-hidden rounded-[20px] border border-black/5 bg-white shadow-[-12px_0_32px_0_rgba(26,28,28,0.09)] transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)]"
+      >
+        <div className="relative h-[210px] w-full overflow-hidden bg-[#f5f5f5]">
+          <Image
+            src={product.image}
+            alt={product.name}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            unoptimized
+          />
+
+          {hasInfoContent(product.raw) ? (
+            <button
+              type="button"
+              onClick={() => openInfoModal(product.raw)}
+              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm backdrop-blur transition hover:bg-primary hover:text-white"
+              title="View ingredients and allergens"
+            >
+              <Eye size={16} />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="p-4">
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <h3 className="min-w-0 flex-1 text-[17px] font-semibold leading-[1.35] tracking-[-0.01em] text-[#202020]">
+              <span className="block break-words">{firstLine}</span>
+              <span className="block break-words">{secondLine}</span>
+            </h3>
+
+            <span className="shrink-0 pt-0.5 text-[18px] font-semibold text-primary">
+              ${toNumber(product.price, 0).toFixed(2)}
+            </span>
+          </div>
+
+          <p className="line-clamp-2 min-h-[44px] text-[13px] leading-[1.65] text-[#8a8a8a]">
+            {product.description}
+          </p>
+
+          <button
+            onClick={() => handleAddClick(product.raw)}
+            disabled={addingId === product.id}
+            className="mt-4 flex h-11 w-full items-center justify-center rounded-full border border-primary/10 bg-primary text-[13px] font-medium text-primary-foreground shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:opacity-95 disabled:opacity-70"
+          >
+            {addingId === product.id ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              "+ Add to Cart"
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <section className="overflow-x-hidden px-4 py-5 sm:px-6 lg:px-8 xl:pr-5">
         <div className="w-full max-w-full">
-          <div className="mb-6 flex items-start justify-between gap-4">
+          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <h1 className="text-[21px] font-semibold leading-tight tracking-[-0.02em] text-[#1f1f1f] sm:text-[32px]">
                 Our Signature Selection
@@ -1431,10 +1811,41 @@ export default function SignatureSelectionContent({
                 ingredients and a passion for culinary excellence.
               </p>
             </div>
+
+            <div className="w-full rounded-2xl bg-gray-100 p-1 sm:w-fit">
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleViewModeChange("multiple")}
+                  className={`flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition ${
+                    viewMode === "multiple"
+                      ? "bg-white text-primary shadow-sm"
+                      : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
+                  }`}
+                >
+                  <MenuIcon size={15} />
+                  By Menu
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleViewModeChange("onePage")}
+                  className={`flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-xs font-semibold transition ${
+                    viewMode === "onePage"
+                      ? "bg-white text-primary shadow-sm"
+                      : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
+                  }`}
+                >
+                  <List size={15} />
+                  1 Page
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="relative mb-7 w-full max-w-full overflow-hidden">
             <button
+              type="button"
               onClick={() => scrollMenu("left")}
               className="absolute left-0 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/90 shadow-[0_6px_20px_rgba(0,0,0,0.06)] backdrop-blur md:flex"
             >
@@ -1455,12 +1866,13 @@ export default function SignatureSelectionContent({
               onTouchMove={(e) => onMouseMove(e.touches[0].pageX)}
             >
               {menus.map((menu) => {
-                const active = activeMenu?.id === menu.id;
+                const active = String(activeChipMenuId) === String(menu.id);
 
                 return (
                   <button
                     key={menu.id}
-                    onClick={() => setActiveMenuId(menu.id)}
+                    type="button"
+                    onClick={() => handleMenuClick(String(menu.id))}
                     className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2.5 text-[13px] font-medium transition-all duration-200 ${
                       active
                         ? "border-primary/15 bg-primary text-primary-foreground shadow-[0_8px_18px_rgba(0,0,0,0.08)]"
@@ -1474,6 +1886,7 @@ export default function SignatureSelectionContent({
             </div>
 
             <button
+              type="button"
               onClick={() => scrollMenu("right")}
               className="absolute right-0 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/90 shadow-[0_6px_20px_rgba(0,0,0,0.06)] backdrop-blur md:flex"
             >
@@ -1485,74 +1898,65 @@ export default function SignatureSelectionContent({
             <div className="flex min-h-[300px] items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
+          ) : menus.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fafafa] p-8 text-center">
+              <p className="text-sm text-[#777]">No menus found.</p>
+            </div>
+          ) : viewMode === "onePage" ? (
+            <div className="space-y-10">
+              {onePageMenuSections.map(({ menu, products }) => (
+                <section
+                  key={menu.id}
+                  ref={(el) => {
+                    menuSectionRefs.current[String(menu.id)] = el;
+                  }}
+                  data-menu-id={menu.id}
+                  className="scroll-mt-24"
+                >
+                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h2 className="text-[20px] font-semibold text-gray-900">
+                        {menu.name}
+                      </h2>
+
+                      {hasText(menu.description) ? (
+                        <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
+                          {menu.description}
+                        </p>
+                      ) : (
+                        <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
+                          Explore available items from this menu.
+                        </p>
+                      )}
+                    </div>
+
+                    <span className="w-fit rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+                      {products.length} item
+                      {products.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+
+                  {products.length === 0 ? (
+                    <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fafafa] p-8 text-center">
+                      <p className="text-sm text-[#777]">
+                        No menu items found in this menu.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
+                      {products.map((product) => renderProductCard(product))}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
           ) : products.length === 0 ? (
             <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fafafa] p-8 text-center">
               <p className="text-sm text-[#777]">No menu items found.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
-              {products.map((product) => {
-                const nameParts = product.name.split(" ");
-                const firstLine = nameParts.slice(0, 2).join(" ");
-                const secondLine = nameParts.slice(2).join(" ");
-
-                return (
-                  <div
-                    key={product.id}
-                    className="group min-w-0 overflow-hidden rounded-[20px] border border-black/5 bg-white shadow-[-12px_0_32px_0_rgba(26,28,28,0.09)] transition-all duration-300 hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)]"
-                  >
-                    <div className="relative h-[210px] w-full overflow-hidden bg-[#f5f5f5]">
-                      <Image
-                        src={product.image}
-                        alt={product.name}
-                        fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                        unoptimized
-                      />
-
-                      {hasInfoContent(product.raw) ? (
-                        <button
-                          type="button"
-                          onClick={() => openInfoModal(product.raw)}
-                          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm backdrop-blur transition hover:bg-primary hover:text-white"
-                          title="View ingredients and allergens"
-                        >
-                          <Eye size={16} />
-                        </button>
-                      ) : null}
-                    </div>
-
-                    <div className="p-4">
-                      <div className="mb-2 flex items-start justify-between gap-3">
-                        <h3 className="min-w-0 flex-1 text-[17px] font-semibold leading-[1.35] tracking-[-0.01em] text-[#202020]">
-                          <span className="block break-words">{firstLine}</span>
-                          <span className="block break-words">{secondLine}</span>
-                        </h3>
-
-                        <span className="shrink-0 pt-0.5 text-[18px] font-semibold text-primary">
-                          ${toNumber(product.price, 0).toFixed(2)}
-                        </span>
-                      </div>
-
-                      <p className="line-clamp-2 min-h-[44px] text-[13px] leading-[1.65] text-[#8a8a8a]">
-                        {product.description}
-                      </p>
-
-                      <button
-                        onClick={() => handleAddClick(product.raw)}
-                        disabled={addingId === product.id}
-                        className="mt-4 flex h-11 w-full items-center justify-center rounded-full border border-primary/10 bg-primary text-[13px] font-medium text-primary-foreground shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:opacity-95 disabled:opacity-70"
-                      >
-                        {addingId === product.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "+ Add to Cart"
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {products.map((product) => renderProductCard(product))}
             </div>
           )}
         </div>
@@ -1736,7 +2140,7 @@ export default function SignatureSelectionContent({
 
                             <div>
                               <p className="text-sm font-medium text-gray-800">
-                                {variation.name}
+                                {variation.displayText || variation.name}
                               </p>
 
                               {variation.description ? (
@@ -1759,85 +2163,92 @@ export default function SignatureSelectionContent({
                 </div>
               ) : null}
 
-{selectedItemSupportsSplitPizza ? (
-  <div className="mb-5 rounded-2xl border border-gray-100 bg-gray-50 p-4 transition">
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <p className="font-medium text-gray-900">Enable split pizza</p>
-        <p className="text-xs text-gray-500">
-          Choose another split-pizza item for the second half.
-        </p>
-      </div>
+              {selectedItemSupportsSplitPizza ? (
+                <div className="mb-5 rounded-2xl border border-gray-100 bg-gray-50 p-4 transition">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        Enable split pizza
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Choose another split-pizza item for the second half.
+                      </p>
+                    </div>
 
-      <button
-        type="button"
-        onClick={() => handleSplitPizzaToggle(!splitPizzaEnabled)}
-        className={`relative h-7 w-12 rounded-full transition ${
-          splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
-        }`}
-      >
-        <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
-            splitPizzaEnabled ? "left-6" : "left-1"
-          }`}
-        />
-      </button>
-    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSplitPizzaToggle(!splitPizzaEnabled)
+                      }
+                      className={`relative h-7 w-12 rounded-full transition ${
+                        splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
+                          splitPizzaEnabled ? "left-6" : "left-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
 
-    {splitPizzaEnabled ? (
-      <div className="mt-4 space-y-4">
-        <div>
-          <p className="mb-2 text-sm font-medium text-gray-900">
-            Select other pizza half
-          </p>
+                  {splitPizzaEnabled ? (
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <p className="mb-2 text-sm font-medium text-gray-900">
+                          Select other pizza half
+                        </p>
 
-          <AsyncSelect
-            value={splitPizzaItem}
-            onChange={handleSplitPizzaItemChange}
-            placeholder="Select split-pizza item"
-            fetchOptions={fetchPizzaItems}
-            labelKey="name"
-            valueKey="id"
-          />
-        </div>
+                        <AsyncSelect
+                          value={splitPizzaItem}
+                          onChange={handleSplitPizzaItemChange}
+                          placeholder="Select split-pizza item"
+                          fetchOptions={fetchPizzaItems}
+                          labelKey="name"
+                          valueKey="id"
+                        />
+                      </div>
 
-        {splitPizzaItem ? (
-          <div className="rounded-xl bg-white p-3">
-            <p className="text-sm font-semibold text-gray-900">
-              Selected second half
-            </p>
+                      {splitPizzaItem ? (
+                        <div className="rounded-xl bg-white p-3">
+                          <p className="text-sm font-semibold text-gray-900">
+                            Selected second half
+                          </p>
 
-            <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
-              <div className="min-w-0">
-                <p className="truncate font-medium text-gray-900">
-                  {splitPizzaItem?.name}
-                </p>
+                          <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-gray-900">
+                                {splitPizzaItem?.name}
+                              </p>
 
-                {splitPizzaItem?.description ? (
-                  <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
-                    {splitPizzaItem.description}
-                  </p>
-                ) : null}
-              </div>
+                              {splitPizzaItem?.description ? (
+                                <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
+                                  {splitPizzaItem.description}
+                                </p>
+                              ) : null}
+                            </div>
 
-              {getMenuItemResolvedPrice(
-                splitPizzaItem,
-                splitPizzaVariation || getDefaultVariation(splitPizzaItem)
-              ) > 0 ? (
-                <span className="shrink-0 font-medium text-primary">
-                  ${getMenuItemResolvedPrice(
-                    splitPizzaItem,
-                    splitPizzaVariation || getDefaultVariation(splitPizzaItem)
-                  ).toFixed(2)}
-                </span>
+                            {getMenuItemResolvedPrice(
+                              splitPizzaItem,
+                              splitPizzaVariation ||
+                                getDefaultVariation(splitPizzaItem)
+                            ) > 0 ? (
+                              <span className="shrink-0 font-medium text-primary">
+                                $
+                                {getMenuItemResolvedPrice(
+                                  splitPizzaItem,
+                                  splitPizzaVariation ||
+                                    getDefaultVariation(splitPizzaItem)
+                                ).toFixed(2)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
-            </div>
-          </div>
-        ) : null}
-      </div>
-    ) : null}
-  </div>
-) : null}
 
               {filteredModifierLinks.length > 0 ? (
                 <div>
