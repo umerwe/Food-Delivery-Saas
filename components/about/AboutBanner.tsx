@@ -31,7 +31,7 @@ export default function AboutBanner() {
           Delivering happiness, one meal at a time.
         </p>
 
-        <Link href="/categories"
+        <Link href="/items"
           className="mt-8 bg-[#FF5A2C] hover:bg-[#e14e25] text-white px-8 py-3 text-base md:text-lg rounded-md"
         >
           Order Now

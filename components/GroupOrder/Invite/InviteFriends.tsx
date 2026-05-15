@@ -63,7 +63,7 @@ export default function InviteFriends() {
 
   // 🔥 COPY LINK
   const handleCopy = async () => {
-    const link = `${window.location.origin}/categories?code=${order?.inviteCode}`;
+    const link = `${window.location.origin}/items?code=${order?.inviteCode}`;
     await navigator.clipboard.writeText(link);
     toast.success("Link copied");
   };
@@ -132,7 +132,7 @@ export default function InviteFriends() {
 
           <div className="flex items-center bg-gray-100 rounded-full px-4 py-2 gap-3">
             <span className="text-gray-700 text-sm flex-1 truncate">
-              {`${window.location.origin}/categories?code=${order.inviteCode}`}
+              {`${window.location.origin}/items?code=${order.inviteCode}`}
             </span>
 
             <button
@@ -224,7 +224,7 @@ export default function InviteFriends() {
         <div className="mt-10 text-center">
           <button
             onClick={() =>
-              router.push(`/categories?code=${order.inviteCode}`)
+              router.push(`/items?code=${order.inviteCode}`)
             }
             className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full font-semibold shadow-md"
           >

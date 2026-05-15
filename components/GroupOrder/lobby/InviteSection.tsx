@@ -8,7 +8,7 @@ export default function InviteSection({ order }: any) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    const link = `${window.location.origin}/categories?code=${order?.inviteCode}`;
+    const link = `${window.location.origin}/items?code=${order?.inviteCode}`;
     await navigator.clipboard.writeText(link);
     setCopied(true);
     toast.success("Link copied");
@@ -34,7 +34,7 @@ export default function InviteSection({ order }: any) {
         <div className="max-w-xl mt-5 flex items-center bg-white rounded-full px-4 py-2 justify-between text-sm border border-gray-200 shadow-sm">
 
           <span className="text-gray-500 truncate pr-3">
-            {order?.inviteCode ? `${window.location.origin}/categories?code=${order?.inviteCode}` : "Generating..."}
+            {order?.inviteCode ? `${window.location.origin}/items?code=${order?.inviteCode}` : "Generating..."}
           </span>
 
           <button

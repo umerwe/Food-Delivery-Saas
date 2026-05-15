@@ -92,7 +92,7 @@ return (
         <Button
           variant="link"
           className="text-primary font-bold text-sm sm:text-lg p-0"
-          onClick={() => router.push("/categories")}
+          onClick={() => router.push("/items")}
         >
           View All
           <ChevronRight className="w-[10px] h-[16px]" strokeWidth={3} />
