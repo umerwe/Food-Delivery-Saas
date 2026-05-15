@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import TestimonialsSection from "./Testimonials";
 import useApi from "@/hooks/useApi";
@@ -97,6 +97,8 @@ type ModifierLink = {
 
 type ModifierSelectionMap = Record<string, SelectedModifier[]>;
 
+type CheckoutType = "delivery" | "pickup";
+
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -116,6 +118,7 @@ const hasText = (value: unknown) => {
 const normalizeApiList = (res: any) => {
   if (Array.isArray(res?.data)) return res.data;
   if (Array.isArray(res?.data?.data)) return res.data.data;
+  if (Array.isArray(res?.data?.items)) return res.data.items;
   if (Array.isArray(res?.items)) return res.items;
   return [];
 };
@@ -123,6 +126,16 @@ const normalizeApiList = (res: any) => {
 const normalizeArray = (value: any): any[] => {
   if (!value) return [];
   return Array.isArray(value) ? value : [];
+};
+
+const getCheckoutType = (type?: string | null): CheckoutType => {
+  const normalized = String(type || "").toLowerCase();
+
+  if (normalized === "pickup" || normalized === "takeaway") {
+    return "pickup";
+  }
+
+  return "delivery";
 };
 
 /* ================= PRODUCT INFO HELPERS ================= */
@@ -679,12 +692,18 @@ const getModifierSideVariationOverrides = (menuItem: any, modifier: Modifier) =>
 export default function ProductPage() {
   const params = useSearchParams();
   const slug = params.get("slug");
+  const itemIdParam = params.get("itemId") || "";
+  const cartItemId = params.get("cartItemId") || "";
+  const checkoutType = getCheckoutType(params.get("type"));
+
+  const isEditingCartItem = Boolean(cartItemId);
 
   const { token } = useAuthContext();
-  const { get, post } = useApi(token);
+  const { get, post, patch } = useApi(token);
   const router = useRouter();
 
   const [item, setItem] = useState<any>(null);
+  const [cartItemToEdit, setCartItemToEdit] = useState<any>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [qty, setQty] = useState(1);
@@ -701,6 +720,8 @@ export default function ProductPage() {
   const [splitPizzaEnabled, setSplitPizzaEnabled] = useState(false);
   const [splitPizzaItem, setSplitPizzaItem] = useState<any>(null);
 
+  const editPrefilledRef = useRef(false);
+
   const { user } = useAuth();
   const customerId = user?.id;
   const branchId = user?.branchId;
@@ -710,6 +731,14 @@ export default function ProductPage() {
     (user as any)?.restaurantId ||
     (user as any)?.profile?.restaurantId ||
     "";
+
+
+  const getMenuItemBasePrice = (menuItem: any) => {
+    return toNumber(
+      menuItem?.basePrice ?? menuItem?.unitPrice ?? menuItem?.price,
+      0
+    );
+  };
 
   const getVariationDisplayPrice = (menuItem: any, variation: any) => {
     const variationId = String(variation?.id || variation?.variationId || "");
@@ -748,7 +777,18 @@ export default function ProductPage() {
         variationId,
       });
 
-    return itemOverride?.pickupPrice ?? variation?.pickupPrice ?? null;
+    const candidates = [
+      itemOverride?.pickupPrice,
+      variation?.pickupPrice,
+      variation?.takeawayPrice,
+    ];
+
+    for (const candidate of candidates) {
+      const numeric = toNumber(candidate, 0);
+      if (numeric > 0) return numeric;
+    }
+
+    return null;
   };
 
   const getVariationDisplayText = (menuItem: any, variation: any) => {
@@ -1154,11 +1194,96 @@ export default function ProductPage() {
     };
   };
 
+  const getMenuItemResolvedPrice = (
+    menuItem: any,
+    variation?: MenuVariation | null
+  ) => {
+    if (!menuItem) return 0;
+
+    if (variation?.id) {
+      if (checkoutType === "pickup") {
+        const pickupPrice = getVariationPickupPrice(menuItem, variation);
+
+        if (pickupPrice && pickupPrice > 0) {
+          return pickupPrice;
+        }
+      }
+
+      return toNumber(variation.price, 0);
+    }
+
+    const basePrice = getMenuItemBasePrice(menuItem);
+
+    if (checkoutType === "pickup") {
+      const adjustment = toNumber(menuItem?.takeawayPriceAdjustment, 0);
+      return Math.max(0, basePrice + adjustment);
+    }
+
+    const adjustment = toNumber(menuItem?.deliveryPriceAdjustment, 0);
+    return Math.max(0, basePrice + adjustment);
+  };
+
+  const itemVariations = useMemo(() => getItemVariations(item), [item]);
+
+  const splitPizzaDefaultVariation = useMemo(
+    () => getDefaultVariation(splitPizzaItem),
+    [splitPizzaItem]
+  );
+
+  const filteredModifierLinks = useMemo(() => {
+    return getVisibleModifierLinks(item, selectedVariation);
+  }, [item, selectedVariation]);
+
+  const itemSupportsSplitPizza = Boolean(item?.supportsSplitPizza);
+
+  const resolvedItemPrice = getMenuItemResolvedPrice(item, selectedVariation);
+
+  const splitPizzaResolvedItemPrice = getMenuItemResolvedPrice(
+    splitPizzaItem,
+    splitPizzaDefaultVariation
+  );
+
+  const getDepositAmount = (menuItem: any) => {
+    return toNumber(menuItem?.depositAmount, 0);
+  };
+
+  const depositAmount = getDepositAmount(item);
+
+  const getModifiersTotal = (
+    selectionMap: ModifierSelectionMap,
+    menuItem: any,
+    variation?: MenuVariation | null
+  ) => {
+    return Object.values(selectionMap)
+      .flat()
+      .reduce((acc, modifier) => {
+        const price = getModifierEffectivePrice(modifier, menuItem, variation);
+        const modifierQty = Math.max(1, toNumber(modifier.selectedQuantity, 1));
+
+        return acc + price * modifierQty;
+      }, 0);
+  };
+
+  const modifiersTotal = getModifiersTotal(
+    selectedModifiers,
+    item,
+    selectedVariation
+  );
+
+  const splitPizzaBasePrice =
+    splitPizzaEnabled && splitPizzaItem
+      ? Math.max(resolvedItemPrice, splitPizzaResolvedItemPrice)
+      : resolvedItemPrice;
+
+  const totalPrice = (splitPizzaBasePrice + modifiersTotal + depositAmount) * qty;
+
   useEffect(() => {
     let isMounted = true;
 
     const fetchItem = async () => {
-      if (!slug) {
+      const searchValue = slug || itemIdParam;
+
+      if (!searchValue) {
         if (isMounted) {
           setItem(null);
           setPageLoading(false);
@@ -1174,7 +1299,7 @@ export default function ProductPage() {
         setPageLoading(true);
 
         const res = await get(
-          `/v1/menu/items?search=${encodeURIComponent(slug)}`
+          `/v1/menu/items?search=${encodeURIComponent(searchValue)}`
         );
 
         if (!isMounted) return;
@@ -1189,8 +1314,14 @@ export default function ProductPage() {
 
         const matchedItem =
           items.find(
-            (menuItem: any) => String(menuItem?.slug || "") === String(slug)
-          ) || items[0];
+            (menuItem: any) =>
+              itemIdParam && String(menuItem?.id || "") === String(itemIdParam)
+          ) ||
+          items.find(
+            (menuItem: any) =>
+              slug && String(menuItem?.slug || "") === String(slug)
+          ) ||
+          items[0];
 
         if (!matchedItem) {
           setItem(null);
@@ -1221,20 +1352,113 @@ export default function ProductPage() {
     return () => {
       isMounted = false;
     };
-  }, [slug, token]);
+  }, [slug, itemIdParam, token]);
 
-  const itemVariations = useMemo(() => getItemVariations(item), [item]);
+  useEffect(() => {
+    const fetchCartItemToEdit = async () => {
+      if (!cartItemId || !customerId || !token) return;
 
-  const splitPizzaDefaultVariation = useMemo(
-    () => getDefaultVariation(splitPizzaItem),
-    [splitPizzaItem]
-  );
+      const res = await get(`/v1/cart?customerId=${customerId}`);
 
-  const filteredModifierLinks = useMemo(() => {
-    return getVisibleModifierLinks(item, selectedVariation);
-  }, [item, selectedVariation]);
+      if (!res || res?.error) return;
 
-  const itemSupportsSplitPizza = Boolean(item?.supportsSplitPizza);
+      const cart = res?.data?.items ? res?.data : res?.data?.data || res?.data;
+      const items = normalizeArray(cart?.items);
+
+      const found = items.find((entry: any) => {
+        return String(entry?.id || "") === String(cartItemId);
+      });
+
+      if (!found) return;
+
+      setCartItemToEdit(found);
+      setQty(Math.max(1, toNumber(found?.quantity, 1)));
+      setInstructions(found?.note || "");
+    };
+
+    fetchCartItemToEdit();
+  }, [cartItemId, customerId, token]);
+
+  useEffect(() => {
+    if (!cartItemToEdit || !item || editPrefilledRef.current) return;
+
+    const variation =
+      itemVariations.find((entry) => {
+        return String(entry?.id || "") === String(cartItemToEdit?.variationId || "");
+      }) || getDefaultVariation(item);
+
+    setSelectedVariation(variation);
+
+    const selectedModifierRecords = normalizeArray(
+      cartItemToEdit?.selectedModifiers?.length
+        ? cartItemToEdit.selectedModifiers
+        : cartItemToEdit?.modifiers
+    );
+
+    const visibleLinks = getVisibleModifierLinks(item, variation);
+    const nextModifiers: ModifierSelectionMap = {};
+
+    selectedModifierRecords.forEach((selectedRecord: any) => {
+      const modifierId = String(
+        selectedRecord?.modifierId || selectedRecord?.id || ""
+      );
+
+      if (!modifierId) return;
+
+      for (const link of visibleLinks) {
+        const group = link?.modifierGroup;
+        const groupId = String(group?.id || "");
+        const modifier = normalizeArray(group?.modifiers).find((entry: any) => {
+          return String(entry?.id || "") === modifierId;
+        });
+
+        if (!modifier || !groupId) continue;
+
+        nextModifiers[groupId] = [
+          ...(nextModifiers[groupId] || []),
+          {
+            ...modifier,
+            id: modifierId,
+            name: selectedRecord?.name || modifier?.name || "Modifier",
+            selectedQuantity: Math.max(1, toNumber(selectedRecord?.quantity, 1)),
+          },
+        ];
+
+        break;
+      }
+    });
+
+    setSelectedModifiers(nextModifiers);
+
+    const selectedSections = normalizeArray(
+      cartItemToEdit?.selectedSections?.length
+        ? cartItemToEdit.selectedSections
+        : cartItemToEdit?.sections
+    );
+
+    if (selectedSections.length > 0) {
+      const rightSection =
+        selectedSections.find((section: any) => {
+          return String(section?.slot || "").toUpperCase() === "RIGHT";
+        }) ||
+        selectedSections.find((section: any) => {
+          return String(section?.menuItemId || "") !== String(item?.id || "");
+        });
+
+      if (rightSection?.menuItemId) {
+        setSplitPizzaEnabled(true);
+        setSplitPizzaItem({
+          id: rightSection.menuItemId,
+          name: rightSection.menuItemName || "Selected second half",
+          basePrice: rightSection.unitPrice,
+          price: rightSection.unitPrice,
+          unitPrice: rightSection.unitPrice,
+        });
+      }
+    }
+
+    editPrefilledRef.current = true;
+  }, [cartItemToEdit, item, itemVariations]);
 
   useEffect(() => {
     if (itemSupportsSplitPizza) return;
@@ -1378,61 +1602,6 @@ export default function ProductPage() {
         quantity: Math.max(1, toNumber(modifier.selectedQuantity, 1)),
       }));
   };
-
-  const getModifiersTotal = (
-    selectionMap: ModifierSelectionMap,
-    menuItem: any,
-    variation?: MenuVariation | null
-  ) => {
-    return Object.values(selectionMap)
-      .flat()
-      .reduce((acc, modifier) => {
-        const price = getModifierEffectivePrice(modifier, menuItem, variation);
-        const modifierQty = Math.max(1, toNumber(modifier.selectedQuantity, 1));
-
-        return acc + price * modifierQty;
-      }, 0);
-  };
-
-  const getMenuItemBasePrice = (menuItem: any) => {
-    return toNumber(
-      menuItem?.basePrice ?? menuItem?.unitPrice ?? menuItem?.price,
-      0
-    );
-  };
-
-  const getMenuItemResolvedPrice = (
-    menuItem: any,
-    variation?: MenuVariation | null
-  ) => {
-    if (!menuItem) return 0;
-
-    if (variation?.id) {
-      return toNumber(variation.price, 0);
-    }
-
-    return getMenuItemBasePrice(menuItem);
-  };
-
-  const resolvedItemPrice = getMenuItemResolvedPrice(item, selectedVariation);
-
-  const splitPizzaResolvedItemPrice = getMenuItemResolvedPrice(
-    splitPizzaItem,
-    splitPizzaDefaultVariation
-  );
-
-  const modifiersTotal = getModifiersTotal(
-    selectedModifiers,
-    item,
-    selectedVariation
-  );
-
-  const splitPizzaBasePrice =
-    splitPizzaEnabled && splitPizzaItem
-      ? Math.max(resolvedItemPrice, splitPizzaResolvedItemPrice)
-      : resolvedItemPrice;
-
-  const totalPrice = (splitPizzaBasePrice + modifiersTotal) * qty;
 
   const fetchPizzaItems = async ({
     search,
@@ -1606,6 +1775,77 @@ export default function ProductPage() {
     });
   };
 
+  const buildCreateCartPayload = () => {
+    const splitSections =
+      splitPizzaEnabled && splitPizzaItem?.id
+        ? [
+            {
+              slot: "LEFT",
+              menuItemId: item.id,
+            },
+            {
+              slot: "RIGHT",
+              menuItemId: splitPizzaItem.id,
+            },
+          ]
+        : undefined;
+
+    const restaurantMenuId = getId(
+      item?.restaurantMenuId ||
+        item?.restaurantMenu?.id ||
+        item?.menuLinks?.[0]?.restaurantMenuId ||
+        item?.menuLinks?.[0]?.restaurantMenu?.id ||
+        item?.menuLinks?.[0]?.menuId
+    );
+
+    const payload: any = {
+      branchId,
+      menuItemId: item.id,
+      ...(restaurantMenuId ? { restaurantMenuId } : {}),
+      variationId: selectedVariation?.id || null,
+      quantity: qty,
+      modifiers: buildModifiersPayload(selectedModifiers),
+      note: instructions?.trim() || "",
+    };
+
+    if (splitSections) {
+      payload.sections = splitSections;
+    }
+
+    return payload;
+  };
+
+  const buildPatchCartPayload = () => {
+    const splitSections =
+      splitPizzaEnabled && splitPizzaItem?.id
+        ? [
+            {
+              slot: "LEFT",
+              menuItemId: item.id,
+            },
+            {
+              slot: "RIGHT",
+              menuItemId: splitPizzaItem.id,
+            },
+          ]
+        : undefined;
+
+    const payload: any = {
+      variationId: selectedVariation?.id || null,
+      quantity: qty,
+      modifiers: buildModifiersPayload(selectedModifiers),
+      note: instructions?.trim() || "",
+    };
+
+    if (splitSections) {
+      payload.sections = splitSections;
+    } else {
+      payload.sections = [];
+    }
+
+    return payload;
+  };
+
   const handleAddToCart = async () => {
     try {
       setLoading(true);
@@ -1619,52 +1859,15 @@ export default function ProductPage() {
         return;
       }
 
-      if (splitPizzaEnabled) {
-        if (!splitPizzaItem?.id) {
-          toast.error("Please select the other pizza half");
-          return;
-        }
+      if (splitPizzaEnabled && !splitPizzaItem?.id) {
+        toast.error("Please select the other pizza half");
+        return;
       }
 
       const groupCode =
         typeof window !== "undefined"
           ? localStorage.getItem("groupOrderCode")
           : null;
-
-      const splitSections =
-        splitPizzaEnabled && splitPizzaItem?.id
-          ? [
-              {
-                slot: "LEFT",
-                menuItemId: item.id,
-              },
-              {
-                slot: "RIGHT",
-                menuItemId: splitPizzaItem.id,
-              },
-            ]
-          : undefined;
-
-      const restaurantMenuId = getId(
-        item?.restaurantMenuId ||
-          item?.restaurantMenu?.id ||
-          item?.menuLinks?.[0]?.restaurantMenuId ||
-          item?.menuLinks?.[0]?.restaurantMenu?.id ||
-          item?.menuLinks?.[0]?.menuId
-      );
-
-      const basePayload: any = {
-        menuItemId: item.id,
-        ...(restaurantMenuId ? { restaurantMenuId } : {}),
-        quantity: qty,
-        variationId: selectedVariation?.id || null,
-        modifiers: buildModifiersPayload(selectedModifiers),
-        note: instructions?.trim() || "",
-      };
-
-      if (splitSections) {
-        basePayload.sections = splitSections;
-      }
 
       let res: any;
 
@@ -1691,45 +1894,61 @@ export default function ProductPage() {
           return;
         }
 
-        res = await post(`/v1/group-orders/${groupOrder.id}/items`, basePayload);
+        const groupPayload = buildPatchCartPayload();
+        groupPayload.menuItemId = item.id;
+
+        res = await post(`/v1/group-orders/${groupOrder.id}/items`, groupPayload);
       } else {
         if (!customerId) {
           toast.error("Customer not found");
           return;
         }
 
-        if (!branchId) {
+        if (!branchId && !isEditingCartItem) {
           toast.error("Please select a branch first");
           return;
         }
 
-        res = await post(`/v1/cart/items?customerId=${customerId}`, {
-          ...basePayload,
-          branchId,
-        });
+        if (isEditingCartItem) {
+          res = await patch(
+            `/v1/cart/items/${cartItemId}`,
+            buildPatchCartPayload()
+          );
+        } else {
+          res = await post(
+            `/v1/cart/items?customerId=${customerId}`,
+            buildCreateCartPayload()
+          );
+        }
       }
 
       if (!res || res?.error) {
-        toast.error(res?.error || res?.message || "Failed to add");
+        toast.error(res?.error || res?.message || "Failed to save item");
         return;
       }
 
-      toast.success(groupCode ? "Added to group order" : "Added to cart");
+      toast.success(
+        isEditingCartItem
+          ? "Cart item updated successfully"
+          : groupCode
+          ? "Added to group order"
+          : "Added to cart"
+      );
 
       if (groupCode) {
         router.push("/group-order/lobby");
       } else {
-        router.push("/checkout");
+        router.push(`/checkout?type=${checkoutType}`);
       }
     } catch (error) {
-      console.error("Add to cart failed:", error);
+      console.error("Cart item save failed:", error);
       toast.error("Something went wrong");
     } finally {
       setLoading(false);
     }
   };
 
-  if (pageLoading || (!!slug && !token)) {
+  if (pageLoading || (!!(slug || itemIdParam) && !token)) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center p-10">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -1807,8 +2026,22 @@ export default function ProductPage() {
 
           <p className="text-sm text-gray-600">{item?.description}</p>
 
-          <div className="text-2xl font-bold text-primary">
-            ${totalPrice.toFixed(2)}
+          <div>
+            <div className="text-2xl font-bold text-primary">
+              ${totalPrice.toFixed(2)}
+            </div>
+
+            {checkoutType === "pickup" ? (
+              <p className="mt-1 text-xs font-medium text-primary">
+                Pickup pricing applied
+              </p>
+            ) : null}
+
+            {depositAmount > 0 ? (
+              <p className="mt-1 text-xs text-amber-600">
+                Includes deposit ${depositAmount.toFixed(2)} per item
+              </p>
+            ) : null}
           </div>
 
           {itemVariations.length > 0 ? (
@@ -1816,46 +2049,63 @@ export default function ProductPage() {
               <p className="mb-2 font-medium">Size</p>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {itemVariations.map((variation) => (
-                  <label
-                    key={variation.id}
-                    className={`cursor-pointer rounded-xl border px-4 py-3 ${
-                      selectedVariation?.id === variation.id
-                        ? "border-primary bg-primary/5"
-                        : "border-gray-200"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="radio"
-                          name="size"
-                          checked={selectedVariation?.id === variation.id}
-                          onChange={() => {
-                            setSelectedVariation(variation);
-                          }}
-                          className="mt-1 accent-[var(--primary)]"
-                        />
+                {itemVariations.map((variation) => {
+                  const deliveryPrice = toNumber(variation.price, 0);
+                  const pickupPrice = getVariationPickupPrice(item, variation);
+                  const shownPrice =
+                    checkoutType === "pickup" && pickupPrice && pickupPrice > 0
+                      ? pickupPrice
+                      : deliveryPrice;
 
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {variation.displayText || variation.name}
-                          </p>
+                  return (
+                    <label
+                      key={variation.id}
+                      className={`cursor-pointer rounded-xl border px-4 py-3 ${
+                        selectedVariation?.id === variation.id
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-200"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="radio"
+                            name="size"
+                            checked={selectedVariation?.id === variation.id}
+                            onChange={() => {
+                              setSelectedVariation(variation);
+                            }}
+                            className="mt-1 accent-[var(--primary)]"
+                          />
 
-                          {variation.description ? (
-                            <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                              {variation.description}
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {variation.displayText || variation.name}
                             </p>
-                          ) : null}
-                        </div>
-                      </div>
 
-                      <span className="shrink-0 font-medium text-primary">
-                        ${toNumber(variation.price, 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </label>
-                ))}
+                            {variation.description ? (
+                              <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                                {variation.description}
+                              </p>
+                            ) : null}
+
+                            {checkoutType === "pickup" &&
+                            pickupPrice &&
+                            pickupPrice > 0 ? (
+                              <p className="mt-1 text-xs text-primary">
+                                Pickup price
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <span className="shrink-0 font-medium text-primary">
+                          ${shownPrice.toFixed(2)}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           ) : null}
@@ -1989,8 +2239,10 @@ export default function ProductPage() {
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : null}
               {loading
-                ? "Processing..."
-                : `Add to Cart | $${totalPrice.toFixed(2)}`}
+                ? isEditingCartItem
+                  ? "Updating..."
+                  : "Processing..."
+                : `${isEditingCartItem ? "Update Cart" : "Add to Cart"} | $${totalPrice.toFixed(2)}`}
             </button>
           </div>
         </div>
