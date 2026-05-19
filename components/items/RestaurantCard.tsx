@@ -8,6 +8,7 @@ import {
   Eye,
   Minus,
   Download,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -115,6 +116,262 @@ const normalizeApiList = (res: any) => {
   if (Array.isArray(res?.data?.data)) return res.data.data;
   return [];
 };
+
+
+const normalizeArray = (value: any): any[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [];
+};
+
+/* ================= PRODUCT INFO HELPERS ================= */
+
+const titleizeConstant = (value: any) => {
+  return String(value || "")
+    .trim()
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getTenantSettings = (item: any) => {
+  return (
+    item?.restaurant?.tenant?.settings ||
+    item?.tenant?.settings ||
+    item?.restaurant?.settings ||
+    {}
+  );
+};
+
+const getProductLabelMap = (item: any) => {
+  const settings = getTenantSettings(item);
+  const labels = normalizeArray(settings?.productLabels);
+
+  const map = new Map<string, string>();
+
+  labels.forEach((entry: any) => {
+    const value = String(entry?.value || entry?.code || "").trim();
+    const label = String(entry?.label || entry?.name || "").trim();
+
+    if (value) {
+      map.set(value, label || titleizeConstant(value));
+    }
+  });
+
+  return map;
+};
+
+const getProductLabels = (item: any) => {
+  const labelMap = getProductLabelMap(item);
+
+  const rawLabels = [
+    ...normalizeArray(item?.labels),
+    ...normalizeArray(item?.dietaryFlags),
+  ];
+
+  const seen = new Set<string>();
+
+  return rawLabels
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .map((value) => ({
+      value,
+      label: labelMap.get(value) || titleizeConstant(value),
+    }));
+};
+
+const getAllergenTemplateMap = (item: any) => {
+  const settings = getTenantSettings(item);
+
+  const templates =
+    settings?.customerApp?.allergenAdditiveTemplates ||
+    settings?.allergenAdditiveTemplates ||
+    {};
+
+  const allergens = normalizeArray(templates?.allergens);
+  const additives = normalizeArray(templates?.additives);
+
+  const map = new Map<string, string>();
+
+  [...allergens, ...additives].forEach((entry: any) => {
+    const code = String(entry?.code || entry?.value || "").trim();
+    const label = String(entry?.label || entry?.name || "").trim();
+
+    if (code && label) {
+      map.set(code, label);
+    }
+  });
+
+  return map;
+};
+
+const getAllergenAdditives = (item: any) => {
+  const templateMap = getAllergenTemplateMap(item);
+  const seen = new Set<string>();
+
+  const directEntries = normalizeArray(item?.allergenAdditives)
+    .map((entry: any) => {
+      const code = String(entry?.code || entry?.value || "").trim();
+      const directLabel = String(entry?.label || entry?.name || "").trim();
+      const mappedLabel = code ? templateMap.get(code) : "";
+
+      return {
+        code,
+        label: directLabel || mappedLabel || "",
+      };
+    })
+    .filter((entry) => hasText(entry.label));
+
+  const codeEntries = [
+    ...normalizeArray(item?.allergenCodes),
+    ...normalizeArray(item?.allergenFlags),
+    ...normalizeArray(item?.additiveCodes),
+    ...normalizeArray(item?.additiveFlags),
+  ]
+    .map((code) => {
+      const normalizedCode = String(code || "").trim();
+      const mappedLabel = templateMap.get(normalizedCode) || "";
+
+      return {
+        code: normalizedCode,
+        label: mappedLabel,
+      };
+    })
+    .filter((entry) => hasText(entry.label));
+
+  return [...directEntries, ...codeEntries]
+    .filter((entry) => entry.label)
+    .filter((entry) => {
+      const key = entry.label.toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+};
+
+const hasProductInfoContent = (item: any) => {
+  return Boolean(
+    hasText(item?.ingredients) ||
+      hasText(item?.nutritionalInformation) ||
+      getProductLabels(item).length > 0 ||
+      getAllergenAdditives(item).length > 0 ||
+      hasText(item?.allergenPdfUrl)
+  );
+};
+
+function ProductInfoContent({ item }: { item: any }) {
+  const productLabels = getProductLabels(item);
+  const allergenAdditives = getAllergenAdditives(item);
+
+  const hasIngredients = hasText(item?.ingredients);
+  const hasNutritionalInformation = hasText(item?.nutritionalInformation);
+  const hasAllergenPdf = hasText(item?.allergenPdfUrl);
+
+  const hasAnyInfo =
+    hasIngredients ||
+    hasNutritionalInformation ||
+    productLabels.length > 0 ||
+    allergenAdditives.length > 0 ||
+    hasAllergenPdf;
+
+  if (!hasAnyInfo) {
+    return (
+      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+        <p className="text-sm font-medium text-gray-900">
+          No additional product information
+        </p>
+        <p className="mt-1 text-sm text-gray-500">
+          Details for ingredients, allergens, labels, and nutrition have not
+          been added yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {productLabels.length > 0 ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Product Labels
+          </h3>
+
+          <div className="flex flex-wrap gap-2">
+            {productLabels.map((label) => (
+              <span
+                key={label.value}
+                className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 ring-1 ring-green-100"
+              >
+                {label.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {allergenAdditives.length > 0 ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Allergens & Additives
+          </h3>
+
+          <div className="flex flex-wrap gap-2">
+            {allergenAdditives.map((entry) => (
+              <span
+                key={entry.label}
+                className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100"
+              >
+                {entry.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {hasIngredients ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Ingredients
+          </h3>
+          <p className="text-sm leading-relaxed text-gray-600">
+            {item.ingredients}
+          </p>
+        </div>
+      ) : null}
+
+      {hasNutritionalInformation ? (
+        <div className="rounded-2xl bg-gray-50 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Nutritional Information
+          </h3>
+          <p className="text-sm leading-relaxed text-gray-600">
+            {item.nutritionalInformation}
+          </p>
+        </div>
+      ) : null}
+
+      {hasAllergenPdf ? (
+        <a
+          href={String(item.allergenPdfUrl)}
+          download
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
+        >
+          <Download size={16} />
+          Download allergen PDF
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 
 export default function RestaurantCard({ item }: any) {
   const router = useRouter();
@@ -1122,24 +1379,7 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
       ? `${String(item.description).slice(0, 90)}...`
       : item?.description || "";
 
-  const hasIngredients = hasText(item?.ingredients);
-
-  const hasNutritionalInformation = hasText(item?.nutritionalInformation);
-
-  const hasAllergenFlags =
-    Array.isArray(item?.allergenFlags) && item.allergenFlags.length > 0;
-
-  const hasDietaryFlags =
-    Array.isArray(item?.dietaryFlags) && item.dietaryFlags.length > 0;
-
-  const hasAllergenPdf = hasText(item?.allergenPdfUrl);
-
-  const hasInfoBoxContent =
-    hasIngredients ||
-    hasNutritionalInformation ||
-    hasAllergenFlags ||
-    hasDietaryFlags ||
-    hasAllergenPdf;
+  const hasInfoBoxContent = hasProductInfoContent(item);
 
   const defaultCardVariation = getDefaultVariation(item);
   const displayCardPrice = getMenuItemResolvedPrice(item, defaultCardVariation);
@@ -1227,98 +1467,39 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         ) : null}
       </div>
 
-      <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
-        <DialogContent className="max-h-[90vh] max-w-md overflow-auto rounded-2xl p-6">
-          <h2 className="mb-1 text-lg font-semibold text-gray-900">
-            Product Information
-          </h2>
+      {infoOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={(event) => {
+            event.stopPropagation();
+            setInfoOpen(false);
+          }}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-[520px] overflow-auto rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Product Information
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">{item?.name}</p>
+              </div>
 
-          <p className="mb-5 text-sm text-gray-500">{item?.name}</p>
-
-          <div className="space-y-5">
-            <div>
-              <h3 className="mb-2 font-semibold text-gray-900">
-                Ingredients
-              </h3>
-
-              {hasIngredients ? (
-                <p className="text-sm leading-relaxed text-gray-600">
-                  {item.ingredients}
-                </p>
-              ) : (
-                <p className="text-sm text-gray-400">
-                  Ingredients information is not available.
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => setInfoOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <div>
-              <h3 className="mb-2 font-semibold text-gray-900">Allergens</h3>
-
-              {hasAllergenFlags ? (
-                <div className="flex flex-wrap gap-2">
-                  {item.allergenFlags.map((flag: string) => (
-                    <span
-                      key={flag}
-                      className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-600"
-                    >
-                      {flag}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">
-                  Allergen information is not available.
-                </p>
-              )}
-
-              {hasAllergenPdf ? (
-                <a
-                  href={item.allergenPdfUrl}
-                  download
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
-                >
-                  <Download size={16} />
-                  Download allergen PDF
-                </a>
-              ) : null}
-            </div>
-
-            {hasNutritionalInformation ? (
-              <div>
-                <h3 className="mb-2 font-semibold text-gray-900">
-                  Nutritional Information
-                </h3>
-
-                <p className="text-sm leading-relaxed text-gray-600">
-                  {item.nutritionalInformation}
-                </p>
-              </div>
-            ) : null}
-
-            {hasDietaryFlags ? (
-              <div>
-                <h3 className="mb-2 font-semibold text-gray-900">
-                  Dietary Preferences
-                </h3>
-
-                <div className="flex flex-wrap gap-2">
-                  {item.dietaryFlags.map((flag: string) => (
-                    <span
-                      key={flag}
-                      className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700"
-                    >
-                      {flag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+            <ProductInfoContent item={item} />
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      ) : null}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[95vh] max-w-md overflow-auto rounded-2xl p-6">
