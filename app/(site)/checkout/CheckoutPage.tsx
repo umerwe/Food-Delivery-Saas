@@ -23,6 +23,10 @@ const toNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const normalizeArray = (value: any): any[] => {
+  return Array.isArray(value) ? value : [];
+};
+
 const getModifierPriceFromGroups = (cartItem: any, modifierId: string) => {
   const modifierGroups = Array.isArray(cartItem?.menuItem?.modifierGroups)
     ? cartItem.menuItem.modifierGroups
@@ -86,9 +90,88 @@ const getSelectedModifiers = (cartItem: any) => {
   });
 };
 
+const getSelectedSectionLabel = (slot?: string) => {
+  const normalizedSlot = String(slot || "").toUpperCase();
+
+  if (normalizedSlot === "LEFT") return "Left half";
+  if (normalizedSlot === "RIGHT") return "Right half";
+
+  return normalizedSlot ? `${normalizedSlot} half` : "Selected half";
+};
+
+const getSelectedSections = (cartItem: any) => {
+  const rawSelectedSections = normalizeArray(cartItem?.selectedSections);
+  const rawSections = normalizeArray(cartItem?.sections);
+  const allowedFlavors = normalizeArray(cartItem?.menuItem?.splitPizza?.allowedFlavors);
+
+  const selectedSectionBySlot = rawSelectedSections.reduce(
+    (acc: Record<string, any>, section: any) => {
+      const slot = String(section?.slot || "").toUpperCase();
+
+      if (slot) {
+        acc[slot] = section;
+      }
+
+      return acc;
+    },
+    {}
+  );
+
+  const resolveMenuItemName = (section: any, selectedSection?: any) => {
+    const directName =
+      selectedSection?.menuItemName ||
+      selectedSection?.menuItem?.name ||
+      section?.menuItemName ||
+      section?.menuItem?.name;
+
+    if (directName) return directName;
+
+    const menuItemId = section?.menuItemId || selectedSection?.menuItemId;
+
+    if (String(menuItemId || "") === String(cartItem?.menuItem?.id || "")) {
+      return cartItem?.menuItem?.name || "Selected pizza";
+    }
+
+    const flavor = allowedFlavors.find((item: any) => {
+      return String(item?.id || "") === String(menuItemId || "");
+    });
+
+    return flavor?.name || "Selected pizza";
+  };
+
+  const resolveUnitPrice = (section: any, selectedSection?: any) => {
+    return toNumber(
+      selectedSection?.unitPrice ??
+        selectedSection?.price ??
+        section?.unitPrice ??
+        section?.price,
+      0
+    );
+  };
+
+  const sourceSections = rawSelectedSections.length ? rawSelectedSections : rawSections;
+
+  return sourceSections
+    .map((section: any) => {
+      const slot = String(section?.slot || "").toUpperCase();
+      const selectedSection = selectedSectionBySlot[slot];
+      const menuItemId = section?.menuItemId || selectedSection?.menuItemId;
+
+      return {
+        slot,
+        label: getSelectedSectionLabel(slot),
+        menuItemId,
+        menuItemName: resolveMenuItemName(section, selectedSection),
+        unitPrice: resolveUnitPrice(section, selectedSection),
+      };
+    })
+    .filter((section: any) => section?.slot || section?.menuItemId);
+};
+
 const normalizeCartItem = (item: any) => {
   const quantity = Math.max(1, toNumber(item?.quantity, 1));
   const selectedModifiers = getSelectedModifiers(item);
+  const selectedSections = getSelectedSections(item);
 
   const fallbackModifiersTotal = selectedModifiers.reduce(
     (acc: number, modifier: any) => {
@@ -97,8 +180,16 @@ const normalizeCartItem = (item: any) => {
     0
   );
 
+  const highestSplitPizzaHalfPrice = selectedSections.reduce(
+    (highestPrice: number, section: any) => {
+      return Math.max(highestPrice, toNumber(section?.unitPrice, 0));
+    },
+    0
+  );
+
   const itemUnitPrice = toNumber(
     item?.unitPrice ??
+      (highestSplitPizzaHalfPrice > 0 ? highestSplitPizzaHalfPrice : undefined) ??
       item?.menuItem?.unitPrice ??
       item?.menuItem?.selectedVariation?.price ??
       item?.price,
@@ -121,6 +212,7 @@ const normalizeCartItem = (item: any) => {
     id: item?.id,
     menuItemId: item?.menuItemId,
     categoryId: item?.menuItem?.category?.id,
+    slug: item?.menuItem?.slug,
     quantity,
     name: item?.menuItem?.name || "Untitled Item",
     price: unitPriceWithModifiers,
@@ -131,9 +223,22 @@ const normalizeCartItem = (item: any) => {
     lineTotal,
     desc: item?.menuItem?.description || "",
     img: item?.menuItem?.imageUrl || "",
-    selectedVariationName: item?.menuItem?.selectedVariation?.name || "",
+    selectedVariationName:
+      item?.menuItem?.selectedVariation?.displayText ||
+      item?.menuItem?.selectedVariation?.name ||
+      "",
+    selectedVariation: item?.menuItem?.selectedVariation,
+    variationId: item?.variationId || item?.menuItem?.selectedVariation?.id,
     selectedModifiers,
+    selectedSections,
+    sections: selectedSections,
+    menuItem: item?.menuItem,
     note: item?.note || "",
+    depositAmount: item?.menuItem?.depositAmount,
+    pickupPrice: item?.pickupPrice ?? item?.menuItem?.pickupPrice,
+    pickupUnitPrice: item?.pickupUnitPrice,
+    takeawayPriceAdjustment: item?.menuItem?.takeawayPriceAdjustment,
+    deliveryPriceAdjustment: item?.menuItem?.deliveryPriceAdjustment,
   };
 };
 
@@ -235,51 +340,42 @@ export default function CheckoutPage() {
   }, [user]);
 
   const updateQuantity = async (id: string, type: "inc" | "dec") => {
-  const currentItem = cartItems.find((item) => item.id === id);
-  if (!currentItem) return;
+    const currentItem = cartItems.find((item) => item.id === id);
+    if (!currentItem) return;
 
-  const currentQty = Math.max(1, toNumber(currentItem.quantity, 1));
+    const currentQty = Math.max(1, toNumber(currentItem.quantity, 1));
 
-  const newQty =
-    type === "inc" ? currentQty + 1 : Math.max(1, currentQty - 1);
+    const newQty =
+      type === "inc" ? currentQty + 1 : Math.max(1, currentQty - 1);
 
-  if (newQty === currentQty) return;
+    if (newQty === currentQty) return;
 
-  const previousCartItems = cartItems;
+    const previousCartItems = cartItems;
 
-  setCartItems((prev) =>
-    prev.map((item) => {
-      if (item.id !== id) return item;
+    setCartItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
 
-      const unitPriceWithModifiers = toNumber(
-        item.unitPriceWithModifiers ?? item.price,
-        0
-      );
+        return recalculateCartItemQuantity(item, newQty);
+      })
+    );
 
-      return {
-        ...item,
+    try {
+      const res = await patch(`/v1/cart/items/${id}?customerId=${customerId}`, {
         quantity: newQty,
-        lineTotal: unitPriceWithModifiers * newQty,
-      };
-    })
-  );
+      });
 
-  try {
-    const res = await patch(`/v1/cart/items/${id}?customerId=${customerId}`, {
-      quantity: newQty,
-    });
-
-    if (!res || res.error) {
+      if (!res || res.error) {
+        setCartItems(previousCartItems);
+        toast.error(res?.error || "Failed to update quantity");
+        return;
+      }
+    } catch (err) {
+      console.error(err);
       setCartItems(previousCartItems);
-      toast.error(res?.error || "Failed to update quantity");
-      return;
+      toast.error("Failed to update quantity");
     }
-  } catch (err) {
-    console.error(err);
-    setCartItems(previousCartItems);
-    toast.error("Failed to update quantity");
-  }
-};
+  };
 
   const deleteItem = async (id: string) => {
     const previousCartItems = cartItems;

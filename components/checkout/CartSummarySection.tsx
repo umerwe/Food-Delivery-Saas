@@ -30,6 +30,8 @@ interface CartSection {
   menuItemId?: string;
   menuItemName?: string;
   unitPrice?: number | string;
+  menuItem?: any;
+  name?: string;
 }
 
 interface CartItem {
@@ -299,10 +301,83 @@ const getSelectedSections = (item: CartItem): CartSection[] => {
     .map((section: any) => ({
       slot: String(section?.slot || "").toUpperCase(),
       menuItemId: section?.menuItemId,
-      menuItemName: section?.menuItemName || section?.menuItem?.name || "",
+      menuItemName:
+        section?.menuItemName ||
+        section?.menuItem?.name ||
+        section?.name ||
+        "",
       unitPrice: section?.unitPrice ?? section?.price ?? 0,
+      menuItem: section?.menuItem,
+      name: section?.name,
     }))
     .filter((section) => section?.slot || section?.menuItemId);
+};
+
+const getSplitHalfLabel = (slot?: string, fallback = "Half") => {
+  const normalizedSlot = String(slot || "").trim().toUpperCase();
+
+  if (normalizedSlot === "LEFT") return "Left half";
+  if (normalizedSlot === "RIGHT") return "Right half";
+
+  if (!normalizedSlot) return fallback;
+
+  return `${normalizedSlot.charAt(0)}${normalizedSlot
+    .slice(1)
+    .toLowerCase()} half`;
+};
+
+const getSplitSectionName = (section?: CartSection) => {
+  return (
+    String(
+      section?.menuItemName ||
+        section?.menuItem?.name ||
+        section?.name ||
+        "Selected item"
+    ).trim() || "Selected item"
+  );
+};
+
+const getSplitPizzaDisplay = (
+  item: CartItem,
+  selectedSections: CartSection[]
+) => {
+  const currentMenuItemId = String(getMenuItemId(item) || "");
+  const currentItemName = String(item?.name || item?.menuItem?.name || "").trim();
+
+  const normalizedSections = selectedSections.map((section, index) => {
+    const sectionName = getSplitSectionName(section);
+    const sectionMenuItemId = String(section?.menuItemId || "");
+    const isCurrentById =
+      Boolean(currentMenuItemId) && sectionMenuItemId === currentMenuItemId;
+    const isCurrentByName =
+      Boolean(currentItemName) &&
+      sectionName.toLowerCase() === currentItemName.toLowerCase();
+
+    return {
+      ...section,
+      index,
+      label: getSplitHalfLabel(section?.slot, `Half ${index + 1}`),
+      displayName: sectionName,
+      price: toNumber(section?.unitPrice, 0),
+      isCurrentItem: isCurrentById || isCurrentByName,
+    };
+  });
+
+  const currentSectionIndex = normalizedSections.findIndex(
+    (section) => section.isCurrentItem
+  );
+
+  const otherHalfSections =
+    currentSectionIndex >= 0
+      ? normalizedSections.filter((section) => section.index !== currentSectionIndex)
+      : normalizedSections.length > 1
+        ? normalizedSections.slice(1)
+        : [];
+
+  return {
+    sections: normalizedSections,
+    otherHalfSections,
+  };
 };
 
 const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
@@ -482,6 +557,10 @@ export default function CartSummarySection({
 
               const selectedVariationName = getSelectedVariationName(item);
               const isSplitPizza = selectedSections.length > 0;
+              const splitPizzaDisplay = getSplitPizzaDisplay(
+                item,
+                selectedSections
+              );
 
               return (
                 <div
@@ -547,26 +626,73 @@ export default function CartSummarySection({
                             </p>
                           </div>
 
-                          <div className="space-y-1.5">
-                            {selectedSections.map((section, index) => (
-                              <div
-                                key={`${item.id}-section-${section.slot || index}`}
-                                className="flex items-center justify-between gap-3 text-xs"
-                              >
-                                <span className="min-w-0 truncate text-gray-700">
-                                  <span className="font-semibold">
-                                    {section.slot || `Side ${index + 1}`}:
-                                  </span>{" "}
-                                  {section.menuItemName || "Selected item"}
-                                </span>
+                          {splitPizzaDisplay.otherHalfSections.length > 0 ? (
+                            <div className="mb-2 rounded-[10px] border border-primary/15 bg-white/80 px-3 py-2">
+                              <p className="text-[11px] font-medium text-gray-500">
+                                Other half
+                              </p>
 
-                                {toNumber(section.unitPrice, 0) > 0 ? (
-                                  <span className="shrink-0 font-medium text-gray-800">
-                                    {formatCurrency(section.unitPrice)}
-                                  </span>
-                                ) : null}
+                              <div className="mt-1 space-y-1">
+                                {splitPizzaDisplay.otherHalfSections.map(
+                                  (section) => (
+                                    <div
+                                      key={`${item.id}-other-half-${
+                                        section.slot || section.index
+                                      }`}
+                                      className="flex items-center justify-between gap-3 text-xs"
+                                    >
+                                      <span className="min-w-0 truncate font-semibold text-gray-900">
+                                        {section.label}: {section.displayName}
+                                      </span>
+
+                                      {section.price > 0 ? (
+                                        <span className="shrink-0 font-semibold text-primary">
+                                          {formatCurrency(section.price)}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  )
+                                )}
                               </div>
-                            ))}
+                            </div>
+                          ) : null}
+
+                          <div className="space-y-1.5">
+                            {splitPizzaDisplay.sections.map((section) => {
+                              const isOtherHalf =
+                                splitPizzaDisplay.otherHalfSections.some(
+                                  (otherSection) =>
+                                    otherSection.index === section.index
+                                );
+
+                              return (
+                                <div
+                                  key={`${item.id}-section-${
+                                    section.slot || section.index
+                                  }`}
+                                  className="flex items-center justify-between gap-3 text-xs"
+                                >
+                                  <span className="min-w-0 truncate text-gray-700">
+                                    <span className="font-semibold">
+                                      {section.label}:
+                                    </span>{" "}
+                                    {section.displayName}
+
+                                    {isOtherHalf ? (
+                                      <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                        Other half
+                                      </span>
+                                    ) : null}
+                                  </span>
+
+                                  {section.price > 0 ? (
+                                    <span className="shrink-0 font-medium text-gray-800">
+                                      {formatCurrency(section.price)}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
                           </div>
 
                           <p className="mt-2 text-[11px] text-gray-500">

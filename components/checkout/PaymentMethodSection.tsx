@@ -49,10 +49,7 @@ const PaymentMethodSection = ({
         ))}
       </div>
 
-      {/* future add method button */}
-      <div className="w-[45px] h-[45px] rounded-[12px] bg-[#E8F1FF] flex items-center justify-center">
-        <Plus width={24} height={24} />
-      </div>
+   
     </section>
   );
 };
