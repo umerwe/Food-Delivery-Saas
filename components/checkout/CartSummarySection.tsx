@@ -362,6 +362,15 @@ export default function CartSummarySection({
   const searchParams = useSearchParams();
 
   const checkoutType = getCheckoutType(searchParams.get("type"));
+  const canEditCart = title !== "Order Details";
+
+  const handleAddMoreItems = () => {
+    const params = new URLSearchParams();
+
+    params.set("type", checkoutType);
+
+    router.push(`/items?${params.toString()}`);
+  };
 
   const pricingItems = cartItems.map((item) => ({
     item,
@@ -413,19 +422,48 @@ export default function CartSummarySection({
             </p>
           </div>
 
-          {cartItems.length > 0 ? (
-            <button
-              type="button"
-              onClick={clearCart}
-              className="cursor-pointer text-sm text-red-500 hover:underline"
-            >
-              Clear Cart
-            </button>
-          ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {canEditCart && cartItems.length > 0 ? (
+              <button
+                type="button"
+                onClick={handleAddMoreItems}
+                className="inline-flex h-9 items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:border-primary/25 hover:bg-primary/10"
+              >
+                <Plus size={14} strokeWidth={2.5} />
+                Add More Items
+              </button>
+            ) : null}
+
+            {cartItems.length > 0 ? (
+              <button
+                type="button"
+                onClick={clearCart}
+                className="cursor-pointer text-sm text-red-500 hover:underline"
+              >
+                Clear Cart
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {cartItems.length === 0 ? (
-          <p className="text-sm text-gray-400">Your cart is empty</p>
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 p-5 text-center">
+            <p className="text-sm font-medium text-gray-700">Your cart is empty</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Add items from the menu to start building the order.
+            </p>
+
+            {canEditCart ? (
+              <button
+                type="button"
+                onClick={handleAddMoreItems}
+                className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-full border border-primary/15 bg-white px-4 text-sm font-medium text-primary shadow-sm transition hover:border-primary/25 hover:bg-primary/5"
+              >
+                <Plus size={14} strokeWidth={2.5} />
+                Browse Items
+              </button>
+            ) : null}
+          </div>
         ) : (
           <div className="space-y-[19px]">
             {pricingItems.map(({ item, pricing }) => {
@@ -746,6 +784,17 @@ export default function CartSummarySection({
             <span>{formatCurrency(finalTotal)}</span>
           </div>
         </div>
+
+        {canEditCart && cartItems.length > 0 ? (
+          <button
+            type="button"
+            onClick={handleAddMoreItems}
+            className="mt-[15px] inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-[10px] border border-primary/15 bg-primary/5 text-base font-medium text-primary transition hover:border-primary/25 hover:bg-primary/10"
+          >
+            <Plus size={17} strokeWidth={2.5} />
+            Add More Items
+          </button>
+        ) : null}
 
         {title !== "Order Details" ? (
           <Button
