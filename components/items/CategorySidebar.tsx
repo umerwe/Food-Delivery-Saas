@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { List, Loader2, Menu, Search } from "lucide-react";
 
@@ -34,6 +35,11 @@ export default function CategorySidebar({
 }: CategorySidebarProps) {
   const router = useRouter();
 
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const categoryButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
+    {}
+  );
+
   const handleCategoryClick = (id: string) => {
     if (viewMode === "onePage") {
       onCategorySelect?.(String(id));
@@ -43,10 +49,41 @@ export default function CategorySidebar({
     router.push(`/items?categoryId=${id}`);
   };
 
+  useEffect(() => {
+    if (!activeCategoryId) return;
+
+    const container = listRef.current;
+    const activeButton = categoryButtonRefs.current[String(activeCategoryId)];
+
+    if (!container || !activeButton) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = activeButton.getBoundingClientRect();
+
+    const topGap = activeRect.top - containerRect.top;
+    const bottomGap = activeRect.bottom - containerRect.bottom;
+
+    if (topGap < 12) {
+      container.scrollTo({
+        top: Math.max(0, container.scrollTop + topGap - 16),
+        behavior: "smooth",
+      });
+
+      return;
+    }
+
+    if (bottomGap > -12) {
+      container.scrollTo({
+        top: container.scrollTop + bottomGap + 16,
+        behavior: "smooth",
+      });
+    }
+  }, [activeCategoryId, categories, viewMode]);
+
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+    <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-gray-900">Full menu</h2>
           <p className="mt-1 text-xs text-gray-500">
             Browse by category or view the full menu.
@@ -60,27 +97,27 @@ export default function CategorySidebar({
           <button
             type="button"
             onClick={() => onViewModeChange?.("multiple")}
-            className={`flex h-10 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition ${
+            className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition ${
               viewMode === "multiple"
                 ? "bg-white text-primary shadow-sm"
                 : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
             }`}
           >
-            <Menu size={15} />
-            By Category
+            <Menu size={15} className="shrink-0" />
+            <span className="truncate">By Category</span>
           </button>
 
           <button
             type="button"
             onClick={() => onViewModeChange?.("onePage")}
-            className={`flex h-10 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition ${
+            className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition ${
               viewMode === "onePage"
                 ? "bg-white text-primary shadow-sm"
                 : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
             }`}
           >
-            <List size={15} />
-            1 Page
+            <List size={15} className="shrink-0" />
+            <span className="truncate">1 Page</span>
           </button>
         </div>
       </div>
@@ -101,7 +138,10 @@ export default function CategorySidebar({
       </div>
 
       {/* LIST */}
-      <div className="max-h-[calc(100vh-260px)] space-y-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
+      <div
+        ref={listRef}
+        className="max-h-[calc(100vh-320px)] min-h-[180px] space-y-2 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]"
+      >
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-400">
             <Loader2 size={16} className="animate-spin" />
@@ -122,9 +162,12 @@ export default function CategorySidebar({
               return (
                 <button
                   key={id}
+                  ref={(element) => {
+                    categoryButtonRefs.current[id] = element;
+                  }}
                   type="button"
                   onClick={() => handleCategoryClick(id)}
-                  className={`flex w-full items-center justify-between gap-3 rounded-full px-5 py-3 text-left text-sm font-medium transition ${
+                  className={`flex w-full min-w-0 items-center justify-between gap-3 rounded-full px-5 py-3 text-left text-sm font-medium transition ${
                     isActive
                       ? "bg-primary text-white shadow-sm"
                       : "text-gray-800 hover:bg-gray-100"

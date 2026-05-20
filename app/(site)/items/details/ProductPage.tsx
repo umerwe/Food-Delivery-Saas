@@ -11,6 +11,27 @@ import { useAuth } from "@/hooks/useAuth";
 import { Download, Eye, Loader2, Minus, Plus, X } from "lucide-react";
 import AsyncSelect from "@/components/ui/AsyncSelect";
 
+type PromotionInfo = {
+  promotionId?: string;
+  title?: string | null;
+  description?: string | null;
+  applyMode?: "ORDER_TOTAL" | "SCOPED_ITEMS" | string;
+  discountType?: "FLAT" | "PERCENTAGE" | string;
+  discountValue?: number | string | null;
+  maxDiscountAmount?: number | string | null;
+  discountAmount?: number | string | null;
+  discountedAmount?: number | string | null;
+};
+
+type PromotionPricing = {
+  promotion: PromotionInfo | null;
+  originalPrice: number;
+  finalPrice: number;
+  discountAmount: number;
+  hasPromotion: boolean;
+  hasDiscount: boolean;
+};
+
 type ItemPriceOverride = {
   id?: string;
   menuItemId?: string | null;
@@ -43,6 +64,8 @@ type MenuVariation = {
   price?: string | number;
   pickupPrice?: string | number | null;
   displayText?: string | null;
+  discountedPrice?: string | number | null;
+  promotion?: PromotionInfo | null;
   sortOrder?: number;
   isDefault?: boolean;
   isActive?: boolean;
@@ -137,6 +160,189 @@ const getCheckoutType = (type?: string | null): CheckoutType => {
 
   return "delivery";
 };
+
+/* ================= PROMOTION HELPERS ================= */
+
+const formatMoney = (value: unknown) => {
+  return `$${toNumber(value, 0).toFixed(2)}`;
+};
+
+const isPromotionObject = (value: any): value is PromotionInfo => {
+  return Boolean(value && typeof value === "object");
+};
+
+const getPromotionInfo = (source: any): PromotionInfo | null => {
+  return isPromotionObject(source?.promotion) ? source.promotion : null;
+};
+
+const getPromotionDiscountLabel = (promotion?: PromotionInfo | null) => {
+  if (!promotion) return "";
+
+  const discountValue = toNumber(promotion.discountValue, 0);
+
+  if (promotion.discountType === "PERCENTAGE") {
+    return `${discountValue}% off`;
+  }
+
+  if (promotion.discountType === "FLAT") {
+    return `${formatMoney(discountValue)} off`;
+  }
+
+  return "Offer applied";
+};
+
+const getPromotionTitle = (promotion?: PromotionInfo | null) => {
+  if (!promotion) return "";
+
+  return (
+    String(promotion.title || "").trim() ||
+    getPromotionDiscountLabel(promotion) ||
+    "Promotion applied"
+  );
+};
+
+const getBackendDiscountedPriceCandidate = (
+  source: any,
+  promotion?: PromotionInfo | null
+) => {
+  const candidates = [
+    source?.discountedPrice,
+    source?.discountedBasePrice,
+    promotion?.discountedAmount,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null || candidate === "") {
+      continue;
+    }
+
+    const numeric = toNumber(candidate, Number.NaN);
+
+    if (Number.isFinite(numeric) && numeric >= 0) {
+      return numeric;
+    }
+  }
+
+  return null;
+};
+
+const calculatePromotionDiscount = (
+  originalPrice: number,
+  promotion?: PromotionInfo | null
+) => {
+  if (!promotion || originalPrice <= 0) return 0;
+
+  const discountValue = toNumber(promotion.discountValue, 0);
+  const backendDiscountAmount = toNumber(promotion.discountAmount, 0);
+  const maxDiscountAmount = toNumber(promotion.maxDiscountAmount, 0);
+
+  let discountAmount = 0;
+
+  if (backendDiscountAmount > 0) {
+    discountAmount = backendDiscountAmount;
+  } else if (promotion.discountType === "PERCENTAGE") {
+    discountAmount = (originalPrice * discountValue) / 100;
+  } else if (promotion.discountType === "FLAT") {
+    discountAmount = discountValue;
+  }
+
+  if (maxDiscountAmount > 0) {
+    discountAmount = Math.min(discountAmount, maxDiscountAmount);
+  }
+
+  return Math.min(Math.max(discountAmount, 0), originalPrice);
+};
+
+const getPromotionPricing = ({
+  source,
+  originalPrice,
+}: {
+  source: any;
+  originalPrice: number;
+}): PromotionPricing => {
+  const safeOriginalPrice = Math.max(0, toNumber(originalPrice, 0));
+  const promotion = getPromotionInfo(source);
+
+  if (!promotion) {
+    return {
+      promotion: null,
+      originalPrice: safeOriginalPrice,
+      finalPrice: safeOriginalPrice,
+      discountAmount: 0,
+      hasPromotion: false,
+      hasDiscount: false,
+    };
+  }
+
+  const backendDiscountedPrice = getBackendDiscountedPriceCandidate(
+    source,
+    promotion
+  );
+
+  const calculatedDiscount = calculatePromotionDiscount(
+    safeOriginalPrice,
+    promotion
+  );
+
+  const calculatedFinalPrice = Math.max(0, safeOriginalPrice - calculatedDiscount);
+
+  const finalPrice =
+    backendDiscountedPrice !== null && backendDiscountedPrice <= safeOriginalPrice
+      ? backendDiscountedPrice
+      : calculatedFinalPrice;
+
+  const discountAmount = Math.max(0, safeOriginalPrice - finalPrice);
+
+  return {
+    promotion,
+    originalPrice: safeOriginalPrice,
+    finalPrice,
+    discountAmount,
+    hasPromotion: true,
+    hasDiscount: discountAmount > 0 && finalPrice < safeOriginalPrice,
+  };
+};
+
+const getPromotionSourceForPrice = (menuItem: any, variation?: any | null) => {
+  if (getPromotionInfo(variation)) return variation;
+  if (getPromotionInfo(menuItem)) return menuItem;
+  return variation || menuItem;
+};
+
+function PromotionBadge({ promotion }: { promotion?: PromotionInfo | null }) {
+  if (!promotion) return null;
+
+  const label = getPromotionDiscountLabel(promotion);
+
+  return (
+    <span className="inline-flex w-fit items-center rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700 ring-1 ring-green-100">
+      {label || "Promotion"}
+    </span>
+  );
+}
+
+function PromotionPrice({
+  pricing,
+  className = "",
+  originalClassName = "",
+}: {
+  pricing: PromotionPricing;
+  className?: string;
+  originalClassName?: string;
+}) {
+  if (!pricing.hasDiscount) {
+    return <span className={className}>{formatMoney(pricing.originalPrice)}</span>;
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-2 ${className}`}>
+      <span className={`text-gray-400 line-through ${originalClassName}`}>
+        {formatMoney(pricing.originalPrice)}
+      </span>
+      <span>{formatMoney(pricing.finalPrice)}</span>
+    </span>
+  );
+}
 
 /* ================= PRODUCT INFO HELPERS ================= */
 
@@ -562,6 +768,8 @@ const getAllRawVariationSources = (menuItem: any) => {
       price: override?.price ?? override?.variation?.price,
       pickupPrice: override?.pickupPrice ?? override?.variation?.pickupPrice,
       displayText: override?.displayText ?? override?.variation?.displayText,
+      discountedPrice: override?.discountedPrice ?? override?.variation?.discountedPrice,
+      promotion: override?.promotion ?? override?.variation?.promotion ?? null,
       itemPriceOverrides: [
         ...(Array.isArray(override?.variation?.itemPriceOverrides)
           ? override.variation.itemPriceOverrides
@@ -859,6 +1067,8 @@ export default function ProductPage() {
         price: getVariationDisplayPrice(menuItem, raw),
         pickupPrice: getVariationPickupPrice(menuItem, raw),
         displayText: getVariationDisplayText(menuItem, raw),
+        discountedPrice: raw?.discountedPrice ?? raw?.promotion?.discountedAmount ?? null,
+        promotion: getPromotionInfo(raw),
         sortOrder: toNumber(raw?.sortOrder, 0),
         isDefault: Boolean(raw?.isDefault),
         isActive: raw?.isActive !== false,
@@ -1238,10 +1448,20 @@ export default function ProductPage() {
 
   const resolvedItemPrice = getMenuItemResolvedPrice(item, selectedVariation);
 
+  const selectedItemPromotionPricing = getPromotionPricing({
+    source: getPromotionSourceForPrice(item, selectedVariation),
+    originalPrice: resolvedItemPrice,
+  });
+
   const splitPizzaResolvedItemPrice = getMenuItemResolvedPrice(
     splitPizzaItem,
     splitPizzaDefaultVariation
   );
+
+  const splitPizzaPromotionPricing = getPromotionPricing({
+    source: getPromotionSourceForPrice(splitPizzaItem, splitPizzaDefaultVariation),
+    originalPrice: splitPizzaResolvedItemPrice,
+  });
 
   const getDepositAmount = (menuItem: any) => {
     return toNumber(menuItem?.depositAmount, 0);
@@ -1275,7 +1495,21 @@ export default function ProductPage() {
       ? Math.max(resolvedItemPrice, splitPizzaResolvedItemPrice)
       : resolvedItemPrice;
 
+  const splitPizzaDisplayBasePrice =
+    splitPizzaEnabled && splitPizzaItem
+      ? Math.max(
+          selectedItemPromotionPricing.finalPrice,
+          splitPizzaPromotionPricing.finalPrice
+        )
+      : selectedItemPromotionPricing.finalPrice;
+
   const totalPrice = (splitPizzaBasePrice + modifiersTotal + depositAmount) * qty;
+  const displayTotalPrice =
+    (splitPizzaDisplayBasePrice + modifiersTotal + depositAmount) * qty;
+  const hasTotalPromotionDiscount = displayTotalPrice < totalPrice;
+  const totalPromotionDiscount = Math.max(0, totalPrice - displayTotalPrice);
+  const activeVisiblePromotion =
+    selectedItemPromotionPricing.promotion || splitPizzaPromotionPricing.promotion;
 
   useEffect(() => {
     let isMounted = true;
@@ -2026,20 +2260,60 @@ export default function ProductPage() {
 
           <p className="text-sm text-gray-600">{item?.description}</p>
 
-          <div>
-            <div className="text-2xl font-bold text-primary">
-              ${totalPrice.toFixed(2)}
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-2xl font-bold text-primary">
+                {hasTotalPromotionDiscount ? (
+                  <PromotionPrice
+                    pricing={{
+                      promotion: activeVisiblePromotion,
+                      originalPrice: totalPrice,
+                      finalPrice: displayTotalPrice,
+                      discountAmount: totalPromotionDiscount,
+                      hasPromotion: true,
+                      hasDiscount: true,
+                    }}
+                    originalClassName="text-base font-semibold"
+                  />
+                ) : (
+                  formatMoney(totalPrice)
+                )}
+              </div>
+
+              {activeVisiblePromotion ? (
+                <PromotionBadge promotion={activeVisiblePromotion} />
+              ) : null}
             </div>
 
+            {activeVisiblePromotion ? (
+              <div className="mt-2 rounded-xl bg-green-50 px-3 py-2">
+                <p className="text-xs font-semibold text-green-700">
+                  {getPromotionTitle(activeVisiblePromotion)}
+                </p>
+
+                {activeVisiblePromotion.description ? (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-green-700/80">
+                    {activeVisiblePromotion.description}
+                  </p>
+                ) : null}
+
+                {hasTotalPromotionDiscount ? (
+                  <p className="mt-1 text-xs text-green-700">
+                    You save {formatMoney(totalPromotionDiscount)}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             {checkoutType === "pickup" ? (
-              <p className="mt-1 text-xs font-medium text-primary">
+              <p className="mt-2 text-xs font-medium text-primary">
                 Pickup pricing applied
               </p>
             ) : null}
 
             {depositAmount > 0 ? (
               <p className="mt-1 text-xs text-amber-600">
-                Includes deposit ${depositAmount.toFixed(2)} per item
+                Includes deposit {formatMoney(depositAmount)} per item
               </p>
             ) : null}
           </div>
@@ -2056,6 +2330,11 @@ export default function ProductPage() {
                     checkoutType === "pickup" && pickupPrice && pickupPrice > 0
                       ? pickupPrice
                       : deliveryPrice;
+
+                  const variationPromotionPricing = getPromotionPricing({
+                    source: getPromotionSourceForPrice(item, variation),
+                    originalPrice: shownPrice,
+                  });
 
                   return (
                     <label
@@ -2096,12 +2375,28 @@ export default function ProductPage() {
                                 Pickup price
                               </p>
                             ) : null}
+
+                            {variationPromotionPricing.hasPromotion ? (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <PromotionBadge
+                                  promotion={variationPromotionPricing.promotion}
+                                />
+
+                                {variationPromotionPricing.hasDiscount ? (
+                                  <span className="text-xs font-medium text-green-700">
+                                    Save {formatMoney(
+                                      variationPromotionPricing.discountAmount
+                                    )}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
 
-                        <span className="shrink-0 font-medium text-primary">
-                          ${shownPrice.toFixed(2)}
-                        </span>
+                        <div className="shrink-0 text-right font-medium text-primary">
+                          <PromotionPrice pricing={variationPromotionPricing} />
+                        </div>
                       </div>
                     </label>
                   );
@@ -2174,9 +2469,17 @@ export default function ProductPage() {
                         </div>
 
                         {splitPizzaResolvedItemPrice > 0 ? (
-                          <span className="shrink-0 font-medium text-primary">
-                            ${splitPizzaResolvedItemPrice.toFixed(2)}
-                          </span>
+                          <div className="shrink-0 text-right font-medium text-primary">
+                            <PromotionPrice pricing={splitPizzaPromotionPricing} />
+
+                            {splitPizzaPromotionPricing.hasPromotion ? (
+                              <div className="mt-1 flex justify-end">
+                                <PromotionBadge
+                                  promotion={splitPizzaPromotionPricing.promotion}
+                                />
+                              </div>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
                     </div>
@@ -2242,7 +2545,7 @@ export default function ProductPage() {
                 ? isEditingCartItem
                   ? "Updating..."
                   : "Processing..."
-                : `${isEditingCartItem ? "Update Cart" : "Add to Cart"} | $${totalPrice.toFixed(2)}`}
+                : `${isEditingCartItem ? "Update Cart" : "Add to Cart"} | ${formatMoney(displayTotalPrice)}`}
             </button>
           </div>
         </div>

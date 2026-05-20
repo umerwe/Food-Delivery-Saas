@@ -234,7 +234,8 @@ const normalizeCartItem = (item: any) => {
     sections: selectedSections,
     menuItem: item?.menuItem,
     note: item?.note || "",
-    depositAmount: item?.menuItem?.depositAmount,
+    depositAmount: item?.depositAmount ?? item?.menuItem?.depositAmount,
+    depositTotal: item?.depositTotal,
     pickupPrice: item?.pickupPrice ?? item?.menuItem?.pickupPrice,
     pickupUnitPrice: item?.pickupUnitPrice,
     takeawayPriceAdjustment: item?.menuItem?.takeawayPriceAdjustment,
@@ -249,10 +250,28 @@ const recalculateCartItemQuantity = (item: any, quantity: number) => {
     0
   );
 
+  const depositUnitAmount = toNumber(item?.depositAmount, 0);
+  const depositTotal = depositUnitAmount * safeQuantity;
+
   return {
     ...item,
     quantity: safeQuantity,
-    lineTotal: unitPriceWithModifiers * safeQuantity,
+    depositTotal,
+    lineTotal: unitPriceWithModifiers * safeQuantity + depositTotal,
+  };
+};
+
+const normalizeCartResponse = (res: any) => {
+  const cart =
+    res?.data?.items || res?.data?.quote
+      ? res.data
+      : res?.data?.data?.items || res?.data?.data?.quote
+      ? res.data.data
+      : res?.data || {};
+
+  return {
+    items: Array.isArray(cart?.items) ? cart.items : [],
+    quote: cart?.quote ?? null,
   };
 };
 
@@ -269,6 +288,7 @@ export default function CheckoutPage() {
   const { get, patch, del, post } = useApi(token);
 
   const [cartItems, setCartItems] = useState<any[]>([]);
+  const [cartQuote, setCartQuote] = useState<any | null>(null);
   const [loadingCart, setLoadingCart] = useState(false);
 
   const router = useRouter();
@@ -295,10 +315,11 @@ export default function CheckoutPage() {
 
       const res = await get(`/v1/cart?customerId=${customerId}`);
 
-      const items = Array.isArray(res?.data?.items) ? res.data.items : [];
+      const { items, quote } = normalizeCartResponse(res);
       const formatted = items.map((item: any) => normalizeCartItem(item));
 
       setCartItems(formatted);
+      setCartQuote(quote);
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch cart");
@@ -310,6 +331,9 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (customerId) {
       fetchCart();
+    } else {
+      setCartItems([]);
+      setCartQuote(null);
     }
   }, [customerId]);
 
@@ -370,6 +394,8 @@ export default function CheckoutPage() {
         toast.error(res?.error || "Failed to update quantity");
         return;
       }
+
+      await fetchCart();
     } catch (err) {
       console.error(err);
       setCartItems(previousCartItems);
@@ -391,6 +417,7 @@ export default function CheckoutPage() {
         return;
       }
 
+      await fetchCart();
       toast.success("Item removed");
     } catch (err) {
       console.error(err);
@@ -401,19 +428,23 @@ export default function CheckoutPage() {
 
   const clearCart = async () => {
     const previousCartItems = cartItems;
+    const previousCartQuote = cartQuote;
 
     try {
       setCartItems([]);
+      setCartQuote(null);
 
       const res = await del(`/v1/cart?customerId=${customerId}`);
 
       if (res?.error) {
         setCartItems(previousCartItems);
+        setCartQuote(previousCartQuote);
         toast.error(res.error || "Failed to clear cart");
       }
     } catch (err) {
       console.error(err);
       setCartItems(previousCartItems);
+      setCartQuote(previousCartQuote);
       toast.error("Failed to clear cart");
     }
   };
@@ -677,6 +708,7 @@ export default function CheckoutPage() {
         <div className="lg:col-span-5">
           <CartSummarySection
             cartItems={cartItems}
+            quote={cartQuote}
             updateQuantity={updateQuantity}
             deleteItem={deleteItem}
             clearCart={clearCart}

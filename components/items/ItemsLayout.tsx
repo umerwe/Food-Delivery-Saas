@@ -273,9 +273,9 @@ export default function ItemsLayout({ categoryId }: any) {
   };
 
   return (
-    <div className="flex flex-col gap-6 px-4 py-6 md:px-10 lg:flex-row">
+    <div className="flex min-w-0 flex-col gap-6 px-4 py-6 md:px-10 lg:flex-row lg:items-start">
       {/* SIDEBAR */}
-      <aside className="w-full shrink-0 lg:sticky lg:top-6 lg:w-[280px] lg:self-start">
+      <aside className="w-full min-w-0 shrink-0 lg:sticky lg:top-24 lg:w-[280px] lg:self-start">
         <CategorySidebar
           activeCategoryId={activeCategoryId}
           categories={categories}

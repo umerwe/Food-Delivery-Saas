@@ -70,9 +70,29 @@ interface CartItem {
   deliveryPriceAdjustment?: number | string;
 }
 
+interface CartQuote {
+  subtotal?: number | string;
+  taxAmount?: number | string;
+  deliveryFee?: number | string;
+  discountAmount?: number | string;
+  walletAppliedAmount?: number | string;
+  loyaltyDiscountAmount?: number | string;
+  loyaltyPointsRedeemed?: number | string;
+  totalAmount?: number | string;
+  payableAmount?: number | string;
+  appliedPromotion?: {
+    id?: string;
+    title?: string;
+    applyMode?: string;
+    autoApply?: boolean;
+  } | null;
+}
+
 interface Props {
   title?: string;
   cartItems: CartItem[];
+  quote?: CartQuote | null;
+  cartQuote?: CartQuote | null;
   updateQuantity: (id: string, type: "inc" | "dec") => void;
   deleteItem: (id: string) => void;
   clearCart: () => void;
@@ -90,6 +110,11 @@ type CheckoutType = "delivery" | "pickup";
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const toNullableNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const hasText = (value: unknown) => {
@@ -535,6 +560,8 @@ const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
 export default function CartSummarySection({
   title = "Cart Summary",
   cartItems,
+  quote,
+  cartQuote,
   updateQuantity,
   deleteItem,
   clearCart,
@@ -580,13 +607,56 @@ export default function CartSummarySection({
         }, 0)
       : 0;
 
-  const deliveryFee = checkoutType === "delivery" ? 0 : 0;
-  const taxes = 0;
-  const discount = toNumber(couponDiscount, 0);
+  const resolvedQuote = quote ?? cartQuote ?? null;
+  const quoteSubtotal = toNullableNumber(resolvedQuote?.subtotal);
+  const quoteDeliveryFee = toNullableNumber(resolvedQuote?.deliveryFee);
+  const quoteTaxAmount = toNullableNumber(resolvedQuote?.taxAmount);
+  const quotePayableAmount = toNullableNumber(
+    resolvedQuote?.payableAmount ?? resolvedQuote?.totalAmount
+  );
+
+  const deliveryFee = quoteDeliveryFee ?? (checkoutType === "delivery" ? 0 : 0);
+  const taxes = quoteTaxAmount ?? 0;
+
+  const quoteDiscount = Math.max(0, toNumber(resolvedQuote?.discountAmount, 0));
+  const manualCouponDiscount = Math.max(0, toNumber(couponDiscount, 0));
+  const discount = quoteDiscount > 0 ? quoteDiscount : manualCouponDiscount;
+
+  const loyaltyDiscount = Math.max(
+    0,
+    toNumber(resolvedQuote?.loyaltyDiscountAmount, 0)
+  );
+
+  const walletAppliedAmount = Math.max(
+    0,
+    toNumber(resolvedQuote?.walletAppliedAmount, 0)
+  );
+
+  const computedTotalBeforeDiscount =
+    itemTotal + depositTotal + pickupPriceTotal + deliveryFee + taxes;
 
   const totalBeforeDiscount =
-    itemTotal + depositTotal + pickupPriceTotal + deliveryFee + taxes;
-  const finalTotal = Math.max(0, totalBeforeDiscount - discount);
+    quoteSubtotal !== null
+      ? quoteSubtotal + pickupPriceTotal + deliveryFee + taxes
+      : computedTotalBeforeDiscount;
+
+  const quotedFinalTotal =
+    quotePayableAmount !== null
+      ? quotePayableAmount + pickupPriceTotal
+      : null;
+
+  const finalTotal =
+    quotedFinalTotal !== null
+      ? Math.max(0, quotedFinalTotal)
+      : Math.max(
+          0,
+          totalBeforeDiscount - discount - loyaltyDiscount - walletAppliedAmount
+        );
+
+  const appliedPromotion = resolvedQuote?.appliedPromotion ?? null;
+  const hasAppliedPromotion = Boolean(appliedPromotion?.id || appliedPromotion?.title);
+  const hasAnyDiscount =
+    discount > 0 || loyaltyDiscount > 0 || walletAppliedAmount > 0;
 
   const handleEditItem = (item: CartItem) => {
     const menuItemId = getMenuItemId(item);
@@ -1033,9 +1103,26 @@ export default function CartSummarySection({
         </div>
 
         {discount > 0 ? (
-          <div className="flex items-center gap-2 rounded-md bg-green-100 p-3 text-sm font-medium text-green-700">
-            <TicketPercent width={16} height={16} />
-            Coupon Applied
+          <div className="rounded-md bg-green-100 p-3 text-sm font-medium text-green-700">
+            <div className="flex items-center gap-2">
+              <TicketPercent width={16} height={16} />
+              <span>
+                {hasAppliedPromotion
+                  ? appliedPromotion?.autoApply
+                    ? "Auto Promotion Applied"
+                    : "Promotion Applied"
+                  : "Coupon Applied"}
+              </span>
+            </div>
+
+            {hasAppliedPromotion ? (
+              <p className="mt-1 pl-6 text-xs font-normal text-green-700/90">
+                {appliedPromotion?.title || "Promotion discount"}
+                {appliedPromotion?.applyMode
+                  ? ` · ${String(appliedPromotion.applyMode).replace(/_/g, " ")}`
+                  : ""}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -1046,14 +1133,37 @@ export default function CartSummarySection({
           </div>
 
           {discount > 0 ? (
-            <div className="flex items-center justify-between pb-[15px] text-sm text-green-600">
-              <span>Discount</span>
+            <div className="flex items-center justify-between text-sm text-green-600">
+              <span>
+                {hasAppliedPromotion ? "Promotion Discount" : "Discount"}
+              </span>
               <span>- {formatCurrency(discount)}</span>
             </div>
           ) : null}
 
+          {loyaltyDiscount > 0 ? (
+            <div className="flex items-center justify-between text-sm text-green-600">
+              <span>
+                Loyalty Discount
+                {toNumber(resolvedQuote?.loyaltyPointsRedeemed, 0) > 0
+                  ? ` (${toNumber(resolvedQuote?.loyaltyPointsRedeemed, 0)} pts)`
+                  : ""}
+              </span>
+              <span>- {formatCurrency(loyaltyDiscount)}</span>
+            </div>
+          ) : null}
+
+          {walletAppliedAmount > 0 ? (
+            <div className="flex items-center justify-between pb-[15px] text-sm text-green-600">
+              <span>Wallet Applied</span>
+              <span>- {formatCurrency(walletAppliedAmount)}</span>
+            </div>
+          ) : hasAnyDiscount ? (
+            <div className="pb-[15px]" />
+          ) : null}
+
           <div className="flex items-center justify-between text-[24px] font-medium text-gray-900">
-            <span>Total</span>
+            <span>{walletAppliedAmount > 0 ? "Payable Total" : "Total"}</span>
             <span>{formatCurrency(finalTotal)}</span>
           </div>
         </div>

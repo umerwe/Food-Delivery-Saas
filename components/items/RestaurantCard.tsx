@@ -19,6 +19,27 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import AsyncSelect from "../ui/AsyncSelect";
 
+type PromotionInfo = {
+  promotionId?: string;
+  title?: string | null;
+  description?: string | null;
+  applyMode?: "ORDER_TOTAL" | "SCOPED_ITEMS" | string;
+  discountType?: "FLAT" | "PERCENTAGE" | string;
+  discountValue?: number | string | null;
+  maxDiscountAmount?: number | string | null;
+  discountAmount?: number | string | null;
+  discountedAmount?: number | string | null;
+};
+
+type PromotionPricing = {
+  promotion: PromotionInfo | null;
+  originalPrice: number;
+  finalPrice: number;
+  discountAmount: number;
+  hasPromotion: boolean;
+  hasDiscount: boolean;
+};
+
 type ItemPriceOverride = {
   id?: string;
   menuItemId?: string;
@@ -42,6 +63,9 @@ type MenuVariation = {
   name: string;
   description?: string;
   price?: string | number;
+  displayText?: string | null;
+  discountedPrice?: string | number | null;
+  promotion?: PromotionInfo | null;
   sortOrder?: number;
   isDefault?: boolean;
   isActive?: boolean;
@@ -122,6 +146,199 @@ const normalizeArray = (value: any): any[] => {
   if (!value) return [];
   return Array.isArray(value) ? value : [];
 };
+
+/* ================= PROMOTION HELPERS ================= */
+
+const formatMoney = (value: unknown) => {
+  return `$${toNumber(value, 0).toFixed(2)}`;
+};
+
+const isPromotionObject = (value: any): value is PromotionInfo => {
+  return Boolean(value && typeof value === "object");
+};
+
+const getPromotionInfo = (source: any): PromotionInfo | null => {
+  return isPromotionObject(source?.promotion) ? source.promotion : null;
+};
+
+const getPromotionDiscountLabel = (promotion?: PromotionInfo | null) => {
+  if (!promotion) return "";
+
+  const discountValue = toNumber(promotion.discountValue, 0);
+
+  if (promotion.discountType === "PERCENTAGE") {
+    return `${discountValue}% OFF`;
+  }
+
+  if (promotion.discountType === "FLAT") {
+    return `${formatMoney(discountValue)} OFF`;
+  }
+
+  return "OFFER";
+};
+
+const getPromotionTitle = (promotion?: PromotionInfo | null) => {
+  if (!promotion) return "";
+
+  return (
+    String(promotion.title || "").trim() ||
+    getPromotionDiscountLabel(promotion) ||
+    "Promotion applied"
+  );
+};
+
+const getBackendDiscountedPriceCandidate = (
+  source: any,
+  promotion?: PromotionInfo | null
+) => {
+  const candidates = [
+    source?.discountedPrice,
+    source?.discountedBasePrice,
+    promotion?.discountedAmount,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null || candidate === "") {
+      continue;
+    }
+
+    const numeric = toNumber(candidate, Number.NaN);
+
+    if (Number.isFinite(numeric) && numeric >= 0) {
+      return numeric;
+    }
+  }
+
+  return null;
+};
+
+const calculatePromotionDiscount = (
+  originalPrice: number,
+  promotion?: PromotionInfo | null
+) => {
+  if (!promotion || originalPrice <= 0) return 0;
+
+  const discountValue = toNumber(promotion.discountValue, 0);
+  const backendDiscountAmount = toNumber(promotion.discountAmount, 0);
+  const maxDiscountAmount = toNumber(promotion.maxDiscountAmount, 0);
+
+  let discountAmount = 0;
+
+  if (backendDiscountAmount > 0) {
+    discountAmount = backendDiscountAmount;
+  } else if (promotion.discountType === "PERCENTAGE") {
+    discountAmount = (originalPrice * discountValue) / 100;
+  } else if (promotion.discountType === "FLAT") {
+    discountAmount = discountValue;
+  }
+
+  if (maxDiscountAmount > 0) {
+    discountAmount = Math.min(discountAmount, maxDiscountAmount);
+  }
+
+  return Math.min(Math.max(discountAmount, 0), originalPrice);
+};
+
+const getPromotionPricing = ({
+  source,
+  originalPrice,
+}: {
+  source: any;
+  originalPrice: number;
+}): PromotionPricing => {
+  const safeOriginalPrice = Math.max(0, toNumber(originalPrice, 0));
+  const promotion = getPromotionInfo(source);
+
+  if (!promotion) {
+    return {
+      promotion: null,
+      originalPrice: safeOriginalPrice,
+      finalPrice: safeOriginalPrice,
+      discountAmount: 0,
+      hasPromotion: false,
+      hasDiscount: false,
+    };
+  }
+
+  const backendDiscountedPrice = getBackendDiscountedPriceCandidate(
+    source,
+    promotion
+  );
+
+  const calculatedDiscount = calculatePromotionDiscount(
+    safeOriginalPrice,
+    promotion
+  );
+
+  const calculatedFinalPrice = Math.max(0, safeOriginalPrice - calculatedDiscount);
+
+  const finalPrice =
+    backendDiscountedPrice !== null && backendDiscountedPrice <= safeOriginalPrice
+      ? backendDiscountedPrice
+      : calculatedFinalPrice;
+
+  const discountAmount = Math.max(0, safeOriginalPrice - finalPrice);
+
+  return {
+    promotion,
+    originalPrice: safeOriginalPrice,
+    finalPrice,
+    discountAmount,
+    hasPromotion: true,
+    hasDiscount: discountAmount > 0 && finalPrice < safeOriginalPrice,
+  };
+};
+
+const getPromotionSourceForPrice = (menuItem: any, variation?: any | null) => {
+  if (getPromotionInfo(variation)) return variation;
+  if (getPromotionInfo(menuItem)) return menuItem;
+  return variation || menuItem;
+};
+
+function PromotionBadge({
+  promotion,
+  compact = false,
+}: {
+  promotion?: PromotionInfo | null;
+  compact?: boolean;
+}) {
+  if (!promotion) return null;
+
+  const label = getPromotionDiscountLabel(promotion);
+
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded-full bg-green-50 font-semibold text-green-700 ring-1 ring-green-100 ${
+        compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
+      }`}
+    >
+      {label || "OFFER"}
+    </span>
+  );
+}
+
+function PromotionPrice({
+  pricing,
+  className = "",
+  originalClassName = "",
+}: {
+  pricing: PromotionPricing;
+  className?: string;
+  originalClassName?: string;
+}) {
+  if (!pricing.hasDiscount) {
+    return <span className={className}>{formatMoney(pricing.originalPrice)}</span>;
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-2 ${className}`}>
+      <span className={`text-gray-400 line-through ${originalClassName}`}>
+        {formatMoney(pricing.originalPrice)}
+      </span>
+      <span>{formatMoney(pricing.finalPrice)}</span>
+    </span>
+  );
+}
 
 /* ================= PRODUCT INFO HELPERS ================= */
 
@@ -428,7 +645,10 @@ export default function RestaurantCard({ item }: any) {
         categoryId: raw?.categoryId,
         name: String(raw?.name || ""),
         description: raw?.description || "",
-        price: raw?.price ?? 0,
+        price: raw?.price ?? raw?.itemPriceOverrides?.[0]?.price ?? 0,
+        displayText: raw?.displayText ?? raw?.itemPriceOverrides?.[0]?.displayText ?? null,
+        discountedPrice: raw?.discountedPrice ?? raw?.promotion?.discountedAmount ?? null,
+        promotion: getPromotionInfo(raw),
         sortOrder: toNumber(raw?.sortOrder, 0),
         isDefault: Boolean(raw?.isDefault),
         isActive: raw?.isActive !== false,
@@ -1038,10 +1258,20 @@ export default function RestaurantCard({ item }: any) {
 
   const resolvedItemPrice = getMenuItemResolvedPrice(item, selectedVariation);
 
+  const selectedItemPromotionPricing = getPromotionPricing({
+    source: getPromotionSourceForPrice(item, selectedVariation),
+    originalPrice: resolvedItemPrice,
+  });
+
   const splitPizzaResolvedItemPrice = getMenuItemResolvedPrice(
     splitPizzaItem,
     splitPizzaDefaultVariation
   );
+
+  const splitPizzaPromotionPricing = getPromotionPricing({
+    source: getPromotionSourceForPrice(splitPizzaItem, splitPizzaDefaultVariation),
+    originalPrice: splitPizzaResolvedItemPrice,
+  });
 
   const modifiersTotal = getModifiersTotal(
     selectedModifiers,
@@ -1054,7 +1284,20 @@ export default function RestaurantCard({ item }: any) {
       ? Math.max(resolvedItemPrice, splitPizzaResolvedItemPrice)
       : resolvedItemPrice;
 
+  const splitPizzaDisplayBasePrice =
+    splitPizzaEnabled && splitPizzaItem
+      ? Math.max(
+          selectedItemPromotionPricing.finalPrice,
+          splitPizzaPromotionPricing.finalPrice
+        )
+      : selectedItemPromotionPricing.finalPrice;
+
   const totalPrice = (splitPizzaBasePrice + modifiersTotal) * qty;
+  const displayTotalPrice = (splitPizzaDisplayBasePrice + modifiersTotal) * qty;
+  const hasTotalPromotionDiscount = displayTotalPrice < totalPrice;
+  const totalPromotionDiscount = Math.max(0, totalPrice - displayTotalPrice);
+  const activeVisiblePromotion =
+    selectedItemPromotionPricing.promotion || splitPizzaPromotionPricing.promotion;
 
   const fetchPizzaItems = async ({
     search,
@@ -1383,6 +1626,10 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
 
   const defaultCardVariation = getDefaultVariation(item);
   const displayCardPrice = getMenuItemResolvedPrice(item, defaultCardVariation);
+  const cardPromotionPricing = getPromotionPricing({
+    source: getPromotionSourceForPrice(item, defaultCardVariation),
+    originalPrice: displayCardPrice,
+  });
 
   return (
     <>
@@ -1419,9 +1666,24 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
               {truncatedDesc || "Fresh premium item"}
             </p>
 
-            <p className="text-sm font-semibold text-gray-900">
-              ${displayCardPrice.toFixed(2)}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-gray-900">
+                <PromotionPrice pricing={cardPromotionPricing} />
+              </p>
+
+              {cardPromotionPricing.hasPromotion ? (
+                <PromotionBadge
+                  promotion={cardPromotionPricing.promotion}
+                  compact
+                />
+              ) : null}
+            </div>
+
+            {cardPromotionPricing.hasDiscount ? (
+              <p className="mt-1 text-[11px] font-medium text-green-700">
+                Save {formatMoney(cardPromotionPricing.discountAmount)}
+              </p>
+            ) : null}
 
             <button
               type="button"
@@ -1436,6 +1698,15 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
           </div>
 
           <div className="relative h-[110px] w-[120px] overflow-hidden rounded-xl">
+            {cardPromotionPricing.hasPromotion ? (
+              <div className="absolute left-2 top-2 z-10">
+                <PromotionBadge
+                  promotion={cardPromotionPricing.promotion}
+                  compact
+                />
+              </div>
+            ) : null}
+
             <Image
               src={item?.imageUrl || "/placeholder.png"}
               alt={item?.name || "item"}
@@ -1503,55 +1774,104 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[95vh] max-w-md overflow-auto rounded-2xl p-6">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
-            {item?.name}
-          </h2>
+          <div className="mb-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {item?.name}
+              </h2>
+
+              {selectedItemPromotionPricing.hasPromotion ? (
+                <PromotionBadge
+                  promotion={selectedItemPromotionPricing.promotion}
+                />
+              ) : null}
+            </div>
+
+            {selectedItemPromotionPricing.hasPromotion ? (
+              <div className="mt-2 rounded-xl bg-green-50 px-3 py-2">
+                <p className="text-xs font-semibold text-green-700">
+                  {getPromotionTitle(selectedItemPromotionPricing.promotion)}
+                </p>
+
+                {selectedItemPromotionPricing.promotion?.description ? (
+                  <p className="mt-0.5 line-clamp-2 text-xs text-green-700/80">
+                    {selectedItemPromotionPricing.promotion.description}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
 
           {itemVariations.length > 0 ? (
             <div className="mb-5">
               <p className="mb-2 font-medium text-gray-900">Size</p>
 
               <div className="grid grid-cols-1 gap-3">
-                {itemVariations.map((variation) => (
-                  <label
-                    key={variation.id}
-                    className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
-                      selectedVariation?.id === variation.id
-                        ? "border-primary bg-primary/5"
-                        : "border-gray-200 bg-white"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="radio"
-                          name={`size-${item?.id}`}
-                          checked={selectedVariation?.id === variation.id}
-                          onChange={() => setSelectedVariation(variation)}
-                          className="mt-1 accent-[var(--primary)]"
-                        />
+                {itemVariations.map((variation) => {
+                  const variationPrice = toNumber(variation.price, 0);
+                  const variationPromotionPricing = getPromotionPricing({
+                    source: getPromotionSourceForPrice(item, variation),
+                    originalPrice: variationPrice,
+                  });
 
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">
-                            {variation.name}
-                          </p>
+                  return (
+                    <label
+                      key={variation.id}
+                      className={`cursor-pointer rounded-xl border px-4 py-3 transition ${
+                        selectedVariation?.id === variation.id
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-200 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="radio"
+                            name={`size-${item?.id}`}
+                            checked={selectedVariation?.id === variation.id}
+                            onChange={() => setSelectedVariation(variation)}
+                            className="mt-1 accent-[var(--primary)]"
+                          />
 
-                          {variation.description ? (
-                            <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                              {variation.description}
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">
+                              {variation.displayText || variation.name}
                             </p>
-                          ) : null}
-                        </div>
-                      </div>
 
-                      {toNumber(variation.price, 0) > 0 ? (
-                        <span className="shrink-0 text-sm font-semibold text-primary">
-                          ${toNumber(variation.price, 0).toFixed(2)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </label>
-                ))}
+                            {variation.description ? (
+                              <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                                {variation.description}
+                              </p>
+                            ) : null}
+
+                            {variationPromotionPricing.hasPromotion ? (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <PromotionBadge
+                                  promotion={variationPromotionPricing.promotion}
+                                  compact
+                                />
+
+                                {variationPromotionPricing.hasDiscount ? (
+                                  <span className="text-xs font-medium text-green-700">
+                                    Save {formatMoney(
+                                      variationPromotionPricing.discountAmount
+                                    )}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {variationPrice > 0 ? (
+                          <div className="shrink-0 text-right text-sm font-semibold text-primary">
+                            <PromotionPrice pricing={variationPromotionPricing} />
+                          </div>
+                        ) : null}
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           ) : null}
@@ -1618,9 +1938,18 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
               </div>
 
               {splitPizzaResolvedItemPrice > 0 ? (
-                <span className="shrink-0 font-medium text-primary">
-                  ${splitPizzaResolvedItemPrice.toFixed(2)}
-                </span>
+                <div className="shrink-0 text-right font-medium text-primary">
+                  <PromotionPrice pricing={splitPizzaPromotionPricing} />
+
+                  {splitPizzaPromotionPricing.hasPromotion ? (
+                    <div className="mt-1 flex justify-end">
+                      <PromotionBadge
+                        promotion={splitPizzaPromotionPricing.promotion}
+                        compact
+                      />
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           </div>
@@ -1680,8 +2009,27 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
               </button>
             </div>
 
-            <div className="text-lg font-semibold text-primary">
-              ${totalPrice.toFixed(2)}
+            <div className="text-right text-lg font-semibold text-primary">
+              {hasTotalPromotionDiscount ? (
+                <div className="flex flex-col items-end">
+                  <PromotionPrice
+                    pricing={{
+                      promotion: activeVisiblePromotion,
+                      originalPrice: totalPrice,
+                      finalPrice: displayTotalPrice,
+                      discountAmount: totalPromotionDiscount,
+                      hasPromotion: true,
+                      hasDiscount: true,
+                    }}
+                    originalClassName="text-sm font-medium"
+                  />
+                  <span className="mt-0.5 text-xs font-medium text-green-700">
+                    Save {formatMoney(totalPromotionDiscount)}
+                  </span>
+                </div>
+              ) : (
+                formatMoney(totalPrice)
+              )}
             </div>
           </div>
 

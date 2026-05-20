@@ -333,68 +333,118 @@ export default function ItemsListing({
     if (!categories.length) return;
 
     let frameId: number | null = null;
+    let observer: IntersectionObserver | null = null;
 
-    const getDocumentHeight = () => {
-      return Math.max(
-        document.body.scrollHeight,
-        document.documentElement.scrollHeight,
-        document.body.offsetHeight,
-        document.documentElement.offsetHeight
-      );
+    const categoryIds = categories
+      .map((category) => String(category?.id || ""))
+      .filter(Boolean);
+
+    if (!categoryIds.length) return;
+
+    const getScrollParents = () => {
+      const firstSection = categoryIds
+        .map((id) => sectionRefs.current[id])
+        .find(Boolean);
+
+      const parents: Array<HTMLElement | Window> = [window];
+      let parent = firstSection?.parentElement || null;
+
+      while (parent && parent !== document.body) {
+        const style = window.getComputedStyle(parent);
+        const overflowY = style.overflowY;
+
+        if (
+          /(auto|scroll|overlay)/.test(overflowY) &&
+          parent.scrollHeight > parent.clientHeight
+        ) {
+          parents.push(parent);
+        }
+
+        parent = parent.parentElement;
+      }
+
+      return parents;
+    };
+
+    const getScrollableBottomState = () => {
+      const scrollParents = getScrollParents();
+
+      for (const parent of scrollParents) {
+        if (parent === window) {
+          const scrollTop = window.scrollY || window.pageYOffset || 0;
+          const viewportHeight =
+            window.innerHeight || document.documentElement.clientHeight || 0;
+
+          const documentHeight = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight,
+            document.body.offsetHeight,
+            document.documentElement.offsetHeight
+          );
+
+          if (scrollTop + viewportHeight >= documentHeight - 140) {
+            return true;
+          }
+
+          continue;
+        }
+
+        const element = parent as HTMLElement;
+
+        if (
+          element.scrollTop + element.clientHeight >=
+          element.scrollHeight - 140
+        ) {
+          return true;
+        }
+      }
+
+      return false;
     };
 
     const updateActiveCategory = () => {
       frameId = null;
 
-      const categoryIds = categories
-        .map((category) => String(category?.id || ""))
-        .filter(Boolean);
+      const availableIds = categoryIds.filter((id) => sectionRefs.current[id]);
 
-      if (!categoryIds.length) return;
+      if (!availableIds.length) return;
 
-      const scrollTop = window.scrollY || window.pageYOffset || 0;
-      const viewportHeight =
-        window.innerHeight || document.documentElement.clientHeight || 0;
-      const documentHeight = getDocumentHeight();
+      const lastCategoryId = availableIds[availableIds.length - 1];
 
-      const lastCategoryId = categoryIds[categoryIds.length - 1];
-
-      /*
-       * Important:
-       * At the bottom of the page, the last section can be too short to cross
-       * the normal activation line. In that case, force the last category active.
-       */
-      const isNearPageBottom =
-        scrollTop + viewportHeight >= documentHeight - 120;
-
-      if (isNearPageBottom) {
+      if (getScrollableBottomState()) {
         onActiveCategoryChange?.(lastCategoryId);
         return;
       }
 
+      const viewportHeight =
+        window.innerHeight || document.documentElement.clientHeight || 0;
+
       /*
-       * Activation line:
-       * We do not use viewport center because short sections can flicker.
-       * This line behaves like a sticky-sidebar reading position.
+       * This line represents the reading position below the sticky header.
+       * It works better than viewport center because restaurant sections can
+       * be short, image heights can change after load, and some layouts scroll
+       * inside an overflow container instead of the window.
        */
-      const activationLine =
-        scrollTop + Math.min(220, Math.max(120, viewportHeight * 0.28));
+      const activationY = Math.min(
+        260,
+        Math.max(120, viewportHeight * 0.28)
+      );
 
-      let nextActiveId = categoryIds[0];
+      let nextActiveId = availableIds[0];
 
-      for (const id of categoryIds) {
+      for (const id of availableIds) {
         const section = sectionRefs.current[id];
 
         if (!section) continue;
 
-        const sectionTop =
-          section.getBoundingClientRect().top + scrollTop;
+        const rect = section.getBoundingClientRect();
 
-        if (sectionTop <= activationLine) {
+        if (rect.top <= activationY) {
           nextActiveId = id;
-        } else {
-          break;
+          continue;
         }
+
+        break;
       }
 
       onActiveCategoryChange?.(nextActiveId);
@@ -405,14 +455,52 @@ export default function ItemsListing({
       frameId = window.requestAnimationFrame(updateActiveCategory);
     };
 
+    const scrollParents = getScrollParents();
+
+    scrollParents.forEach((parent) => {
+      parent.addEventListener("scroll", scheduleUpdate, { passive: true });
+    });
+
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("orientationchange", scheduleUpdate);
+
+    if ("IntersectionObserver" in window) {
+      observer = new IntersectionObserver(
+        () => {
+          scheduleUpdate();
+        },
+        {
+          root: null,
+          rootMargin: "-96px 0px -60% 0px",
+          threshold: [0, 0.01, 0.1, 0.25, 0.5, 0.75, 1],
+        }
+      );
+
+      for (const id of categoryIds) {
+        const section = sectionRefs.current[id];
+
+        if (!section) continue;
+
+        observer.observe(section);
+      }
+    }
+
     scheduleUpdate();
 
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
+    const lateLayoutTimer = window.setTimeout(scheduleUpdate, 450);
 
     return () => {
-      window.removeEventListener("scroll", scheduleUpdate);
+      scrollParents.forEach((parent) => {
+        parent.removeEventListener("scroll", scheduleUpdate);
+      });
+
       window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("orientationchange", scheduleUpdate);
+      window.clearTimeout(lateLayoutTimer);
+
+      if (observer) {
+        observer.disconnect();
+      }
 
       if (frameId !== null) {
         window.cancelAnimationFrame(frameId);
@@ -460,7 +548,7 @@ export default function ItemsListing({
 
     return (
       <>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
           {state.items.map((item) => (
             <RestaurantCard key={item.id} item={item} />
           ))}
@@ -491,7 +579,7 @@ export default function ItemsListing({
 
   if (viewMode === "onePage") {
     return (
-      <div className="space-y-10">
+      <div className="min-w-0 space-y-10">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-semibold text-gray-900">Full Menu</h2>
           <p className="mt-1 text-sm text-gray-500">
@@ -517,7 +605,7 @@ export default function ItemsListing({
                   sectionRefs.current[id] = el;
                 }}
                 data-category-id={id}
-                className="scroll-mt-24"
+                className="scroll-mt-32"
               >
                 <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
