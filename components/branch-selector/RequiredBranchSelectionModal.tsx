@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuthContext } from "@/context/AuthContext";
 import BranchSelectorModal from "./BranchSelectorModal";
-
-import { Branch} from "../types/branch-selector";
+import { Branch } from "../types/branch-selector";
 
 type RequiredBranchSelectionModalProps = {
   restaurantId?: string | number | null;
@@ -19,6 +18,7 @@ export default function RequiredBranchSelectionModal({
 }: RequiredBranchSelectionModalProps) {
   const { token, user } = useAuthContext();
   const [open, setOpen] = useState(false);
+  const [dismissedEmptyState, setDismissedEmptyState] = useState(false);
 
   const resolvedRestaurantId = useMemo(() => {
     return restaurantId || user?.restaurantId || user?.tenantId || null;
@@ -27,26 +27,48 @@ export default function RequiredBranchSelectionModal({
   const shouldShow =
     !!token && !!user && !user?.branchId && !!resolvedRestaurantId;
 
+  /*
+   * Reset dismissal when the auth/restaurant context changes.
+   * This prevents a previous empty-state close from hiding the modal forever
+   * for a different user or restaurant.
+   */
   useEffect(() => {
-    setOpen(shouldShow);
-  }, [shouldShow]);
+    setDismissedEmptyState(false);
+  }, [user?.id, user?.branchId, resolvedRestaurantId]);
 
-  if (!shouldShow && !open) return null;
+  useEffect(() => {
+    setOpen(shouldShow && !dismissedEmptyState);
+  }, [shouldShow, dismissedEmptyState]);
+
+  const handleClose = () => {
+    /*
+     * Branch selection is required only when branches exist.
+     * If the child modal exposes a close action from the empty state,
+     * allow the user to close it and do not immediately reopen it.
+     */
+    setDismissedEmptyState(true);
+    setOpen(false);
+  };
+
+  const handleSelected = (branch: Branch) => {
+    setDismissedEmptyState(false);
+    setOpen(false);
+    onSelected?.(branch);
+  };
+
+  if ((!shouldShow || dismissedEmptyState) && !open) return null;
 
   return (
     <BranchSelectorModal
       open={open}
-      onClose={() => {}}
+      onClose={handleClose}
       restaurantId={resolvedRestaurantId}
       endpoint={endpoint}
       forceSelection
       badgeText="Branch Required"
       title="Choose Your Branch"
       description=""
-      onSelected={(branch) => {
-        setOpen(false);
-        onSelected?.(branch);
-      }}
+      onSelected={handleSelected}
     />
   );
 }

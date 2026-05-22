@@ -290,7 +290,7 @@ return (
             </div>
 
             <h3 className="text-base font-semibold text-[#111827]">
-              No matching branches found
+              No matching branches founded
             </h3>
             <p className="mx-auto mt-2 max-w-[360px] text-sm leading-6 text-[#6B7280]">
               We could not find any active branches for your current search.

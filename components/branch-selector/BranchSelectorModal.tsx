@@ -1,16 +1,21 @@
 "use client";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  FaMapMarkerAlt,
-  FaStore,
   FaCheckCircle,
+  FaMapMarkerAlt,
   FaSearch,
+  FaStore,
+  FaTimes,
 } from "react-icons/fa";
 import { toast } from "sonner";
 import useApi from "@/hooks/useApi";
 import { useAuthContext } from "@/context/AuthContext";
 import { Branch, BranchApiResponse } from "../types/branch-selector";
-import { getBranchAddressText, persistSelectedBranch } from "../utils/branch-selector";
+import {
+  getBranchAddressText,
+  persistSelectedBranch,
+} from "../utils/branch-selector";
 import { usePathname } from "next/navigation";
 
 type BranchSelectorModalProps = {
@@ -39,10 +44,10 @@ export default function BranchSelectorModal({
   const { token, user, setUser } = useAuthContext();
   const api = useApi(token);
   const getRef = useRef(api.get);
-const pathname = usePathname();
-const isBlockedRoute = pathname === "/login";
+  const pathname = usePathname();
+  const isBlockedRoute = pathname === "/login" || pathname === "/auth/login";
 
-useEffect(() => {
+  useEffect(() => {
     getRef.current = api.get;
   }, [api.get]);
 
@@ -66,9 +71,10 @@ useEffect(() => {
     return restaurantId || user?.restaurantId || user?.tenantId || null;
   }, [restaurantId, user]);
 
-
   const canFetch =
-  !!token && !!user && !!resolvedRestaurantId && open && !isBlockedRoute;
+    !!token && !!user && !!resolvedRestaurantId && open && !isBlockedRoute;
+
+  const hasActiveSearch = Boolean(search.trim() || searchInput.trim());
 
   const buildUrl = useCallback(() => {
     const baseUrl =
@@ -97,7 +103,9 @@ useEffect(() => {
       const res: BranchApiResponse = await getRef.current(url);
 
       const list = Array.isArray(res?.data) ? res.data : [];
-      const activeBranches = list.filter((b: Branch) => b?.isActive !== false);
+      const activeBranches = list.filter((branch: Branch) => {
+        return branch?.isActive !== false;
+      });
 
       const meta = res?.meta || {};
       const nextTotalPages = meta.totalPages ?? res?.totalPages ?? 1;
@@ -186,20 +194,42 @@ useEffect(() => {
     onClose();
   };
 
+  const handleClearSearch = () => {
+    setPage(1);
+    setSearch("");
+    setSearchInput("");
+  };
+
+  const handleEmptyClose = () => {
+    /*
+     * Even when forceSelection is true, allow closing the modal if there are
+     * no selectable branches. Otherwise the user gets trapped in an empty modal.
+     */
+    onClose();
+  };
+
   if (!open || !user || !token || isBlockedRoute) return null;
 
   return (
     <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-[#0A0D12]/55 p-4 backdrop-blur-[10px]">
-      <div
-        className="absolute inset-0"
-        onClick={handleBackdropClose}
-      />
+      <div className="absolute inset-0" onClick={handleBackdropClose} />
 
-      <div className="relative flex w-full max-w-[720px] max-h-[90vh] flex-col overflow-hidden rounded-[32px] border border-white/20 bg-white shadow-[0_30px_100px_rgba(2,6,23,0.22)]">
+      <div className="relative flex max-h-[90vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[32px] border border-white/20 bg-white shadow-[0_30px_100px_rgba(2,6,23,0.22)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-[var(--primary)]/12 via-[var(--primary)]/5 to-transparent" />
         <div className="pointer-events-none absolute right-[-60px] top-[-60px] h-40 w-40 rounded-full bg-[var(--primary)]/5 blur-3xl" />
 
         <div className="relative shrink-0 border-b border-[#EEF1F4] px-6 pb-6 pt-6 md:px-8 md:pb-7 md:pt-7">
+          {!forceSelection ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#6B7280] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              aria-label="Close branch selector"
+            >
+              <FaTimes className="text-[13px]" />
+            </button>
+          ) : null}
+
           <div className="flex items-start gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-[color:rgba(206,24,27,0.08)] text-[var(--primary)] shadow-[0_8px_24px_rgba(206,24,27,0.08)]">
               <FaStore className="text-[20px]" />
@@ -256,10 +286,31 @@ useEffect(() => {
               <h3 className="text-base font-semibold text-[#111827]">
                 No matching branches found
               </h3>
+
               <p className="mx-auto mt-2 max-w-[360px] text-sm leading-6 text-[#6B7280]">
                 We could not find any active branches for your current search.
-                Try another keyword.
+                Try another keyword or close this selector.
               </p>
+
+              <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                {hasActiveSearch ? (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="inline-flex h-11 min-w-[140px] items-center justify-center rounded-full border border-[color:rgba(206,24,27,0.18)] bg-white px-5 text-sm font-semibold text-[var(--primary)] transition hover:bg-[color:rgba(206,24,27,0.04)]"
+                  >
+                    Clear search
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={handleEmptyClose}
+                  className="inline-flex h-11 min-w-[140px] items-center justify-center rounded-full bg-[var(--primary)] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--primary)]/90"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3 pb-2">
@@ -319,17 +370,18 @@ useEffect(() => {
                 {totalBranches > 0
                   ? `Showing page ${page} of ${Math.max(totalPages, 1)}`
                   : forceSelection
-                  ? "You must select a branch before continuing."
-                  : "Browse and switch branch anytime."}
+                    ? "No selectable branch is currently available."
+                    : "Browse and switch branch anytime."}
               </p>
-              {totalBranches > 0 && (
+
+              {totalBranches > 0 ? (
                 <p className="mt-1 text-[11px] text-[#9CA3AF]">
                   {totalBranches} branch{totalBranches === 1 ? "" : "es"} found
                 </p>
-              )}
+              ) : null}
             </div>
 
-            {totalBranches > 0 && totalPages > 1 && (
+            {totalBranches > 0 && totalPages > 1 ? (
               <div className="flex items-center justify-center gap-2 md:justify-end">
                 <button
                   type="button"
@@ -353,7 +405,7 @@ useEffect(() => {
                   Next
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
