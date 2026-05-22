@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import {
   FaCheck,
   FaRegCalendarAlt,
@@ -9,9 +9,41 @@ import {
   FaUsers,
   FaMapMarkerAlt,
 } from "react-icons/fa";
+import { useAuth } from "@/hooks/useAuth";
+
+const toFiniteNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const buildAddressText = (address: any) => {
+  return [
+    address?.street,
+    address?.area,
+    address?.city,
+    address?.state,
+    address?.country,
+  ]
+    .filter(Boolean)
+    .join(", ");
+};
+
+const getCoordinatesFromCandidates = (candidates: any[]) => {
+  for (const candidate of candidates) {
+    const lat = toFiniteNumber(candidate?.lat);
+    const lng = toFiniteNumber(candidate?.lng);
+
+    if (lat !== null && lng !== null) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
+};
 
 export default function ReservationSuccess({ data }: { data: any }) {
-  // ✅ Format date & time
+  const { user } = useAuth();
+
   const reservationDate = data?.reservationDate
     ? new Date(data.reservationDate)
     : null;
@@ -31,32 +63,86 @@ export default function ReservationSuccess({ data }: { data: any }) {
       })
     : "-";
 
-  return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-[760px]">
+  const branch = useMemo(() => {
+    return (
+      data?.branch ||
+      data?.branchData ||
+      data?.reservationBranch ||
+      (user as any)?.branch ||
+      {}
+    );
+  }, [data, user]);
 
-        {/* ✅ HEADER */}
-        <div className="text-center mb-8">
+  const branchAddress = useMemo(() => {
+    return (
+      (user as any)?.branch?.address ||
+      data?.branch?.address ||
+      data?.branchAddress ||
+      data?.address ||
+      branch?.address ||
+      branch ||
+      {}
+    );
+  }, [branch, data, user]);
+
+  const branchName =
+    branch?.name || data?.branchName || data?.restaurant?.name || "Restaurant";
+
+  const addressText = buildAddressText(branchAddress);
+
+  const coordinates = useMemo(() => {
+    return getCoordinatesFromCandidates([
+      (user as any)?.branch?.address,
+      data?.branch?.address,
+      data?.branchAddress,
+      data?.address,
+      data?.branch,
+      branchAddress,
+      data,
+    ]);
+  }, [branchAddress, data, user]);
+
+  const mapQuery = coordinates
+    ? `${coordinates.lat},${coordinates.lng}`
+    : addressText || branchName;
+
+  const iframeMapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(
+    mapQuery
+  )}&z=16&output=embed`;
+
+  const directionsUrl = coordinates
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+        `${coordinates.lat},${coordinates.lng}`
+      )}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        mapQuery
+      )}`;
+
+  return (
+    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-[760px]">
+        {/* HEADER */}
+        <div className="mb-8 text-center">
           <div className="flex justify-center">
-            <div className="bg-green-100 p-2 rounded-full">
-              <div className="bg-green-600 p-3 rounded-full flex items-center justify-center">
-                <FaCheck className="text-white text-sm" />
+            <div className="rounded-full bg-green-100 p-2">
+              <div className="flex items-center justify-center rounded-full bg-green-600 p-3">
+                <FaCheck className="text-sm text-white" />
               </div>
             </div>
           </div>
 
-          <h1 className="text-[30px] font-semibold text-gray-900 mt-5">
+          <h1 className="mt-5 text-[30px] font-semibold text-gray-900">
             Reservation Confirmed
           </h1>
 
-          <p className="text-gray-500 mt-2 text-[15px] max-w-[520px] mx-auto">
-            We look forward to welcoming you. Your reservation has been successfully created.
+          <p className="mx-auto mt-2 max-w-[520px] text-[15px] text-gray-500">
+            We look forward to welcoming you. Your reservation has been
+            successfully created.
           </p>
         </div>
 
-        {/* ✅ CARD */}
-        <div className="bg-white rounded-[22px] shadow-md overflow-hidden">
-
+        {/* CARD */}
+        <div className="overflow-hidden rounded-[22px] bg-white shadow-md">
           {/* IMAGE */}
           <div className="relative h-[230px] w-full">
             <Image
@@ -69,32 +155,28 @@ export default function ReservationSuccess({ data }: { data: any }) {
             <div className="absolute inset-0 bg-black/50" />
 
             <div className="absolute bottom-5 left-6 text-white">
-              <p className="text-sm text-orange-400 font-medium">
+              <p className="text-sm font-medium text-orange-400">
                 Upcoming Dining experience
               </p>
 
-              <h2 className="text-[22px] font-semibold mt-1">
+              <h2 className="mt-1 text-[22px] font-semibold">
                 Your Reservation
               </h2>
 
-              <p className="text-sm mt-1 text-gray-200">
+              <p className="mt-1 text-sm text-gray-200">
                 Status: {data?.status || "CONFIRMED"}
               </p>
             </div>
           </div>
 
           {/* DETAILS */}
-          <div className="px-6 py-6 grid grid-cols-2 gap-y-6 text-sm">
+          <div className="grid grid-cols-2 gap-y-6 px-6 py-6 text-sm">
             <Detail
               icon={<FaRegCalendarAlt />}
               label="Date"
               value={formattedDate}
             />
-            <Detail
-              icon={<FaClock />}
-              label="Time"
-              value={formattedTime}
-            />
+            <Detail icon={<FaClock />} label="Time" value={formattedTime} />
             <Detail
               icon={<FaUsers />}
               label="Guests"
@@ -109,49 +191,64 @@ export default function ReservationSuccess({ data }: { data: any }) {
 
           {/* CONFIRMATION */}
           <div className="px-6 pb-6">
-            <div className="bg-gray-100 rounded-xl px-5 py-4 flex items-center justify-between border-l-4 border-orange-500">
+            <div className="flex items-center justify-between rounded-xl border-l-4 border-orange-500 bg-gray-100 px-5 py-4">
               <div>
-                <p className="text-gray-400 text-xs">Confirmation ID</p>
-                <p className="text-orange-600 font-semibold text-lg mt-1">
+                <p className="text-xs text-gray-400">Confirmation ID</p>
+                <p className="mt-1 text-lg font-semibold text-orange-600">
                   #{data?.id?.slice(0, 8)?.toUpperCase() || "N/A"}
                 </p>
               </div>
 
-              <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full">
+              <span className="rounded-full bg-green-100 px-3 py-1 text-xs text-green-700">
                 {data?.status || "Booked"}
               </span>
             </div>
           </div>
 
-          {/* MAP + BUTTONS */}
+          {/* MAP */}
           <div className="px-6 pb-8">
-            <div className="grid grid-cols-[1fr_180px] gap-4">
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
+              <div className="flex flex-col gap-1 border-b border-gray-200 bg-white px-4 py-3">
+                <p className="text-sm font-semibold text-gray-900">
+                  {branchName}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {addressText || "Branch address not available"}
+                </p>
+              </div>
 
-              {/* MAP */}
-              <div className="relative h-[140px] rounded-xl overflow-hidden">
-                <Image
-                  src="/items/map.png"
-                  alt="Map"
-                  fill
-                  className="object-cover"
+              <div className="relative h-[220px] w-full">
+                <iframe
+                  title="Reservation branch location"
+                  src={iframeMapSrc}
+                  className="h-full w-full border-0"
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
                 />
 
-                <button className="absolute bottom-3 left-3 bg-white px-3 py-1 text-xs rounded-md shadow font-medium">
+                <a
+                  href={directionsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="absolute bottom-3 left-3 rounded-md bg-white px-3 py-1.5 text-xs font-medium text-gray-900 shadow transition hover:bg-gray-50"
+                >
                   Get Direction
-                </button>
+                </a>
               </div>
 
-              {/* BUTTONS */}
-              <div className="flex flex-col gap-3">
-                <button className="bg-orange-500 text-white py-3 rounded-xl font-medium hover:bg-orange-600 transition text-sm">
-                  View Menu
-                </button>
-
-                <button className="border border-gray-300 py-3 rounded-xl font-medium hover:bg-gray-50 transition text-sm">
-                  Add to Calendar
-                </button>
+              <div className="border-t border-gray-200 bg-white px-4 py-3 text-xs text-gray-500">
+                {coordinates ? (
+                  <span>
+                    Location: {coordinates.lat}, {coordinates.lng}
+                  </span>
+                ) : (
+                  <span>
+                    Map is using branch address because latitude/longitude are
+                    not available.
+                  </span>
+                )}
               </div>
-
             </div>
           </div>
         </div>
@@ -160,7 +257,6 @@ export default function ReservationSuccess({ data }: { data: any }) {
   );
 }
 
-/* ✅ DETAIL COMPONENT */
 type DetailProps = {
   icon: ReactNode;
   label: string;
@@ -170,9 +266,9 @@ type DetailProps = {
 function Detail({ icon, label, value }: DetailProps) {
   return (
     <div className="flex gap-3 border-l-2 border-orange-500 pl-3">
-      <div className="text-gray-400 mt-0.5 text-[14px]">{icon}</div>
+      <div className="mt-0.5 text-[14px] text-gray-400">{icon}</div>
       <div>
-        <p className="text-gray-400 text-xs">{label}</p>
+        <p className="text-xs text-gray-400">{label}</p>
         <p className="font-medium text-gray-800">{value}</p>
       </div>
     </div>
