@@ -1,15 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import {
-  Plus,
-  Info,
-  Loader2,
-  Eye,
-  Minus,
-  Download,
-  X,
-} from "lucide-react";
+import { Plus, Info, Loader2, Eye, Minus, Download, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useApi from "@/hooks/useApi";
@@ -126,7 +118,7 @@ const toNumber = (value: unknown, fallback = 0) => {
 
 const sortBySortOrder = <T extends { sortOrder?: number }>(items: T[]) => {
   return [...items].sort(
-    (a, b) => toNumber(a?.sortOrder, 0) - toNumber(b?.sortOrder, 0)
+    (a, b) => toNumber(a?.sortOrder, 0) - toNumber(b?.sortOrder, 0),
   );
 };
 
@@ -141,6 +133,37 @@ const normalizeApiList = (res: any) => {
   return [];
 };
 
+const getApiResponseMessage = (res: any) => {
+  return [
+    res?.message,
+    typeof res?.error === "string" ? res.error : "",
+    res?.error?.message,
+    res?.error?.code,
+    res?.data?.message,
+    typeof res?.data?.error === "string" ? res.data.error : "",
+    res?.data?.error?.message,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+};
+
+const isApiErrorResponse = (res: any) => {
+  return !res || res?.success === false || Boolean(res?.error);
+};
+
+const getApiErrorMessage = (res: any, fallback = "Something went wrong") => {
+  return getApiResponseMessage(res) || fallback;
+};
+
+const isCartBranchConflictResponse = (res: any) => {
+  const message = getApiResponseMessage(res).toLowerCase();
+
+  return (
+    message.includes("cart already contains items from another branch") ||
+    message.includes("clear it before switching branches")
+  );
+};
 
 const normalizeArray = (value: any): any[] => {
   if (!value) return [];
@@ -189,7 +212,7 @@ const getPromotionTitle = (promotion?: PromotionInfo | null) => {
 
 const getBackendDiscountedPriceCandidate = (
   source: any,
-  promotion?: PromotionInfo | null
+  promotion?: PromotionInfo | null,
 ) => {
   const candidates = [
     source?.discountedPrice,
@@ -214,7 +237,7 @@ const getBackendDiscountedPriceCandidate = (
 
 const calculatePromotionDiscount = (
   originalPrice: number,
-  promotion?: PromotionInfo | null
+  promotion?: PromotionInfo | null,
 ) => {
   if (!promotion || originalPrice <= 0) return 0;
 
@@ -262,18 +285,22 @@ const getPromotionPricing = ({
 
   const backendDiscountedPrice = getBackendDiscountedPriceCandidate(
     source,
-    promotion
+    promotion,
   );
 
   const calculatedDiscount = calculatePromotionDiscount(
     safeOriginalPrice,
-    promotion
+    promotion,
   );
 
-  const calculatedFinalPrice = Math.max(0, safeOriginalPrice - calculatedDiscount);
+  const calculatedFinalPrice = Math.max(
+    0,
+    safeOriginalPrice - calculatedDiscount,
+  );
 
   const finalPrice =
-    backendDiscountedPrice !== null && backendDiscountedPrice <= safeOriginalPrice
+    backendDiscountedPrice !== null &&
+    backendDiscountedPrice <= safeOriginalPrice
       ? backendDiscountedPrice
       : calculatedFinalPrice;
 
@@ -327,7 +354,9 @@ function PromotionPrice({
   originalClassName?: string;
 }) {
   if (!pricing.hasDiscount) {
-    return <span className={className}>{formatMoney(pricing.originalPrice)}</span>;
+    return (
+      <span className={className}>{formatMoney(pricing.originalPrice)}</span>
+    );
   }
 
   return (
@@ -475,10 +504,10 @@ const getAllergenAdditives = (item: any) => {
 const hasProductInfoContent = (item: any) => {
   return Boolean(
     hasText(item?.ingredients) ||
-      hasText(item?.nutritionalInformation) ||
-      getProductLabels(item).length > 0 ||
-      getAllergenAdditives(item).length > 0 ||
-      hasText(item?.allergenPdfUrl)
+    hasText(item?.nutritionalInformation) ||
+    getProductLabels(item).length > 0 ||
+    getAllergenAdditives(item).length > 0 ||
+    hasText(item?.allergenPdfUrl),
   );
 };
 
@@ -589,11 +618,10 @@ function ProductInfoContent({ item }: { item: any }) {
   );
 }
 
-
 export default function RestaurantCard({ item }: any) {
   const router = useRouter();
   const { token } = useAuthContext();
-  const { post, get } = useApi(token);
+  const { post, get, del } = useApi(token);
   const { user } = useAuth();
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -646,8 +674,10 @@ export default function RestaurantCard({ item }: any) {
         name: String(raw?.name || ""),
         description: raw?.description || "",
         price: raw?.price ?? raw?.itemPriceOverrides?.[0]?.price ?? 0,
-        displayText: raw?.displayText ?? raw?.itemPriceOverrides?.[0]?.displayText ?? null,
-        discountedPrice: raw?.discountedPrice ?? raw?.promotion?.discountedAmount ?? null,
+        displayText:
+          raw?.displayText ?? raw?.itemPriceOverrides?.[0]?.displayText ?? null,
+        discountedPrice:
+          raw?.discountedPrice ?? raw?.promotion?.discountedAmount ?? null,
         promotion: getPromotionInfo(raw),
         sortOrder: toNumber(raw?.sortOrder, 0),
         isDefault: Boolean(raw?.isDefault),
@@ -752,7 +782,7 @@ export default function RestaurantCard({ item }: any) {
 
   const getStandaloneItemModifiers = (
     menuItem: any,
-    linkedModifierIds: Set<string>
+    linkedModifierIds: Set<string>,
   ): Modifier[] => {
     const deduped = new Map<string, Modifier>();
 
@@ -819,7 +849,7 @@ export default function RestaurantCard({ item }: any) {
             },
           ],
           variationPriceOverrides: Array.isArray(
-            rawModifier?.variationPriceOverrides
+            rawModifier?.variationPriceOverrides,
           )
             ? rawModifier.variationPriceOverrides
             : [],
@@ -842,7 +872,7 @@ export default function RestaurantCard({ item }: any) {
       : [];
 
     const rawCategoryModifierGroups = Array.isArray(
-      menuItem?.categoryModifierGroups
+      menuItem?.categoryModifierGroups,
     )
       ? menuItem.categoryModifierGroups
       : [];
@@ -882,7 +912,7 @@ export default function RestaurantCard({ item }: any) {
           variationId: link?.variationId ? String(link.variationId) : null,
           sortOrder: toNumber(
             link?.sortOrder ?? normalizedGroup?.sortOrder ?? 0,
-            0
+            0,
           ),
           modifierGroup: normalizedGroup,
         };
@@ -899,7 +929,7 @@ export default function RestaurantCard({ item }: any) {
 
     const standaloneModifiers = getStandaloneItemModifiers(
       menuItem,
-      linkedModifierIds
+      linkedModifierIds,
     );
 
     const standaloneLink: ModifierLink | null = standaloneModifiers.length
@@ -969,7 +999,7 @@ export default function RestaurantCard({ item }: any) {
 
   const getVisibleModifierLinks = (
     menuItem: any,
-    variation?: MenuVariation | null
+    variation?: MenuVariation | null,
   ) => {
     const links = getItemModifierLinks(menuItem);
     const hasVariations = getItemVariations(menuItem).length > 0;
@@ -1008,7 +1038,7 @@ export default function RestaurantCard({ item }: any) {
   const getModifierEffectivePrice = (
     modifier: Modifier,
     menuItemId?: string,
-    variation?: MenuVariation | null
+    variation?: MenuVariation | null,
   ) => {
     const modifierId = String(modifier?.id || "");
     const normalizedMenuItemId = String(menuItemId || "");
@@ -1071,7 +1101,7 @@ export default function RestaurantCard({ item }: any) {
 
   const splitPizzaDefaultVariation = useMemo(
     () => getDefaultVariation(splitPizzaItem),
-    [splitPizzaItem]
+    [splitPizzaItem],
   );
 
   const filteredModifierLinks = useMemo(() => {
@@ -1108,8 +1138,8 @@ export default function RestaurantCard({ item }: any) {
   useEffect(() => {
     const visibleGroupIds = new Set(
       filteredModifierLinks.map((groupLink) =>
-        String(groupLink?.modifierGroup?.id || "")
-      )
+        String(groupLink?.modifierGroup?.id || ""),
+      ),
     );
 
     setSelectedModifiers((prev) => {
@@ -1124,7 +1154,6 @@ export default function RestaurantCard({ item }: any) {
       return next;
     });
   }, [filteredModifierLinks]);
-
 
   const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
     const groupId = String(group.id);
@@ -1150,7 +1179,7 @@ export default function RestaurantCard({ item }: any) {
       if (isSelected) {
         if (minSelect > 0 && current.length <= minSelect) {
           toast.error(
-            `${group?.name || "This group"} requires at least ${minSelect} selection(s)`
+            `${group?.name || "This group"} requires at least ${minSelect} selection(s)`,
           );
           return prev;
         }
@@ -1169,7 +1198,7 @@ export default function RestaurantCard({ item }: any) {
 
       if (maxSelect && current.length >= maxSelect) {
         toast.error(
-          `You can select up to ${maxSelect} option(s) for ${group.name}`
+          `You can select up to ${maxSelect} option(s) for ${group.name}`,
         );
         return prev;
       }
@@ -1183,7 +1212,7 @@ export default function RestaurantCard({ item }: any) {
 
   const validateSelections = (
     links: ModifierLink[],
-    selectionMap: SelectedModifiersMap
+    selectionMap: SelectedModifiersMap,
   ) => {
     for (const link of links) {
       const group = link?.modifierGroup;
@@ -1193,14 +1222,14 @@ export default function RestaurantCard({ item }: any) {
 
       if (minSelect > 0 && selected.length < minSelect) {
         toast.error(
-          `${group?.name || "This group"} requires at least ${minSelect} selection(s)`
+          `${group?.name || "This group"} requires at least ${minSelect} selection(s)`,
         );
         return false;
       }
 
       if (maxSelect && selected.length > maxSelect) {
         toast.error(
-          `${group?.name || "This group"} allows at most ${maxSelect} selection(s)`
+          `${group?.name || "This group"} allows at most ${maxSelect} selection(s)`,
         );
         return false;
       }
@@ -1221,7 +1250,7 @@ export default function RestaurantCard({ item }: any) {
   const getModifiersTotal = (
     selectionMap: SelectedModifiersMap,
     menuItemId?: string,
-    variation?: MenuVariation | null
+    variation?: MenuVariation | null,
   ) => {
     return Object.values(selectionMap)
       .flat()
@@ -1229,7 +1258,7 @@ export default function RestaurantCard({ item }: any) {
         const modifierPrice = getModifierEffectivePrice(
           modifier,
           menuItemId,
-          variation
+          variation,
         );
 
         return acc + modifierPrice;
@@ -1239,13 +1268,13 @@ export default function RestaurantCard({ item }: any) {
   const getMenuItemBasePrice = (menuItem: any) => {
     return toNumber(
       menuItem?.basePrice ?? menuItem?.unitPrice ?? menuItem?.price,
-      0
+      0,
     );
   };
 
   const getMenuItemResolvedPrice = (
     menuItem: any,
-    variation?: MenuVariation | null
+    variation?: MenuVariation | null,
   ) => {
     if (!menuItem) return 0;
 
@@ -1265,18 +1294,21 @@ export default function RestaurantCard({ item }: any) {
 
   const splitPizzaResolvedItemPrice = getMenuItemResolvedPrice(
     splitPizzaItem,
-    splitPizzaDefaultVariation
+    splitPizzaDefaultVariation,
   );
 
   const splitPizzaPromotionPricing = getPromotionPricing({
-    source: getPromotionSourceForPrice(splitPizzaItem, splitPizzaDefaultVariation),
+    source: getPromotionSourceForPrice(
+      splitPizzaItem,
+      splitPizzaDefaultVariation,
+    ),
     originalPrice: splitPizzaResolvedItemPrice,
   });
 
   const modifiersTotal = getModifiersTotal(
     selectedModifiers,
     item?.id,
-    selectedVariation
+    selectedVariation,
   );
 
   const splitPizzaBasePrice =
@@ -1288,7 +1320,7 @@ export default function RestaurantCard({ item }: any) {
     splitPizzaEnabled && splitPizzaItem
       ? Math.max(
           selectedItemPromotionPricing.finalPrice,
-          splitPizzaPromotionPricing.finalPrice
+          splitPizzaPromotionPricing.finalPrice,
         )
       : selectedItemPromotionPricing.finalPrice;
 
@@ -1297,7 +1329,8 @@ export default function RestaurantCard({ item }: any) {
   const hasTotalPromotionDiscount = displayTotalPrice < totalPrice;
   const totalPromotionDiscount = Math.max(0, totalPrice - displayTotalPrice);
   const activeVisiblePromotion =
-    selectedItemPromotionPricing.promotion || splitPizzaPromotionPricing.promotion;
+    selectedItemPromotionPricing.promotion ||
+    splitPizzaPromotionPricing.promotion;
 
   const fetchPizzaItems = async ({
     search,
@@ -1386,12 +1419,12 @@ export default function RestaurantCard({ item }: any) {
                     ? "Select 1 required option"
                     : "Select up to 1 option"
                   : maxSelect
-                  ? minSelect > 0
-                    ? `Select ${minSelect}-${maxSelect}`
-                    : `Select up to ${maxSelect}`
-                  : minSelect > 0
-                  ? `Select at least ${minSelect}`
-                  : "Optional"}
+                    ? minSelect > 0
+                      ? `Select ${minSelect}-${maxSelect}`
+                      : `Select up to ${maxSelect}`
+                    : minSelect > 0
+                      ? `Select at least ${minSelect}`
+                      : "Optional"}
               </p>
             </div>
 
@@ -1404,7 +1437,7 @@ export default function RestaurantCard({ item }: any) {
           <div className="space-y-2">
             {groupModifiers.map((modifier) => {
               const selectedModifier = selectedInGroup.find(
-                (selected) => selected.id === modifier.id
+                (selected) => selected.id === modifier.id,
               );
 
               const checked = Boolean(selectedModifier);
@@ -1415,7 +1448,7 @@ export default function RestaurantCard({ item }: any) {
               const effectivePrice = getModifierEffectivePrice(
                 modifier,
                 menuItem?.id,
-                variation
+                variation,
               );
 
               const inputType = maxSelect === 1 ? "radio" : "checkbox";
@@ -1427,8 +1460,8 @@ export default function RestaurantCard({ item }: any) {
                     disableBecauseMaxReached
                       ? "bg-gray-100 opacity-70"
                       : checked
-                      ? "bg-primary/5 ring-1 ring-primary/20"
-                      : "bg-gray-50"
+                        ? "bg-primary/5 ring-1 ring-primary/20"
+                        : "bg-gray-50"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -1438,9 +1471,7 @@ export default function RestaurantCard({ item }: any) {
                         name={`${scope}-modifier-group-${groupId}`}
                         checked={checked}
                         disabled={disableBecauseMaxReached}
-                        onChange={() =>
-                          handleModifierToggle(group, modifier)
-                        }
+                        onChange={() => handleModifierToggle(group, modifier)}
                         className="mt-1 accent-[var(--primary)]"
                       />
 
@@ -1461,7 +1492,6 @@ export default function RestaurantCard({ item }: any) {
                       </span>
                     ) : null}
                   </div>
-
                 </div>
               );
             })}
@@ -1469,6 +1499,45 @@ export default function RestaurantCard({ item }: any) {
         </div>
       );
     });
+  };
+
+  const addCartItemWithBranchRetry = async (payload: any) => {
+    if (!customerId) {
+      return {
+        success: false,
+        error: "Customer not found",
+      };
+    }
+
+    const cartPayload = {
+      ...payload,
+      branchId,
+    };
+
+    const addUrl = `/v1/cart/items?customerId=${customerId}`;
+    const clearCartUrl = `/v1/cart?customerId=${customerId}`;
+
+    const firstRes = await post(addUrl, cartPayload);
+
+    if (!isCartBranchConflictResponse(firstRes)) {
+      return firstRes;
+    }
+
+    const clearRes = await del(clearCartUrl);
+
+    if (isApiErrorResponse(clearRes)) {
+      return {
+        success: false,
+        error: getApiErrorMessage(
+          clearRes,
+          "Failed to clear previous branch cart",
+        ),
+      };
+    }
+
+    toast.info("Previous branch cart cleared. Adding selected item again.");
+
+    return post(addUrl, cartPayload);
   };
 
   async function handleAddToCart() {
@@ -1540,11 +1609,11 @@ export default function RestaurantCard({ item }: any) {
         const groupOrders = Array.isArray(groupOrdersRes?.data)
           ? groupOrdersRes.data
           : Array.isArray(groupOrdersRes?.data?.data)
-          ? groupOrdersRes.data.data
-          : [];
+            ? groupOrdersRes.data.data
+            : [];
 
         const groupOrder = groupOrders.find(
-          (order: any) => order?.inviteCode === groupCode
+          (order: any) => order?.inviteCode === groupCode,
         );
 
         if (!groupOrder) {
@@ -1552,16 +1621,16 @@ export default function RestaurantCard({ item }: any) {
           return;
         }
 
-        res = await post(`/v1/group-orders/${groupOrder.id}/items`, basePayload);
+        res = await post(
+          `/v1/group-orders/${groupOrder.id}/items`,
+          basePayload,
+        );
       } else {
-        res = await post(`/v1/cart/items?customerId=${customerId}`, {
-          ...basePayload,
-          branchId,
-        });
+        res = await addCartItemWithBranchRetry(basePayload);
       }
 
-      if (!res || res?.error) {
-        toast.error(res?.error || "Failed to add to cart");
+      if (isApiErrorResponse(res)) {
+        toast.error(getApiErrorMessage(res, "Failed to add to cart"));
         return;
       }
 
@@ -1586,32 +1655,32 @@ export default function RestaurantCard({ item }: any) {
   }
 
   const handlePlusClick = () => {
-  if (loading) return;
+    if (loading) return;
 
-  const groupCode =
-    typeof window !== "undefined"
-      ? localStorage.getItem("groupOrderCode")
-      : null;
+    const groupCode =
+      typeof window !== "undefined"
+        ? localStorage.getItem("groupOrderCode")
+        : null;
 
-  if (!hasOptions) {
-    if (!groupCode && !branchId) {
-      toast.error("Please select a branch first");
+    if (!hasOptions) {
+      if (!groupCode && !branchId) {
+        toast.error("Please select a branch first");
+        return;
+      }
+
+      handleAddToCart();
       return;
     }
 
-    handleAddToCart();
-    return;
-  }
+    setOpen(true);
+  };
 
-  setOpen(true);
-};
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
 
-const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-  if (event.key !== "Enter" && event.key !== " ") return;
-
-  event.preventDefault();
-  handlePlusClick();
-};
+    event.preventDefault();
+    handlePlusClick();
+  };
 
   const handleNavigateToDetails = () => {
     router.push(`/items/details?itemId=${item?.id}&slug=${item?.slug}`);
@@ -1633,14 +1702,14 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
 
   return (
     <>
-     <div
-  role="button"
-  tabIndex={0}
-  onClick={handlePlusClick}
-  onKeyDown={handleCardKeyDown}
-  className="group relative cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-primary/40 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
->
-     <div className="flex justify-between gap-4">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handlePlusClick}
+        onKeyDown={handleCardKeyDown}
+        className="group relative cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-primary/40 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+      >
+        <div className="flex justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-start justify-between gap-2">
               <h3 className="text-sm font-semibold text-gray-900">
@@ -1650,10 +1719,10 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
               {hasInfoBoxContent ? (
                 <button
                   type="button"
-                 onClick={(event) => {
-  event.stopPropagation();
-  setInfoOpen(true);
-}}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setInfoOpen(true);
+                  }}
                   className="rounded-full border border-gray-200 bg-gray-50 p-1.5 text-gray-500 transition hover:text-primary"
                   title="View ingredients and allergens"
                 >
@@ -1687,10 +1756,10 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
 
             <button
               type="button"
-             onClick={(event) => {
-  event.stopPropagation();
-  handleNavigateToDetails();
-}}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleNavigateToDetails();
+              }}
               className="mt-2 flex items-center gap-1 text-xs text-primary"
             >
               <Info size={14} /> Item Info
@@ -1717,10 +1786,10 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
 
             <button
               type="button"
-            onClick={(event) => {
-  event.stopPropagation();
-  handlePlusClick();
-}}
+              onClick={(event) => {
+                event.stopPropagation();
+                handlePlusClick();
+              }}
               disabled={loading}
               className="absolute bottom-2 right-2 rounded-full bg-primary p-2 text-white shadow-sm transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-70"
             >
@@ -1847,14 +1916,17 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
                             {variationPromotionPricing.hasPromotion ? (
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <PromotionBadge
-                                  promotion={variationPromotionPricing.promotion}
+                                  promotion={
+                                    variationPromotionPricing.promotion
+                                  }
                                   compact
                                 />
 
                                 {variationPromotionPricing.hasDiscount ? (
                                   <span className="text-xs font-medium text-green-700">
-                                    Save {formatMoney(
-                                      variationPromotionPricing.discountAmount
+                                    Save{" "}
+                                    {formatMoney(
+                                      variationPromotionPricing.discountAmount,
                                     )}
                                   </span>
                                 ) : null}
@@ -1865,7 +1937,9 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
 
                         {variationPrice > 0 ? (
                           <div className="shrink-0 text-right text-sm font-semibold text-primary">
-                            <PromotionPrice pricing={variationPromotionPricing} />
+                            <PromotionPrice
+                              pricing={variationPromotionPricing}
+                            />
                           </div>
                         ) : null}
                       </div>
@@ -1876,88 +1950,94 @@ const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
             </div>
           ) : null}
 
-       {itemSupportsSplitPizza ? (
-  <div className="mb-5 rounded-2xl border border-gray-100 bg-gray-50 p-4 transition">
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <p className="font-medium text-gray-900">Enable split pizza</p>
-        <p className="text-xs text-gray-500">
-          Choose another split-pizza item for the second half.
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => handleSplitPizzaToggle(!splitPizzaEnabled)}
-        className={`relative h-7 w-12 rounded-full transition ${
-          splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
-        }`}
-      >
-        <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
-            splitPizzaEnabled ? "left-6" : "left-1"
-          }`}
-        />
-      </button>
-    </div>
-
-    {splitPizzaEnabled ? (
-      <div className="mt-4 space-y-4">
-        <div>
-          <p className="mb-2 text-sm font-medium text-gray-900">
-            Select other pizza half
-          </p>
-
-          <AsyncSelect
-            value={splitPizzaItem}
-            onChange={handleSplitPizzaItemChange}
-            placeholder="Select split-pizza item"
-            fetchOptions={fetchPizzaItems}
-            labelKey="name"
-            valueKey="id"
-          />
-        </div>
-
-        {splitPizzaItem ? (
-          <div className="rounded-xl bg-white p-3">
-            <p className="text-sm font-semibold text-gray-900">
-              Selected second half
-            </p>
-
-            <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
-              <div className="min-w-0">
-                <p className="truncate font-medium text-gray-900">
-                  {splitPizzaItem?.name}
-                </p>
-
-                {splitPizzaItem?.description ? (
-                  <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
-                    {splitPizzaItem.description}
+          {itemSupportsSplitPizza ? (
+            <div className="mb-5 rounded-2xl border border-gray-100 bg-gray-50 p-4 transition">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium text-gray-900">
+                    Enable split pizza
                   </p>
-                ) : null}
+                  <p className="text-xs text-gray-500">
+                    Choose another split-pizza item for the second half.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSplitPizzaToggle(!splitPizzaEnabled)}
+                  className={`relative h-7 w-12 rounded-full transition ${
+                    splitPizzaEnabled ? "bg-primary" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
+                      splitPizzaEnabled ? "left-6" : "left-1"
+                    }`}
+                  />
+                </button>
               </div>
 
-              {splitPizzaResolvedItemPrice > 0 ? (
-                <div className="shrink-0 text-right font-medium text-primary">
-                  <PromotionPrice pricing={splitPizzaPromotionPricing} />
+              {splitPizzaEnabled ? (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-gray-900">
+                      Select other pizza half
+                    </p>
 
-                  {splitPizzaPromotionPricing.hasPromotion ? (
-                    <div className="mt-1 flex justify-end">
-                      <PromotionBadge
-                        promotion={splitPizzaPromotionPricing.promotion}
-                        compact
-                      />
+                    <AsyncSelect
+                      value={splitPizzaItem}
+                      onChange={handleSplitPizzaItemChange}
+                      placeholder="Select split-pizza item"
+                      fetchOptions={fetchPizzaItems}
+                      labelKey="name"
+                      valueKey="id"
+                    />
+                  </div>
+
+                  {splitPizzaItem ? (
+                    <div className="rounded-xl bg-white p-3">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Selected second half
+                      </p>
+
+                      <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-gray-900">
+                            {splitPizzaItem?.name}
+                          </p>
+
+                          {splitPizzaItem?.description ? (
+                            <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
+                              {splitPizzaItem.description}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        {splitPizzaResolvedItemPrice > 0 ? (
+                          <div className="shrink-0 text-right font-medium text-primary">
+                            <PromotionPrice
+                              pricing={splitPizzaPromotionPricing}
+                            />
+
+                            {splitPizzaPromotionPricing.hasPromotion ? (
+                              <div className="mt-1 flex justify-end">
+                                <PromotionBadge
+                                  promotion={
+                                    splitPizzaPromotionPricing.promotion
+                                  }
+                                  compact
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   ) : null}
                 </div>
               ) : null}
             </div>
-          </div>
-        ) : null}
-      </div>
-    ) : null}
-  </div>
-) : null}
+          ) : null}
 
           {filteredModifierLinks.length > 0 ? (
             <div>

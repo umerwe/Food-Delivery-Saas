@@ -907,7 +907,7 @@ export default function ProductPage() {
   const isEditingCartItem = Boolean(cartItemId);
 
   const { token } = useAuthContext();
-  const { get, post, patch } = useApi(token);
+  const { get, post, patch, del } = useApi(token);
   const router = useRouter();
 
   const [item, setItem] = useState<any>(null);
@@ -2080,6 +2080,60 @@ export default function ProductPage() {
     return payload;
   };
 
+  const getApiErrorMessage = (res: any, fallback = "Something went wrong") => {
+    const candidate =
+      res?.error?.message ||
+      res?.message ||
+      res?.error ||
+      res?.data?.message ||
+      res?.data?.error?.message;
+
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate;
+    }
+
+    if (Array.isArray(candidate) && candidate.length) {
+      return candidate.filter(Boolean).join(", ");
+    }
+
+    return fallback;
+  };
+
+  const isCartBranchConflict = (res: any) => {
+    const message = getApiErrorMessage(res, "")
+      .toLowerCase()
+      .trim();
+
+    return (
+      message.includes("cart already contains items from another branch") ||
+      message.includes("clear it before switching branches")
+    );
+  };
+
+  const clearCartAndRetryAdd = async () => {
+    if (!customerId) {
+      toast.error("Customer not found");
+      return null;
+    }
+
+    const clearRes = await del(`/v1/cart?customerId=${customerId}`);
+
+    if (!clearRes || clearRes?.error) {
+      toast.error(
+        getApiErrorMessage(
+          clearRes,
+          "Failed to clear cart before switching branch"
+        )
+      );
+      return null;
+    }
+
+    return post(
+      `/v1/cart/items?customerId=${customerId}`,
+      buildCreateCartPayload()
+    );
+  };
+
   const handleAddToCart = async () => {
     try {
       setLoading(true);
@@ -2156,8 +2210,17 @@ export default function ProductPage() {
         }
       }
 
+      if (
+        !groupCode &&
+        !isEditingCartItem &&
+        isCartBranchConflict(res)
+      ) {
+        toast.info("Clearing previous branch cart and adding this item...");
+        res = await clearCartAndRetryAdd();
+      }
+
       if (!res || res?.error) {
-        toast.error(res?.error || res?.message || "Failed to save item");
+        toast.error(getApiErrorMessage(res, "Failed to save item"));
         return;
       }
 

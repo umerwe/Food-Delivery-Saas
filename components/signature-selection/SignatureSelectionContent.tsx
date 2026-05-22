@@ -12,6 +12,7 @@ import {
   Menu as MenuIcon,
   Minus,
   Plus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import useApi from "@/hooks/useApi";
@@ -250,6 +251,255 @@ const normalizeArray = (value: any): any[] => {
   return Array.isArray(value) ? value : [];
 };
 
+/* ================= PRODUCT INFO HELPERS ================= */
+
+const titleizeConstant = (value: any) => {
+  return String(value || "")
+    .trim()
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getTenantSettings = (item: any) => {
+  return (
+    item?.restaurant?.tenant?.settings ||
+    item?.tenant?.settings ||
+    item?.restaurant?.settings ||
+    {}
+  );
+};
+
+const getProductLabelMap = (item: any) => {
+  const settings = getTenantSettings(item);
+  const labels = normalizeArray(settings?.productLabels);
+
+  const map = new Map<string, string>();
+
+  labels.forEach((entry: any) => {
+    const value = String(entry?.value || entry?.code || "").trim();
+    const label = String(entry?.label || entry?.name || "").trim();
+
+    if (value) {
+      map.set(value, label || titleizeConstant(value));
+    }
+  });
+
+  return map;
+};
+
+const getProductLabels = (item: any) => {
+  const labelMap = getProductLabelMap(item);
+
+  const rawLabels = [
+    ...normalizeArray(item?.labels),
+    ...normalizeArray(item?.dietaryFlags),
+  ];
+
+  const seen = new Set<string>();
+
+  return rawLabels
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .filter((value) => {
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
+    .map((value) => ({
+      value,
+      label: labelMap.get(value) || titleizeConstant(value),
+    }));
+};
+
+const getAllergenTemplateMap = (item: any) => {
+  const settings = getTenantSettings(item);
+
+  const templates =
+    settings?.customerApp?.allergenAdditiveTemplates ||
+    settings?.allergenAdditiveTemplates ||
+    {};
+
+  const allergens = normalizeArray(templates?.allergens);
+  const additives = normalizeArray(templates?.additives);
+
+  const map = new Map<string, string>();
+
+  [...allergens, ...additives].forEach((entry: any) => {
+    const code = String(entry?.code || entry?.value || "").trim();
+    const label = String(entry?.label || entry?.name || "").trim();
+
+    if (code && label) {
+      map.set(code, label);
+    }
+  });
+
+  return map;
+};
+
+const getAllergenAdditives = (item: any) => {
+  const templateMap = getAllergenTemplateMap(item);
+  const seen = new Set<string>();
+
+  const directEntries = normalizeArray(item?.allergenAdditives)
+    .map((entry: any) => {
+      const code = String(entry?.code || entry?.value || "").trim();
+      const directLabel = String(entry?.label || entry?.name || "").trim();
+      const mappedLabel = code ? templateMap.get(code) : "";
+
+      return {
+        code,
+        label: directLabel || mappedLabel || "",
+      };
+    })
+    .filter((entry) => hasText(entry.label));
+
+  const codeEntries = [
+    ...normalizeArray(item?.allergenCodes),
+    ...normalizeArray(item?.allergenFlags),
+    ...normalizeArray(item?.additiveCodes),
+    ...normalizeArray(item?.additiveFlags),
+  ]
+    .map((code) => {
+      const normalizedCode = String(code || "").trim();
+      const mappedLabel = templateMap.get(normalizedCode) || "";
+
+      return {
+        code: normalizedCode,
+        label: mappedLabel,
+      };
+    })
+    .filter((entry) => hasText(entry.label));
+
+  return [...directEntries, ...codeEntries]
+    .filter((entry) => entry.label)
+    .filter((entry) => {
+      const key = entry.label.toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+};
+
+const hasProductInfoContent = (item: any) => {
+  return Boolean(
+    hasText(item?.ingredients) ||
+      hasText(item?.nutritionalInformation) ||
+      getProductLabels(item).length > 0 ||
+      getAllergenAdditives(item).length > 0 ||
+      hasText(item?.allergenPdfUrl)
+  );
+};
+
+function ProductInfoContent({ item }: { item: any }) {
+  const productLabels = getProductLabels(item);
+  const allergenAdditives = getAllergenAdditives(item);
+
+  const hasIngredients = hasText(item?.ingredients);
+  const hasNutritionalInformation = hasText(item?.nutritionalInformation);
+  const hasAllergenPdf = hasText(item?.allergenPdfUrl);
+
+  const hasAnyInfo =
+    hasIngredients ||
+    hasNutritionalInformation ||
+    productLabels.length > 0 ||
+    allergenAdditives.length > 0 ||
+    hasAllergenPdf;
+
+  if (!hasAnyInfo) {
+    return (
+      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+        <p className="text-sm font-medium text-gray-900">
+          No additional product information
+        </p>
+        <p className="mt-1 text-sm text-gray-500">
+          Details for ingredients, allergens, labels, and nutrition have not
+          been added yet.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {productLabels.length > 0 ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Product Labels
+          </h3>
+
+          <div className="flex flex-wrap gap-2">
+            {productLabels.map((label) => (
+              <span
+                key={label.value}
+                className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 ring-1 ring-green-100"
+              >
+                {label.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {allergenAdditives.length > 0 ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Allergens & Additives
+          </h3>
+
+          <div className="flex flex-wrap gap-2">
+            {allergenAdditives.map((entry) => (
+              <span
+                key={entry.label}
+                className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100"
+              >
+                {entry.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {hasIngredients ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Ingredients
+          </h3>
+          <p className="text-sm leading-relaxed text-gray-600">
+            {item.ingredients}
+          </p>
+        </div>
+      ) : null}
+
+      {hasNutritionalInformation ? (
+        <div className="rounded-2xl bg-gray-50 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-gray-900">
+            Nutritional Information
+          </h3>
+          <p className="text-sm leading-relaxed text-gray-600">
+            {item.nutritionalInformation}
+          </p>
+        </div>
+      ) : null}
+
+      {hasAllergenPdf ? (
+        <a
+          href={String(item.allergenPdfUrl)}
+          download
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
+        >
+          <Download size={16} />
+          Download allergen PDF
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 const getId = (value: any) => {
   if (value === undefined || value === null) return "";
   return String(value);
@@ -384,6 +634,35 @@ const findBestModifierOverride = ({
   return matching.find(isGenericMenuItemOverride) || matching[0];
 };
 
+/* ================= CART API HELPERS ================= */
+
+const getApiErrorMessage = (res: any, fallback = "Something went wrong") => {
+  if (!res) return fallback;
+
+  if (typeof res?.error === "string") return res.error;
+  if (typeof res?.error?.message === "string") return res.error.message;
+  if (typeof res?.message === "string") return res.message;
+  if (typeof res?.data?.message === "string") return res.data.message;
+  if (typeof res?.data?.error === "string") return res.data.error;
+  if (typeof res?.data?.error?.message === "string") {
+    return res.data.error.message;
+  }
+
+  return fallback;
+};
+
+const isBranchCartConflictResponse = (res: any) => {
+  const message = getApiErrorMessage(res, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+  return (
+    message.includes("cart already contains items from another branch") ||
+    (message.includes("another branch") && message.includes("clear"))
+  );
+};
+
+
 export default function SignatureSelectionContent({
   restaurantId,
   customerId,
@@ -391,7 +670,7 @@ export default function SignatureSelectionContent({
   onCartRefresh,
 }: SignatureSelectionContentProps) {
   const { token } = useAuth();
-  const { get, post } = useApi(token);
+  const { get, post, del } = useApi(token);
 
   const [menus, setMenus] = useState<MenuRecord[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string>("");
@@ -1524,10 +1803,29 @@ export default function SignatureSelectionContent({
         payload.sections = splitSections;
       }
 
-      const res = await post(`/v1/cart/items?customerId=${customerId}`, payload);
+      const addCartItem = async () => {
+        return post(`/v1/cart/items?customerId=${customerId}`, payload);
+      };
+
+      let res = await addCartItem();
+
+      if (isBranchCartConflictResponse(res)) {
+        toast.info("Your cart had items from another branch. Clearing cart...");
+
+        const clearCartRes = await del(`/v1/cart?customerId=${customerId}`);
+
+        if (!clearCartRes || clearCartRes.error) {
+          toast.error(
+            getApiErrorMessage(clearCartRes, "Failed to clear cart")
+          );
+          return;
+        }
+
+        res = await addCartItem();
+      }
 
       if (!res || res.error) {
-        toast.error(res?.error || "Failed to add to cart");
+        toast.error(getApiErrorMessage(res, "Failed to add to cart"));
         return;
       }
 
@@ -1565,15 +1863,7 @@ export default function SignatureSelectionContent({
   };
 
   const hasInfoContent = (item?: MenuItem | null) => {
-    if (!item) return false;
-
-    return (
-      hasText(item.ingredients) ||
-      hasText(item.nutritionalInformation) ||
-      (Array.isArray(item.allergenFlags) && item.allergenFlags.length > 0) ||
-      (Array.isArray(item.dietaryFlags) && item.dietaryFlags.length > 0) ||
-      hasText(item.allergenPdfUrl)
-    );
+    return hasProductInfoContent(item);
   };
 
   const startDragging = (pageX: number) => {
@@ -1972,115 +2262,42 @@ export default function SignatureSelectionContent({
         `}</style>
       </section>
 
-      <Dialog
-        open={infoOpen}
-        onOpenChange={(nextOpen) => {
-          setInfoOpen(nextOpen);
-
-          if (!nextOpen) {
+      {infoOpen && infoItem ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => {
+            setInfoOpen(false);
             setInfoItem(null);
-          }
-        }}
-      >
-        <DialogContent className="max-h-[90vh] max-w-md overflow-auto rounded-2xl p-6">
-          {infoItem ? (
-            <>
-              <h2 className="mb-1 text-lg font-semibold text-gray-900">
-                Product Information
-              </h2>
-
-              <p className="mb-5 text-sm text-gray-500">{infoItem.name}</p>
-
-              <div className="space-y-5">
-                <div>
-                  <h3 className="mb-2 font-semibold text-gray-900">
-                    Ingredients
-                  </h3>
-
-                  {hasText(infoItem.ingredients) ? (
-                    <p className="text-sm leading-relaxed text-gray-600">
-                      {infoItem.ingredients}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-gray-400">
-                      Ingredients information is not available.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="mb-2 font-semibold text-gray-900">
-                    Allergens
-                  </h3>
-
-                  {Array.isArray(infoItem.allergenFlags) &&
-                  infoItem.allergenFlags.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {infoItem.allergenFlags.map((flag: string) => (
-                        <span
-                          key={flag}
-                          className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-600"
-                        >
-                          {flag}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-400">
-                      Allergen information is not available.
-                    </p>
-                  )}
-
-                  {hasText(infoItem.allergenPdfUrl) ? (
-                    <a
-                      href={String(infoItem.allergenPdfUrl)}
-                      download
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white"
-                    >
-                      <Download size={16} />
-                      Download allergen PDF
-                    </a>
-                  ) : null}
-                </div>
-
-                {hasText(infoItem.nutritionalInformation) ? (
-                  <div>
-                    <h3 className="mb-2 font-semibold text-gray-900">
-                      Nutritional Information
-                    </h3>
-
-                    <p className="text-sm leading-relaxed text-gray-600">
-                      {infoItem.nutritionalInformation}
-                    </p>
-                  </div>
-                ) : null}
-
-                {Array.isArray(infoItem.dietaryFlags) &&
-                infoItem.dietaryFlags.length > 0 ? (
-                  <div>
-                    <h3 className="mb-2 font-semibold text-gray-900">
-                      Dietary Preferences
-                    </h3>
-
-                    <div className="flex flex-wrap gap-2">
-                      {infoItem.dietaryFlags.map((flag: string) => (
-                        <span
-                          key={flag}
-                          className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700"
-                        >
-                          {flag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+          }}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-[520px] overflow-auto rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Product Information
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">{infoItem.name}</p>
               </div>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInfoOpen(false);
+                  setInfoItem(null);
+                }}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <ProductInfoContent item={infoItem} />
+          </div>
+        </div>
+      ) : null}
 
       <Dialog
         open={modalOpen}
