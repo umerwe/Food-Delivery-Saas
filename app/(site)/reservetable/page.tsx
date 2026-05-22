@@ -703,12 +703,11 @@ export default function ReserveTablePage() {
               <label className="text-sm font-medium">Special Request</label>
 
               <Textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Birthday, allergies, window seat..."
-                className="mt-2 rounded-xl border border-gray-200 bg-[#FAFAF9] focus:border-primary focus:ring-1 focus:ring-primary"
-              />
-
+  value={note}
+  onChange={(e) => setNote(e.target.value)}
+  placeholder="Birthday, allergies, window seat..."
+  className="mt-2 rounded-xl border border-gray-200 bg-[#FAFAF9] placeholder:text-gray-400 focus:border-primary focus:ring-1 focus:ring-primary"
+/>
               <p className="mt-1 text-xs text-gray-500">
                 Tip: Add occasion details for better experience
               </p>
