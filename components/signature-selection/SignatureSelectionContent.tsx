@@ -70,6 +70,7 @@ type Modifier = {
   modifierGroupId?: string;
   restaurantId?: string;
   name: string;
+  displayText?: string | null;
   description?: string | null;
   priceDelta?: string | number;
   sortOrder?: number;
@@ -124,6 +125,11 @@ type MenuItem = {
   price?: string | number;
   isActive?: boolean;
   supportsSplitPizza?: boolean;
+  isRequired?: boolean;
+  minSelect?: number;
+  maxSelect?: number;
+  minQuantity?: number;
+  maxQuantity?: number;
   categoryId?: string;
   ingredients?: string | null;
   nutritionalInformation?: string | null;
@@ -182,6 +188,7 @@ type ProductCardData = {
 
 type SelectedModifiersMap = Record<string, SelectedModifier[]>;
 
+const ADDONS_GROUP_ID = "__item_addons__";
 const MENU_PAGE_LIMIT = 20;
 
 const toNumber = (value: unknown, fallback = 0) => {
@@ -1019,6 +1026,7 @@ export default function SignatureSelectionContent({
     return {
       id: String(raw.id),
       name: String(raw?.name || ""),
+      displayText: raw?.displayText ?? raw?.label ?? null,
       description: raw?.description ?? null,
       priceDelta: raw?.priceDelta ?? 0,
       sortOrder: toNumber(raw?.sortOrder, 0),
@@ -1660,18 +1668,93 @@ export default function SignatureSelectionContent({
     return getVisibleModifierLinks(selectedItem, selectedVariation);
   }, [selectedItem, selectedVariation]);
 
+  const selectedItemAddons = useMemo(() => {
+    if (!selectedItem) return [];
+    return getStandaloneItemModifiers(selectedItem, new Set<string>());
+  }, [selectedItem]);
+
+  const selectedAddons = selectedModifiers[ADDONS_GROUP_ID] || [];
+
+  const itemQuantityRules = useMemo(() => {
+    const minQuantity = Math.max(1, toNumber(selectedItem?.minQuantity, 1));
+    const rawMaxQuantity = toNumber(selectedItem?.maxQuantity, 0);
+
+    return {
+      minQuantity,
+      maxQuantity: rawMaxQuantity > 0 ? rawMaxQuantity : undefined,
+    };
+  }, [selectedItem]);
+
+  const addonSelectionRules = useMemo(() => {
+    const rawMinSelect = toNumber(selectedItem?.minSelect, 0);
+    const rawMaxSelect = toNumber(selectedItem?.maxSelect, 0);
+    const isRequired = Boolean(selectedItem?.isRequired);
+
+    return {
+      minSelect: Math.max(isRequired ? 1 : 0, rawMinSelect),
+      maxSelect: rawMaxSelect > 0 ? rawMaxSelect : undefined,
+      isRequired,
+    };
+  }, [selectedItem]);
+
+  const addonSelectionLabel = useMemo(() => {
+    const { minSelect, maxSelect } = addonSelectionRules;
+
+    if (minSelect > 0 && maxSelect) {
+      return `Min ${minSelect} · Max ${maxSelect}`;
+    }
+
+    if (minSelect > 0) {
+      return `Min ${minSelect}`;
+    }
+
+    if (maxSelect) {
+      return `Max ${maxSelect}`;
+    }
+
+    return "Optional";
+  }, [addonSelectionRules]);
+
+  const quantityLabel = useMemo(() => {
+    const { minQuantity, maxQuantity } = itemQuantityRules;
+
+    if (maxQuantity) {
+      return `Min ${minQuantity} · Max ${maxQuantity}`;
+    }
+
+    return `Min ${minQuantity}`;
+  }, [itemQuantityRules]);
+
   useEffect(() => {
-    if (!selectedItem) return;
-
-    const visibleLinks = getVisibleModifierLinks(
-      selectedItem,
-      selectedVariation
+    const validAddonIds = new Set(
+      selectedItemAddons.map((addon) => String(addon.id))
     );
 
-    setSelectedModifiers((prev) =>
-      sanitizeSelectedModifiersForVisibleGroups(prev, visibleLinks)
-    );
-  }, [selectedItem, selectedVariation]);
+    setSelectedModifiers((prev): SelectedModifiersMap => {
+      const existingAddons = prev[ADDONS_GROUP_ID] || [];
+      const nextAddons = existingAddons.filter((addon) =>
+        validAddonIds.has(String(addon.id))
+      );
+
+      if (!nextAddons.length) {
+        return {};
+      }
+
+      const next: SelectedModifiersMap = {};
+      next[ADDONS_GROUP_ID] = nextAddons;
+      return next;
+    });
+  }, [selectedItemAddons]);
+
+  useEffect(() => {
+    setQty((prev) => {
+      const minQuantity = itemQuantityRules.minQuantity;
+      const maxQuantity = itemQuantityRules.maxQuantity;
+      const nextQuantity = Math.max(minQuantity, prev);
+
+      return maxQuantity ? Math.min(maxQuantity, nextQuantity) : nextQuantity;
+    });
+  }, [itemQuantityRules]);
 
   useEffect(() => {
     if (selectedItemSupportsSplitPizza) return;
@@ -1723,7 +1806,7 @@ export default function SignatureSelectionContent({
     setSplitPizzaItem(null);
     setSplitPizzaVariation(null);
     setSplitPizzaModifiers({});
-    setQty(1);
+    setQty(Math.max(1, toNumber(item?.minQuantity, 1)));
     setNote("");
     setModalOpen(true);
   };
@@ -1764,7 +1847,7 @@ export default function SignatureSelectionContent({
 
     const safeModifiersMap = modifiersMap || {};
 
-    if (!validateSelections(item, safeModifiersMap, variation)) {
+    if (!validateAddonSelections(item, safeModifiersMap)) {
       return;
     }
 
@@ -1842,11 +1925,11 @@ export default function SignatureSelectionContent({
 
   const handleAddClick = (item: MenuItem) => {
     const variations = getItemVariations(item);
-    const modifiers = getItemModifierLinks(item);
+    const addons = getStandaloneItemModifiers(item, new Set<string>());
 
     const hasOptions =
       variations.length > 0 ||
-      modifiers.length > 0 ||
+      addons.length > 0 ||
       Boolean(item?.supportsSplitPizza);
 
     if (hasOptions) {
@@ -1854,7 +1937,12 @@ export default function SignatureSelectionContent({
       return;
     }
 
-    addToCart(item, 1, null, {});
+    addToCart(
+      item,
+      Math.max(1, toNumber(item?.minQuantity, 1)),
+      null,
+      {}
+    );
   };
 
   const openInfoModal = (item: MenuItem) => {
@@ -1889,6 +1977,181 @@ export default function SignatureSelectionContent({
 
     const amount = direction === "left" ? -220 : 220;
     scrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
+  };
+
+  const handleAddonToggle = (modifier: Modifier) => {
+    setSelectedModifiers((prev): SelectedModifiersMap => {
+      const current = prev[ADDONS_GROUP_ID] || [];
+      const isSelected = current.some((addon) => addon.id === modifier.id);
+      const { minSelect, maxSelect } = addonSelectionRules;
+      const itemName = selectedItem?.name || "This item";
+
+      if (isSelected) {
+        if (minSelect > 0 && current.length <= minSelect) {
+          toast.error(
+            `${itemName} requires at least ${minSelect} add-on${
+              minSelect === 1 ? "" : "s"
+            }`
+          );
+          return prev;
+        }
+
+        const nextAddons = current.filter((addon) => addon.id !== modifier.id);
+        const next: SelectedModifiersMap = {};
+
+        if (nextAddons.length) {
+          next[ADDONS_GROUP_ID] = nextAddons;
+        }
+
+        return next;
+      }
+
+      if (maxSelect && current.length >= maxSelect) {
+        toast.error(
+          `${itemName} allows at most ${maxSelect} add-on${
+            maxSelect === 1 ? "" : "s"
+          }`
+        );
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [ADDONS_GROUP_ID]: [
+          ...current,
+          {
+            ...modifier,
+            selectedQuantity: 1,
+          },
+        ],
+      };
+    });
+  };
+
+  const validateAddonSelections = (
+    item: MenuItem,
+    modifiersMap: SelectedModifiersMap
+  ) => {
+    const addons = getStandaloneItemModifiers(item, new Set<string>());
+
+    if (!addons.length) return true;
+
+    const selectedCount = (modifiersMap[ADDONS_GROUP_ID] || []).length;
+    const minSelect = Math.max(
+      Boolean(item?.isRequired) ? 1 : 0,
+      toNumber(item?.minSelect, 0)
+    );
+    const rawMaxSelect = toNumber(item?.maxSelect, 0);
+    const maxSelect = rawMaxSelect > 0 ? rawMaxSelect : undefined;
+    const itemName = item?.name || "This item";
+
+    if (minSelect > 0 && selectedCount < minSelect) {
+      toast.error(
+        `${itemName} requires at least ${minSelect} add-on${
+          minSelect === 1 ? "" : "s"
+        }`
+      );
+      return false;
+    }
+
+    if (maxSelect && selectedCount > maxSelect) {
+      toast.error(
+        `${itemName} allows at most ${maxSelect} add-on${
+          maxSelect === 1 ? "" : "s"
+        }`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const renderAddonSection = () => {
+    if (!selectedItem || !selectedItemAddons.length) return null;
+
+    const { maxSelect } = addonSelectionRules;
+    const selectedCount = selectedAddons.length;
+
+    return (
+      <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="font-medium text-gray-900">Add-ons</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                {addonSelectionLabel}
+              </span>
+              <span className="text-xs text-gray-500">
+                Choose from available add-ons
+              </span>
+            </div>
+          </div>
+
+          <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+            {selectedCount}
+            {maxSelect ? ` / ${maxSelect}` : ""} selected
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2">
+          {selectedItemAddons.map((modifier) => {
+            const checked = selectedAddons.some(
+              (selected) => selected.id === modifier.id
+            );
+
+            const disableBecauseMaxReached =
+              !checked && Boolean(maxSelect) && selectedCount >= Number(maxSelect);
+
+            const effectivePrice = getModifierEffectivePrice(
+              modifier,
+              selectedItem.id,
+              selectedVariation
+            );
+
+            return (
+              <label
+                key={modifier.id}
+                className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl border px-3 py-3 text-sm transition ${
+                  disableBecauseMaxReached
+                    ? "cursor-not-allowed border-gray-100 bg-gray-100 opacity-70"
+                    : checked
+                    ? "border-primary/25 bg-primary/5 ring-1 ring-primary/20"
+                    : "border-gray-100 bg-gray-50 hover:border-primary/25 hover:bg-white"
+                }`}
+              >
+                <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disableBecauseMaxReached}
+                    onChange={() => handleAddonToggle(modifier)}
+                    className="mt-1 accent-[var(--primary)]"
+                  />
+
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-gray-900">
+                      {(modifier as any).displayText || modifier.name}
+                    </span>
+
+                    {modifier.description ? (
+                      <span className="mt-1 block text-xs leading-relaxed text-gray-500">
+                        {modifier.description}
+                      </span>
+                    ) : null}
+                  </span>
+                </span>
+
+                {effectivePrice > 0 ? (
+                  <span className="shrink-0 font-semibold text-primary">
+                    +${effectivePrice.toFixed(2)}
+                  </span>
+                ) : null}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const totalModalPrice = selectedItem
@@ -2467,17 +2730,7 @@ export default function SignatureSelectionContent({
                 </div>
               ) : null}
 
-              {filteredModifierLinks.length > 0 ? (
-                <div>
-                  {renderModifierGroups({
-                    links: filteredModifierLinks,
-                    selectionMap: selectedModifiers,
-                    item: selectedItem,
-                    variation: selectedVariation,
-                    scope: "main",
-                  })}
-                </div>
-              ) : null}
+              {renderAddonSection()}
 
               <div className="mb-5">
                 <p className="mb-2 font-medium text-gray-900">
@@ -2492,29 +2745,54 @@ export default function SignatureSelectionContent({
                 />
               </div>
 
-              <div className="mb-5 flex items-center justify-between">
-                <div className="flex items-center rounded-full bg-gray-100 px-3 py-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setQty((prev) => Math.max(1, prev - 1))}
-                    className="px-2 text-lg text-gray-700"
-                    disabled={addingId === selectedItem.id}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center rounded-full bg-gray-100 px-3 py-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQty((prev) =>
+                          Math.max(itemQuantityRules.minQuantity, prev - 1)
+                        )
+                      }
+                      className="px-2 text-lg text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={
+                        addingId === selectedItem.id ||
+                        qty <= itemQuantityRules.minQuantity
+                      }
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
 
-                  <span className="px-4 text-sm font-semibold text-gray-900">
-                    {qty}
-                  </span>
+                    <span className="px-4 text-sm font-semibold text-gray-900">
+                      {qty}
+                    </span>
 
-                  <button
-                    type="button"
-                    onClick={() => setQty((prev) => prev + 1)}
-                    className="px-2 text-lg text-gray-700"
-                    disabled={addingId === selectedItem.id}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQty((prev) =>
+                          itemQuantityRules.maxQuantity
+                            ? Math.min(itemQuantityRules.maxQuantity, prev + 1)
+                            : prev + 1
+                        )
+                      }
+                      className="px-2 text-lg text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={
+                        addingId === selectedItem.id ||
+                        Boolean(
+                          itemQuantityRules.maxQuantity &&
+                            qty >= itemQuantityRules.maxQuantity
+                        )
+                      }
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <p className="mt-1 text-center text-[11px] font-medium text-gray-500">
+                    {quantityLabel}
+                  </p>
                 </div>
 
                 <div className="text-lg font-semibold text-primary">

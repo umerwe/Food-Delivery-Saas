@@ -17,6 +17,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/hooks/useAuth";
+import { AlertTriangle, X } from "lucide-react";
 
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
@@ -26,6 +27,117 @@ const toNumber = (value: unknown, fallback = 0) => {
 const normalizeArray = (value: any): any[] => {
   return Array.isArray(value) ? value : [];
 };
+
+type BackendErrorState = {
+  context: string;
+  message: string;
+  code?: string;
+  path?: string;
+  timestamp?: string;
+};
+
+const getBackendErrorMessage = (res: any, fallback = "Something went wrong") => {
+  if (!res) return fallback;
+
+  const candidates = [
+    res?.message,
+    res?.error?.message,
+    typeof res?.error === "string" ? res.error : "",
+    res?.data?.message,
+    res?.data?.error?.message,
+    typeof res?.data?.error === "string" ? res.data.error : "",
+    res?.response?.data?.message,
+    res?.response?.data?.error?.message,
+    res?.response?.data?.error,
+  ];
+
+  const message = candidates.find((entry) => {
+    return typeof entry === "string" && entry.trim();
+  });
+
+  return String(message || fallback);
+};
+
+const getBackendErrorCode = (res: any) => {
+  return (
+    res?.error?.code ||
+    res?.data?.error?.code ||
+    res?.response?.data?.error?.code ||
+    ""
+  );
+};
+
+const getBackendErrorMeta = (res: any) => {
+  return res?.meta || res?.data?.meta || res?.response?.data?.meta || {};
+};
+
+const hasBackendError = (res: any) => {
+  return !res || res?.success === false || Boolean(res?.error);
+};
+
+function BackendErrorBanner({
+  error,
+  onDismiss,
+}: {
+  error: BackendErrorState | null;
+  onDismiss: () => void;
+}) {
+  if (!error) return null;
+
+  return (
+    <div className="mb-6 overflow-hidden rounded-2xl border border-red-100 bg-red-50 shadow-sm -mt-10">
+      <div className="flex items-start gap-3 p-4 sm:p-5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
+          <AlertTriangle size={20} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-red-900">
+              Backend Error
+            </p>
+
+            {error.code ? (
+              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-red-700 ring-1 ring-red-100">
+                {error.code}
+              </span>
+            ) : null}
+          </div>
+
+          <p className="mt-1 text-sm leading-6 text-red-800">
+            <span className="font-medium">{error.context}:</span>{" "}
+            {error.message}
+          </p>
+
+          {error.path || error.timestamp ? (
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-red-700/80">
+              {error.path ? (
+                <span className="rounded-full bg-white/70 px-2 py-1">
+                  {error.path}
+                </span>
+              ) : null}
+
+              {error.timestamp ? (
+                <span className="rounded-full bg-white/70 px-2 py-1">
+                  {new Date(error.timestamp).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-red-700 transition hover:bg-red-100"
+          aria-label="Dismiss backend error"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const getModifierPriceFromGroups = (cartItem: any, modifierId: string) => {
   const modifierGroups = Array.isArray(cartItem?.menuItem?.modifierGroups)
@@ -290,9 +402,30 @@ export default function CheckoutPage() {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [cartQuote, setCartQuote] = useState<any | null>(null);
   const [loadingCart, setLoadingCart] = useState(false);
+  const [backendError, setBackendError] = useState<BackendErrorState | null>(
+    null
+  );
 
   const router = useRouter();
   const customerId = user?.id;
+
+  const reportBackendError = (context: string, res: any, fallback: string) => {
+    const meta = getBackendErrorMeta(res);
+    const message = getBackendErrorMessage(res, fallback);
+
+    setBackendError({
+      context,
+      message,
+      code: getBackendErrorCode(res),
+      path: meta?.path,
+      timestamp: meta?.timestamp,
+    });
+
+  };
+
+  const clearBackendError = () => {
+    setBackendError(null);
+  };
 
   const [stripePayment, setStripePayment] = useState<any>({
     open: false,
@@ -315,14 +448,30 @@ export default function CheckoutPage() {
 
       const res = await get(`/v1/cart?customerId=${customerId}`);
 
+      if (hasBackendError(res)) {
+        setCartItems([]);
+        setCartQuote(null);
+        reportBackendError(
+          "Backend error while fetching cart",
+          res,
+          "Failed to fetch cart"
+        );
+        return;
+      }
+
       const { items, quote } = normalizeCartResponse(res);
       const formatted = items.map((item: any) => normalizeCartItem(item));
 
       setCartItems(formatted);
       setCartQuote(quote);
-    } catch (err) {
+      clearBackendError();
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to fetch cart");
+      reportBackendError(
+        "Backend error while fetching cart",
+        err,
+        err?.message || "Failed to fetch cart"
+      );
     } finally {
       setLoadingCart(false);
     }
@@ -389,17 +538,25 @@ export default function CheckoutPage() {
         quantity: newQty,
       });
 
-      if (!res || res.error) {
+      if (hasBackendError(res)) {
         setCartItems(previousCartItems);
-        toast.error(res?.error || "Failed to update quantity");
+        reportBackendError(
+          "Backend error while updating cart quantity",
+          res,
+          "Failed to update quantity"
+        );
         return;
       }
 
       await fetchCart();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setCartItems(previousCartItems);
-      toast.error("Failed to update quantity");
+      reportBackendError(
+        "Backend error while updating cart quantity",
+        err,
+        err?.message || "Failed to update quantity"
+      );
     }
   };
 
@@ -411,18 +568,26 @@ export default function CheckoutPage() {
 
       const res = await del(`/v1/cart/items/${id}?customerId=${customerId}`);
 
-      if (res?.error) {
+      if (hasBackendError(res)) {
         setCartItems(previousCartItems);
-        toast.error(res.error || "Failed to remove item");
+        reportBackendError(
+          "Backend error while removing cart item",
+          res,
+          "Failed to remove item"
+        );
         return;
       }
 
       await fetchCart();
       toast.success("Item removed");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setCartItems(previousCartItems);
-      toast.error("Failed to remove item");
+      reportBackendError(
+        "Backend error while removing cart item",
+        err,
+        err?.message || "Failed to remove item"
+      );
     }
   };
 
@@ -436,16 +601,29 @@ export default function CheckoutPage() {
 
       const res = await del(`/v1/cart?customerId=${customerId}`);
 
-      if (res?.error) {
+      if (hasBackendError(res)) {
         setCartItems(previousCartItems);
         setCartQuote(previousCartQuote);
-        toast.error(res.error || "Failed to clear cart");
+        reportBackendError(
+          "Backend error while clearing cart",
+          res,
+          "Failed to clear cart"
+        );
+        return false;
       }
-    } catch (err) {
+
+      clearBackendError();
+      return true;
+    } catch (err: any) {
       console.error(err);
       setCartItems(previousCartItems);
       setCartQuote(previousCartQuote);
-      toast.error("Failed to clear cart");
+      reportBackendError(
+        "Backend error while clearing cart",
+        err,
+        err?.message || "Failed to clear cart"
+      );
+      return false;
     }
   };
 
@@ -455,15 +633,24 @@ export default function CheckoutPage() {
         orderType: activeTab === "pickup" ? "TAKEAWAY" : "DELIVERY",
       });
 
-      if (!res || res.error) {
-        toast.error(res?.error || "Failed to set order type");
+      if (hasBackendError(res)) {
+        reportBackendError(
+          "Backend error while setting order type",
+          res,
+          "Failed to set order type"
+        );
         return false;
       }
 
+      clearBackendError();
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to set order type");
+      reportBackendError(
+        "Backend error while setting order type",
+        err,
+        err?.message || "Failed to set order type"
+      );
       return false;
     }
   };
@@ -476,15 +663,24 @@ export default function CheckoutPage() {
         deliveryAddressId: selectedAddress,
       });
 
-      if (!res || res.error) {
-        toast.error(res?.error || "Failed to set address");
+      if (hasBackendError(res)) {
+        reportBackendError(
+          "Backend error while setting delivery address",
+          res,
+          "Failed to set address"
+        );
         return false;
       }
 
+      clearBackendError();
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Failed to set address");
+      reportBackendError(
+        "Backend error while setting delivery address",
+        err,
+        err?.message || "Failed to set address"
+      );
       return false;
     }
   };
@@ -569,17 +765,27 @@ export default function CheckoutPage() {
         customerNote: note,
       });
 
-      if (!res || res.error) {
-        toast.error(res?.error || "Checkout failed");
+      if (hasBackendError(res)) {
+        reportBackendError(
+          "Backend error while placing order",
+          res,
+          "Checkout failed"
+        );
         return;
       }
 
       const orderId = res?.data?.id;
 
       if (!orderId) {
-        toast.error("Invalid order response");
+        reportBackendError(
+          "Backend error while placing order",
+          res,
+          "Invalid order response"
+        );
         return;
       }
+
+      clearBackendError();
 
       if (paymentMethod === "card") {
         const attemptRes = await post(`/v1/payments/orders/${orderId}/attempts`, {
@@ -588,8 +794,12 @@ export default function CheckoutPage() {
           note: "Order payment",
         });
 
-        if (!attemptRes?.success) {
-          toast.error("Failed to initiate payment");
+        if (hasBackendError(attemptRes) || !attemptRes?.success) {
+          reportBackendError(
+            "Backend error while initiating payment",
+            attemptRes,
+            "Failed to initiate payment"
+          );
           return;
         }
 
@@ -618,9 +828,13 @@ export default function CheckoutPage() {
 
       await clearCart();
       router.push(`/order?success=true&orderId=${orderId}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Order failed");
+      reportBackendError(
+        "Backend error while placing order",
+        err,
+        err?.message || "Order failed"
+      );
     } finally {
       setPlacingOrder(false);
     }
@@ -654,19 +868,29 @@ export default function CheckoutPage() {
         customerId,
       });
 
-      if (!res || res.error) {
+      if (hasBackendError(res)) {
         setCouponDiscount(0);
-        toast.error(res?.error || "Invalid coupon");
+        reportBackendError(
+          "Backend error while validating coupon",
+          res,
+          "Invalid coupon"
+        );
         return;
       }
 
       const discount = toNumber(res?.data?.discountAmount, 0);
 
       setCouponDiscount(discount);
+      clearBackendError();
       toast.success("Coupon applied");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Coupon validation failed");
+      setCouponDiscount(0);
+      reportBackendError(
+        "Backend error while validating coupon",
+        err,
+        err?.message || "Coupon validation failed"
+      );
     } finally {
       setValidatingCoupon(false);
     }
@@ -674,6 +898,11 @@ export default function CheckoutPage() {
 
   return (
     <div className="mx-auto mb-[113px] mt-[63px] max-w-[1400px] px-4 md:px-30">
+      <BackendErrorBanner
+        error={backendError}
+        onDismiss={() => setBackendError(null)}
+      />
+
       <div className="grid grid-cols-1 gap-16 lg:grid-cols-12">
         <div className="space-y-[38px] lg:col-span-7">
           <Tabs activeTab={activeTab} />

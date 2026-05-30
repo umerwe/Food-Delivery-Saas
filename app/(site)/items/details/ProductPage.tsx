@@ -78,6 +78,7 @@ type Modifier = {
   modifierGroupId?: string;
   restaurantId?: string;
   name: string;
+  displayText?: string | null;
   description?: string | null;
   priceDelta?: string | number;
   sortOrder?: number;
@@ -744,6 +745,7 @@ const normalizeModifier = (
     modifierGroupId: raw?.modifierGroupId,
     restaurantId: raw?.restaurantId,
     name: String(raw?.name || ""),
+    displayText: raw?.displayText ?? raw?.label ?? null,
     description: raw?.description ?? "",
     priceDelta: raw?.priceDelta ?? 0,
     sortOrder: toNumber(raw?.sortOrder, 0),
@@ -1087,50 +1089,6 @@ export default function ProductPage() {
     return sortBySortOrder(Array.from(deduped.values()));
   };
 
-  const getNormalizedModifiersFromGroup = (group: any): Modifier[] => {
-    const directModifiers = Array.isArray(group?.modifiers)
-      ? group.modifiers
-      : [];
-
-    const modifiersFromLinks = Array.isArray(group?.modifierLinks)
-      ? group.modifierLinks.map((link: any) => link?.modifier).filter(Boolean)
-      : [];
-
-    const rawModifiers = [...directModifiers, ...modifiersFromLinks];
-    const deduped = new Map<string, Modifier>();
-
-    for (const raw of rawModifiers) {
-      const normalized = normalizeModifier(raw);
-      if (!normalized) continue;
-
-      if (!deduped.has(normalized.id)) {
-        deduped.set(normalized.id, normalized);
-      }
-    }
-
-    return sortBySortOrder(Array.from(deduped.values()));
-  };
-
-  const normalizeGroup = (group: any): ModifierGroup | null => {
-    if (!group?.id) return null;
-    if (group?.isActive === false) return null;
-
-    return {
-      id: String(group.id),
-      name: String(group?.name || ""),
-      description: group?.description || "",
-      minSelect: group?.minSelect,
-      maxSelect: group?.maxSelect,
-      isRequired: Boolean(group?.isRequired),
-      sortOrder: toNumber(group?.sortOrder, 0),
-      isActive: group?.isActive !== false,
-      modifiers: getNormalizedModifiersFromGroup(group),
-      modifierLinks: Array.isArray(group?.modifierLinks)
-        ? group.modifierLinks
-        : [],
-    };
-  };
-
   const getStandaloneItemModifiers = (
     menuItem: any,
     linkedModifierIds: Set<string>
@@ -1187,106 +1145,40 @@ export default function ProductPage() {
   const getItemModifierLinks = (menuItem: any): ModifierLink[] => {
     if (!menuItem) return [];
 
-    const rawDirectLinks = [
-      ...normalizeArray(menuItem?.modifierLinks),
-      ...normalizeArray(menuItem?.category?.modifierLinks),
-    ];
+    /*
+     * Current payload no longer uses modifier groups for customer selection.
+     * Add-ons are controlled directly at the item level:
+     * - minSelect / maxSelect = how many add-ons can be selected
+     * - minQuantity / maxQuantity = item quantity limits, not add-on quantity
+     */
+    const standaloneModifiers = getStandaloneItemModifiers(menuItem, new Set());
 
-    const rawModifierGroups = [
-      ...normalizeArray(menuItem?.modifierGroups),
-      ...normalizeArray(menuItem?.categoryModifierGroups).map(
-        (entry) => entry?.modifierGroup || entry
-      ),
-      ...normalizeArray(menuItem?.category?.modifierGroups),
-      ...normalizeArray(menuItem?.category?.categoryModifierGroups).map(
-        (entry) => entry?.modifierGroup || entry
-      ),
-    ];
+    if (!standaloneModifiers.length) return [];
 
-    const normalizedDirectLinks: ModifierLink[] = rawDirectLinks
-      .map((link: any, index: number) => {
-        const normalizedGroup = normalizeGroup(link?.modifierGroup);
-        if (!normalizedGroup) return null;
+    const minSelect = Math.max(0, toNumber(menuItem?.minSelect, 0));
+    const rawMaxSelect = toNumber(menuItem?.maxSelect, 0);
+    const maxSelect = rawMaxSelect > 0 ? Math.max(minSelect, rawMaxSelect) : undefined;
+    const isRequired = Boolean(menuItem?.isRequired) || minSelect > 0;
 
-        return {
-          id:
-            String(link?.id || "") ||
-            `modifier-link-${normalizedGroup.id}-${index}`,
-          variationId: link?.variationId ? String(link.variationId) : null,
-          sortOrder: toNumber(
-            link?.sortOrder ?? normalizedGroup?.sortOrder ?? 0,
-            0
-          ),
-          modifierGroup: normalizedGroup,
-        };
-      })
-      .filter(Boolean) as ModifierLink[];
-
-    const normalizedModifierGroups: ModifierLink[] = rawModifierGroups
-      .map((group: any, index: number) => {
-        const normalizedGroup = normalizeGroup(group);
-        if (!normalizedGroup) return null;
-
-        return {
-          id: `group-${normalizedGroup.id}-${index}`,
-          variationId: null,
-          sortOrder: toNumber(normalizedGroup?.sortOrder, 0),
-          modifierGroup: normalizedGroup,
-        };
-      })
-      .filter(Boolean) as ModifierLink[];
-
-    const linkedModifierIds = new Set<string>();
-
-    [...normalizedDirectLinks, ...normalizedModifierGroups].forEach((link) => {
-      normalizeArray(link?.modifierGroup?.modifiers).forEach((modifier) => {
-        if (modifier?.id) linkedModifierIds.add(String(modifier.id));
-      });
-    });
-
-    const standaloneModifiers = getStandaloneItemModifiers(
-      menuItem,
-      linkedModifierIds
-    );
-
-    const standaloneLink: ModifierLink | null = standaloneModifiers.length
-      ? {
-          id: `standalone-modifiers-${menuItem.id}`,
-          variationId: null,
+    return [
+      {
+        id: `item-addons-${menuItem.id}`,
+        variationId: null,
+        sortOrder: 999,
+        modifierGroup: {
+          id: `item-addons-${menuItem.id}`,
+          name: "Add-ons",
+          description: "Choose the add-ons you want with this item.",
+          minSelect,
+          maxSelect,
+          isRequired,
           sortOrder: 999,
-          modifierGroup: {
-            id: `standalone-modifiers-${menuItem.id}`,
-            name: "Add-ons",
-            description: "Available add-ons for this item.",
-            minSelect: 0,
-            maxSelect: undefined,
-            isRequired: false,
-            sortOrder: 999,
-            isActive: true,
-            modifiers: standaloneModifiers,
-            modifierLinks: [],
-          },
-        }
-      : null;
-
-    const deduped = new Map<string, ModifierLink>();
-
-    for (const link of [
-      ...normalizedDirectLinks,
-      ...normalizedModifierGroups,
-      ...(standaloneLink ? [standaloneLink] : []),
-    ]) {
-      const groupId = String(link?.modifierGroup?.id || "");
-      if (!groupId) continue;
-
-      const key = `${String(link?.variationId || "common")}::${groupId}`;
-
-      if (!deduped.has(key)) {
-        deduped.set(key, link);
-      }
-    }
-
-    return sortBySortOrder(Array.from(deduped.values()));
+          isActive: true,
+          modifiers: standaloneModifiers,
+          modifierLinks: [],
+        },
+      },
+    ];
   };
 
   const getDefaultVariation = (menuItem: any) => {
@@ -1404,6 +1296,85 @@ export default function ProductPage() {
     };
   };
 
+  const getItemQuantityLimits = (menuItem: any) => {
+    const minQuantity = Math.max(1, toNumber(menuItem?.minQuantity, 1));
+    const rawMaxQuantity = toNumber(menuItem?.maxQuantity, 0);
+    const maxQuantity =
+      rawMaxQuantity > 0 ? Math.max(minQuantity, rawMaxQuantity) : undefined;
+
+    return {
+      minQuantity,
+      maxQuantity,
+    };
+  };
+
+  const clampQuantity = (
+    value: unknown,
+    limits: {
+      minQuantity: number;
+      maxQuantity?: number;
+    }
+  ) => {
+    const parsed = Math.max(
+      limits.minQuantity,
+      toNumber(value, limits.minQuantity)
+    );
+
+    if (limits.maxQuantity) {
+      return Math.min(parsed, limits.maxQuantity);
+    }
+
+    return parsed;
+  };
+
+  const getModifierDisplayName = (modifier?: Modifier | null) => {
+    return String(
+      modifier?.displayText || modifier?.name || "Option"
+    ).trim();
+  };
+
+  const getModifierSelectionHelpText = (group?: ModifierGroup | null) => {
+    const { minSelect, maxSelect, isRequired } = getGroupValidation(
+      group as ModifierGroup
+    );
+
+    if (maxSelect === 1) {
+      return isRequired || minSelect > 0
+        ? "Select 1 required add-on"
+        : "Optional · select 1 add-on";
+    }
+
+    if (maxSelect) {
+      return minSelect > 0
+        ? `Select ${minSelect}-${maxSelect} add-ons`
+        : `Select up to ${maxSelect} add-ons`;
+    }
+
+    if (minSelect > 0) {
+      return `Select at least ${minSelect} add-on${minSelect === 1 ? "" : "s"}`;
+    }
+
+    return "Optional add-ons";
+  };
+
+  const getModifierSelectionLimitText = (group?: ModifierGroup | null) => {
+    const { minSelect, maxSelect } = getGroupValidation(group as ModifierGroup);
+
+    if (minSelect > 0 && maxSelect) {
+      return `Min ${minSelect} · Max ${maxSelect}`;
+    }
+
+    if (minSelect > 0) {
+      return `Min ${minSelect}`;
+    }
+
+    if (maxSelect) {
+      return `Max ${maxSelect}`;
+    }
+
+    return "";
+  };
+
   const getMenuItemResolvedPrice = (
     menuItem: any,
     variation?: MenuVariation | null
@@ -1446,6 +1417,8 @@ export default function ProductPage() {
 
   const itemSupportsSplitPizza = Boolean(item?.supportsSplitPizza);
 
+  const itemQuantityLimits = getItemQuantityLimits(item);
+
   const resolvedItemPrice = getMenuItemResolvedPrice(item, selectedVariation);
 
   const selectedItemPromotionPricing = getPromotionPricing({
@@ -1478,9 +1451,8 @@ export default function ProductPage() {
       .flat()
       .reduce((acc, modifier) => {
         const price = getModifierEffectivePrice(modifier, menuItem, variation);
-        const modifierQty = Math.max(1, toNumber(modifier.selectedQuantity, 1));
 
-        return acc + price * modifierQty;
+        return acc + price;
       }, 0);
   };
 
@@ -1565,7 +1537,7 @@ export default function ProductPage() {
         setItem(matchedItem);
         setSelectedVariation(getDefaultVariation(matchedItem));
         setSelectedModifiers({});
-        setQty(1);
+        setQty(getItemQuantityLimits(matchedItem).minQuantity);
         setInstructions("");
         setSplitPizzaEnabled(false);
         setSplitPizzaItem(null);
@@ -1704,6 +1676,12 @@ export default function ProductPage() {
   useEffect(() => {
     if (!item) return;
 
+    setQty((prev) => clampQuantity(prev, getItemQuantityLimits(item)));
+  }, [item?.id, item?.minQuantity, item?.maxQuantity]);
+
+  useEffect(() => {
+    if (!item) return;
+
     const visibleGroupIds = new Set(
       filteredModifierLinks.map((link) => String(link?.modifierGroup?.id || ""))
     );
@@ -1717,10 +1695,7 @@ export default function ProductPage() {
             .filter(Boolean)
             .map((modifier) => ({
               ...modifier,
-              selectedQuantity: Math.max(
-                1,
-                toNumber(modifier.selectedQuantity, 1)
-              ),
+              selectedQuantity: 1,
             }));
 
           if (normalizedModifiers.length) {
@@ -1759,9 +1734,9 @@ export default function ProductPage() {
       if (alreadySelected) {
         if (minSelect > 0 && current.length <= minSelect) {
           toast.error(
-            `${
-              group?.name || "This group"
-            } requires at least ${minSelect} selection(s)`
+            `${item?.name || "This item"} requires at least ${minSelect} add-on${
+              minSelect === 1 ? "" : "s"
+            }`
           );
           return prev;
         }
@@ -1782,8 +1757,8 @@ export default function ProductPage() {
 
       if (maxSelect && current.length >= maxSelect) {
         toast.error(
-          `You can select up to ${maxSelect} option(s) for ${
-            group?.name || "this group"
+          `${item?.name || "This item"} allows at most ${maxSelect} add-on${
+            maxSelect === 1 ? "" : "s"
           }`
         );
         return prev;
@@ -1796,6 +1771,22 @@ export default function ProductPage() {
     });
   };
 
+  const handleItemQuantityChange = (nextQuantity: number) => {
+    const limits = getItemQuantityLimits(item);
+    const clamped = clampQuantity(nextQuantity, limits);
+
+    if (
+      limits.maxQuantity &&
+      nextQuantity > limits.maxQuantity &&
+      qty === limits.maxQuantity
+    ) {
+      toast.error(`You can add up to ${limits.maxQuantity} item(s)`);
+      return;
+    }
+
+    setQty(clamped);
+  };
+
   const validateSelections = (
     links: ModifierLink[],
     selectionMap: ModifierSelectionMap
@@ -1805,21 +1796,22 @@ export default function ProductPage() {
       const groupId = String(group?.id || "");
       const selected = selectionMap[groupId] || [];
       const { minSelect, maxSelect } = getGroupValidation(group);
+      const itemName = item?.name || "This item";
 
       if (minSelect > 0 && selected.length < minSelect) {
         toast.error(
-          `${
-            group?.name || "This group"
-          } requires at least ${minSelect} selection(s)`
+          `${itemName} requires at least ${minSelect} add-on${
+            minSelect === 1 ? "" : "s"
+          }`
         );
         return false;
       }
 
       if (maxSelect && selected.length > maxSelect) {
         toast.error(
-          `${
-            group?.name || "This group"
-          } allows at most ${maxSelect} selection(s)`
+          `${itemName} allows at most ${maxSelect} add-on${
+            maxSelect === 1 ? "" : "s"
+          }`
         );
         return false;
       }
@@ -1833,7 +1825,7 @@ export default function ProductPage() {
       .flat()
       .map((modifier) => ({
         modifierId: modifier.id,
-        quantity: Math.max(1, toNumber(modifier.selectedQuantity, 1)),
+        quantity: 1,
       }));
   };
 
@@ -1897,7 +1889,7 @@ export default function ProductPage() {
       const group = link.modifierGroup;
       const groupId = String(group?.id || "");
       const selectedInGroup = selectionMap[groupId] || [];
-      const { minSelect, maxSelect, isRequired } = getGroupValidation(group);
+      const { maxSelect, isRequired } = getGroupValidation(group);
 
       const groupModifiers = Array.isArray(group?.modifiers)
         ? group.modifiers.filter((modifier) => modifier?.isActive !== false)
@@ -1905,29 +1897,37 @@ export default function ProductPage() {
 
       if (!groupModifiers.length) return null;
 
+      const selectionHelp = getModifierSelectionHelpText(group);
+      const selectionLimit = getModifierSelectionLimitText(group);
+
       return (
         <div
           key={`${scope}-${String(link?.variationId || "common")}-${groupId}`}
+          className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div>
-              <p className="font-medium text-gray-900">{group?.name}</p>
-              <p className="text-xs text-gray-500">
-                {maxSelect === 1
-                  ? isRequired || minSelect > 0
-                    ? "Select 1 required option"
-                    : "Optional · select 1 option"
-                  : maxSelect
-                  ? minSelect > 0
-                    ? `Select ${minSelect}-${maxSelect}`
-                    : `Select up to ${maxSelect}`
-                  : minSelect > 0
-                  ? `Select at least ${minSelect}`
-                  : "Optional"}
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-gray-900">Add-ons</p>
+                {isRequired ? (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                    Required
+                  </span>
+                ) : null}
+              </div>
+
+              <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                {selectionHelp}
               </p>
+
+              {selectionLimit ? (
+                <span className="mt-2 inline-flex rounded-full bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary ring-1 ring-primary/10">
+                  {selectionLimit}
+                </span>
+              ) : null}
             </div>
 
-            <span className="text-xs text-gray-500">
+            <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
               {selectedInGroup.length}
               {maxSelect ? ` / ${maxSelect}` : ""}
             </span>
@@ -1954,15 +1954,17 @@ export default function ProductPage() {
                 !!maxSelect &&
                 selectedInGroup.length >= maxSelect;
 
+              const modifierDisplayName = getModifierDisplayName(modifier);
+
               return (
                 <div
                   key={`${modifier.id}-${String(variation?.id || "base")}`}
-                  className={`rounded-lg px-3 py-2 text-sm ${
+                  className={`rounded-xl border px-3 py-3 text-sm transition ${
                     disableBecauseMaxReached
-                      ? "bg-gray-100 opacity-70"
+                      ? "border-gray-100 bg-gray-100 opacity-70"
                       : checked
-                      ? "bg-primary/5 ring-1 ring-primary/20"
-                      : "bg-gray-50"
+                      ? "border-primary/20 bg-primary/5 ring-1 ring-primary/10"
+                      : "border-gray-100 bg-gray-50 hover:border-primary/20 hover:bg-white"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -1982,12 +1984,19 @@ export default function ProductPage() {
                       />
 
                       <span className="min-w-0">
-                        <span className="block truncate text-gray-900">
-                          {modifier.name}
+                        <span className="block truncate font-medium text-gray-900">
+                          {modifierDisplayName}
                         </span>
 
+                        {modifier.displayText &&
+                        modifier.displayText !== modifier.name ? (
+                          <span className="mt-0.5 block text-[11px] font-medium text-primary">
+                            {modifier.name}
+                          </span>
+                        ) : null}
+
                         {modifier.description ? (
-                          <span className="mt-0.5 block text-xs text-gray-500">
+                          <span className="mt-0.5 block text-xs leading-relaxed text-gray-500">
                             {modifier.description}
                           </span>
                         ) : null}
@@ -1995,8 +2004,8 @@ export default function ProductPage() {
                     </label>
 
                     {effectivePrice > 0 ? (
-                      <span className="shrink-0 font-medium text-primary">
-                        +${effectivePrice.toFixed(2)}
+                      <span className="shrink-0 text-right font-medium text-primary">
+                        +{formatMoney(effectivePrice)}
                       </span>
                     ) : null}
                   </div>
@@ -2575,26 +2584,46 @@ export default function ProductPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center rounded-full bg-gray-100">
-              <button
-                type="button"
-                onClick={() => setQty((prev) => Math.max(1, prev - 1))}
-                className="px-3 py-2"
-                disabled={loading}
-              >
-                <Minus size={16} />
-              </button>
+            <div>
+              <div className="flex items-center rounded-full bg-gray-100">
+                <button
+                  type="button"
+                  onClick={() => handleItemQuantityChange(qty - 1)}
+                  className="px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={loading || qty <= itemQuantityLimits.minQuantity}
+                >
+                  <Minus size={16} />
+                </button>
 
-              <span className="px-4">{qty}</span>
+                <span className="min-w-[42px] px-3 text-center font-semibold">
+                  {qty}
+                </span>
 
-              <button
-                type="button"
-                onClick={() => setQty((prev) => prev + 1)}
-                className="px-3 py-2"
-                disabled={loading}
-              >
-                <Plus size={16} />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleItemQuantityChange(qty + 1)}
+                  className="px-3 py-2 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={
+                    loading ||
+                    Boolean(
+                      itemQuantityLimits.maxQuantity &&
+                        qty >= itemQuantityLimits.maxQuantity
+                    )
+                  }
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+
+              {(itemQuantityLimits.minQuantity > 1 ||
+                itemQuantityLimits.maxQuantity) ? (
+                <p className="mt-1 text-center text-[11px] text-gray-400">
+                  Min {itemQuantityLimits.minQuantity}
+                  {itemQuantityLimits.maxQuantity
+                    ? ` · Max ${itemQuantityLimits.maxQuantity}`
+                    : ""}
+                </p>
+              ) : null}
             </div>
 
             <button

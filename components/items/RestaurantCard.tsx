@@ -69,6 +69,7 @@ type Modifier = {
   modifierGroupId?: string;
   restaurantId?: string;
   name: string;
+  displayText?: string | null;
   description?: string;
   priceDelta?: string | number;
   sortOrder?: number;
@@ -110,6 +111,8 @@ type ModifierLink = {
 };
 
 type SelectedModifiersMap = Record<string, SelectedModifier[]>;
+
+const ADDONS_GROUP_ID = "__item_addons__";
 
 const toNumber = (value: unknown, fallback = 0) => {
   const num = Number(value);
@@ -718,6 +721,7 @@ export default function RestaurantCard({ item }: any) {
         modifierGroupId: raw?.modifierGroupId,
         restaurantId: raw?.restaurantId,
         name: String(raw?.name || ""),
+        displayText: raw?.displayText ?? raw?.label ?? null,
         description: raw?.description || "",
         priceDelta: raw?.priceDelta ?? 0,
         sortOrder: toNumber(raw?.sortOrder, 0),
@@ -767,6 +771,7 @@ export default function RestaurantCard({ item }: any) {
       modifierGroupId: raw?.modifierGroupId,
       restaurantId: raw?.restaurantId,
       name: String(raw?.name || ""),
+      displayText: raw?.displayText ?? raw?.label ?? null,
       description: raw?.description || "",
       priceDelta: raw?.priceDelta ?? 0,
       sortOrder: toNumber(raw?.sortOrder, 0),
@@ -1097,24 +1102,76 @@ export default function RestaurantCard({ item }: any) {
   };
 
   const itemVariations = useMemo(() => getItemVariations(item), [item]);
-  const itemModifierLinks = useMemo(() => getItemModifierLinks(item), [item]);
+
+  const itemAddons = useMemo(() => {
+    return getStandaloneItemModifiers(item, new Set<string>());
+  }, [item]);
+
+  const itemQuantityRules = useMemo(() => {
+    const minQuantity = Math.max(1, toNumber(item?.minQuantity, 1));
+    const rawMaxQuantity = toNumber(item?.maxQuantity, 0);
+
+    return {
+      minQuantity,
+      maxQuantity: rawMaxQuantity > 0 ? rawMaxQuantity : undefined,
+    };
+  }, [item]);
+
+  const addonSelectionRules = useMemo(() => {
+    const rawMinSelect = toNumber(item?.minSelect, 0);
+    const rawMaxSelect = toNumber(item?.maxSelect, 0);
+    const isRequired = Boolean(item?.isRequired);
+
+    return {
+      minSelect: Math.max(isRequired ? 1 : 0, rawMinSelect),
+      maxSelect: rawMaxSelect > 0 ? rawMaxSelect : undefined,
+      isRequired,
+    };
+  }, [item]);
+
+  const selectedAddons = selectedModifiers[ADDONS_GROUP_ID] || [];
+
+  const addonSelectionLabel = useMemo(() => {
+    const { minSelect, maxSelect } = addonSelectionRules;
+
+    if (minSelect > 0 && maxSelect) {
+      return `Min ${minSelect} · Max ${maxSelect}`;
+    }
+
+    if (minSelect > 0) {
+      return `Min ${minSelect}`;
+    }
+
+    if (maxSelect) {
+      return `Max ${maxSelect}`;
+    }
+
+    return "Optional";
+  }, [addonSelectionRules]);
+
+  const quantityLabel = useMemo(() => {
+    const { minQuantity, maxQuantity } = itemQuantityRules;
+
+    if (maxQuantity) {
+      return `Min ${minQuantity} · Max ${maxQuantity}`;
+    }
+
+    return `Min ${minQuantity}`;
+  }, [itemQuantityRules]);
 
   const splitPizzaDefaultVariation = useMemo(
     () => getDefaultVariation(splitPizzaItem),
     [splitPizzaItem],
   );
 
-  const filteredModifierLinks = useMemo(() => {
-    return getVisibleModifierLinks(item, selectedVariation);
-  }, [item, selectedVariation]);
-
   const hasOptions =
     itemVariations.length > 0 ||
-    itemModifierLinks.length > 0 ||
+    itemAddons.length > 0 ||
     itemSupportsSplitPizza;
 
   useEffect(() => {
     setSelectedVariation(getDefaultVariation(item));
+    setQty(Math.max(1, toNumber(item?.minQuantity, 1)));
   }, [item]);
 
   useEffect(() => {
@@ -1126,7 +1183,7 @@ export default function RestaurantCard({ item }: any) {
 
   useEffect(() => {
     if (!open) {
-      setQty(1);
+      setQty(Math.max(1, toNumber(item?.minQuantity, 1)));
       setNote("");
       setSelectedModifiers({});
       setSelectedVariation(getDefaultVariation(item));
@@ -1136,103 +1193,92 @@ export default function RestaurantCard({ item }: any) {
   }, [open, item]);
 
   useEffect(() => {
-    const visibleGroupIds = new Set(
-      filteredModifierLinks.map((groupLink) =>
-        String(groupLink?.modifierGroup?.id || ""),
-      ),
-    );
+    setQty((prev) => {
+      const minQuantity = itemQuantityRules.minQuantity;
+      const maxQuantity = itemQuantityRules.maxQuantity;
+      const nextQuantity = Math.max(minQuantity, prev);
 
-    setSelectedModifiers((prev) => {
+      return maxQuantity ? Math.min(maxQuantity, nextQuantity) : nextQuantity;
+    });
+  }, [itemQuantityRules]);
+
+  useEffect(() => {
+    const validAddonIds = new Set(itemAddons.map((addon) => String(addon.id)));
+
+    setSelectedModifiers((prev): SelectedModifiersMap => {
+      const existingAddons = prev[ADDONS_GROUP_ID] || [];
+      const nextAddons = existingAddons.filter((addon) =>
+        validAddonIds.has(String(addon.id)),
+      );
+
       const next: SelectedModifiersMap = {};
 
-      for (const [groupId, modifiers] of Object.entries(prev || {})) {
-        if (visibleGroupIds.has(String(groupId))) {
-          next[groupId] = modifiers;
-        }
+      if (nextAddons.length) {
+        next[ADDONS_GROUP_ID] = nextAddons;
       }
 
       return next;
     });
-  }, [filteredModifierLinks]);
+  }, [itemAddons]);
 
-  const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
-    const groupId = String(group.id);
-
+  const handleAddonToggle = (modifier: Modifier) => {
     setSelectedModifiers((prev) => {
-      const current = prev[groupId] || [];
-      const { minSelect, maxSelect, isRequired } = getGroupValidation(group);
-      const isSelected = current.some((m) => m.id === modifier.id);
-
-      if (maxSelect === 1) {
-        if (isSelected && !isRequired) {
-          const next = { ...prev };
-          delete next[groupId];
-          return next;
-        }
-
-        return {
-          ...prev,
-          [groupId]: [{ ...modifier, selectedQuantity: 1 }],
-        };
-      }
+      const current = prev[ADDONS_GROUP_ID] || [];
+      const isSelected = current.some((addon) => addon.id === modifier.id);
+      const { minSelect, maxSelect } = addonSelectionRules;
+      const itemName = item?.name || "This item";
 
       if (isSelected) {
         if (minSelect > 0 && current.length <= minSelect) {
-          toast.error(
-            `${group?.name || "This group"} requires at least ${minSelect} selection(s)`,
-          );
+          toast.error(`${itemName} requires at least ${minSelect} add-on${minSelect === 1 ? "" : "s"}`);
           return prev;
         }
 
-        const remaining = current.filter((m) => m.id !== modifier.id);
-        const next = { ...prev };
+        const nextAddons = current.filter((addon) => addon.id !== modifier.id);
+        const next: SelectedModifiersMap = { ...prev };
 
-        if (remaining.length) {
-          next[groupId] = remaining;
+        if (nextAddons.length) {
+          next[ADDONS_GROUP_ID] = nextAddons;
         } else {
-          delete next[groupId];
+          delete next[ADDONS_GROUP_ID];
         }
 
         return next;
       }
 
       if (maxSelect && current.length >= maxSelect) {
-        toast.error(
-          `You can select up to ${maxSelect} option(s) for ${group.name}`,
-        );
+        toast.error(`${itemName} allows at most ${maxSelect} add-on${maxSelect === 1 ? "" : "s"}`);
         return prev;
       }
 
       return {
         ...prev,
-        [groupId]: [...current, { ...modifier, selectedQuantity: 1 }],
+        [ADDONS_GROUP_ID]: [
+          ...current,
+          {
+            ...modifier,
+            selectedQuantity: 1,
+          },
+        ],
       };
     });
   };
 
-  const validateSelections = (
-    links: ModifierLink[],
-    selectionMap: SelectedModifiersMap,
-  ) => {
-    for (const link of links) {
-      const group = link?.modifierGroup;
-      const groupId = String(group?.id || "");
-      const selected = selectionMap[groupId] || [];
-      const { minSelect, maxSelect } = getGroupValidation(group);
+  const validateAddonSelections = () => {
+    if (!itemAddons.length) return true;
 
-      if (minSelect > 0 && selected.length < minSelect) {
-        toast.error(
-          `${group?.name || "This group"} requires at least ${minSelect} selection(s)`,
-        );
-        return false;
-      }
+    const selectedCount = selectedAddons.length;
+    const { minSelect, maxSelect } = addonSelectionRules;
+    const itemName = item?.name || "This item";
 
-      if (maxSelect && selected.length > maxSelect) {
-        toast.error(
-          `${group?.name || "This group"} allows at most ${maxSelect} selection(s)`,
-        );
-        return false;
-      }
+    if (minSelect > 0 && selectedCount < minSelect) {
+      toast.error(`${itemName} requires at least ${minSelect} add-on${minSelect === 1 ? "" : "s"}`);
+      return false;
+    }
+
+    if (maxSelect && selectedCount > maxSelect) {
+      toast.error(`${itemName} allows at most ${maxSelect} add-on${maxSelect === 1 ? "" : "s"}`);
+      return false;
     }
 
     return true;
@@ -1380,125 +1426,92 @@ export default function RestaurantCard({ item }: any) {
     setSplitPizzaItem(selectedItem || null);
   };
 
-  const renderModifierGroups = ({
-    links,
-    selectionMap,
-    menuItem,
-    variation,
-    scope,
-  }: {
-    links: ModifierLink[];
-    selectionMap: SelectedModifiersMap;
-    menuItem: any;
-    variation?: MenuVariation | null;
-    scope: "main" | "split";
-  }) => {
-    return links.map((groupLink) => {
-      const group = groupLink.modifierGroup;
-      const groupId = String(group?.id || "");
-      const selectedInGroup = selectionMap[groupId] || [];
-      const { minSelect, maxSelect, isRequired } = getGroupValidation(group);
+  const renderAddonSection = () => {
+    if (!itemAddons.length) return null;
 
-      const groupModifiers = Array.isArray(group?.modifiers)
-        ? group.modifiers.filter((modifier) => modifier?.isActive !== false)
-        : [];
+    const { maxSelect } = addonSelectionRules;
+    const selectedCount = selectedAddons.length;
 
-      if (!groupModifiers.length) return null;
-
-      return (
-        <div
-          key={`${scope}-${groupLink?.variationId || "common"}-${groupId}`}
-          className="mb-5"
-        >
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div>
-              <p className="font-medium text-gray-900">{group?.name}</p>
-              <p className="text-xs text-gray-500">
-                {maxSelect === 1
-                  ? isRequired
-                    ? "Select 1 required option"
-                    : "Select up to 1 option"
-                  : maxSelect
-                    ? minSelect > 0
-                      ? `Select ${minSelect}-${maxSelect}`
-                      : `Select up to ${maxSelect}`
-                    : minSelect > 0
-                      ? `Select at least ${minSelect}`
-                      : "Optional"}
-              </p>
+    return (
+      <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="font-medium text-gray-900">Add-ons</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                {addonSelectionLabel}
+              </span>
+              <span className="text-xs text-gray-500">
+                Choose from available add-ons
+              </span>
             </div>
-
-            <span className="text-xs text-gray-500">
-              {selectedInGroup.length}
-              {maxSelect ? ` / ${maxSelect}` : ""}
-            </span>
           </div>
 
-          <div className="space-y-2">
-            {groupModifiers.map((modifier) => {
-              const selectedModifier = selectedInGroup.find(
-                (selected) => selected.id === modifier.id,
-              );
+          <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+            {selectedCount}
+            {maxSelect ? ` / ${maxSelect}` : ""} selected
+          </span>
+        </div>
 
-              const checked = Boolean(selectedModifier);
+        <div className="grid grid-cols-1 gap-2">
+          {itemAddons.map((modifier) => {
+            const checked = selectedAddons.some(
+              (selected) => selected.id === modifier.id,
+            );
 
-              const disableBecauseMaxReached =
-                !checked && !!maxSelect && selectedInGroup.length >= maxSelect;
+            const disableBecauseMaxReached =
+              !checked && !!maxSelect && selectedCount >= maxSelect;
 
-              const effectivePrice = getModifierEffectivePrice(
-                modifier,
-                menuItem?.id,
-                variation,
-              );
+            const effectivePrice = getModifierEffectivePrice(
+              modifier,
+              item?.id,
+              selectedVariation,
+            );
 
-              const inputType = maxSelect === 1 ? "radio" : "checkbox";
+            return (
+              <label
+                key={modifier.id}
+                className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl border px-3 py-3 text-sm transition ${
+                  disableBecauseMaxReached
+                    ? "cursor-not-allowed border-gray-100 bg-gray-100 opacity-70"
+                    : checked
+                      ? "border-primary/25 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-gray-100 bg-gray-50 hover:border-primary/25 hover:bg-white"
+                }`}
+              >
+                <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disableBecauseMaxReached}
+                    onChange={() => handleAddonToggle(modifier)}
+                    className="mt-1 accent-[var(--primary)]"
+                  />
 
-              return (
-                <div
-                  key={modifier.id}
-                  className={`rounded-xl px-3 py-3 text-sm ${
-                    disableBecauseMaxReached
-                      ? "bg-gray-100 opacity-70"
-                      : checked
-                        ? "bg-primary/5 ring-1 ring-primary/20"
-                        : "bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-gray-800">
-                      <input
-                        type={inputType}
-                        name={`${scope}-modifier-group-${groupId}`}
-                        checked={checked}
-                        disabled={disableBecauseMaxReached}
-                        onChange={() => handleModifierToggle(group, modifier)}
-                        className="mt-1 accent-[var(--primary)]"
-                      />
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-gray-900">
+                      {modifier.displayText || modifier.name}
+                    </span>
 
-                      <span className="min-w-0">
-                        <span className="block truncate">{modifier.name}</span>
-
-                        {modifier.description ? (
-                          <span className="mt-1 block text-xs text-gray-500">
-                            {modifier.description}
-                          </span>
-                        ) : null}
-                      </span>
-                    </label>
-
-                    {effectivePrice > 0 ? (
-                      <span className="shrink-0 font-medium text-primary">
-                        +${effectivePrice.toFixed(2)}
+                    {modifier.description ? (
+                      <span className="mt-1 block text-xs leading-relaxed text-gray-500">
+                        {modifier.description}
                       </span>
                     ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  </span>
+                </span>
+
+                {effectivePrice > 0 ? (
+                  <span className="shrink-0 font-semibold text-primary">
+                    +${effectivePrice.toFixed(2)}
+                  </span>
+                ) : null}
+              </label>
+            );
+          })}
         </div>
-      );
-    });
+      </div>
+    );
   };
 
   const addCartItemWithBranchRetry = async (payload: any) => {
@@ -1549,7 +1562,7 @@ export default function RestaurantCard({ item }: any) {
         return;
       }
 
-      if (!validateSelections(filteredModifierLinks, selectedModifiers)) {
+      if (!validateAddonSelections()) {
         return;
       }
 
@@ -2039,17 +2052,7 @@ export default function RestaurantCard({ item }: any) {
             </div>
           ) : null}
 
-          {filteredModifierLinks.length > 0 ? (
-            <div>
-              {renderModifierGroups({
-                links: filteredModifierLinks,
-                selectionMap: selectedModifiers,
-                menuItem: item,
-                variation: selectedVariation,
-                scope: "main",
-              })}
-            </div>
-          ) : null}
+          {renderAddonSection()}
 
           <div className="mb-5">
             <p className="mb-2 font-medium text-gray-900">
@@ -2064,29 +2067,51 @@ export default function RestaurantCard({ item }: any) {
             />
           </div>
 
-          <div className="mb-5 flex items-center justify-between">
-            <div className="flex items-center rounded-full bg-gray-100 px-3 py-1.5">
-              <button
-                type="button"
-                onClick={() => setQty((prev) => Math.max(1, prev - 1))}
-                className="px-2 text-lg text-gray-700"
-                disabled={loading}
-              >
-                <Minus size={16} />
-              </button>
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center rounded-full bg-gray-100 px-3 py-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQty((prev) =>
+                      Math.max(itemQuantityRules.minQuantity, prev - 1),
+                    )
+                  }
+                  className="px-2 text-lg text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={loading || qty <= itemQuantityRules.minQuantity}
+                >
+                  <Minus size={16} />
+                </button>
 
-              <span className="px-4 text-sm font-semibold text-gray-900">
-                {qty}
-              </span>
+                <span className="px-4 text-sm font-semibold text-gray-900">
+                  {qty}
+                </span>
 
-              <button
-                type="button"
-                onClick={() => setQty((prev) => prev + 1)}
-                className="px-2 text-lg text-gray-700"
-                disabled={loading}
-              >
-                <Plus size={16} />
-              </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQty((prev) =>
+                      itemQuantityRules.maxQuantity
+                        ? Math.min(itemQuantityRules.maxQuantity, prev + 1)
+                        : prev + 1,
+                    )
+                  }
+                  className="px-2 text-lg text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={
+                    loading ||
+                    Boolean(
+                      itemQuantityRules.maxQuantity &&
+                        qty >= itemQuantityRules.maxQuantity,
+                    )
+                  }
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+
+              <p className="mt-1 text-center text-[11px] font-medium text-gray-500">
+                {quantityLabel}
+              </p>
             </div>
 
             <div className="text-right text-lg font-semibold text-primary">
