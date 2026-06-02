@@ -5,7 +5,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import TestimonialsSection from "@/components/pages/Items/components/Testimonials";
 import useItems from "@/hooks/useItems";
-import useCart from "@/hooks/useCart";
+import { useCart } from "@/hooks/useCart";
 import { useAuthContext } from "@/hooks/useAuth";
 import { getStoredGroupOrderCode } from "@/lib/group-order";
 import { toast } from "sonner";

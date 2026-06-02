@@ -66,6 +66,14 @@ export const addCustomerCartItem = ({
   token?: string | null;
 }) => postCart(`/v1/cart/items?customerId=${customerId}`, payload, token);
 
+export const quoteCustomerCart = ({
+  customerId,
+  token,
+}: {
+  customerId: string;
+  token?: string | null;
+}) => postCart(`/v1/cart/quote?customerId=${customerId}`, {}, token);
+
 export const updateCustomerCartItem = ({
   cartItemId,
   payload,

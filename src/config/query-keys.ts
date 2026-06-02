@@ -34,6 +34,9 @@ export const queryKeys = {
     categories: (restaurantId?: string | null) => ["customer-home", "categories", restaurantId ?? ""] as const,
     promotions: (restaurantId?: string | null, branchId?: string | null) => ["customer-home", "promotions", restaurantId ?? "", branchId ?? ""] as const,
   },
+  customerDeals: {
+    list: (params: Record<string, unknown>) => ["customer-deals", "list", params] as const,
+  },
   orders: {
     all: ["orders"] as const,
     request: (endpoint: string) => ["orders", "request", endpoint] as const,

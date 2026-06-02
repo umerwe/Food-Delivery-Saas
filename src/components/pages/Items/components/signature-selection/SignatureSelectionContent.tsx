@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import useCart from "@/hooks/useCart";
+import { useCart } from "@/hooks/useCart";
 import useMenu from "@/hooks/useMenu";
 import { useAuth } from "@/hooks/useAuth";
 import { getSignatureMenuViewMode, setSignatureMenuViewMode } from "@/lib/view-preferences";

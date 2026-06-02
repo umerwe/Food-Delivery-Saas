@@ -100,6 +100,9 @@ interface CartQuote {
     title?: string;
     applyMode?: string;
     autoApply?: boolean;
+    discountType?: string;
+    discountValue?: number;
+    discountAmount?: number;
   } | null;
 }
 
@@ -626,7 +629,12 @@ export function CartSummarySection({
   const deliveryFee = quoteDeliveryFee ?? (checkoutType === "delivery" ? 0 : 0);
   const taxes = quoteTaxAmount ?? 0;
 
-  const quoteDiscount = Math.max(0, toNumber(resolvedQuote?.discountAmount, 0));
+  const appliedPromotion = resolvedQuote?.appliedPromotion ?? null;
+  const hasAppliedPromotion = Boolean(appliedPromotion?.id || appliedPromotion?.title);
+  const quoteDiscount = Math.max(
+    0,
+    toNumber(resolvedQuote?.discountAmount ?? appliedPromotion?.discountAmount, 0)
+  );
   const manualCouponDiscount = Math.max(0, toNumber(couponDiscount, 0));
   const discount = quoteDiscount > 0 ? quoteDiscount : manualCouponDiscount;
 
@@ -661,8 +669,6 @@ export function CartSummarySection({
           totalBeforeDiscount - discount - loyaltyDiscount - walletAppliedAmount
         );
 
-  const appliedPromotion = resolvedQuote?.appliedPromotion ?? null;
-  const hasAppliedPromotion = Boolean(appliedPromotion?.id || appliedPromotion?.title);
   const hasAnyDiscount =
     discount > 0 || loyaltyDiscount > 0 || walletAppliedAmount > 0;
 
@@ -1155,15 +1161,13 @@ export function CartSummarySection({
           </Button>
         </div>
 
-        {discount > 0 ? (
+        {discount > 0 || hasAppliedPromotion ? (
           <div className="rounded-md bg-green-100 p-3 text-sm font-medium text-green-700">
             <div className="flex items-center gap-2">
               <TicketPercent width={16} height={16} />
               <span>
                 {hasAppliedPromotion
-                  ? appliedPromotion?.autoApply
-                    ? "Auto Promotion Applied"
-                    : "Promotion Applied"
+                  ? "Applied deal"
                   : "Coupon Applied"}
               </span>
             </div>
@@ -1173,6 +1177,9 @@ export function CartSummarySection({
                 {appliedPromotion?.title || "Promotion discount"}
                 {appliedPromotion?.applyMode
                   ? ` · ${String(appliedPromotion.applyMode).replace(/_/g, " ")}`
+                  : ""}
+                {toNumber(appliedPromotion?.discountAmount, 0) > 0
+                  ? ` · ${formatCurrency(appliedPromotion?.discountAmount)} off`
                   : ""}
               </p>
             ) : null}
@@ -1187,9 +1194,7 @@ export function CartSummarySection({
 
           {discount > 0 ? (
             <div className="flex items-center justify-between text-sm text-green-600">
-              <span>
-                {hasAppliedPromotion ? "Promotion Discount" : "Discount"}
-              </span>
+              <span>{hasAppliedPromotion ? "Applied deal discount" : "Discount"}</span>
               <span>- {formatCurrency(discount)}</span>
             </div>
           ) : null}

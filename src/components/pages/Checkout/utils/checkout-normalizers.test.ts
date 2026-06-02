@@ -45,4 +45,24 @@ describe("checkout normalizers", () => {
     expect(normalized.name).toBe("Burger");
     expect(recalculateCartItemQuantity(normalized, 3).lineTotal).toBe(15);
   });
+
+  it("preserves applied promotion on cart quote", () => {
+    const { quote } = normalizeCartResponse({
+      data: {
+        quote: {
+          appliedPromotion: {
+            id: "deal-1",
+            title: "Burger Combo",
+            discountAmount: 301,
+          },
+        },
+      },
+    });
+
+    expect(quote?.appliedPromotion).toMatchObject({
+      id: "deal-1",
+      title: "Burger Combo",
+      discountAmount: 301,
+    });
+  });
 });

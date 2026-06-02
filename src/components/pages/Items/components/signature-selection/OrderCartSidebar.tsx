@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Minus, Plus, Tag, X, ArrowRight, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import useCart from "@/hooks/useCart";
+import { useCart } from "@/hooks/useCart";
 import type { CartItemRecord } from "./types";
 import { getCartItemUnitPrice, toNumber } from "./signature-selection-utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,7 +28,7 @@ type OrderCartSidebarProps = {
   onCartRefresh?: () => void;
 };
 
-export default function OrderCartSidebar({
+export function OrderCartSidebar({
   customerId,
   cartRefreshKey,
   onCartRefresh,

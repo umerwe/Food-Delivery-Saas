@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import HeroSection from "@/components/pages/Home/components/heroSection";
 import FoodCategorySection from "@/components/pages/Home/components/foodCategorySection";
@@ -13,12 +13,16 @@ import Footer from "@/components/layout/footer/Footer";
 import RequiredBranchSelectionModal from "@/components/common/branch-selector/RequiredBranchSelectionModal";
 import OrderNowFloatingButton from "@/components/ui/OrderNowFloatingButton";
 import BranchOpeningHoursPopup from "@/components/pages/Home/components/BranchOpeningHours";
+import { CustomerDealsSection } from "@/components/pages/Home/components/CustomerDealsSection";
 
 import { DEFAULT_BRANDING } from "@/config/default-branding";
 import { useAuth } from "@/hooks/useAuth";
 import { useBranding } from "@/hooks/useBranding";
+import { useAddDealToCart } from "@/hooks/useCart";
+import { useCustomerDeals } from "@/hooks/useCustomerDeals";
 import { useHome } from "@/hooks/useHome";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
+import type { CustomerDeal } from "@/types/customer-deals";
 
 const HomePage = () => {
   const { user, token, restaurantId: authRestaurantId } = useAuth();
@@ -27,6 +31,14 @@ const HomePage = () => {
   const restaurantId = useMemo(() => resolveHomeRestaurantId(user, authRestaurantId), [authRestaurantId, user]);
   const branchId = useMemo(() => resolveHomeBranchId(user), [user]);
   const homeQuery = useHome(restaurantId, branchId, Boolean(token && branchId));
+  const dealsQuery = useCustomerDeals({ restaurantId, branchId, limit: 20 });
+  const addDealMutation = useAddDealToCart(branchId);
+  const handleAddDeal = useCallback(
+    (deal: CustomerDeal) => {
+      addDealMutation.mutate(deal);
+    },
+    [addDealMutation]
+  );
   const homeResponse = homeQuery.data;
   const homeData = homeResponse ? homeResponse.data : undefined;
   const branding = homeData?.branding ?? fallbackBranding ?? DEFAULT_BRANDING;
@@ -53,6 +65,13 @@ const HomePage = () => {
           <FoodCategorySection />
         </section>
       ) : null}
+
+      <CustomerDealsSection
+        deals={dealsQuery.deals}
+        isLoading={dealsQuery.isLoading}
+        addingDealId={addDealMutation.isPending ? addDealMutation.variables?.id ?? null : null}
+        onAddDeal={handleAddDeal}
+      />
 
       <WhyChooseUs />
       <AppPromo />

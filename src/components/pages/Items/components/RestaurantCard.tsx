@@ -5,7 +5,7 @@ import { Plus, Info, Loader2, Eye, Minus, Download, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import useItems from "@/hooks/useItems";
-import useCart from "@/hooks/useCart";
+import { useCart } from "@/hooks/useCart";
 import { useAuthContext } from "@/hooks/useAuth";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
