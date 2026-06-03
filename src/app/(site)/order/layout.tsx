@@ -1,4 +1,3 @@
-import Footer from "@/components/layout/footer/Footer";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -14,7 +13,6 @@ export default function OrderLayout({
     return (
         <>
             {children}
-            <Footer />
         </>
     );
 }

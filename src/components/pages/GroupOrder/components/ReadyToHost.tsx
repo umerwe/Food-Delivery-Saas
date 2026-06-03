@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 export default function ReadyToHost() {
+  const t = useTranslations("groupOrder.readyToHost");
+
   return (
     <section className="w-full bg-[#f4f4f4] px-6 md:px-40 py-16 pb-30">
       <div className="mx-auto">
@@ -22,24 +25,23 @@ export default function ReadyToHost() {
           {/* CONTENT */}
           <div className="relative z-10 max-w-2xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold text-white">
-              Ready to host your feast?
+              {t("title")}
             </h2>
 
             {/* SUBTEXT */}
             <p className="mt-4 text-gray-300 text-sm md:text-base leading-relaxed">
-              Gather your colleagues for the perfect lunch or sync up with friends
-              for a movie night spread.
+              {t("description")}
             </p>
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
 
               {/* PRIMARY BUTTON */}
               <Link href="/group-order/invite" className="px-8 py-3 bg-primary text-white rounded-full font-semibold shadow-lg hover:opacity-90 transition">
-                Get Started Now
+                {t("getStarted")}
               </Link>
 
               {/* SECONDARY BUTTON (GLASS EFFECT) */}
               <button className="px-8 py-3 rounded-full font-semibold text-white bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition">
-                Learn More
+                {t("learnMore")}
               </button>
 
             </div>

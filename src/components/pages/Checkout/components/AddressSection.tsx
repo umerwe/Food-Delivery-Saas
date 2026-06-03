@@ -1,6 +1,7 @@
 import { Calendar, MapPin } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { useTranslations } from "next-intl"
 
 interface Props {
   selectedAddress: string | null
@@ -11,6 +12,7 @@ export default function PickupAddressSection({
   selectedAddress,
   setSelectedAddress,
 }: Props) {
+  const t = useTranslations("checkout")
 
   const addressId = "Dno. 12-34-12, XYC Apartments, DOOR Colony, Hyderabad, Telangana"
   const isSelected = selectedAddress === addressId
@@ -20,13 +22,13 @@ export default function PickupAddressSection({
       <div className="flex items-center gap-3 mb-[53px]">
         <MapPin className="text-primary" size={28} />
         <h2 className="text-[24px] font-semibold text-gray-900">
-          Pickup address
+          {t("pickupAddress")}
         </h2>
       </div>
 
       <Button variant="outline">
         <Calendar size={20} className="text-black" />
-        Schedule your pickup
+        {t("schedulePickup")}
       </Button>
 
       {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-[30px]">

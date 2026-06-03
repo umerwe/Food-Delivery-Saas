@@ -7,8 +7,10 @@ import useChat from "@/hooks/useChat";
 import type { ChatMessage, ChatMessageCreatedEvent, ChatThread } from "@/services/chat";
 import { io, Socket } from "socket.io-client";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 export default function ChatUI() {
+  const t = useTranslations("contact.chat");
   const { token, user } = useAuth();
   const { createChatThread, fetchChatThreads, fetchChatThreadMessages, sendChatMessage } = useChat(token);
 const searchParams = useSearchParams();
@@ -21,7 +23,7 @@ const [creatingThread, setCreatingThread] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const chatBodyRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const activeThreadRef = useRef<ChatThread | null>(null);
   useEffect(() => {
@@ -146,7 +148,14 @@ const fetchMessages = async (id: string) => {
   };
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const chatBody = chatBodyRef.current;
+
+    if (!chatBody) return;
+
+    chatBody.scrollTo({
+      top: chatBody.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages]);
 
   useEffect(() => {
@@ -207,79 +216,81 @@ const fetchMessages = async (id: string) => {
   }, [token]);
 
   return (
-    <div className="flex h-screen bg-[#f7f6f5] text-[13px] text-[#1f1f1f]">
+    <div className="flex h-[calc(100dvh-88px)] overflow-hidden bg-[#f7f6f5] text-[13px] text-[#1f1f1f]">
       {/* Sidebar */}
-      <aside className="hidden md:flex flex-col w-[260px] bg-[#f3f1ef] px-4 py-5">
-        <p className="text-[10px] tracking-widest text-gray-400 mb-3">
-          USER CONTEXT
-        </p>
+      <aside className="hidden min-h-0 w-[260px] flex-col overflow-hidden bg-[#f3f1ef] px-4 py-5 md:flex">
+        <div className="shrink-0">
+          <p className="text-[10px] tracking-widest text-gray-400 mb-3">
+            {t("userContext")}
+          </p>
 
-        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 flex items-center justify-center rounded-full bg-[#f4c7b8] text-[12px] font-semibold">
-              {user?.profile?.firstName?.[0] || "U"}
-            </div>
-            <div>
-              <p className="font-medium text-[13px]">
-                {user?.profile?.firstName}
-              </p>
-              <p className="text-[11px] text-gray-400">
-                Premium Member
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3 text-[11px]">
-            <div>
-              <p className="text-gray-400 uppercase text-[9px] tracking-wider">
-                Account Since
-              </p>
-              <p className="text-[12px] mt-[2px]">
-                {user?.profile?.createdAt
-                  ? formatDate(user?.profile?.createdAt)
-                  : "—"}
-              </p>
+          <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 flex items-center justify-center rounded-full bg-[#f4c7b8] text-[12px] font-semibold">
+                {user?.profile?.firstName?.[0] || "U"}
+              </div>
+              <div>
+                <p className="font-medium text-[13px]">
+                  {user?.profile?.firstName}
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  {t("premiumMember")}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <p className="text-gray-400 uppercase text-[9px] tracking-wider">
-                Recent Topic
-              </p>
-              <p className="text-[12px] mt-[2px]">
-                {threads[0]?.subject || "Support Chat"}
-              </p>
+            <div className="mt-4 space-y-3 text-[11px]">
+              <div>
+                <p className="text-gray-400 uppercase text-[9px] tracking-wider">
+                  {t("accountSince")}
+                </p>
+                <p className="text-[12px] mt-[2px]">
+                  {user?.profile?.createdAt
+                    ? formatDate(user?.profile?.createdAt)
+                    : "—"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-gray-400 uppercase text-[9px] tracking-wider">
+                  {t("recentTopic")}
+                </p>
+                <p className="text-[12px] mt-[2px]">
+                  {threads[0]?.subject || t("supportChat")}
+                </p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* THREADS */}
-        <div className="mt-6">
-          <p className="text-[10px] tracking-widest text-gray-400 mb-3">
-            CONVERSATIONS
+        <div className="mt-6 flex min-h-0 flex-1 flex-col">
+          <p className="mb-3 shrink-0 text-[10px] tracking-widest text-gray-400">
+            {t("conversations")}
           </p>
 
-          <div className="space-y-2">
-            {threads.map((t) => (
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+            {threads.map((thread) => (
               <div
-                key={t.id}
-                onClick={() => setActiveThread(t)}
+                key={thread.id}
+                onClick={() => setActiveThread(thread)}
                 className={`rounded-lg px-3 py-3 cursor-pointer ${
-                  activeThread?.id === t.id
+                  activeThread?.id === thread.id
                     ? "bg-[#e7e5e4]"
                     : "bg-[#ecebea]"
                 }`}
               >
 
                 <div className="flex justify-between items-center"><p className="text-[12px] font-medium">
-                  {t.subject}
+                  {thread.subject}
                 </p>
-                 {t.orderId && (
+                 {thread.orderId && (
   <span className="text-[9px] px-2 py-[1px] bg-orange-100 text-orange-600 rounded-full">
-    Order
+    {t("orderBadge")}
   </span>
 )}</div>
                 <p className="text-[10px] text-gray-400 mt-1 truncate">
-                  {t.lastMessagePreview}
+                  {thread.lastMessagePreview}
                 </p>
               </div>
             ))}
@@ -288,28 +299,28 @@ const fetchMessages = async (id: string) => {
       </aside>
 
       {/* MAIN */}
-      <main className="flex flex-col flex-1">
+      <main className="flex min-h-0 flex-1 flex-col">
         {/* HEADER */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#f7f6f5] border-b border-gray-200">
          <h2 className="font-medium text-[14px]">
   {activeThread?.orderId
-    ? `Order #${activeThread.orderId} • Order Support`
-    : activeThread?.subject || "Live Chat"}
+    ? t("orderSupportTitle", { orderId: activeThread.orderId })
+    : activeThread?.subject || t("liveChat")}
 </h2>
 
           <span className="text-[10px] px-3 py-[3px] rounded-full bg-[#e9e7e5] text-gray-500">
-            ENCRYPTED
+            {t("encrypted")}
           </span>
         </div>
 
         {/* CHAT BODY */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar">
+        <div ref={chatBodyRef} className="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar">
           <div className="bg-[#2f2f2f] text-white rounded-md px-4 py-3 max-w-[720px]">
             <p className="text-[10px] uppercase tracking-wider opacity-60 mb-1">
-              Note
+              {t("note")}
             </p>
             <p className="text-[12px] leading-relaxed">
-              Please do not share personal or card details in this chat.
+              {t("privacyNotice")}
             </p>
           </div>
 {creatingThread && (
@@ -318,7 +329,7 @@ const fetchMessages = async (id: string) => {
       <Loader2 className="animate-spin text-[#ef5a2a]" size={16} />
     </div>
     <p className="text-[12px] text-gray-500">
-      Setting up your order conversation...
+      {t("settingUpConversation")}
     </p>
   </div>
 )}
@@ -335,7 +346,7 @@ const fetchMessages = async (id: string) => {
                   </div>
 
                   <p className="text-[10px] text-gray-400 mt-1 mr-1">
-                    You · {formatTime(msg.createdAt)}
+                    {t("you")} · {formatTime(msg.createdAt)}
                   </p>
                 </div>
               </div>
@@ -345,13 +356,11 @@ const fetchMessages = async (id: string) => {
                   <p className="text-[12px]">{msg.body}</p>
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1 ml-1">
-                  Support · {formatTime(msg.createdAt)}
+                  {t("support")} · {formatTime(msg.createdAt)}
                 </p>
               </div>
             );
           })}
-
-          <div ref={bottomRef} />
         </div>
 
         {/* INPUT */}
@@ -361,7 +370,7 @@ const fetchMessages = async (id: string) => {
                 transition-all duration-200">
             <input
               type="text"
-              placeholder="Type a message..."
+              placeholder={t("messagePlaceholder")}
               className="flex-1 bg-transparent outline-none text-[12px]"
               value={message}
               onChange={(e) => setMessage(e.target.value)}

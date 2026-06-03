@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
   CalendarDays,
@@ -43,7 +44,10 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
-const formatPeriod = (popup?: LandingPopup | null) => {
+const formatPeriod = (
+  popup: LandingPopup | null | undefined,
+  t: (key: "until" | "from", values: { date: string }) => string
+) => {
   const from =
     popup?.period?.fromDate || popup?.temporaryClosure?.closedAt || null;
 
@@ -58,17 +62,20 @@ const formatPeriod = (popup?: LandingPopup | null) => {
   }
 
   if (formattedTo) {
-    return `Until ${formattedTo}`;
+    return t("until", { date: formattedTo });
   }
 
   if (formattedFrom) {
-    return `From ${formattedFrom}`;
+    return t("from", { date: formattedFrom });
   }
 
   return "";
 };
 
-const getPopupLabel = (type?: LandingPopupType) => {
+const getPopupLabel = (
+  type: LandingPopupType | undefined,
+  t: (key: "temporaryUnavailable" | "vacationSchedule" | "holidaySchedule" | "importantUpdate") => string
+) => {
   const normalized = String(type || "").toUpperCase();
 
   if (
@@ -76,18 +83,18 @@ const getPopupLabel = (type?: LandingPopupType) => {
     normalized.includes("CLOSURE") ||
     normalized.includes("CLOSED")
   ) {
-    return "Temporarily unavailable";
+    return t("temporaryUnavailable");
   }
 
   if (normalized.includes("VACATION")) {
-    return "Vacation schedule";
+    return t("vacationSchedule");
   }
 
   if (normalized.includes("HOLIDAY")) {
-    return "Holiday schedule";
+    return t("holidaySchedule");
   }
 
-  return "Important branch update";
+  return t("importantUpdate");
 };
 
 const getPopupKey = (popup?: LandingPopup | null, branchId?: string) => {
@@ -105,6 +112,7 @@ export default function BranchOpeningHoursPopup({
   popup,
   branch,
 }: BranchOpeningHoursPopupProps) {
+  const t = useTranslations("home.branchOpeningHours");
   const branchId = String(branch?.id || "");
 
   const popupKey = useMemo(
@@ -120,18 +128,18 @@ export default function BranchOpeningHoursPopup({
 
   const shouldShow = Boolean(popup?.show) && dismissedKey !== popupKey;
 
-  const periodLabel = formatPeriod(popup);
-  const label = getPopupLabel(popup?.type);
+  const periodLabel = formatPeriod(popup, t);
+  const label = getPopupLabel(popup?.type, t);
 
-  const title = popup?.title || "Branch schedule update";
+  const title = popup?.title || t("scheduleUpdate");
 
   const message =
     popup?.message ||
     popup?.temporaryClosure?.message ||
-    "This branch has a schedule update. Please check the availability before placing your order.";
+    t("defaultMessage");
 
   const reason = popup?.temporaryClosure?.reason;
-  const branchName = branch?.name || "Selected branch";
+  const branchName = branch?.name || t("selectedBranch");
 
   const handleDismiss = () => {
     setDismissedKey(popupKey);
@@ -158,7 +166,7 @@ export default function BranchOpeningHoursPopup({
               type="button"
               onClick={handleDismiss}
               className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition hover:bg-white/25 sm:right-5 sm:top-5"
-              aria-label="Close branch notice"
+              aria-label={t("closeNotice")}
             >
               <X size={18} />
             </button>
@@ -192,14 +200,14 @@ export default function BranchOpeningHoursPopup({
           <div className="grid gap-3">
             <InfoCard
               icon={<MapPin size={18} />}
-              label="Branch"
+              label={t("branch")}
               value={branchName}
             />
 
             {periodLabel ? (
               <InfoCard
                 icon={<Clock size={18} />}
-                label="Affected period"
+                label={t("affectedPeriod")}
                 value={periodLabel}
               />
             ) : null}
@@ -207,7 +215,7 @@ export default function BranchOpeningHoursPopup({
             {reason ? (
               <InfoCard
                 icon={<CalendarDays size={18} />}
-                label="Reason"
+                label={t("reason")}
                 value={reason}
               />
             ) : null}
@@ -215,8 +223,7 @@ export default function BranchOpeningHoursPopup({
 
           <div className="mt-5 rounded-2xl border border-border bg-muted/50 p-4 sm:mt-6">
             <p className="break-words text-sm leading-6 text-muted-foreground">
-              You can still browse the menu, but ordering may be unavailable
-              during this schedule window.
+              {t("browseNotice")}
             </p>
           </div>
         </div>
@@ -228,7 +235,7 @@ export default function BranchOpeningHoursPopup({
               onClick={handleDismiss}
               className="h-12 min-w-0 flex-1 rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90"
             >
-              I understand
+              {t("understand")}
             </Button>
 
             <Button
@@ -243,7 +250,7 @@ export default function BranchOpeningHoursPopup({
               }}
               className="h-12 min-w-0 flex-1 rounded-full border-primary/20 text-sm font-semibold text-foreground hover:bg-primary/5 hover:text-primary"
             >
-              Browse menu
+              {t("browseMenu")}
             </Button>
           </div>
         </div>

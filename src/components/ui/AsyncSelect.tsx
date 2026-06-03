@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type UIEvent } from "react";
 import { Check, ChevronDown, Loader2, Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export type AsyncSelectOption = object;
 
@@ -30,14 +31,15 @@ const normalize = <TValue extends AsyncSelectOption>(res: AsyncSelectResult<TVal
   return [];
 };
 
-export default function AsyncSelect<TValue extends AsyncSelectOption = AsyncSelectOption>({
+export function AsyncSelect<TValue extends AsyncSelectOption = AsyncSelectOption>({
   value,
   onChange,
-  placeholder = "Select",
+  placeholder,
   fetchOptions,
   labelKey = "name" as keyof TValue & string,
   valueKey = "id" as keyof TValue & string,
 }: Props<TValue>) {
+  const t = useTranslations("common");
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   const [open, setOpen] = useState(false);
@@ -114,7 +116,7 @@ export default function AsyncSelect<TValue extends AsyncSelectOption = AsyncSele
       className="flex h-[44px] w-full items-center justify-between rounded-xl bg-white/70 backdrop-blur px-4 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.08)] transition"
     >
       <span className={value ? "text-gray-900" : "text-gray-400"}>
-        {value ? String(getOptionValue(value, labelKey) ?? "") : placeholder}
+        {value ? String(getOptionValue(value, labelKey) ?? "") : placeholder || t("select")}
       </span>
 
       <ChevronDown
@@ -131,7 +133,7 @@ export default function AsyncSelect<TValue extends AsyncSelectOption = AsyncSele
             <Search size={14} className="text-gray-400" />
             <input
               className="w-full bg-transparent outline-none text-sm"
-              placeholder="Search..."
+              placeholder={t("searchPlaceholder")}
               value={search}
               onChange={(e) => {
                 setPage(1);
@@ -176,7 +178,7 @@ export default function AsyncSelect<TValue extends AsyncSelectOption = AsyncSele
 
           {!loading && options.length === 0 && (
             <div className="p-4 text-center text-gray-400 text-sm">
-              No results found
+              {t("noResults")}
             </div>
           )}
         </div>

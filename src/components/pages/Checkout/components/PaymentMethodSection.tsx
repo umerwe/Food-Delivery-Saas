@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface Props {
   paymentMethod: string;
@@ -9,16 +10,17 @@ const PaymentMethodSection = ({
   paymentMethod,
   setPaymentMethod,
 }: Props) => {
+  const t = useTranslations("checkout");
   const options = [
-    { key: "cod", label: "Cash on Delivery" },
-    { key: "card", label: "Credit / Debit Card (Stripe)" },
-    { key: "wallet", label: "Wallet" },
+    { key: "cod", label: t("cashOnDelivery") },
+    { key: "card", label: t("cardStripe") },
+    { key: "wallet", label: t("wallet") },
   ];
 
   return (
     <section className="space-y-[25px]">
       <h2 className="text-[24px] font-semibold text-gray-900 pt-[8px] border-b-2 border-gray-300">
-        Select Payment Method
+        {t("selectPaymentMethod")}
       </h2>
 
       <div className="space-y-3">

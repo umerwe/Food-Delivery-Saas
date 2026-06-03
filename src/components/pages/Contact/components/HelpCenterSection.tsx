@@ -7,8 +7,11 @@ import {
   FaUniversity,
   FaGavel,
 } from "react-icons/fa";
+import { useTranslations } from "next-intl";
 
 export default function HelpCenterSection() {
+  const t = useTranslations("contact.helpCenter");
+
   return (
     <section className="bg-[#F4F4F4] py-16 px-6 md:px-12 lg:px-20">
       <div className="max-w-[1150px] mx-auto">
@@ -16,12 +19,11 @@ export default function HelpCenterSection() {
         {/* HEADER */}
         <div className="mb-12 max-w-[600px]">
           <h1 className="text-[40px] font-semibold text-gray-900 leading-tight">
-            The Help Center.
+            {t("title")}
           </h1>
 
           <p className="text-gray-500 mt-3 text-[15px] leading-relaxed">
-            Navigating the intricacies of culinary governance and editorial standards
-            with ease and transparency.
+            {t("description")}
           </p>
         </div>
 
@@ -30,26 +32,30 @@ export default function HelpCenterSection() {
 
           <HelpCard
             icon={<FaFingerprint />}
-            title="ACCOUNT MANAGEMENT"
-            description="Security protocols, profile authentication, and editorial credentials."
+            title={t("accountTitle")}
+            description={t("accountDescription")}
+            cta={t("explore")}
           />
 
           <HelpCard
             icon={<FaTruck />}
-            title="DELIVERY PROTOCOLS"
-            description="Logistics standards, temperature integrity, and carrier compliance."
+            title={t("deliveryTitle")}
+            description={t("deliveryDescription")}
+            cta={t("explore")}
           />
 
           <HelpCard
             icon={<FaUniversity />}
-            title="PAYMENT & BILLING"
-            description="Invoicing cycles, secure transactions, and financial reconciliation."
+            title={t("paymentTitle")}
+            description={t("paymentDescription")}
+            cta={t("explore")}
           />
 
           <HelpCard
             icon={<FaGavel />}
-            title="LEGAL & COMPLIANCE"
-            description="Regulatory updates, privacy terms, and trust framework."
+            title={t("legalTitle")}
+            description={t("legalDescription")}
+            cta={t("explore")}
           />
 
         </div>
@@ -63,9 +69,10 @@ type HelpCardProps = {
   icon: ReactNode;
   title: string;
   description: string;
+  cta: string;
 };
 
-function HelpCard({ icon, title, description }: HelpCardProps) {
+function HelpCard({ icon, title, description, cta }: HelpCardProps) {
   return (
     <div className="bg-white rounded-[14px] p-6 shadow-sm hover:shadow-md transition duration-300 border border-gray-100">
 
@@ -82,7 +89,7 @@ function HelpCard({ icon, title, description }: HelpCardProps) {
 
       {/* CTA */}
       <button className="text-primary text-[12px] font-semibold tracking-wide flex items-center gap-1 hover:gap-2 transition-all">
-        EXPLORE →
+        {cta}
       </button>
     </div>
   );

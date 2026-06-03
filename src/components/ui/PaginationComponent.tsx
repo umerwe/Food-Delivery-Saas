@@ -1,4 +1,5 @@
 "use client"
+import { useTranslations } from "next-intl";
 import {
     Pagination,
     PaginationContent,
@@ -18,14 +19,17 @@ type Props = {
     onPageChange: (page: number) => void;
 };
 
-const PaginationSection = ({ page, totalPages, total, limit, hasNext, hasPrevious, onPageChange }: Props) => {
+export const PaginationSection = ({ page, totalPages, total, limit, hasNext, hasPrevious, onPageChange }: Props) => {
+    const t = useTranslations("common");
     const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
     const showing = Math.min(limit, total - (page - 1) * limit);
 
     return (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-                <p className="text-sm">Showing {showing} from {total} data</p>
+                <p className="text-sm">
+                    {t("showingFromData", { showing, total })}
+                </p>
             </div>
             <div>
                 <Pagination>
@@ -65,5 +69,3 @@ const PaginationSection = ({ page, totalPages, total, limit, hasNext, hasPreviou
         </div>
     );
 };
-
-export default PaginationSection;

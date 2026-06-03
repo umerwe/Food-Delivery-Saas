@@ -21,8 +21,10 @@ import { useAuth } from "@/hooks/useAuth";
 import type { ApiRecord, BackendErrorState, CartItem } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorMeta, hasBackendError, normalizeCartItem, normalizeCartResponse, recalculateCartItemQuantity, toNumber } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import type { BranchRecord } from "@/types/branch-selector";
+import { useTranslations } from "next-intl";
 
 function CheckoutPageContent() {
+  const t = useTranslations("checkout");
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
   const activeTab = type === "pickup" ? "pickup" : "delivery";
@@ -88,9 +90,9 @@ function CheckoutPageContent() {
         setCartItems([]);
         setCartQuote(null);
         reportBackendError(
-          "Backend error while fetching cart",
+          t("toast.failedFetchCart"),
           res,
-          "Failed to fetch cart"
+          t("toast.failedFetchCart")
         );
         return;
       }
@@ -103,9 +105,9 @@ function CheckoutPageContent() {
       clearBackendError();
     } catch (err) {
       reportBackendError(
-        "Backend error while fetching cart",
+        t("toast.failedFetchCart"),
         err,
-        err instanceof Error ? err.message : "Failed to fetch cart"
+        err instanceof Error ? err.message : t("toast.failedFetchCart")
       );
     } finally {
       setLoadingCart(false);
@@ -200,9 +202,9 @@ function CheckoutPageContent() {
       if (hasBackendError(res)) {
         setCartItems(previousCartItems);
         reportBackendError(
-          "Backend error while updating cart quantity",
+          t("toast.failedUpdateQuantity"),
           res,
-          "Failed to update quantity"
+          t("toast.failedUpdateQuantity")
         );
         return;
       }
@@ -211,9 +213,9 @@ function CheckoutPageContent() {
     } catch (err) {
       setCartItems(previousCartItems);
       reportBackendError(
-        "Backend error while updating cart quantity",
+        t("toast.failedUpdateQuantity"),
         err,
-        err instanceof Error ? err.message : "Failed to update quantity"
+        err instanceof Error ? err.message : t("toast.failedUpdateQuantity")
       );
     }
   };
@@ -229,21 +231,21 @@ function CheckoutPageContent() {
       if (hasBackendError(res)) {
         setCartItems(previousCartItems);
         reportBackendError(
-          "Backend error while removing cart item",
+          t("toast.failedRemoveItem"),
           res,
-          "Failed to remove item"
+          t("toast.failedRemoveItem")
         );
         return;
       }
 
       await fetchCart();
-      toast.success("Item removed");
+      toast.success(t("toast.itemRemoved"));
     } catch (err) {
       setCartItems(previousCartItems);
       reportBackendError(
-        "Backend error while removing cart item",
+        t("toast.failedRemoveItem"),
         err,
-        err instanceof Error ? err.message : "Failed to remove item"
+        err instanceof Error ? err.message : t("toast.failedRemoveItem")
       );
     }
   };
@@ -262,9 +264,9 @@ function CheckoutPageContent() {
         setCartItems(previousCartItems);
         setCartQuote(previousCartQuote);
         reportBackendError(
-          "Backend error while clearing cart",
+          t("toast.failedClearCart"),
           res,
-          "Failed to clear cart"
+          t("toast.failedClearCart")
         );
         return false;
       }
@@ -275,9 +277,9 @@ function CheckoutPageContent() {
       setCartItems(previousCartItems);
       setCartQuote(previousCartQuote);
       reportBackendError(
-        "Backend error while clearing cart",
+        t("toast.failedClearCart"),
         err,
-        err instanceof Error ? err.message : "Failed to clear cart"
+        err instanceof Error ? err.message : t("toast.failedClearCart")
       );
       return false;
     }
@@ -291,9 +293,9 @@ function CheckoutPageContent() {
 
       if (hasBackendError(res)) {
         reportBackendError(
-          "Backend error while setting order type",
+          t("toast.failedSetOrderType"),
           res,
-          "Failed to set order type"
+          t("toast.failedSetOrderType")
         );
         return false;
       }
@@ -302,9 +304,9 @@ function CheckoutPageContent() {
       return true;
     } catch (err) {
       reportBackendError(
-        "Backend error while setting order type",
+        t("toast.failedSetOrderType"),
         err,
-        err instanceof Error ? err.message : "Failed to set order type"
+        err instanceof Error ? err.message : t("toast.failedSetOrderType")
       );
       return false;
     }
@@ -320,9 +322,9 @@ function CheckoutPageContent() {
 
       if (hasBackendError(res)) {
         reportBackendError(
-          "Backend error while setting delivery address",
+          t("toast.failedSetAddress"),
           res,
-          "Failed to set address"
+          t("toast.failedSetAddress")
         );
         return false;
       }
@@ -331,9 +333,9 @@ function CheckoutPageContent() {
       return true;
     } catch (err) {
       reportBackendError(
-        "Backend error while setting delivery address",
+        t("toast.failedSetAddress"),
         err,
-        err instanceof Error ? err.message : "Failed to set address"
+        err instanceof Error ? err.message : t("toast.failedSetAddress")
       );
       return false;
     }
@@ -382,17 +384,17 @@ function CheckoutPageContent() {
       setPlacingOrder(true);
 
       if (!cartItems.length) {
-        toast.error("Cart is empty");
+        toast.error(t("toast.cartEmpty"));
         return;
       }
 
       if (activeTab === "delivery" && !selectedAddress) {
-        toast.error("Please select address");
+        toast.error(t("toast.selectAddress"));
         return;
       }
 
       if (activeTab === "pickup" && (!pickupDate || !pickupTime)) {
-        toast.error("Please select pickup date and time");
+        toast.error(t("toast.selectPickupDateTime"));
         return;
       }
 
@@ -405,7 +407,7 @@ function CheckoutPageContent() {
       const orderTime = getOrderTime();
 
       if (!orderTime) {
-        toast.error("Invalid order time");
+        toast.error(t("toast.invalidOrderTime"));
         return;
       }
 
@@ -422,9 +424,9 @@ function CheckoutPageContent() {
 
       if (hasBackendError(res)) {
         reportBackendError(
-          "Backend error while placing order",
+          t("toast.checkoutFailed"),
           res,
-          "Checkout failed"
+          t("toast.checkoutFailed")
         );
         return;
       }
@@ -434,9 +436,9 @@ function CheckoutPageContent() {
 
       if (!orderId) {
         reportBackendError(
-          "Backend error while placing order",
+          t("toast.invalidOrderResponse"),
           res,
-          "Invalid order response"
+          t("toast.invalidOrderResponse")
         );
         return;
       }
@@ -452,9 +454,9 @@ function CheckoutPageContent() {
 
         if (hasBackendError(attemptRes) || !attemptRes?.success) {
           reportBackendError(
-            "Backend error while initiating payment",
+            t("toast.failedInitiatePayment"),
             attemptRes,
-            "Failed to initiate payment"
+            t("toast.failedInitiatePayment")
           );
           return;
         }
@@ -474,22 +476,22 @@ function CheckoutPageContent() {
       }
 
       if (paymentMethod === "wallet") {
-        toast.success("Paid using wallet");
+        toast.success(t("toast.paidUsingWallet"));
 
         await clearCart();
         router.push(`/order?success=true&orderId=${orderId}`);
         return;
       }
 
-      toast.success("Order placed successfully");
+      toast.success(t("toast.orderPlaced"));
 
       await clearCart();
       router.push(`/order?success=true&orderId=${orderId}`);
     } catch (err) {
       reportBackendError(
-        "Backend error while placing order",
+        t("toast.orderFailed"),
         err,
-        err instanceof Error ? err.message : "Order failed"
+        err instanceof Error ? err.message : t("toast.orderFailed")
       );
     } finally {
       setPlacingOrder(false);
@@ -508,7 +510,7 @@ function CheckoutPageContent() {
 
   const validateCoupon = async () => {
     if (!couponCode.trim()) {
-      toast.error("Enter coupon code");
+      toast.error(t("toast.enterCouponCode"));
       return;
     }
 
@@ -527,9 +529,9 @@ function CheckoutPageContent() {
       if (hasBackendError(res)) {
         setCouponDiscount(0);
         reportBackendError(
-          "Backend error while validating coupon",
+          t("toast.invalidCoupon"),
           res,
-          "Invalid coupon"
+          t("toast.invalidCoupon")
         );
         return;
       }
@@ -539,13 +541,13 @@ function CheckoutPageContent() {
 
       setCouponDiscount(discount);
       clearBackendError();
-      toast.success("Coupon applied");
+      toast.success(t("toast.couponApplied"));
     } catch (err) {
       setCouponDiscount(0);
       reportBackendError(
-        "Backend error while validating coupon",
+        t("toast.couponValidationFailed"),
         err,
-        err instanceof Error ? err.message : "Coupon validation failed"
+        err instanceof Error ? err.message : t("toast.couponValidationFailed")
       );
     } finally {
       setValidatingCoupon(false);
@@ -609,7 +611,7 @@ function CheckoutPageContent() {
       {stripePayment.open && stripePromise && stripePayment.clientSecret ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="max-h-[90vh] w-[400px] overflow-auto rounded-2xl bg-white p-6">
-            <h2 className="mb-4 text-lg font-semibold">Complete Payment</h2>
+            <h2 className="mb-4 text-lg font-semibold">{t("completePayment")}</h2>
 
             <Elements
               stripe={stripePromise}
@@ -656,6 +658,7 @@ const OrderStripeCheckout = ({
   onSuccess: () => void;
   onFail: () => void;
 }) => {
+  const t = useTranslations("checkout");
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -679,7 +682,7 @@ const OrderStripeCheckout = ({
           note: error.message,
         });
 
-        toast.error(error.message || "Payment failed");
+        toast.error(error.message || t("toast.paymentFailed"));
         onFail();
         return;
       }
@@ -691,14 +694,14 @@ const OrderStripeCheckout = ({
           note: "Stripe success",
         });
 
-        toast.success("Payment successful");
+        toast.success(t("toast.paymentSuccessful"));
         onSuccess();
         return;
       }
 
-      toast.error("Payment was not completed");
+      toast.error(t("toast.paymentNotCompleted"));
     } catch (err) {
-      toast.error("Payment failed");
+      toast.error(t("toast.paymentFailed"));
       onFail();
     } finally {
       setLoading(false);
@@ -716,7 +719,7 @@ const OrderStripeCheckout = ({
         className="h-11 w-full rounded-xl text-white disabled:opacity-60"
         style={{ background: "var(--primary)" }}
       >
-        {loading ? "Processing..." : "Pay Now"}
+        {loading ? t("processing") : t("payNow")}
       </button>
     </div>
   );

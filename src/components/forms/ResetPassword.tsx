@@ -2,25 +2,63 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { getAuthErrorMessage } from "@/lib/auth";
 import { resendResetOtp, resetPassword } from "@/services/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { MUTED_TEXT_CLASS } from "@/components/common/common-classes";
 import {
-  resetPasswordSchema,
+  createResetPasswordSchema,
+  type AuthValidationMessages,
   type ResetPasswordFormValues,
 } from "@/validations/auth";
 
-const ResetPassword = () => {
+export function ResetPasswordLoadingFallback() {
+  const tCommon = useTranslations("common");
+
+  return <div className="text-sm text-gray-500">{tCommon("loading")}</div>;
+}
+
+const useAuthValidationMessages = (): AuthValidationMessages => {
+  const t = useTranslations("validation");
+
+  return useMemo(
+    () => ({
+      emailRequired: t("emailRequired"),
+      emailInvalid: t("emailInvalid"),
+      passwordRequired: t("passwordRequired"),
+      restaurantIdRequired: t("restaurantIdRequired"),
+      firstNameRequired: t("firstNameRequired"),
+      lastNameRequired: t("lastNameRequired"),
+      phoneRequired: t("phoneRequired"),
+      confirmPasswordRequired: t("confirmPasswordRequired"),
+      acceptTermsRequired: t("acceptTermsRequired"),
+      passwordsDoNotMatch: t("passwordsDoNotMatch"),
+      otpRequired: t("otpRequired"),
+      newPasswordRequired: t("newPasswordRequired"),
+      restaurantIdMissing: t("restaurantIdMissing"),
+    }),
+    [t]
+  );
+};
+
+function ResetPasswordFormInner() {
+  const t = useTranslations("auth");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const searchParams = useSearchParams();
+  const validationMessages = useAuthValidationMessages();
+  const translatedResetPasswordSchema = useMemo(
+    () => createResetPasswordSchema(validationMessages),
+    [validationMessages]
+  );
 
   const form = useForm<ResetPasswordFormValues>({
-    resolver: zodResolver(resetPasswordSchema),
+    resolver: zodResolver(translatedResetPasswordSchema),
     defaultValues: {
       email: "",
       otp: "",
@@ -62,7 +100,7 @@ const ResetPassword = () => {
     const restaurantId = form.getValues("restaurantId");
 
     if (!email || !restaurantId) {
-      toast.error("Missing email or restaurant id");
+      toast.error(t("missingEmailOrRestaurantId"));
       return;
     }
 
@@ -74,7 +112,7 @@ const ResetPassword = () => {
         restaurantId,
       });
 
-      toast.success("OTP resent successfully");
+      toast.success(t("otpResent"));
 
       setCountdown(60);
     } catch (error) {
@@ -97,7 +135,7 @@ const ResetPassword = () => {
         restaurantId: values.restaurantId,
       });
 
-      toast.success("Password reset successfully!");
+      toast.success(t("passwordResetSuccess"));
 
       setTimeout(() => {
         router.push("/auth/login");
@@ -115,10 +153,10 @@ const ResetPassword = () => {
 
       <div className="space-y-1">
         <h1 className="text-headline-sm font-bold font-roboto text-primary">
-          Reset password
+          {t("resetPasswordTitle")}
         </h1>
         <p className={MUTED_TEXT_CLASS}>
-          Enter the OTP sent to your email and set a new password
+          {t("resetPasswordDescription")}
         </p>
       </div>
 
@@ -133,7 +171,7 @@ const ResetPassword = () => {
         <Input
           id="email"
           type="email"
-          placeholder="Email"
+          placeholder={t("email")}
           required
           {...form.register("email")}
         />
@@ -142,7 +180,7 @@ const ResetPassword = () => {
         <Input
           id="otp"
           type="text"
-          placeholder="Enter OTP"
+          placeholder={t("enterOtp")}
           required
           {...form.register("otp")}
         />
@@ -152,7 +190,7 @@ const ResetPassword = () => {
 
           {countdown > 0 ? (
             <span className="text-muted-foreground">
-              Resend OTP in {countdown}s
+              {t("resendOtpIn", { count: countdown })}
             </span>
           ) : (
             <button
@@ -161,7 +199,7 @@ const ResetPassword = () => {
               disabled={isResending}
               className="text-primary hover:underline"
             >
-              {isResending ? "Sending..." : "Resend OTP"}
+              {isResending ? t("sending") : t("resendOtp")}
             </button>
           )}
 
@@ -171,7 +209,7 @@ const ResetPassword = () => {
         <Input
           id="newPassword"
           type="password"
-          placeholder="Enter new password"
+          placeholder={t("enterNewPassword")}
           required
           {...form.register("newPassword")}
         />
@@ -180,7 +218,7 @@ const ResetPassword = () => {
         <Input
           id="restaurantId"
           type="text"
-          placeholder="Restaurant ID"
+          placeholder={t("restaurantIdUpper")}
           required
           {...form.register("restaurantId")}
         />
@@ -191,13 +229,19 @@ const ResetPassword = () => {
           disabled={isLoading}
           className="w-full h-[50px] text-lg font-semibold bg-primary hover:bg-primary/90 text-white rounded-base transition-colors mb-[15px]"
         >
-          {isLoading ? "Submitting..." : "Reset Password"}
+          {isLoading ? tCommon("submitting") : t("resetPassword")}
         </Button>
 
       </form>
 
     </div>
   );
-};
+}
 
-export default ResetPassword;
+export function ResetPassword() {
+  return (
+    <Suspense fallback={<ResetPasswordLoadingFallback />}>
+      <ResetPasswordFormInner />
+    </Suspense>
+  );
+}

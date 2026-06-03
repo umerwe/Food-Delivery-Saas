@@ -9,10 +9,13 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useBranchSelector from "@/hooks/useBranchSelector";
-import BranchPopup from "@/components/common/popups/BranchPopup";
+import { BranchPopup } from "@/components/common/popups/BranchPopup";
 import { getStoredAuthState } from "@/lib/auth";
 import type { Order, OrderItem, OrderMeta } from "@/services/orders";
+import { useTranslations } from "next-intl";
 export function OrdersHistoryPage() {
+  const t = useTranslations("ordersHistory");
+  const errorT = useTranslations("errors");
   const { token } = useAuthContext();
   const { addCartItemForReorder, fetchOrdersPage } = useOrders(token);
 const router = useRouter();
@@ -45,7 +48,7 @@ const {
     let branchId = user?.branchId ? String(user.branchId) : "";
 
     if (!customerId) {
-      toast.error("User not found");
+      toast.error(t("userNotFound"));
       return;
     }
 
@@ -66,13 +69,13 @@ const {
       } });
     }
 
-    toast.success("Reorder successful!");
+    toast.success(t("reorderSuccessful"));
 
     //  redirect to checkout
     router.push("/checkout");
 
   } catch (err) {
-    toast.error("Reorder failed");
+    toast.error(t("reorderFailed"));
   } finally {
     setReorderingId(null);
   }
@@ -90,7 +93,7 @@ const {
         const { response: res, orders: nextOrders, meta: nextMeta } = await fetchOrdersPage({ page, limit: 10 });
 
         if (!res || res.success === false) {
-          setError(res?.message || "Failed to fetch orders");
+          setError(res?.message || t("failedFetchOrders"));
           setOrders([]);
           return;
         }
@@ -98,7 +101,7 @@ const {
         setOrders(nextOrders);
         setMeta(nextMeta || null);
       } catch {
-        setError("Something went wrong");
+        setError(errorT("somethingWentWrong"));
       } finally {
         setLoading(false);
       }
@@ -116,15 +119,17 @@ const {
   const mapStatus = (status: string) => {
     switch (status) {
       case "DELIVERED":
-        return "Delivered";
+        return t("status.delivered");
       case "CANCELLED":
-        return "Cancelled";
+        return t("status.cancelled");
       case "PLACED":
-        return "Processing";
+        return t("status.processing");
       case "CONFIRMED":
+        return t("status.confirmed");
       case "PREPARING":
+        return t("status.preparing");
       case "PICKED_UP":
-        return "Delivered";
+        return t("status.pickedUp");
       default:
         return status;
     }
@@ -135,7 +140,7 @@ const {
       <div className="max-w-5xl mx-auto">
 
         <h1 className="text-lg sm:text-[22px] font-semibold text-gray-900 mb-5 sm:mb-6">
-          Your Order History
+          {t("title")}
         </h1>
 
         {/* ================= LOADING ================= */}
@@ -159,7 +164,7 @@ const {
         {/* ================= EMPTY ================= */}
         {!loading && !error && orders.length === 0 && (
           <div className="text-center py-16 text-gray-400">
-            No orders found
+            {t("noOrdersFound")}
           </div>
         )}
 
@@ -178,7 +183,7 @@ const {
                     <div className="relative w-full sm:w-[110px] h-[180px] sm:h-[90px] rounded-xl overflow-hidden shrink-0">
                       <Image
                         src={firstItem?.imageUrl || "/placeholder.png"}
-                        alt={firstItem?.menuItemName || "order"}
+                        alt={firstItem?.menuItemName || t("orderImageAlt")}
                         fill
                         className="object-cover"
                       />
@@ -195,11 +200,11 @@ const {
 
                         <div>
                           <h2 className="text-[14px] sm:text-[15px] font-semibold text-gray-900">
-                            {order.branch?.name || "Restaurant"}
+                            {order.branch?.name || t("restaurantFallback")}
                           </h2>
 
                           <p className="text-[11px] text-gray-400 mt-[2px]">
-                            Order #{String(order.id).slice(-6)} ·{" "}
+                            {t("orderNumberShort", { id: String(order.id).slice(-6) })} ·{" "}
                             {formatDate(order.createdAt || "")}
                           </p>
                         </div>
@@ -212,7 +217,7 @@ const {
                       {/* ITEMS */}
                       <p className="text-[12px] text-gray-500 mt-2">
                         <span className="font-medium text-gray-600">
-                          Items:
+                          {t("items")}:
                         </span>{" "}
                         {order.itemsPreview
                           ?.map(
@@ -228,7 +233,7 @@ const {
                           href={`/order?orderId=${order.id}`}
                           className="w-full sm:w-auto text-[12px] px-3 py-[7px] border border-primary text-primary rounded-md hover:bg-orange-50"
                         >
-                          View Details
+                          {t("viewDetails")}
                         </Link>
 
   <button
@@ -239,10 +244,10 @@ const {
                           {reorderingId === order.id ? (
                             <>
                               <Loader2 className="w-3 h-3 animate-spin" />
-                              Reordering...
+                              {t("reordering")}
                             </>
                           ) : (
-                            "Reorder"
+                            t("reorder")
                           )}
                         </button>
                       </div>
@@ -257,7 +262,7 @@ const {
       <>
         {/*  Already reviewed */}
         <span className="text-[12px] text-gray-400">
-          You rated this order
+          {t("youRatedThisOrder")}
         </span>
 
         <div className="flex gap-[2px]">
@@ -278,7 +283,7 @@ const {
       <>
         {/*  No review */}
         <span className="text-[12px] text-gray-400">
-          How was your food?
+          {t("howWasYourFood")}
         </span>
 
         <button
@@ -287,13 +292,13 @@ const {
           }
           className="text-xs text-primary font-medium cursor-pointer"
         >
-          Write Review
+          {t("writeReview")}
         </button>
       </>
     )
   ) : (
     <span className="text-[12px] text-gray-400">
-      Order is being processed
+      {t("orderProcessing")}
     </span>
   )}
 </div>

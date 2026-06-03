@@ -9,9 +9,10 @@ import {
   FaTimes,
 } from "react-icons/fa";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import useBranches from "@/hooks/useBranches";
 import { useAuthContext } from "@/hooks/useAuth";
-import { Branch, BranchApiResponse } from "@/types/branch-selector";
+import type { Branch, BranchApiResponse } from "@/types/branch-selector";
 import {
   getBranchAddressText,
   persistSelectedBranch,
@@ -30,17 +31,19 @@ type BranchSelectorModalProps = {
   onSelected?: (branch: Branch) => void;
 };
 
-export default function BranchSelectorModal({
+export function BranchSelectorModal({
   open,
   onClose,
   restaurantId,
   endpoint,
-  title = "Choose Your Branch",
-  badgeText = "Branch Selection",
-  description = "Select a branch to continue. You can switch branches later anytime.",
+  title,
+  badgeText,
+  description,
   forceSelection = false,
   onSelected,
 }: BranchSelectorModalProps) {
+  const t = useTranslations("branchSelector");
+  const tCommon = useTranslations("common");
   const { token, user, setUser } = useAuthContext();
   const api = useBranches(token);
   const getRef = useRef(api.fetchBranchPage);
@@ -75,6 +78,7 @@ export default function BranchSelectorModal({
     !!token && !!user && !!resolvedRestaurantId && open && !isBlockedRoute;
 
   const hasActiveSearch = Boolean(search.trim() || searchInput.trim());
+  const resolvedDescription = description ?? t("branchSelectionDescription");
 
   const buildUrl = useCallback(() => {
     const baseUrl =
@@ -121,7 +125,7 @@ export default function BranchSelectorModal({
       setHasNextPage(nextHasNextPage);
       setHasPrevPage(nextHasPrevPage);
     } catch (error) {
-      toast.error("Failed to load branches");
+      toast.error(t("failedToLoadBranches"));
       setBranches([]);
       setTotalPages(1);
       setTotalBranches(0);
@@ -130,7 +134,7 @@ export default function BranchSelectorModal({
     } finally {
       setLoading(false);
     }
-  }, [buildUrl, canFetch, page]);
+  }, [buildUrl, canFetch, page, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -167,11 +171,11 @@ export default function BranchSelectorModal({
 
       persistSelectedBranch(branch, setUser);
 
-      toast.success(`Branch selected: ${branch.name}`);
+      toast.success(t("branchSelected", { name: branch.name }));
       onSelected?.(branch);
       onClose();
     } catch (error) {
-      toast.error("Failed to set branch");
+      toast.error(t("failedToSetBranch"));
     } finally {
       setSelectingId(null);
     }
@@ -222,7 +226,7 @@ export default function BranchSelectorModal({
               type="button"
               onClick={onClose}
               className="absolute right-5 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#6B7280] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-              aria-label="Close branch selector"
+              aria-label={t("closeBranchSelector")}
             >
               <FaTimes className="text-[13px]" />
             </button>
@@ -235,16 +239,16 @@ export default function BranchSelectorModal({
 
             <div className="min-w-0 flex-1">
               <div className="inline-flex items-center gap-2 rounded-full border border-[color:rgba(206,24,27,0.14)] bg-[color:rgba(206,24,27,0.06)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
-                {badgeText}
+                {badgeText || t("branchSelection")}
               </div>
 
               <h2 className="mt-3 text-[24px] font-bold tracking-[-0.03em] text-[#111827] md:text-[28px]">
-                {title}
+                {title || t("chooseYourBranch")}
               </h2>
 
-              {description ? (
+              {resolvedDescription ? (
                 <p className="mt-2 max-w-[540px] text-sm leading-6 text-[#6B7280] md:text-[15px]">
-                  {description}
+                  {resolvedDescription}
                 </p>
               ) : null}
             </div>
@@ -257,7 +261,7 @@ export default function BranchSelectorModal({
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search branch by name or location..."
+                placeholder={t("searchBranchByNameOrLocation")}
                 className="h-12 w-full rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] pl-11 pr-4 text-sm text-[#111827] outline-none transition-all duration-200 placeholder:text-[#9CA3AF] focus:border-[var(--primary)] focus:bg-white focus:ring-4 focus:ring-[color:rgba(206,24,27,0.08)]"
               />
             </div>
@@ -269,10 +273,10 @@ export default function BranchSelectorModal({
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="mb-5 h-12 w-12 animate-spin rounded-full border-[3px] border-[color:rgba(206,24,27,0.14)] border-t-[var(--primary)]" />
               <p className="text-sm font-semibold text-[#111827]">
-                Loading available branches...
+                {t("loadingAvailableBranches")}
               </p>
               <p className="mt-1 text-xs text-[#9CA3AF]">
-                Please wait while we fetch your restaurant branches.
+                {t("fetchingRestaurantBranches")}
               </p>
             </div>
           ) : branches.length === 0 ? (
@@ -282,12 +286,11 @@ export default function BranchSelectorModal({
               </div>
 
               <h3 className="text-base font-semibold text-[#111827]">
-                No matching branches found
+                {t("noMatchingBranchesFound")}
               </h3>
 
               <p className="mx-auto mt-2 max-w-[360px] text-sm leading-6 text-[#6B7280]">
-                We could not find any active branches for your current search.
-                Try another keyword or close this selector.
+                {t("noMatchingBranchesDescription")}
               </p>
 
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -297,7 +300,7 @@ export default function BranchSelectorModal({
                     onClick={handleClearSearch}
                     className="inline-flex h-11 min-w-[140px] items-center justify-center rounded-full border border-[color:rgba(206,24,27,0.18)] bg-white px-5 text-sm font-semibold text-[var(--primary)] transition hover:bg-[color:rgba(206,24,27,0.04)]"
                   >
-                    Clear search
+                    {t("clearSearch")}
                   </button>
                 ) : null}
 
@@ -306,7 +309,7 @@ export default function BranchSelectorModal({
                   onClick={handleEmptyClose}
                   className="inline-flex h-11 min-w-[140px] items-center justify-center rounded-full bg-[var(--primary)] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--primary)]/90"
                 >
-                  Close
+                  {tCommon("close")}
                 </button>
               </div>
             </div>
@@ -345,13 +348,13 @@ export default function BranchSelectorModal({
                         </div>
 
                         <div className="hidden shrink-0 rounded-full border border-[color:rgba(206,24,27,0.12)] bg-[color:rgba(206,24,27,0.06)] px-3 py-1 text-[11px] font-semibold text-[var(--primary)] md:block">
-                          {isCurrent ? "Current" : "Available"}
+                          {isCurrent ? t("current") : t("available")}
                         </div>
                       </div>
 
                       <div className="mt-4 inline-flex items-center gap-2 text-[13px] font-semibold text-[var(--primary)]">
                         <FaCheckCircle className="text-[12px]" />
-                        {isCurrent ? "Selected branch" : "Select this branch"}
+                        {isCurrent ? t("selectedBranch") : t("selectThisBranch")}
                       </div>
                     </div>
                   </button>
@@ -366,15 +369,20 @@ export default function BranchSelectorModal({
             <div className="text-center md:text-left">
               <p className="text-xs font-medium text-[#6B7280]">
                 {totalBranches > 0
-                  ? `Showing page ${page} of ${Math.max(totalPages, 1)}`
+                  ? t("showingPageOf", {
+                      page,
+                      totalPages: Math.max(totalPages, 1),
+                    })
                   : forceSelection
-                    ? "No selectable branch is currently available."
-                    : "Browse and switch branch anytime."}
+                    ? t("noSelectableBranch")
+                    : t("browseAndSwitchBranch")}
               </p>
 
               {totalBranches > 0 ? (
                 <p className="mt-1 text-[11px] text-[#9CA3AF]">
-                  {totalBranches} branch{totalBranches === 1 ? "" : "es"} found
+                  {totalBranches === 1
+                    ? t("branchFound", { count: totalBranches })
+                    : t("branchesFound", { count: totalBranches })}
                 </p>
               ) : null}
             </div>
@@ -387,7 +395,7 @@ export default function BranchSelectorModal({
                   disabled={loading || !hasPrevPage}
                   className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-medium text-[#374151] transition-all duration-200 hover:border-[var(--primary)] hover:text-[var(--primary)] hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Previous
+                  {tCommon("previous")}
                 </button>
 
                 <div className="min-w-[44px] rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-center text-sm font-semibold text-[#374151]">
@@ -400,7 +408,7 @@ export default function BranchSelectorModal({
                   disabled={loading || !hasNextPage}
                   className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-medium text-[#374151] transition-all duration-200 hover:border-[var(--primary)] hover:text-[var(--primary)] hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Next
+                  {tCommon("next")}
                 </button>
               </div>
             ) : null}

@@ -1,26 +1,25 @@
 "use client";
 
 import { Share2, Users, ShoppingBag } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function HowItWorks() {
+  const t = useTranslations("groupOrder.howItWorks");
   const steps = [
     {
       icon: Share2,
-      title: "Share the link",
-      description:
-        "Invite friends to join via SMS or messaging apps. Anyone with the link can join your curated session instantly.",
+      title: t("shareTitle"),
+      description: t("shareDescription"),
     },
     {
       icon: Users,
-      title: "Everyone picks",
-      description:
-        "Members add their own favorite items to the cart. Real-time updates let you see exactly who's picked what.",
+      title: t("picksTitle"),
+      description: t("picksDescription"),
     },
     {
       icon: ShoppingBag,
-      title: "Single Checkout",
-      description:
-        "Review the total list and order everything at once. One payment, one delivery, zero coordination stress.",
+      title: t("checkoutTitle"),
+      description: t("checkoutDescription"),
     },
   ];
 
@@ -31,10 +30,10 @@ export default function HowItWorks() {
         {/* HEADER */}
         <div className="mb-12">
           <p className="text-sm font-semibold tracking-wide text-primary uppercase">
-            The Process
+            {t("eyebrow")}
           </p>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">
-            How it works
+            {t("title")}
           </h2>
         </div>
 

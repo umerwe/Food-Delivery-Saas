@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Plus, Info, Loader2, Eye, Minus, Download, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import useItems from "@/hooks/useItems";
 import { useCart } from "@/hooks/useCart";
 import { useAuthContext } from "@/hooks/useAuth";
@@ -11,7 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { getStoredGroupOrderCode } from "@/lib/group-order";
-import AsyncSelect from "@/components/ui/AsyncSelect";
+import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuVariation, Modifier, ModifierGroup, ModifierLink, SelectedModifiersMap, PromotionInfo, PromotionPricing, RawModifierLink, SelectedModifier, VariationPriceOverride } from "@/components/pages/Items/types";
 import { hasText, formatPrice, getSplitPizzaPricingVariation, toNumber } from "@/components/pages/Items/utils/restaurant-card-utils";
 
@@ -223,6 +224,7 @@ function PromotionBadge({
   promotion?: PromotionInfo | null;
   compact?: boolean;
 }) {
+  const t = useTranslations("items.productCard");
   if (!promotion) return null;
 
   const label = getPromotionDiscountLabel(promotion);
@@ -233,7 +235,7 @@ function PromotionBadge({
         compact ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-[11px]"
       }`}
     >
-      {label || "OFFER"}
+      {label || t("offer")}
     </span>
   );
 }
@@ -511,6 +513,8 @@ function ProductInfoContent({ item }: { item: MenuItem | null }) {
 }
 
 export function RestaurantCard({ item }: { item: MenuItem }) {
+  const t = useTranslations("items.productCard");
+  const tErrors = useTranslations("errors");
   const router = useRouter();
   const { token } = useAuthContext();
   const { fetchSplitPizzaMenuItems } = useItems(token);
@@ -822,8 +826,8 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
           sortOrder: 999,
           modifierGroup: {
             id: `standalone-modifiers-${menuItem?.id || "item"}`,
-            name: "Add-ons",
-            description: "Available add-ons for this item.",
+            name: t("addons"),
+            description: t("addonsDescription"),
             minSelect: 0,
             maxSelect: undefined,
             isRequired: false,
@@ -1024,8 +1028,8 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       return `Max ${maxSelect}`;
     }
 
-    return "Optional";
-  }, [addonSelectionRules]);
+    return t("optional");
+  }, [addonSelectionRules, t]);
 
   const quantityLabel = useMemo(() => {
     const { minQuantity, maxQuantity } = itemQuantityRules;
@@ -1119,11 +1123,11 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       const current = prev[ADDONS_GROUP_ID] || [];
       const isSelected = current.some((addon) => addon.id === modifier.id);
       const { minSelect, maxSelect } = addonSelectionRules;
-      const itemName = item?.name || "This item";
+      const itemName = item?.name || t("thisItem");
 
       if (isSelected) {
         if (minSelect > 0 && current.length <= minSelect) {
-          toast.error(`${itemName} requires at least ${minSelect} add-on${minSelect === 1 ? "" : "s"}`);
+          toast.error(t("minimumAddons", { itemName, count: minSelect }));
           return prev;
         }
 
@@ -1140,7 +1144,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       }
 
       if (maxSelect && current.length >= maxSelect) {
-        toast.error(`${itemName} allows at most ${maxSelect} add-on${maxSelect === 1 ? "" : "s"}`);
+        toast.error(t("maximumAddons", { itemName, count: maxSelect }));
         return prev;
       }
 
@@ -1162,15 +1166,15 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
     const selectedCount = selectedAddons.length;
     const { minSelect, maxSelect } = addonSelectionRules;
-    const itemName = item?.name || "This item";
+    const itemName = item?.name || t("thisItem");
 
     if (minSelect > 0 && selectedCount < minSelect) {
-      toast.error(`${itemName} requires at least ${minSelect} add-on${minSelect === 1 ? "" : "s"}`);
+      toast.error(t("minimumAddons", { itemName, count: minSelect }));
       return false;
     }
 
     if (maxSelect && selectedCount > maxSelect) {
-      toast.error(`${itemName} allows at most ${maxSelect} add-on${maxSelect === 1 ? "" : "s"}`);
+      toast.error(t("maximumAddons", { itemName, count: maxSelect }));
       return false;
     }
 
@@ -1305,13 +1309,13 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <p className="font-medium text-gray-900">Add-ons</p>
+            <p className="font-medium text-gray-900">{t("addons")}</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
                 {addonSelectionLabel}
               </span>
               <span className="text-xs text-gray-500">
-                Choose from available add-ons
+                {t("addonsDescription")}
               </span>
             </div>
           </div>
@@ -1387,7 +1391,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
     if (!customerId) {
       return {
         success: false,
-        error: "Customer not found",
+        error: t("customerNotFound"),
       };
     }
 
@@ -1409,12 +1413,12 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
         success: false,
         error: getApiErrorMessage(
           clearRes,
-          "Failed to clear previous branch cart",
+          t("clearPreviousBranchCartFailed"),
         ),
       };
     }
 
-    toast.info("Previous branch cart cleared. Adding selected item again.");
+    toast.info(t("previousBranchCartCleared"));
 
     return addCustomerCartItem({ customerId, payload: cartPayload });
   };
@@ -1424,7 +1428,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       setLoading(true);
 
       if (!item?.id) {
-        toast.error("Item not found");
+        toast.error(t("itemNotFound"));
         return;
       }
 
@@ -1434,7 +1438,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
       if (splitPizzaEnabled) {
         if (!splitPizzaItem?.id) {
-          toast.error("Please select the other pizza half");
+          toast.error(t("selectOtherPizzaHalf"));
           return;
         }
       }
@@ -1442,12 +1446,12 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       const groupCode = getStoredGroupOrderCode();
 
       if (!groupCode && !customerId) {
-        toast.error("Customer not found");
+        toast.error(t("customerNotFound"));
         return;
       }
 
       if (!groupCode && !branchId) {
-        toast.error("Please select a branch");
+        toast.error(t("selectBranch"));
         return;
       }
 
@@ -1487,7 +1491,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
         );
 
         if (!groupOrder) {
-          toast.error("Invalid group order");
+          toast.error(t("invalidGroupOrder"));
           return;
         }
 
@@ -1500,11 +1504,11 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       }
 
       if (isApiErrorResponse(res)) {
-        toast.error(getApiErrorMessage(res, "Failed to add to cart"));
+        toast.error(getApiErrorMessage(res, t("failedAddToCart")));
         return;
       }
 
-      toast.success(groupCode ? "Added to group order" : "Added to cart");
+      toast.success(groupCode ? t("addedToGroupOrder") : t("addedToCart"));
 
       setAnimateCart(true);
       setTimeout(() => setAnimateCart(false), 700);
@@ -1517,7 +1521,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
         router.push("/checkout");
       }
     } catch (error) {
-      toast.error("Something went wrong");
+      toast.error(tErrors("somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -1532,7 +1536,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
     if (!hasOptions) {
       if (!groupCode && !branchId) {
-        toast.error("Please select a branch first");
+        toast.error(t("selectBranchFirst"));
         return;
       }
 
@@ -1592,7 +1596,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
                     setInfoOpen(true);
                   }}
                   className="rounded-full border border-gray-200 bg-gray-50 p-1.5 text-gray-500 transition hover:text-primary"
-                  title="View ingredients and allergens"
+                  title={t("viewIngredients")}
                 >
                   <Eye size={15} />
                 </button>
@@ -1600,7 +1604,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
             </div>
 
             <p className="mb-2 text-xs text-gray-500">
-              {truncatedDesc || "Fresh premium item"}
+              {truncatedDesc || t("freshPremiumItem")}
             </p>
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1740,7 +1744,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
           {itemVariations.length > 0 ? (
             <div className="mb-5">
-              <p className="mb-2 font-medium text-gray-900">Size</p>
+              <p className="mb-2 font-medium text-gray-900">{t("size")}</p>
 
               <div className="grid grid-cols-1 gap-3">
                 {itemVariations.map((variation) => {
@@ -1854,7 +1858,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
                     <AsyncSelect
                       value={splitPizzaItem}
                       onChange={handleSplitPizzaItemChange}
-                      placeholder="Select split-pizza item"
+                      placeholder={t("selectSplitPizzaItem")}
                       fetchOptions={fetchPizzaItems}
                       labelKey="name"
                       valueKey="id"
@@ -1910,13 +1914,13 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
           <div className="mb-5">
             <p className="mb-2 font-medium text-gray-900">
-              Special Instructions
+              {t("specialInstructions")}
             </p>
 
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Add cooking notes, e.g. no onions, extra spicy..."
+              placeholder={t("notesPlaceholder")}
               className="h-24 w-full rounded-xl bg-gray-100 p-3 text-sm outline-none"
             />
           </div>
@@ -1999,7 +2003,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
             className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-            {loading ? "Processing..." : "Add to Cart"}
+            {loading ? t("processing") : t("addToCart")}
           </button>
         </DialogContent>
       </Dialog>

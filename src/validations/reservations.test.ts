@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reservationSchema } from "./reservations";
+import { createReservationSchema, reservationSchema } from "./reservations";
 
 const getDateValue = (offsetDays: number) => {
   const date = new Date();
@@ -55,5 +55,35 @@ describe("reservationSchema", () => {
 
   it("accepts optional fields", () => {
     expect(reservationSchema.safeParse({ ...validReservation, note: undefined }).success).toBe(true);
+  });
+
+  it("supports translated validation messages from the schema factory", () => {
+    const translatedSchema = createReservationSchema({
+      branchRequired: "Filiale erforderlich",
+      dateTimeRequired: "Datum und Uhrzeit erforderlich",
+      pastDate: "Vergangenes Datum",
+      guestWholeNumber: "Ganze Zahl erforderlich",
+      guestMin: "Mindestens ein Gast",
+      guestMax: "Zu viele Gäste",
+      noteMax: "Notiz zu lang",
+    });
+
+    const result = translatedSchema.safeParse({
+      ...validReservation,
+      branchId: "",
+      date: getDateValue(-1),
+      guestCount: 21,
+      note: "x".repeat(501),
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual(
+      expect.arrayContaining([
+        "Filiale erforderlich",
+        "Vergangenes Datum",
+        "Zu viele Gäste",
+        "Notiz zu lang",
+      ])
+    );
   });
 });

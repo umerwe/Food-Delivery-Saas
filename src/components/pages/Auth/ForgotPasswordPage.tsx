@@ -1,5 +1,5 @@
 import { AuthHero } from "@/components/pages/Auth/components/hero"
-import ForgotPassword from "@/components/forms/ForgotPassword"
+import { ForgotPassword } from "@/components/forms/ForgotPassword"
 import { AUTH_FORM_PANEL_CLASS, AUTH_PAGE_CLASS } from "@/components/common/common-classes"
 
 export const metadata = {

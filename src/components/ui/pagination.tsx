@@ -1,6 +1,7 @@
 // components/ui/pagination.tsx
 import * as React from "react"
 import { ChevronsLeft, ChevronsRight, MoreHorizontalIcon } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { poppins } from "@/lib/fonts"
@@ -47,26 +48,30 @@ function PaginationLink({ className, isActive, ...props }: PaginationLinkProps) 
 }
 
 function PaginationPrevious({ className, ...props }: React.ComponentProps<typeof PaginationLink>) {
+  const t = useTranslations("common")
+
   return (
     <PaginationLink
-      aria-label="Go to previous page"
+      aria-label={t("goToPreviousPage")}
       className={cn("gap-1 w-auto px-3 text-lg font-medium bg-primary text-white hover:bg-primary/90 border border-gray-200", className)}
       {...props}
     >
       <ChevronsLeft className="size-4" />
-      <span className="text-sm hidden sm:block">Previous</span>
+      <span className="text-sm hidden sm:block">{t("previous")}</span>
     </PaginationLink>
   )
 }
 
 function PaginationNext({ className, ...props }: React.ComponentProps<typeof PaginationLink>) {
+  const t = useTranslations("common")
+
   return (
     <PaginationLink
-      aria-label="Go to next page"
+      aria-label={t("goToNextPage")}
       className={cn("gap-1 w-auto px-3 text-lg text-white bg-primary hover:bg-primary/90 font-medium border border-gray-200", className)}
       {...props}
     >
-      <span className="text-sm hidden sm:block">Next</span>
+      <span className="text-sm hidden sm:block">{t("next")}</span>
       <ChevronsRight className="size-4" />
     </PaginationLink>
   )

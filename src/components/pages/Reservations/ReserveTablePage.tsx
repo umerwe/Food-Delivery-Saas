@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Clock, Info, Star } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,8 +14,8 @@ import { toast } from "sonner";
 import useReservations from "@/hooks/useReservations";
 import { useAuth } from "@/hooks/useAuth";
 import ReservationSuccess from "@/components/pages/Reservations/components/ReservationSuccess";
-import AsyncSelect from "@/components/ui/AsyncSelect";
-import { reservationSchema, type ReservationFormValues } from "@/validations/reservations";
+import { AsyncSelect } from "@/components/ui/AsyncSelect";
+import { createReservationSchema, type ReservationFormValues } from "@/validations/reservations";
 import type { Reservation, ReservationPayload } from "@/services/reservations";
 import type { BranchRecord } from "@/types/branch-selector";
 
@@ -297,11 +298,24 @@ const buildAvailableTimeSlots = ({
 };
 
 export function ReserveTablePage() {
+  const t = useTranslations("reserveTable");
+  const validationT = useTranslations("validation");
+  const errorsT = useTranslations("errors");
   const { token, user } = useAuth();
   const { createReservation, fetchReservationBranch, fetchReservationBranches, loading } = useReservations(token);
 
   const [success, setSuccess] = useState(false);
   const [reservationData, setReservationData] = useState<Reservation | null>(null);
+
+  const reservationSchema = useMemo(() => createReservationSchema({
+    branchRequired: validationT("reservationBranchRequired"),
+    dateTimeRequired: validationT("reservationDateTimeRequired"),
+    pastDate: validationT("reservationPastDate"),
+    guestWholeNumber: validationT("reservationGuestWholeNumber"),
+    guestMin: validationT("reservationGuestMin"),
+    guestMax: validationT("reservationGuestMax"),
+    noteMax: validationT("reservationNoteMax"),
+  }), [validationT]);
 
   const form = useForm<ReservationFormValues>({
     resolver: zodResolver(reservationSchema),
@@ -395,16 +409,16 @@ export function ReserveTablePage() {
 
   const dateError = useMemo(() => {
     if (!date) return "";
-    if (isPastDateValue(date)) return "Past dates are not available for reservation.";
-    if (!selectedBranch?.id) return "Please select a branch first.";
+    if (isPastDateValue(date)) return t("errors.pastDate");
+    if (!selectedBranch?.id) return t("errors.selectBranchFirst");
     if (!hasOpeningHours && !selectedDateRule) {
-      return "Opening hours are not configured for this branch.";
+      return t("errors.openingHoursNotConfigured");
     }
-    if (!todaysHours) return "Opening hours are not available for selected day.";
+    if (!todaysHours) return t("errors.openingHoursUnavailable");
     if (isClosed) {
       return selectedDateRule
-        ? "Reservations are closed for the selected date range."
-        : "This branch is closed on selected day.";
+        ? t("errors.closedDateRange")
+        : t("errors.closedSelectedDay");
     }
 
     return "";
@@ -415,50 +429,51 @@ export function ReserveTablePage() {
     selectedDateRule,
     todaysHours,
     isClosed,
+    t,
   ]);
 
   const timeError = useMemo(() => {
     if (!date || !time) return "";
     if (dateError) return dateError;
     if (!availableTimeSlots.includes(time)) {
-      return "Please select a valid reservation time from opening hours.";
+      return t("errors.invalidReservationTime");
     }
 
     return "";
-  }, [date, time, dateError, availableTimeSlots]);
+  }, [date, time, dateError, availableTimeSlots, t]);
 
   const timeSelectPlaceholder = useMemo(() => {
-    if (!selectedBranch?.id) return "Select branch first";
-    if (!date) return "Select date first";
-    if (dateError) return "No available time";
-    if (!availableTimeSlots.length) return "No future slots available";
+    if (!selectedBranch?.id) return t("selectBranchFirst");
+    if (!date) return t("selectDateFirst");
+    if (dateError) return t("noAvailableTime");
+    if (!availableTimeSlots.length) return t("noFutureSlots");
 
-    return "Select reservation time";
-  }, [selectedBranch?.id, date, dateError, availableTimeSlots.length]);
+    return t("selectReservationTime");
+  }, [selectedBranch?.id, date, dateError, availableTimeSlots.length, t]);
 
   const openingHoursLabel = useMemo(() => {
     if (!date || !todaysHours) return "";
 
     if (todaysHours?.isClosed) {
-      return "Closed";
+      return t("closed");
     }
 
     return `${todaysHours?.openTime || "--:--"} - ${
       todaysHours?.closeTime || "--:--"
     }`;
-  }, [date, todaysHours]);
+  }, [date, todaysHours, t]);
 
   /* ---------------- SUBMIT ---------------- */
   async function handleSubmit(values: ReservationFormValues) {
     try {
-      if (!customerId) return toast.error("User not found");
+      if (!customerId) return toast.error(t("userNotFound"));
 
       if (!selectedBranch?.id) {
-        return toast.error("Please select a branch");
+        return toast.error(t("selectBranchToast"));
       }
 
       if (!date || !time) {
-        return toast.error("Select date & time");
+        return toast.error(t("selectDateTime"));
       }
 
       if (dateError) {
@@ -470,7 +485,7 @@ export function ReserveTablePage() {
       }
 
       if (!availableTimeSlots.includes(time)) {
-        return toast.error("Selected time is no longer available");
+        return toast.error(t("selectedTimeUnavailable"));
       }
 
       const reservationDate = new Date(`${values.date}T${values.time}:00`).toISOString();
@@ -485,10 +500,10 @@ export function ReserveTablePage() {
       const res = await createReservation({ customerId, payload });
 
       if (!res || res.error) {
-        return toast.error(res?.error || "Failed");
+        return toast.error(res?.error || t("failedFallback"));
       }
 
-      toast.success("Reservation confirmed 🎉");
+      toast.success(t("reservationConfirmedToast"));
 
       setSuccess(true);
       setReservationData(res.data as Reservation);
@@ -496,7 +511,7 @@ export function ReserveTablePage() {
       reset({ branchId: "", date: "", time: "", guestCount: 2, note: "" });
       setSelectedBranch(null);
     } catch {
-      toast.error("Something went wrong");
+      toast.error(errorsT("somethingWentWrong"));
     }
   }
 
@@ -526,17 +541,17 @@ export function ReserveTablePage() {
         {/* LEFT */}
         <div className="mt-10 space-y-3">
           <h1 className="text-[60px] font-bold">
-            Taste The <span className="block text-primary">Extraordinary</span>
+            {t("heroTitlePrefix")} <span className="block text-primary">{t("heroTitleHighlight")}</span>
           </h1>
 
           <p className="text-gray-600">
-            Book your perfect dining experience effortlessly.
+            {t("heroDescription")}
           </p>
 
           <div className="flex items-center gap-2">
             <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
             <span>4.9</span>
-            <span className="text-gray-500">(2.7k reviews)</span>
+            <span className="text-gray-500">{t("reviews")}</span>
           </div>
         </div>
 
@@ -544,10 +559,10 @@ export function ReserveTablePage() {
         <div className="rounded-2xl bg-white p-10 shadow-xl">
           <div className="mb-[27px] space-y-[2px]">
             <h2 className="text-[23px] font-semibold text-gray-900">
-              Reserve a Table
+              {t("title")}
             </h2>
             <p className="text-sm text-gray-500">
-              Choose a branch, date, and available time slot from opening hours.
+              {t("subtitle")}
             </p>
           </div>
 
@@ -558,13 +573,13 @@ export function ReserveTablePage() {
           >
             {/* BRANCH */}
             <div>
-              <label className="text-sm font-medium">Select Branch</label>
+              <label className="text-sm font-medium">{t("selectBranch")}</label>
 
               <div className="mt-2 flex items-center gap-2">
                 <AsyncSelect
                   value={selectedBranch}
                   onChange={handleBranchSelect}
-                  placeholder="Choose branch"
+                  placeholder={t("chooseBranch")}
                   fetchOptions={fetchBranches}
                 />
 
@@ -574,7 +589,7 @@ export function ReserveTablePage() {
                     <Info className="h-4 w-4 cursor-pointer text-gray-500" />
 
                     <div className="absolute left-0 top-6 z-50 hidden w-[280px] rounded-xl border bg-white p-3 text-xs shadow-xl group-hover:block">
-                      <p className="mb-2 font-semibold">Opening Hours</p>
+                      <p className="mb-2 font-semibold">{t("openingHours")}</p>
 
                       {hasOpeningHours ? (
                         <div className="space-y-1">
@@ -586,7 +601,7 @@ export function ReserveTablePage() {
                               <span>{String(h.dayOfWeek || "").slice(0, 3)}</span>
                               <span className="text-right">
                                 {h.isClosed
-                                  ? "Closed"
+                                  ? t("closed")
                                   : `${h.openTime} - ${h.closeTime}`}
                               </span>
                             </div>
@@ -594,13 +609,13 @@ export function ReserveTablePage() {
                         </div>
                       ) : (
                         <p className="text-gray-500">
-                          Opening hours are not configured.
+                          {t("openingHoursNotConfigured")}
                         </p>
                       )}
 
                       {dateRangeRules.length > 0 ? (
                         <div className="mt-3 border-t pt-2">
-                          <p className="mb-1 font-semibold">Date range rules</p>
+                          <p className="mb-1 font-semibold">{t("dateRangeRules")}</p>
                           <div className="space-y-1">
                             {dateRangeRules.slice(0, 5).map((rule, index) => {
                               const { fromDate, toDate } = getDateRangeDates(rule);
@@ -618,7 +633,7 @@ export function ReserveTablePage() {
                                   </span>
                                   <span className="text-right">
                                     {rule?.isClosed
-                                      ? "Closed"
+                                      ? t("closed")
                                       : `${rule?.openTime || "--:--"} - ${
                                           rule?.closeTime || "--:--"
                                         }`}
@@ -638,7 +653,7 @@ export function ReserveTablePage() {
             {/* DATE + TIME */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-sm font-medium">Date</label>
+                <label className="text-sm font-medium">{t("date")}</label>
                 <Input
                   type="date"
                   value={date}
@@ -651,7 +666,7 @@ export function ReserveTablePage() {
                     setValue("time", "", { shouldValidate: true });
 
                     if (nextDate && isPastDateValue(nextDate)) {
-                      toast.error("Past dates are not available for reservation.");
+                      toast.error(t("errors.pastDate"));
                     }
                   }}
                   className="mt-2 rounded-full bg-[#FAFAF9] pr-11"
@@ -662,14 +677,14 @@ export function ReserveTablePage() {
                 ) : date && openingHoursLabel ? (
                   <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
                     <Clock size={12} />
-                    Available hours: {openingHoursLabel}
-                    {selectedDateRule ? " (date range rule)" : ""}
+                    {t("availableHours", { hours: openingHoursLabel })}
+                    {selectedDateRule ? t("dateRangeRuleSuffix") : ""}
                   </p>
                 ) : null}
               </div>
 
               <div>
-                <label className="text-sm font-medium">Time</label>
+                <label className="text-sm font-medium">{t("time")}</label>
 
                 <select
                   value={time}
@@ -690,7 +705,7 @@ export function ReserveTablePage() {
                   <p className="mt-1 text-xs text-red-500">{timeError}</p>
                 ) : date && availableTimeSlots.length > 0 ? (
                   <p className="mt-1 text-xs text-gray-500">
-                    Only future slots inside opening hours are shown.
+                    {t("futureSlotsOnly")}
                   </p>
                 ) : null}
               </div>
@@ -698,7 +713,7 @@ export function ReserveTablePage() {
 
             {/* GUEST */}
             <div>
-              <label className="text-sm font-medium">Guests</label>
+              <label className="text-sm font-medium">{t("guests")}</label>
 
               <div className="mt-2 grid grid-cols-4 gap-2">
                 {[2, 3, 4, 5].map((g) => (
@@ -718,16 +733,16 @@ export function ReserveTablePage() {
 
             {/* NOTE */}
             <div>
-              <label className="text-sm font-medium">Special Request</label>
+              <label className="text-sm font-medium">{t("specialRequest")}</label>
 
               <Textarea
   value={note}
   onChange={(e) => setValue("note", e.target.value, { shouldValidate: true })}
-  placeholder="Birthday, allergies, window seat..."
+  placeholder={t("specialRequestPlaceholder")}
   className="mt-2 rounded-xl border border-gray-200 bg-[#FAFAF9] placeholder:text-gray-400 focus:border-primary focus:ring-1 focus:ring-primary"
 />
               <p className="mt-1 text-xs text-gray-500">
-                Tip: Add occasion details for better experience
+                {t("specialRequestTip")}
               </p>
             </div>
 
@@ -736,7 +751,7 @@ export function ReserveTablePage() {
               className="w-full py-4 text-white disabled:cursor-not-allowed disabled:opacity-60"
               disabled={loading || !canSubmit}
             >
-              {loading ? "Reserving..." : "Confirm Reservation"}
+              {loading ? t("reserving") : t("confirmReservation")}
             </Button>
           </form>
         </div>

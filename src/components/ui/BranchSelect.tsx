@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import useBranches from "@/hooks/useBranches";
 import { useAuth } from "@/hooks/useAuth";
 import type { BranchRecord } from "@/types/branch-selector";
@@ -13,7 +14,8 @@ type BranchSelectProps = {
   onChange: (branch: BranchRecord) => void;
 };
 
-export default function BranchSelect({ value, onChange }: BranchSelectProps) {
+export function BranchSelect({ value, onChange }: BranchSelectProps) {
+  const t = useTranslations("branchSelector");
   const { user, token } = useAuth();
   const { fetchBranches } = useBranches(token);
 
@@ -31,7 +33,7 @@ export default function BranchSelect({ value, onChange }: BranchSelectProps) {
       );
       setBranches(list.filter((b) => b.isActive !== false));
     } catch {
-      toast.error("Failed to load branches");
+      toast.error(t("failedToLoadBranches"));
     } finally {
       setLoading(false);
     }
@@ -56,7 +58,7 @@ export default function BranchSelect({ value, onChange }: BranchSelectProps) {
   return (
     <div ref={dropdownRef}>
       <label className="text-sm font-medium text-gray-700">
-        Select Branch
+        {t("selectBranch")}
       </label>
 
       <div
@@ -64,7 +66,7 @@ export default function BranchSelect({ value, onChange }: BranchSelectProps) {
         className="mt-2 h-12 px-4 flex items-center justify-between rounded-full bg-[#FAFAF9] border border-gray-200 cursor-pointer"
       >
         <span className="text-sm text-gray-700">
-          {value?.name || "Select a branch"}
+          {value?.name || t("selectABranch")}
         </span>
         <ChevronDown className="w-4 h-4 text-gray-500" />
       </div>
@@ -73,7 +75,7 @@ export default function BranchSelect({ value, onChange }: BranchSelectProps) {
         <div className="mt-2 bg-white border rounded-xl shadow-lg p-2 z-50 relative">
 
           <Input
-            placeholder="Search branch..."
+            placeholder={t("searchBranch")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="mb-2"
@@ -98,7 +100,7 @@ export default function BranchSelect({ value, onChange }: BranchSelectProps) {
             ))}
 
             {loading && (
-              <div className="text-center text-sm py-2">Loading...</div>
+              <div className="text-center text-sm py-2">{t("loadingBranches")}</div>
             )}
           </div>
         </div>

@@ -2,16 +2,19 @@
 
 import Image from "next/image";
 import { Star, Loader2, Camera } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useSearchParams, useRouter } from "next/navigation";
 import useOrders from "@/hooks/useOrders";
 import { useAuthContext } from "@/hooks/useAuth";
-import { reviewSchema, type ReviewFormValues } from "@/validations/reviews";
+import { createReviewSchema, type ReviewFormValues } from "@/validations/reviews";
 import type { Order } from "@/services/orders";
+import { useTranslations } from "next-intl";
 
 export default function WriteReview() {
+  const t = useTranslations("orders");
+  const validationT = useTranslations("validation");
   const params = useSearchParams();
   const router = useRouter();
   const orderId = params.get("orderId");
@@ -23,8 +26,13 @@ export default function WriteReview() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
+  const translatedReviewSchema = useMemo(
+    () => createReviewSchema({ reviewMax: validationT("reviewMax") }),
+    [validationT]
+  );
+
   const { setValue, watch, handleSubmit } = useForm<ReviewFormValues>({
-    resolver: zodResolver(reviewSchema),
+    resolver: zodResolver(translatedReviewSchema),
     defaultValues: { rating: 4, review: "" },
   });
   const rating = watch("rating");
@@ -95,16 +103,16 @@ export default function WriteReview() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
         <h2 className="text-lg font-semibold mb-2">
-          Order not found
+          {t("orderNotFound")}
         </h2>
         <p className="text-sm text-gray-500 mb-4">
-          We couldn’t find the order you're trying to review.
+          {t("reviewOrderNotFoundDescription")}
         </p>
         <button
           onClick={() => router.push("/orders-history")}
           className="px-4 py-2 bg-primary text-white rounded-md text-sm"
         >
-          Go Back
+          {t("goBack")}
         </button>
       </div>
     );
@@ -117,9 +125,9 @@ export default function WriteReview() {
       <div className="max-w-6xl mx-auto">
 
         {/* HEADER */}
-        <h1 className="text-2xl font-semibold mb-1">Add Review</h1>
+        <h1 className="text-2xl font-semibold mb-1">{t("addReview")}</h1>
         <p className="text-sm text-gray-500 mb-6">
-          Share your culinary journey with the community.
+          {t("reviewSubtitle")}
         </p>
 
         {/* ORDER CARD */}
@@ -130,7 +138,7 @@ export default function WriteReview() {
                 order?.items?.[0]?.menuItem?.imageUrl ||
                 "/placeholder.png"
               }
-              alt="item"
+              alt={t("itemFallback")}
               fill
               className="object-cover"
             />
@@ -142,7 +150,7 @@ export default function WriteReview() {
             </p>
 
             <h2 className="font-semibold">
-              {order?.branch?.name || "Restaurant"}
+              {order?.branch?.name || t("restaurantFallback")}
             </h2>
 
             <p className="text-xs text-gray-400">
@@ -157,7 +165,7 @@ export default function WriteReview() {
 
           {/* RATING */}
           <p className="text-center text-sm font-medium mb-3">
-            Overall Experience
+            {t("overallExperience")}
           </p>
 
           <div className="flex justify-center gap-2 mb-4">
@@ -176,14 +184,14 @@ export default function WriteReview() {
               />
             ))}
           </div>
-          <p className="text-sm mb-2">Your Review</p>
+          <p className="text-sm mb-2">{t("yourReview")}</p>
           <textarea
             value={review}
             onChange={(e) => setValue("review", e.target.value, { shouldValidate: true })}
-            placeholder="Tell us about your experience... Was the food hot? How was the presentation?"
+            placeholder={t("reviewPlaceholder")}
             className="w-full border border-[#ACACAC] rounded-lg p-3 text-sm outline-none min-h-[120px]"
           />
-          <p className="text-sm mt-4 mb-2">Add Photos</p>
+          <p className="text-sm mt-4 mb-2">{t("addPhotos")}</p>
 
           <div className="flex gap-3 items-center">
             <div
@@ -191,14 +199,14 @@ export default function WriteReview() {
               className="w-[120px] h-[120px] border-2 border-[#ACACAC] border-dashed rounded-xl flex flex-col items-center justify-center text-gray-400 text-xs cursor-pointer hover:border-primary transition"
             >
               <Camera size={20} />
-              Upload
+              {t("upload")}
             </div>
 
             {imagePreview && (
               <div className="w-[120px] h-[120px] relative rounded-xl overflow-hidden border">
                 <Image
                   src={imagePreview}
-                  alt="preview"
+                  alt={t("previewAlt")}
                   fill
                   className="object-cover"
                 />
@@ -221,14 +229,14 @@ export default function WriteReview() {
             onClick={handleSubmit(() => undefined)}
             className="flex-1 bg-[#EC5834] text-white py-3 rounded-lg text-sm font-medium"
           >
-            Submit Review
+            {t("submitReview")}
           </button>
 
           <button
             onClick={() => router.push("/orders-history")}
             className="flex-1 border border-[#EC5834] text-[#EC5834] py-3 rounded-lg text-sm font-medium"
           >
-            Cancel
+            {t("cancel")}
           </button>
         </div>
       </div>

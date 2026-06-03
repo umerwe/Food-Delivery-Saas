@@ -22,6 +22,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import usePayments from "@/hooks/usePayments";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 type Props = {
   balance?: number;
@@ -38,6 +39,7 @@ const CheckoutForm = ({
   clientSecret: string;
   onSuccess: () => void;
 }) => {
+  const t = useTranslations("profile.wallet");
   const stripe = useStripe();
   const elements = useElements();
   const [paying, setPaying] = useState(false);
@@ -53,13 +55,13 @@ const CheckoutForm = ({
     });
 
     if (error) {
-      toast.error(error.message || "Payment failed");
+      toast.error(error.message || t("paymentFailed"));
       setPaying(false);
       return;
     }
 
     if (paymentIntent?.status === "succeeded") {
-      toast.success("Funds added successfully");
+      toast.success(t("fundsAdded"));
       onSuccess();
     }
 
@@ -79,7 +81,7 @@ const CheckoutForm = ({
           className="h-11 rounded-xl"
           disabled={paying}
         >
-          Back
+          {t("back")}
         </Button>
 
         <Button
@@ -89,7 +91,7 @@ const CheckoutForm = ({
           className="h-11 rounded-xl text-white"
           style={{ background: "var(--primary)" }}
         >
-          {paying ? "Processing..." : "Complete Payment"}
+          {paying ? t("processing") : t("completePayment")}
         </Button>
       </div>
     </div>
@@ -100,6 +102,9 @@ const Balance = ({
   currency = "USD",
   loyaltyPoints = 0,
 }: Props) => {
+  const t = useTranslations("profile.wallet");
+  const profileT = useTranslations("profile");
+  const commonT = useTranslations("common");
   const { token } = useAuth();
   const api = usePayments(token);
 
@@ -137,7 +142,7 @@ const Balance = ({
     const numericAmount = Number(amount);
 
     if (!numericAmount || numericAmount < 1) {
-      toast.error("Enter valid amount");
+      toast.error(t("enterValidAmount"));
       return;
     }
 
@@ -148,7 +153,7 @@ const Balance = ({
     });
 
     if (!res?.success) {
-      toast.error(res?.error ?? "Failed to create payment");
+      toast.error(res?.error ?? t("failedCreatePayment"));
       return;
     }
 
@@ -156,14 +161,14 @@ const Balance = ({
     const payment = data?.paymentSession;
 
     if (!payment?.publishableKey || !payment?.clientSecret) {
-      toast.error("Failed to create payment");
+      toast.error(t("failedCreatePayment"));
       return;
     }
 
     setStripePromise(loadStripe(payment.publishableKey));
     setClientSecret(payment.clientSecret);
 
-    toast.success("Choose payment method below");
+    toast.success(t("choosePaymentMethod"));
   };
 
   return (
@@ -173,7 +178,7 @@ const Balance = ({
         style={{ background: "var(--primary)" }}
       >
         <p className="text-[11px] uppercase tracking-[0.18em] text-white/70">
-          Current Balance
+          {profileT("currentBalance")}
         </p>
 
         <div className="mt-2 flex items-end justify-between gap-4">
@@ -183,11 +188,11 @@ const Balance = ({
 </h2>
 <div className="mt-6">
   <p className="text-xs text-white/70">
-    {loyaltyPoints ? "Wallet Activity" : "Member Status"}
+    {loyaltyPoints ? t("walletActivity") : t("memberStatus")}
   </p>
 
   <p className="text-[22px] font-semibold">
-    {loyaltyPoints ? `${loyaltyPoints} txns` : "Standard"}
+    {loyaltyPoints ? t("transactionsShort", { count: loyaltyPoints }) : t("standard")}
   </p>
 </div>
           </div>
@@ -197,7 +202,7 @@ const Balance = ({
             className="h-10 rounded-full bg-white px-5 text-black hover:bg-white/90"
           >
             <Wallet className="mr-2 h-4 w-4" />
-            Add Funds
+            {t("addFunds")}
           </Button>
         </div>
       </div>
@@ -223,11 +228,11 @@ const Balance = ({
               </div>
 
               <DialogTitle className="text-2xl font-semibold">
-                Add Funds
+                {t("addFunds")}
               </DialogTitle>
 
               <p className="mt-2 text-sm text-white/80">
-                Secure wallet top-up with Stripe.
+                {t("topUpSubtitle")}
               </p>
             </DialogHeader>
           </div>
@@ -237,7 +242,7 @@ const Balance = ({
               <>
                 <div>
                   <p className="mb-2 text-sm font-medium text-zinc-700">
-                    Select Amount
+                    {t("selectAmount")}
                   </p>
 
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -265,7 +270,7 @@ const Balance = ({
 
                 <div>
                   <p className="mb-2 text-sm font-medium text-zinc-700">
-                    Custom Amount
+                    {t("customAmount")}
                   </p>
 
                   <div className="relative">
@@ -284,7 +289,7 @@ const Balance = ({
 
                 <div>
                   <p className="mb-2 text-sm font-medium text-zinc-700">
-                    Payment Note
+                    {t("paymentNote")}
                   </p>
 
                   <Input
@@ -301,8 +306,7 @@ const Balance = ({
                       style={{ color: "var(--primary)" }}
                     />
                     <span>
-                      Available methods may include Card, Wallets, Apple Pay,
-                      Google Pay depending on device/browser.
+                      {t("methodsNotice")}
                     </span>
                   </div>
                 </div>
@@ -313,7 +317,7 @@ const Balance = ({
                     onClick={() => setOpen(false)}
                     className="h-11 rounded-xl"
                   >
-                    Cancel
+                    {commonT("cancel")}
                   </Button>
 
                   <Button
@@ -322,7 +326,7 @@ const Balance = ({
                     className="h-11 rounded-xl text-white"
                     style={{ background: "var(--primary)" }}
                   >
-                    {api.loading ? "Loading..." : "Continue"}
+                    {api.loading ? commonT("loading") : commonT("continue")}
                   </Button>
                 </div>
               </>
@@ -330,7 +334,7 @@ const Balance = ({
               <>
                 <div className="flex items-center gap-2 text-sm font-medium text-zinc-700">
                   <CreditCard className="h-4 w-4" />
-                  Select Payment Method
+                  {t("selectPaymentMethod")}
                 </div>
 
                 {stripePromise && (

@@ -6,8 +6,10 @@ import { useSearchParams } from "next/navigation";
 import useOrders from "@/hooks/useOrders";
 import { useAuthContext } from "@/hooks/useAuth";
 import OrderSummary from "@/components/pages/Order/components/OrderSummary";
+import { useTranslations } from "next-intl";
 
 function OrderStatusContent() {
+  const t = useTranslations("orderStatus");
   const { token } = useAuthContext();
   const { fetchOrderById } = useOrders(token);
 
@@ -59,12 +61,25 @@ function OrderStatusContent() {
 
   const currentStep = statusMap[order?.status || ""] || 1;
 
+  const getOrderTypeLabel = (value?: string | null) => {
+    switch (String(value || "").toUpperCase()) {
+      case "DELIVERY":
+        return t("orderType.delivery");
+      case "PICKUP":
+        return t("orderType.pickup");
+      case "TAKEAWAY":
+        return t("orderType.takeaway");
+      default:
+        return value || t("loading");
+    }
+  };
+
   const orderSteps = [
-    { id: 1, title: "Order Placed", desc: "Your order has been placed successfully." },
-    { id: 2, title: "Order Confirmed", desc: "Your order is confirmed and being prepared." },
-    { id: 3, title: "Preparing your food", desc: "We're getting your order ready." },
-    { id: 4, title: "Picked Up", desc: "Your order is out for delivery." },
-    { id: 5, title: "Delivered", desc: "Your order has been delivered. Enjoy!" },
+    { id: 1, title: t("steps.placedTitle"), desc: t("steps.placedDescription") },
+    { id: 2, title: t("steps.confirmedTitle"), desc: t("steps.confirmedDescription") },
+    { id: 3, title: t("steps.preparingTitle"), desc: t("steps.preparingDescription") },
+    { id: 4, title: t("steps.pickedUpTitle"), desc: t("steps.pickedUpDescription") },
+    { id: 5, title: t("steps.deliveredTitle"), desc: t("steps.deliveredDescription") },
   ].map((step) => ({
     ...step,
     active: step.id <= currentStep,
@@ -73,30 +88,21 @@ function OrderStatusContent() {
   return (
     <div className="max-w-[1400px] mx-auto mt-[36px] mb-[113px] px-6 md:px-30 pt-5">
 
-      {/* BACK */}
-      {/* <Link
-        href="/"
-        className="flex items-center gap-2 mb-[45px] hover:opacity-70 transition-opacity"
-      >
-        <ArrowLeft size={37} />
-        <span className="text-xl font-semibold">Back</span>
-      </Link> */}
-
       {/* ================= NOT FOUND ================= */}
       {!loading && notFound && (
         <div className="bg-white rounded-xl shadow-lg p-10 text-center">
           <h2 className="text-lg font-semibold text-red-500 mb-2">
-            Order Not Found
+            {t("orderNotFound")}
           </h2>
           <p className="text-sm text-gray-500 mb-5">
-            The order you’re looking for doesn’t exist or may have been removed.
+            {t("notFoundDescription")}
           </p>
 
           <Link
             href="/"
             className="inline-block bg-primary text-white px-5 py-2 rounded-lg text-sm hover:bg-primary/90"
           >
-            Go to Home
+            {t("goToHome")}
           </Link>
         </div>
       )}
@@ -111,11 +117,14 @@ function OrderStatusContent() {
             {/* HEADER */}
             <div className="mb-[35px]">
               <h1 className="text-xl font-semibold text-gray-900 mb-[10px]">
-                Track Your Order
+                {t("trackYourOrder")}
               </h1>
 
               <p className="text-sm text-gray-400">
-                Order #{order?.id || "..."} • {order?.orderType || "Loading..."}
+                {t("orderMeta", {
+                  id: order?.id || "...",
+                  type: getOrderTypeLabel(order?.orderType),
+                })}
               </p>
             </div>
 
@@ -123,7 +132,7 @@ function OrderStatusContent() {
             <div className="bg-white rounded-[10px] shadow-lg px-[61px] py-[35px] border border-gray-50">
 
               <h2 className="text-xl font-semibold mb-[36px]">
-                Order Status
+                {t("orderStatus")}
               </h2>
 
               {/* LOADING */}

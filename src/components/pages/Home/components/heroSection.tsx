@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Coffee, Loader2, Search, ShoppingBag } from "lucide-react";
+import { useTranslations } from "next-intl";
 import useItems from "@/hooks/useItems";
 import { useAuth } from "@/hooks/useAuth";
 import { getStoredRestaurantId } from "@/lib/auth";
@@ -74,10 +75,11 @@ const getSearchResults = <T,>(response: unknown): T[] => {
 };
 
 const HeroSection = ({
-    restaurantName = "Are you starving?",
-    tagline = "Within a few clicks, find meals that are accessible near you",
+    restaurantName,
+    tagline,
     heroImage = "/hero.png",
 }: HeroSectionProps) => {
+    const t = useTranslations("home.hero");
     const router = useRouter();
     const { token, restaurantId: authRestaurantId, user, loading: authLoading } = useAuth();
     const { get } = useItems(token);
@@ -93,6 +95,8 @@ const HeroSection = ({
     const restaurantId = authRestaurantId || user?.restaurantId || getStoredRestaurantId() || "";
     const trimmedSearch = searchValue.trim();
     const activeResults = searchMode === "categories" ? categoryResults : itemResults;
+    const displayRestaurantName = restaurantName || t("defaultTitle");
+    const displayTagline = tagline || t("defaultTagline");
 
     const clearResults = () => {
         setCategoryResults([]);
@@ -231,7 +235,7 @@ const HeroSection = ({
             <div className="absolute inset-0 z-0">
                 <Image
                     src={resolvedHeroImage}
-                    alt="Hero Pizza Background"
+                    alt={t("heroImageAlt")}
                     fill
                     className="object-cover brightness-75"
                     priority
@@ -240,10 +244,10 @@ const HeroSection = ({
 
             <div className="relative z-10 w-full max-w-4xl px-4 flex flex-col items-center ml-0 md:ml-20">
                 <h1 className="text-white text-5xl md:text-7xl font-extrabold mb-2 drop-shadow-md">
-                    {restaurantName}
+                    {displayRestaurantName}
                 </h1>
                 <p className="text-white text-[22px] font-medium mb-8">
-                    {tagline}
+                    {displayTagline}
                 </p>
 
                 <div className="bg-white rounded-2xl shadow-xl w-full p-6 md:p-8">
@@ -257,7 +261,7 @@ const HeroSection = ({
                                 }`}
                         >
                             <Coffee size={20} />
-                            Categories
+                            {t("categories")}
                         </button>
                         <button
                             type="button"
@@ -268,7 +272,7 @@ const HeroSection = ({
                                 }`}
                         >
                             <ShoppingBag size={20} />
-                            Items
+                            {t("items")}
                         </button>
                     </div>
 
@@ -281,7 +285,7 @@ const HeroSection = ({
                                 type="text"
                                 value={searchValue}
                                 onChange={(event) => setSearchValue(event.target.value)}
-                                placeholder={searchMode === "categories" ? "Search categories" : "Search items"}
+                                placeholder={searchMode === "categories" ? t("searchCategories") : t("searchItems")}
                                 className="w-full bg-[#F5F5F5] border-none rounded-xl h-[49px] pl-12 pr-4 text-gray-700 focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-gray-400"
                             />
                         </div>
@@ -291,7 +295,7 @@ const HeroSection = ({
                             className="bg-primary hover:bg-[#d94e24] text-white px-10 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-2"
                         >
                             <Search size={18} strokeWidth={3} />
-                            Find Food
+                            {t("findFood")}
                         </button>
 
                         {(trimmedSearch || loadingResults) && (
@@ -299,11 +303,11 @@ const HeroSection = ({
                                 {loadingResults ? (
                                     <div className="flex items-center justify-center gap-2 px-5 py-8 text-sm text-gray-500">
                                         <Loader2 size={16} className="animate-spin" />
-                                        Searching {searchMode}...
+                                        {t("searching", { mode: searchMode === "categories" ? t("categories").toLowerCase() : t("items").toLowerCase() })}
                                     </div>
                                 ) : activeResults.length === 0 ? (
                                     <div className="px-5 py-8 text-center text-sm text-gray-500">
-                                        No {searchMode} found
+                                        {t("noneFound", { mode: searchMode === "categories" ? t("categories").toLowerCase() : t("items").toLowerCase() })}
                                     </div>
                                 ) : (
                                     <div className="divide-y divide-gray-100">
@@ -324,7 +328,7 @@ const HeroSection = ({
                                                             {category.name}
                                                         </h4>
                                                         <p className="mt-1 text-xs text-gray-500">
-                                                            Category
+                                                            {t("categoryFallback")}
                                                         </p>
                                                     </div>
                                                 </button>
@@ -346,7 +350,7 @@ const HeroSection = ({
                                                                 {item.name}
                                                             </h4>
                                                             <p className="mt-1 truncate text-xs text-gray-500">
-                                                                {item.category?.name || item.description || "Menu item"}
+                                                                {item.category?.name || item.description || t("menuItemFallback")}
                                                             </p>
                                                         </div>
                                                     </div>

@@ -1,11 +1,13 @@
 "use client";
 
 import { Suspense, useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 import { SignatureSelectionContent } from "@/components/pages/Items/components/signature-selection/SignatureSelectionContent";
 import { OrderCartSidebar } from "@/components/pages/Items/components/signature-selection/OrderCartSidebar";
 import { useAuth } from "@/hooks/useAuth";
 
 function MenuPageContent() {
+const t = useTranslations("menu");
 const { restaurantId, user, loading } = useAuth();
   const [cartRefreshKey, setCartRefreshKey] = useState(0);
 
@@ -16,7 +18,7 @@ const { restaurantId, user, loading } = useAuth();
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-[#777]">Loading...</p>
+        <p className="text-sm text-[#777]">{t("loading")}</p>
       </div>
     );
   }

@@ -1,6 +1,10 @@
+import { useTranslations } from "next-intl";
+
 import { Button } from "@/components/ui/button";
 
 const NewsletterSection = () => {
+    const t = useTranslations("home.newsletter");
+
     return (
         <section
             className="relative w-full h-[481px] py-20 md:py-28 bg-cover bg-center bg-no-repeat"
@@ -15,21 +19,21 @@ const NewsletterSection = () => {
 
                 {/* Headline */}
                 <h2 className="text-[46px] font-semibold mb-4 leading-[tighter]">
-                    Hurry up! Subscribe our newsletter
-                    <span className="hidden md:block">and get 25% off</span>
+                    {t("titleLineOne")}
+                    <span className="hidden md:block">{t("titleLineTwo")}</span>
                 </h2>
 
 
                 {/* Sub-headline */}
                 <p className="text-base  leading-[28px] text-white/90 mb-[32px]">
-                    Lorem ipsum dolor sit amet consectetur. Urna eu amet laoreet nisl. Amet pellentesque
+                    {t("description")}
                 </p>
 
 
                 <form className="flex flex-col sm:flex-row justify-center items-center gap-4 w-full max-w-[708px] mx-auto">
                     <input
                         type="email"
-                        placeholder="Type here"
+                        placeholder={t("placeholder")}
                         className="w-full bg-white rounded-full py-4 px-6 outline-none placeholder:text-gray-400 text-gray-800 focus:ring-2 focus:ring-[#F15A2B] transition-all"
                         required
                     />
@@ -37,7 +41,7 @@ const NewsletterSection = () => {
                         variant="primary"
                         type="submit"
                     >
-                        Subscribe
+                        {t("subscribe")}
                     </Button>
                 </form>
 

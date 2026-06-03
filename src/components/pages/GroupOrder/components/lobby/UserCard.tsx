@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Trash2, Plus, Minus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import useGroupOrder, { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import type { GroupOrderItem, GroupOrderParticipant } from "@/types/group-order";
 
@@ -12,6 +13,7 @@ type UserCardProps = {
 };
 
 export default function UserCard({ participant, orderId, isHost }: UserCardProps) {
+  const t = useTranslations("groupOrder.lobby.userCard");
   const { deleteGroupOrderItem, updateGroupOrderItemQuantity } = useGroupOrderApi(null);
 
   const user = participant?.user;
@@ -51,12 +53,12 @@ const canEdit = canEditItems && isCurrentUser;
 
           <div>
             <p className="font-semibold text-gray-900">
-              {user?.firstName} {user?.lastName} {isHost && "(Host)"}
+              {user?.firstName} {user?.lastName} {isHost && t("hostSuffix")}
             </p>
 
             {picking && (
               <p className="text-sm text-orange-500 mt-1">
-                Picking Items...
+                {t("pickingItems")}
               </p>
             )}
           </div>
@@ -64,7 +66,7 @@ const canEdit = canEditItems && isCurrentUser;
 
         {!picking && (
           <span className="text-xs bg-teal-100 text-teal-700 px-3 py-1 rounded-full font-medium">
-            READY
+            {t("ready")}
           </span>
         )}
       </div>

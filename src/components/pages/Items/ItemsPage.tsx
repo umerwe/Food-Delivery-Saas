@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 import RestaurantHeader from "@/components/pages/Items/components/RestaurantHeader";
 import { ItemsLayout } from "@/components/pages/Items/components/ItemsLayout";
@@ -12,6 +13,7 @@ import { clearStoredGroupOrderCode, getStoredGroupOrderCode, setStoredGroupOrder
 import type { GroupOrder, GroupOrderParticipant } from "@/types/group-order";
 
 function ItemsPageContent() {
+  const t = useTranslations("items.groupOrder");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -51,7 +53,7 @@ function ItemsPageContent() {
     const res = await joinGroupOrder({ inviteCode });
 
     if (!res || res.error) {
-      toast.error(res?.message || res?.error || "Failed to join group order");
+      toast.error(res?.message || res?.error || t("failedJoin"));
       return false;
     }
 
@@ -101,7 +103,7 @@ function ItemsPageContent() {
             return;
           }
 
-          toast.success("Joined group order successfully");
+          toast.success(t("joined"));
         }
       } finally {
         setJoiningGroupOrder(false);
@@ -115,7 +117,7 @@ function ItemsPageContent() {
     <div className="min-h-screen md:px-35">
       {joiningGroupOrder ? (
         <div className="mx-4 mt-4 rounded-2xl border border-primary/10 bg-primary/5 px-4 py-3 text-sm font-medium text-primary md:mx-10">
-          Joining group order...
+          {t("joining")}
         </div>
       ) : null}
 

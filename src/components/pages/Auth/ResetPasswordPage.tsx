@@ -1,6 +1,5 @@
-import { Suspense } from "react";
 import { AuthHero } from "@/components/pages/Auth/components/hero";
-import ResetPassword from "@/components/forms/ResetPassword";
+import { ResetPassword } from "@/components/forms/ResetPassword";
 import { AUTH_FORM_PANEL_CLASS, AUTH_PAGE_CLASS } from "@/components/common/common-classes"
 
 export const metadata = {
@@ -14,9 +13,7 @@ export function ResetPasswordPage() {
       <AuthHero />
 
       <div className={AUTH_FORM_PANEL_CLASS}>
-        <Suspense fallback={<div className="text-sm text-gray-500">Loading...</div>}>
-          <ResetPassword />
-        </Suspense>
+        <ResetPassword />
       </div>
     </div>
   );

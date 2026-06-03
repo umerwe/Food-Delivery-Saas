@@ -1,30 +1,29 @@
 "use client";
 
 import { Rocket, Eye, Heart } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function MissionVisionValues() {
+  const t = useTranslations("about.missionVisionValues");
 
     const items = [
   {
-    title: "Our Mission",
-    description:
-      "To deliver fast, fresh, and affordable culinary delights to every doorstep without the environmental footprint.",
+    title: t("missionTitle"),
+    description: t("missionDescription"),
     icon: Rocket,
     bg: "bg-[#FFD6CC]", // brighter orange tint
     iconColor: "text-[#FF5A2C]",
   },
   {
-    title: "Our Vision",
-    description:
-      "To become the world’s most loved delivery service, recognized for our taste and logistical precision.",
+    title: t("visionTitle"),
+    description: t("visionDescription"),
     icon: Eye,
     bg: "bg-[#D4EEF5]", // brighter blue tint
     iconColor: "text-[#3AA6B9]",
   },
   {
-    title: "Our Values",
-    description:
-      "Quality above all, speed as a standard, and putting the customer at the heart of every decision we make.",
+    title: t("valuesTitle"),
+    description: t("valuesDescription"),
     icon: Heart,
     bg: "bg-[#FFD6CC]", // same as mission (consistent)
     iconColor: "text-[#FF5A2C]",

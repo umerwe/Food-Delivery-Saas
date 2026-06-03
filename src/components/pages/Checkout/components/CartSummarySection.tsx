@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import type { ApiRecord, BackendErrorState } from "@/components/pages/Checkout/utils/checkout-normalizers";
+import { useTranslations } from "next-intl";
 
 interface CartAddon {
   id?: string;
@@ -435,11 +436,22 @@ const getItemPickupExtraUnitPrice = (
   return Math.max(...allPickupPrices);
 };
 
-const getSplitHalfLabel = (slot?: string, fallback = "Half") => {
+type SplitLabels = {
+  half: string;
+  leftHalf: string;
+  rightHalf: string;
+  selectedItem: string;
+};
+
+const getSplitHalfLabel = (
+  slot: string | undefined,
+  fallback: string,
+  labels: SplitLabels
+) => {
   const normalizedSlot = String(slot || "").trim().toUpperCase();
 
-  if (normalizedSlot === "LEFT") return "Left half";
-  if (normalizedSlot === "RIGHT") return "Right half";
+  if (normalizedSlot === "LEFT") return labels.leftHalf;
+  if (normalizedSlot === "RIGHT") return labels.rightHalf;
 
   if (!normalizedSlot) return fallback;
 
@@ -448,26 +460,27 @@ const getSplitHalfLabel = (slot?: string, fallback = "Half") => {
     .toLowerCase()} half`;
 };
 
-const getSplitSectionName = (section?: CartSection) => {
+const getSplitSectionName = (section: CartSection | undefined, fallback: string) => {
   return (
     String(
       section?.menuItemName ||
         section?.menuItem?.name ||
         section?.name ||
-        "Selected item"
-    ).trim() || "Selected item"
+        fallback
+    ).trim() || fallback
   );
 };
 
 const getSplitPizzaDisplay = (
   item: CartItem,
-  selectedSections: CartSection[]
+  selectedSections: CartSection[],
+  labels: SplitLabels
 ) => {
   const currentMenuItemId = String(getMenuItemId(item) || "");
   const currentItemName = String(item?.name || item?.menuItem?.name || "").trim();
 
   const normalizedSections = selectedSections.map((section, index) => {
-    const sectionName = getSplitSectionName(section);
+    const sectionName = getSplitSectionName(section, labels.selectedItem);
     const sectionMenuItemId = String(section?.menuItemId || "");
     const deliveryPrice = getSplitSectionDeliveryPrice(section);
     const pickupPrice = getSplitSectionPickupPrice(section);
@@ -481,7 +494,7 @@ const getSplitPizzaDisplay = (
     return {
       ...section,
       index,
-      label: getSplitHalfLabel(section?.slot, `Half ${index + 1}`),
+      label: getSplitHalfLabel(section?.slot, `${labels.half} ${index + 1}`, labels),
       displayName: sectionName,
       price: displayPrice,
       deliveryPrice,
@@ -570,7 +583,7 @@ const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
   };
 };
 export function CartSummarySection({
-  title = "Cart Summary",
+  title,
   cartItems,
   quote,
   cartQuote,
@@ -587,8 +600,16 @@ export function CartSummarySection({
   couponDiscount = 0,
   validatingCoupon,
 }: Props) {
+  const t = useTranslations("checkout");
   const router = useRouter();
   const canEditCart = title !== "Order Details";
+  const resolvedTitle = title ?? t("cartSummary");
+  const splitLabels: SplitLabels = {
+    half: t("half"),
+    leftHalf: t("leftHalf"),
+    rightHalf: t("rightHalf"),
+    selectedItem: t("selectedItem"),
+  };
 
   const handleAddMoreItems = () => {
     const params = new URLSearchParams();
@@ -694,11 +715,11 @@ export function CartSummarySection({
       <section className="space-y-[20.37px]">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[20px] font-medium text-gray-900">{title}</h2>
+            <h2 className="text-[20px] font-medium text-gray-900">{resolvedTitle}</h2>
             <p className="mt-1 text-xs capitalize text-gray-400">
               {checkoutType === "pickup"
-                ? "Pickup pricing is applied"
-                : "Delivery pricing is applied"}
+                ? t("pickupPricingApplied")
+                : t("deliveryPricingApplied")}
             </p>
           </div>
 
@@ -710,7 +731,7 @@ export function CartSummarySection({
                 className="inline-flex h-9 items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:border-primary/25 hover:bg-primary/10"
               >
                 <Plus size={14} strokeWidth={2.5} />
-                Add More Items
+                {t("addMoreItems")}
               </button>
             ) : null}
 
@@ -720,7 +741,7 @@ export function CartSummarySection({
                 onClick={clearCart}
                 className="cursor-pointer text-sm text-red-500 hover:underline"
               >
-                Clear Cart
+                {t("clearCart")}
               </button>
             ) : null}
           </div>
@@ -742,7 +763,7 @@ export function CartSummarySection({
 
                 <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                   <p className="text-sm font-semibold text-red-900">
-                    Backend Error
+                    {t("backendError")}
                   </p>
 
                   {backendError.code ? (
@@ -767,9 +788,9 @@ export function CartSummarySection({
               </div>
             ) : (
               <>
-                <p className="text-sm font-medium text-gray-700">Your cart is empty</p>
+                <p className="text-sm font-medium text-gray-700">{t("yourCartIsEmpty")}</p>
                 <p className="mt-1 text-xs text-gray-400">
-                  Add items from the menu to start building the order.
+                  {t("emptyCartDescription")}
                 </p>
               </>
             )}
@@ -781,7 +802,7 @@ export function CartSummarySection({
                 className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 text-sm font-medium text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-50"
               >
                 <Trash2 size={14} strokeWidth={2.5} />
-                Clear Cart
+                {t("clearCart")}
               </button>
             ) : canEditCart ? (
               <button
@@ -790,7 +811,7 @@ export function CartSummarySection({
                 className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-full border border-primary/15 bg-white px-4 text-sm font-medium text-primary shadow-sm transition hover:border-primary/25 hover:bg-primary/5"
               >
                 <Plus size={14} strokeWidth={2.5} />
-                Browse Items
+                {t("browseItems")}
               </button>
             ) : null}
           </div>
@@ -815,7 +836,8 @@ export function CartSummarySection({
               const isSplitPizza = selectedSections.length > 0;
               const splitPizzaDisplay = getSplitPizzaDisplay(
                 item,
-                selectedSections
+                selectedSections,
+                splitLabels
               );
 
               return (
@@ -828,7 +850,7 @@ export function CartSummarySection({
                       type="button"
                       onClick={() => handleEditItem(item)}
                       className="rounded-md bg-gray-100 p-1 transition hover:bg-primary/10"
-                      aria-label={`Edit ${item.name}`}
+                      aria-label={t("editItem", { name: item.name })}
                     >
                       <Pencil size={14} className="text-gray-700" />
                     </button>
@@ -837,7 +859,7 @@ export function CartSummarySection({
                       type="button"
                       onClick={() => deleteItem(String(item.id))}
                       className="rounded-md bg-red-100 p-1 transition hover:bg-red-200"
-                      aria-label={`Remove ${item.name}`}
+                      aria-label={t("removeItem", { name: item.name })}
                     >
                       <Trash2 size={14} className="text-red-600" />
                     </button>
@@ -862,13 +884,13 @@ export function CartSummarySection({
 
                         {selectedVariationName ? (
                           <p className="mt-1 text-xs text-gray-500">
-                            Size: {String(selectedVariationName)}
+                            {t("size")}: {String(selectedVariationName)}
                           </p>
                         ) : null}
 
                         {checkoutType === "pickup" && pickupExtraUnitPrice > 0 ? (
                           <p className="mt-1 text-xs font-medium text-primary">
-                            Pickup price: +{formatCurrency(pickupExtraUnitPrice)} each
+                            {t("pickupPriceEach", { price: formatCurrency(pickupExtraUnitPrice) })}
                           </p>
                         ) : null}
                       </div>
@@ -878,14 +900,14 @@ export function CartSummarySection({
                           <div className="mb-2 flex items-center gap-2">
                             <Layers2 size={14} className="text-primary" />
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-                              Split Pizza
+                              {t("splitPizza")}
                             </p>
                           </div>
 
                           {splitPizzaDisplay.otherHalfSections.length > 0 ? (
                             <div className="mb-2 rounded-[10px] border border-primary/15 bg-white/80 px-3 py-2">
                               <p className="text-[11px] font-medium text-gray-500">
-                                Other half
+                                {t("otherHalf")}
                               </p>
 
                               <div className="mt-1 space-y-1">
@@ -941,7 +963,7 @@ export function CartSummarySection({
 
                                       {isOtherHalf ? (
                                         <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                                          Other half
+                                          {t("otherHalf")}
                                         </span>
                                       ) : null}
                                     </p>
@@ -960,7 +982,7 @@ export function CartSummarySection({
                           </div>
 
                           <p className="mt-2 text-[11px] text-gray-500">
-                            Highest half price is used for the base item price.
+                            {t("highestHalfPrice")}
                           </p>
                         </div>
                       ) : null}
@@ -969,14 +991,14 @@ export function CartSummarySection({
                         <div className="rounded-[10px] border border-gray-100 bg-gray-50 px-3 py-2">
                           <div className="mb-1.5 flex items-center justify-between gap-3">
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                              Add-ons
+                              {t("addons")}
                             </p>
                           </div>
 
                           <div className="space-y-1">
                             {selectedAddons.map((addon, index) => {
                               const addonName =
-                                String(addon.name || "").trim() || "Add-on";
+                                String(addon.name || "").trim() || t("addonFallback");
 
                               const addonQty = getAddonQuantity(addon);
                               const addonTotal = getAddonTotal(addon);
@@ -999,7 +1021,7 @@ export function CartSummarySection({
                                   <span className="shrink-0 font-medium text-gray-700">
                                     {addonTotal > 0
                                       ? `+${formatCurrency(addonTotal)}`
-                                      : "Free"}
+                                      : t("free")}
                                   </span>
                                 </div>
                               );
@@ -1012,7 +1034,7 @@ export function CartSummarySection({
                         <div className="flex items-center justify-between rounded-[10px] border border-amber-100 bg-amber-50 px-3 py-2 text-xs">
                           <span className="inline-flex items-center gap-1 font-medium text-amber-700">
                             <BadgeDollarSign size={14} />
-                            Deposit
+                            {t("deposit")}
                           </span>
 
                           <span className="font-semibold text-amber-700">
@@ -1024,7 +1046,7 @@ export function CartSummarySection({
 
                       {item.note ? (
                         <p className="rounded-md bg-yellow-50 px-2 py-1 text-[11px] text-yellow-700">
-                          Note: {item.note}
+                          {t("note")}: {item.note}
                         </p>
                       ) : null}
 
@@ -1036,26 +1058,30 @@ export function CartSummarySection({
 
                           <div className="space-y-0.5">
                             <p className="text-[11px] text-gray-400">
-                              {formatCurrency(unitPriceWithModifiers)} each
+                              {t("each", { price: formatCurrency(unitPriceWithModifiers) })}
                             </p>
 
                             {checkoutType === "pickup" && pickupExtraTotal > 0 ? (
                               <p className="text-[11px] text-gray-400">
-                                Pickup price +{formatCurrency(pickupExtraUnitPrice)}
-                                {quantity > 1 ? ` × ${quantity}` : ""}
+                                {t("pickupPriceQuantity", {
+                                  price: formatCurrency(pickupExtraUnitPrice),
+                                  quantity: quantity > 1 ? ` × ${quantity}` : "",
+                                })}
                               </p>
                             ) : null}
 
                             {selectedAddons.length > 0 ? (
                               <p className="text-[11px] text-gray-400">
-                                Price {formatCurrency(checkoutUnitPrice)} + add-ons{" "}
-                                {formatCurrency(modifiersTotal)}
+                                {t("priceWithAddons", {
+                                  price: formatCurrency(checkoutUnitPrice),
+                                  addons: formatCurrency(modifiersTotal),
+                                })}
                               </p>
                             ) : null}
 
                             {depositTotal > 0 ? (
                               <p className="text-[11px] text-gray-400">
-                                Includes deposit {formatCurrency(depositTotal)}
+                                {t("includesDeposit", { amount: formatCurrency(depositTotal) })}
                               </p>
                             ) : null}
                           </div>
@@ -1094,19 +1120,19 @@ export function CartSummarySection({
 
       <section className="space-y-[15px]">
         <h2 className="text-[18px] font-semibold text-gray-900">
-          Bill details
+          {t("billDetails")}
         </h2>
 
         <div className="space-y-4 text-sm text-gray-500">
           <div className="flex items-center justify-between">
-            <span>Item Total</span>
+            <span>{t("itemTotal")}</span>
             <span>{formatCurrency(itemTotal)}</span>
           </div>
 
           {depositTotal > 0 ? (
             <div className="flex items-center justify-between text-amber-700">
               <div className="flex items-center gap-1">
-                <span>Deposit</span>
+                <span>{t("deposit")}</span>
                 <Info size={16} />
               </div>
               <span>{formatCurrency(depositTotal)}</span>
@@ -1116,7 +1142,7 @@ export function CartSummarySection({
           {checkoutType === "pickup" && pickupPriceTotal > 0 ? (
             <div className="flex items-center justify-between text-primary">
               <div className="flex items-center gap-1">
-                <span>Pickup Price</span>
+                <span>{t("pickupPrice")}</span>
                 <Info size={16} />
               </div>
               <span>{formatCurrency(pickupPriceTotal)}</span>
@@ -1126,7 +1152,7 @@ export function CartSummarySection({
           {checkoutType === "delivery" ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
-                <span>Delivery Fee</span>
+                <span>{t("deliveryFee")}</span>
                 <Info size={16} />
               </div>
               <span>{formatCurrency(deliveryFee)}</span>
@@ -1135,7 +1161,7 @@ export function CartSummarySection({
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
-              <span>Taxes and Charges</span>
+              <span>{t("taxesAndCharges")}</span>
               <Info size={16} />
             </div>
             <span>{formatCurrency(taxes)}</span>
@@ -1147,7 +1173,7 @@ export function CartSummarySection({
             type="text"
             value={couponCode || ""}
             onChange={(e) => setCouponCode?.(e.target.value)}
-            placeholder="Enter coupon code"
+            placeholder={t("couponPlaceholder")}
             className="flex-1 rounded-md border px-3 py-2 text-sm"
           />
 
@@ -1157,7 +1183,7 @@ export function CartSummarySection({
             disabled={validatingCoupon}
             className="h-[42px] text-white"
           >
-            {validatingCoupon ? "Applying..." : "Apply"}
+            {validatingCoupon ? t("applying") : t("apply")}
           </Button>
         </div>
 
@@ -1167,19 +1193,19 @@ export function CartSummarySection({
               <TicketPercent width={16} height={16} />
               <span>
                 {hasAppliedPromotion
-                  ? "Applied deal"
-                  : "Coupon Applied"}
+                  ? t("appliedDeal")
+                  : t("couponApplied")}
               </span>
             </div>
 
             {hasAppliedPromotion ? (
               <p className="mt-1 pl-6 text-xs font-normal text-green-700/90">
-                {appliedPromotion?.title || "Promotion discount"}
+                {appliedPromotion?.title || t("promotionDiscount")}
                 {appliedPromotion?.applyMode
                   ? ` · ${String(appliedPromotion.applyMode).replace(/_/g, " ")}`
                   : ""}
                 {toNumber(appliedPromotion?.discountAmount, 0) > 0
-                  ? ` · ${formatCurrency(appliedPromotion?.discountAmount)} off`
+                  ? ` · ${t("off", { amount: formatCurrency(appliedPromotion?.discountAmount) })}`
                   : ""}
               </p>
             ) : null}
@@ -1188,13 +1214,13 @@ export function CartSummarySection({
 
         <div className="space-y-[15px]">
           <div className="flex items-center justify-between pt-[15px] text-sm text-gray-500">
-            <span>Total before discount</span>
+            <span>{t("totalBeforeDiscount")}</span>
             <span>{formatCurrency(totalBeforeDiscount)}</span>
           </div>
 
           {discount > 0 ? (
             <div className="flex items-center justify-between text-sm text-green-600">
-              <span>{hasAppliedPromotion ? "Applied deal discount" : "Discount"}</span>
+              <span>{hasAppliedPromotion ? t("appliedDealDiscount") : t("discount")}</span>
               <span>- {formatCurrency(discount)}</span>
             </div>
           ) : null}
@@ -1202,10 +1228,11 @@ export function CartSummarySection({
           {loyaltyDiscount > 0 ? (
             <div className="flex items-center justify-between text-sm text-green-600">
               <span>
-                Loyalty Discount
                 {toNumber(resolvedQuote?.loyaltyPointsRedeemed, 0) > 0
-                  ? ` (${toNumber(resolvedQuote?.loyaltyPointsRedeemed, 0)} pts)`
-                  : ""}
+                  ? t("loyaltyDiscountWithPoints", {
+                      points: toNumber(resolvedQuote?.loyaltyPointsRedeemed, 0),
+                    })
+                  : t("loyaltyDiscount")}
               </span>
               <span>- {formatCurrency(loyaltyDiscount)}</span>
             </div>
@@ -1213,7 +1240,7 @@ export function CartSummarySection({
 
           {walletAppliedAmount > 0 ? (
             <div className="flex items-center justify-between pb-[15px] text-sm text-green-600">
-              <span>Wallet Applied</span>
+              <span>{t("walletApplied")}</span>
               <span>- {formatCurrency(walletAppliedAmount)}</span>
             </div>
           ) : hasAnyDiscount ? (
@@ -1221,7 +1248,7 @@ export function CartSummarySection({
           ) : null}
 
           <div className="flex items-center justify-between text-[24px] font-medium text-gray-900">
-            <span>{walletAppliedAmount > 0 ? "Payable Total" : "Total"}</span>
+            <span>{walletAppliedAmount > 0 ? t("payableTotal") : t("total")}</span>
             <span>{formatCurrency(finalTotal)}</span>
           </div>
         </div>
@@ -1233,7 +1260,7 @@ export function CartSummarySection({
             className="mt-[15px] inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-[10px] border border-primary/15 bg-primary/5 text-base font-medium text-primary transition hover:border-primary/25 hover:bg-primary/10"
           >
             <Plus size={17} strokeWidth={2.5} />
-            Add More Items
+            {t("addMoreItems")}
           </button>
         ) : null}
 
@@ -1244,7 +1271,7 @@ export function CartSummarySection({
             variant="primary"
             className="mt-[15px] h-[54px] w-full cursor-pointer rounded-[10px] text-base font-medium shadow-lg shadow-primary/20 disabled:opacity-50"
           >
-            {placingOrder ? "Placing Order..." : "Place Order"}
+            {placingOrder ? t("placingOrder") : t("placeOrder")}
           </Button>
         ) : null}
       </section>

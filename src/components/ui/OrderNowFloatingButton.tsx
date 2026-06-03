@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
+import { useTranslations } from "next-intl";
 
-export default function OrderNowFloatingButton() {
+export function OrderNowFloatingButton() {
+  const t = useTranslations("common");
+
   return (
     <Link
       href="/menu"
@@ -16,10 +19,10 @@ export default function OrderNowFloatingButton() {
         hover:scale-[1.03] hover:bg-primary-300
         active:scale-[0.98]
       "
-      aria-label="Order now"
+      aria-label={t("orderNow")}
     >
       <ShoppingBag size={18} />
-      <span>Order Now</span>
+      <span>{t("orderNow")}</span>
     </Link>
   );
 }

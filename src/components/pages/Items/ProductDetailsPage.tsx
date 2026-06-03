@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import TestimonialsSection from "@/components/pages/Items/components/Testimonials";
 import useItems from "@/hooks/useItems";
 import { useCart } from "@/hooks/useCart";
@@ -11,7 +12,7 @@ import { getStoredGroupOrderCode } from "@/lib/group-order";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Eye, Loader2, Minus, Plus, X } from "lucide-react";
-import AsyncSelect from "@/components/ui/AsyncSelect";
+import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import type { CartPayload, CheckoutType, ItemPriceOverride, MenuItem, MenuVariation, Modifier, ModifierGroup, ModifierLink, ModifierSelectionMap, PromotionInfo, RawModifierLink, SelectedModifier, VariationPriceOverride } from "@/components/pages/Items/types";
 import {
   buildCartPayload,
@@ -197,13 +198,14 @@ const getPromotionSourceForPrice = (menuItem: MenuItem | null, variation?: MenuV
 };
 
 function PromotionBadge({ promotion }: { promotion?: PromotionInfo | null }) {
+  const t = useTranslations("productDetails");
   if (!promotion) return null;
 
   const label = getPromotionDiscountLabel(promotion);
 
   return (
     <span className="inline-flex w-fit items-center rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700 ring-1 ring-green-100">
-      {label || "Promotion"}
+      {label || t("promotion")}
     </span>
   );
 }
@@ -790,6 +792,8 @@ const getModifierSideVariationOverrides = (menuItem: MenuItem | null, modifier: 
 };
 
 function ProductDetailsPageContent() {
+  const t = useTranslations("productDetails");
+  const tErrors = useTranslations("errors");
   const params = useSearchParams();
   const slug = params.get("slug");
   const itemIdParam = params.get("itemId") || "";
@@ -1065,8 +1069,8 @@ function ProductDetailsPageContent() {
         sortOrder: 999,
         modifierGroup: {
           id: `item-addons-${menuItem.id}`,
-          name: "Add-ons",
-          description: "Choose the add-ons you want with this item.",
+          name: t("addons"),
+          description: t("addonsDescription"),
           minSelect,
           maxSelect,
           isRequired,
@@ -1226,8 +1230,8 @@ function ProductDetailsPageContent() {
 
     if (maxSelect === 1) {
       return isRequired || minSelect > 0
-        ? "Select 1 required add-on"
-        : "Optional · select 1 add-on";
+        ? t("requiredAddon")
+        : t("optionalSelectOne");
     }
 
     if (maxSelect) {
@@ -1240,7 +1244,7 @@ function ProductDetailsPageContent() {
       return `Select at least ${minSelect} add-on${minSelect === 1 ? "" : "s"}`;
     }
 
-    return "Optional add-ons";
+    return t("optionalAddons");
   };
 
   const getModifierSelectionLimitText = (group?: ModifierGroup | null) => {
@@ -1393,7 +1397,7 @@ function ProductDetailsPageContent() {
         if (!isMounted) return;
 
         if (!res || res?.error) {
-          toast.error(res?.error || "Failed to fetch item");
+          toast.error(res?.error || t("failedFetchItem"));
           setItem(null);
           return;
         }
@@ -1423,7 +1427,7 @@ function ProductDetailsPageContent() {
         setSplitPizzaItem(null);
       } catch (error) {
         if (!isMounted) return;
-        toast.error("Failed to fetch item");
+        toast.error(t("failedFetchItem"));
         setItem(null);
       } finally {
         if (isMounted) {
@@ -1495,7 +1499,7 @@ function ProductDetailsPageContent() {
           {
             ...modifier,
             id: modifierId,
-            name: String(selectedRecord?.name ?? modifier?.name ?? "Modifier"),
+          name: String(selectedRecord?.name ?? modifier?.name ?? t("modifierFallback")),
             selectedQuantity: Math.max(1, toNumber(selectedRecord?.quantity, 1)),
           },
         ];
@@ -1525,7 +1529,7 @@ function ProductDetailsPageContent() {
         setSplitPizzaEnabled(true);
         setSplitPizzaItem({
           id: getId(rightSection.menuItemId),
-          name: String(rightSection.menuItemName ?? "Selected second half"),
+          name: String(rightSection.menuItemName ?? t("selectedSecondHalf")),
           basePrice: typeof rightSection.unitPrice === "string" || typeof rightSection.unitPrice === "number" ? rightSection.unitPrice : undefined,
           price: typeof rightSection.unitPrice === "string" || typeof rightSection.unitPrice === "number" ? rightSection.unitPrice : undefined,
           unitPrice: typeof rightSection.unitPrice === "string" || typeof rightSection.unitPrice === "number" ? rightSection.unitPrice : undefined,
@@ -1604,9 +1608,7 @@ function ProductDetailsPageContent() {
       if (alreadySelected) {
         if (minSelect > 0 && current.length <= minSelect) {
           toast.error(
-            `${item?.name || "This item"} requires at least ${minSelect} add-on${
-              minSelect === 1 ? "" : "s"
-            }`
+            t("minimumAddons", { itemName: item?.name || t("thisItem"), count: minSelect })
           );
           return prev;
         }
@@ -1627,9 +1629,7 @@ function ProductDetailsPageContent() {
 
       if (maxSelect && current.length >= maxSelect) {
         toast.error(
-          `${item?.name || "This item"} allows at most ${maxSelect} add-on${
-            maxSelect === 1 ? "" : "s"
-          }`
+          t("maximumAddons", { itemName: item?.name || t("thisItem"), count: maxSelect })
         );
         return prev;
       }
@@ -1666,22 +1666,18 @@ function ProductDetailsPageContent() {
       const groupId = String(group?.id || "");
       const selected = selectionMap[groupId] || [];
       const { minSelect, maxSelect } = getGroupValidation(group);
-      const itemName = item?.name || "This item";
+      const itemName = item?.name || t("thisItem");
 
       if (minSelect > 0 && selected.length < minSelect) {
         toast.error(
-          `${itemName} requires at least ${minSelect} add-on${
-            minSelect === 1 ? "" : "s"
-          }`
+          t("minimumAddons", { itemName, count: minSelect })
         );
         return false;
       }
 
       if (maxSelect && selected.length > maxSelect) {
         toast.error(
-          `${itemName} allows at most ${maxSelect} add-on${
-            maxSelect === 1 ? "" : "s"
-          }`
+          t("maximumAddons", { itemName, count: maxSelect })
         );
         return false;
       }
@@ -1769,7 +1765,7 @@ function ProductDetailsPageContent() {
           <div className="mb-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold text-gray-900">Add-ons</p>
+                <p className="font-semibold text-gray-900">{t("addons")}</p>
                 {isRequired ? (
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                     Required
@@ -1908,7 +1904,7 @@ function ProductDetailsPageContent() {
 
   const clearCartAndRetryAdd = async () => {
     if (!customerId) {
-      toast.error("Customer not found");
+      toast.error(t("customerNotFound"));
       return null;
     }
 
@@ -1918,7 +1914,7 @@ function ProductDetailsPageContent() {
       toast.error(
         getApiErrorMessage(
           clearRes,
-          "Failed to clear cart before switching branch"
+          t("failedClearBranchCart")
         )
       );
       return null;
@@ -1935,7 +1931,7 @@ function ProductDetailsPageContent() {
       setLoading(true);
 
       if (!item?.id) {
-        toast.error("Item not found");
+        toast.error(t("itemNotFound"));
         return;
       }
 
@@ -1944,7 +1940,7 @@ function ProductDetailsPageContent() {
       }
 
       if (splitPizzaEnabled && !splitPizzaItem?.id) {
-        toast.error("Please select the other pizza half");
+        toast.error(t("selectOtherPizzaHalf"));
         return;
       }
 
@@ -1956,7 +1952,7 @@ function ProductDetailsPageContent() {
         const { response: groupOrdersRes, groupOrders } = await fetchGroupOrders();
 
         if (!groupOrdersRes || groupOrdersRes.error) {
-          toast.error("Failed to fetch group order");
+          toast.error(t("failedFetchGroupOrder"));
           return;
         }
 
@@ -1965,7 +1961,7 @@ function ProductDetailsPageContent() {
         );
 
         if (!groupOrder) {
-          toast.error("Invalid group order");
+          toast.error(t("invalidGroupOrder"));
           return;
         }
 
@@ -1978,12 +1974,12 @@ function ProductDetailsPageContent() {
         });
       } else {
         if (!customerId) {
-          toast.error("Customer not found");
+          toast.error(t("customerNotFound"));
           return;
         }
 
         if (!branchId && !isEditingCartItem) {
-          toast.error("Please select a branch first");
+          toast.error(t("selectBranchFirst"));
           return;
         }
 
@@ -2005,21 +2001,21 @@ function ProductDetailsPageContent() {
         !isEditingCartItem &&
         isCartBranchConflict(res)
       ) {
-        toast.info("Clearing previous branch cart and adding this item...");
+        toast.info(t("clearingPreviousBranchCart"));
         res = await clearCartAndRetryAdd();
       }
 
       if (!res || res?.error) {
-        toast.error(getApiErrorMessage(res, "Failed to save item"));
+        toast.error(getApiErrorMessage(res, t("failedSaveItem")));
         return;
       }
 
       toast.success(
         isEditingCartItem
-          ? "Cart item updated successfully"
+          ? t("cartItemUpdated")
           : groupCode
-          ? "Added to group order"
-          : "Added to cart"
+          ? t("addedToGroupOrder")
+          : t("addedToCart")
       );
 
       if (groupCode) {
@@ -2028,7 +2024,7 @@ function ProductDetailsPageContent() {
         router.push(`/checkout?type=${checkoutType}`);
       }
     } catch (error) {
-      toast.error("Something went wrong");
+      toast.error(tErrors("somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -2047,7 +2043,7 @@ function ProductDetailsPageContent() {
       <>
         <div className="mx-auto px-4 py-16 text-center sm:px-6 md:px-10 lg:px-40">
           <h2 className="text-xl font-semibold text-gray-900">
-            Item not found
+            {t("itemNotFound")}
           </h2>
           <p className="mt-2 text-sm text-gray-500">
             We could not find the requested menu item.
@@ -2065,7 +2061,7 @@ function ProductDetailsPageContent() {
           <div className="overflow-hidden rounded-2xl">
             <Image
               src={item?.imageUrl || "/placeholder.png"}
-              alt={item?.name || "Product image"}
+              alt={item?.name || t("productImageAlt")}
               width={600}
               height={600}
               className="h-[250px] w-full object-cover sm:h-[350px] md:h-auto"
@@ -2083,7 +2079,7 @@ function ProductDetailsPageContent() {
         <div className="flex flex-col gap-5">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-400">
-              {String(item?.category?.name ?? "Best Seller")}
+              {String(item?.category?.name ?? t("bestSeller"))}
             </p>
 
             <div className="mt-1 flex items-start justify-between gap-3">
@@ -2096,7 +2092,7 @@ function ProductDetailsPageContent() {
                   type="button"
                   onClick={() => setInfoOpen(true)}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-primary hover:text-white"
-                  title="View product information"
+                  title={t("viewProductInformation")}
                 >
                   <Eye size={18} />
                 </button>
@@ -2172,7 +2168,7 @@ function ProductDetailsPageContent() {
 
           {itemVariations.length > 0 ? (
             <div>
-              <p className="mb-2 font-medium">Size</p>
+              <p className="mb-2 font-medium">{t("size")}</p>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {itemVariations.map((variation) => {
@@ -2294,7 +2290,7 @@ function ProductDetailsPageContent() {
                     <AsyncSelect
                       value={splitPizzaItem}
                       onChange={handleSplitPizzaItemChange}
-                      placeholder="Select split-pizza item"
+                      placeholder={t("selectSplitPizzaItem")}
                       fetchOptions={fetchPizzaItems}
                       labelKey="name"
                       valueKey="id"
@@ -2304,7 +2300,7 @@ function ProductDetailsPageContent() {
                   {splitPizzaItem ? (
                     <div className="rounded-xl bg-white p-3">
                       <p className="text-sm font-semibold text-gray-900">
-                        Selected second half
+                        {t("selectedSecondHalf")}
                       </p>
 
                       <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
@@ -2354,11 +2350,11 @@ function ProductDetailsPageContent() {
           ) : null}
 
           <div>
-            <p className="mb-2 font-medium">Special Instructions</p>
+            <p className="mb-2 font-medium">{t("specialInstructions")}</p>
             <textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Add cooking notes (e.g., no onions, extra spicy)..."
+              placeholder={t("notesPlaceholder")}
               className="h-24 w-full rounded-xl bg-gray-100 p-3 text-sm outline-none"
             />
           </div>
@@ -2415,9 +2411,9 @@ function ProductDetailsPageContent() {
               {loading ? <Loader2 size={16} className="animate-spin" /> : null}
               {loading
                 ? isEditingCartItem
-                  ? "Updating..."
-                  : "Processing..."
-                : `${isEditingCartItem ? "Update Cart" : "Add to Cart"} | ${formatMoney(displayTotalPrice)}`}
+                  ? t("updating")
+                  : t("processing")
+                : `${isEditingCartItem ? t("updateCart") : t("addToCart")} | ${formatMoney(displayTotalPrice)}`}
             </button>
           </div>
         </div>
@@ -2429,7 +2425,7 @@ function ProductDetailsPageContent() {
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Product Information
+                  {t("viewProductInformation")}
                 </h2>
                 <p className="mt-1 text-sm text-gray-500">{item?.name}</p>
               </div>

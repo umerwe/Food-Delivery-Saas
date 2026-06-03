@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import Image from "next/image";
 import { BadgePercent, CalendarDays, PackageCheck } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +42,7 @@ const CustomerDealCard = ({
   isAdding: boolean;
   onAddDeal?: (deal: CustomerDeal) => void;
 }) => {
+  const t = useTranslations("home.deals");
   const image = getDealImage(deal);
   const itemNames = getDealItemNames(deal.scopeMenuItems);
   const dateRange = formatDealDateRange(deal.startsAt, deal.expiresAt);
@@ -94,13 +96,13 @@ const CustomerDealCard = ({
 
         {itemNames ? (
           <p className="mt-3 line-clamp-2 text-sm font-medium text-gray-700">
-            Includes {itemNames}
+            {t("includes", { items: itemNames })}
           </p>
         ) : null}
 
         {!hasDealItems ? (
           <p className="mt-3 text-sm font-medium text-red-500">
-            This deal has no available items.
+            {t("noAvailableItems")}
           </p>
         ) : null}
 
@@ -110,7 +112,7 @@ const CustomerDealCard = ({
           disabled={!hasDealItems || isAdding}
           onClick={handleAddDeal}
         >
-          {isAdding ? "Adding..." : "Add Deal"}
+          {isAdding ? t("adding") : t("addDeal")}
         </Button>
       </div>
     </article>
@@ -123,6 +125,7 @@ export const CustomerDealsSection = ({
   addingDealId = null,
   onAddDeal,
 }: CustomerDealsSectionProps) => {
+  const t = useTranslations("home.deals");
   const activeDeals = deals.filter(isDealActive).slice(0, 6);
 
   if (isLoading) {
@@ -142,10 +145,10 @@ export const CustomerDealsSection = ({
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-primary">
-            Deals
+            {t("label")}
           </p>
           <h3 className="mt-1 text-2xl font-bold text-gray-900">
-            Available Deals
+            {t("available")}
           </h3>
         </div>
       </div>

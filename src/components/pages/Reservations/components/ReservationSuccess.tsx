@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { ReactNode, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import {
   FaCheck,
   FaRegCalendarAlt,
@@ -11,6 +12,23 @@ import {
 } from "react-icons/fa";
 import { useAuth } from "@/hooks/useAuth";
 import type { Reservation, ReservationBranch } from "@/services/reservations";
+
+const getReservationStatusKey = (status?: string | null) => {
+  switch (String(status || "").toUpperCase()) {
+    case "PENDING":
+      return "pending";
+    case "CONFIRMED":
+      return "confirmed";
+    case "CANCELLED":
+      return "cancelled";
+    case "COMPLETED":
+      return "completed";
+    case "NO_SHOW":
+      return "noShow";
+    default:
+      return null;
+  }
+};
 
 const toFiniteNumber = (value: unknown) => {
   const parsed = Number(value);
@@ -51,6 +69,8 @@ const getCoordinatesFromCandidates = (candidates: unknown[]) => {
 };
 
 export default function ReservationSuccess({ data }: { data: Reservation | null }) {
+  const t = useTranslations("reserveTable.success");
+  const statusT = useTranslations("reservations.statusLabels");
   const { user } = useAuth();
 
   const reservationDate = data?.reservationDate
@@ -95,10 +115,12 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
   }, [branch, data, user]);
 
   const branchName = String(
-    branch?.name || getRecord(data)?.branchName || getRecord(getRecord(data)?.restaurant)?.name || "Restaurant"
+    branch?.name || getRecord(data)?.branchName || getRecord(getRecord(data)?.restaurant)?.name || t("restaurantFallback")
   );
 
   const addressText = buildAddressText(branchAddress);
+  const statusKey = getReservationStatusKey(data?.status);
+  const statusLabel = statusKey ? statusT(statusKey) : data?.status || statusT("booked");
 
   const coordinates = useMemo(() => {
     return getCoordinatesFromCandidates([
@@ -142,12 +164,11 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
           </div>
 
           <h1 className="mt-5 text-[30px] font-semibold text-gray-900">
-            Reservation Confirmed
+            {t("title")}
           </h1>
 
           <p className="mx-auto mt-2 max-w-[520px] text-[15px] text-gray-500">
-            We look forward to welcoming you. Your reservation has been
-            successfully created.
+            {t("description")}
           </p>
         </div>
 
@@ -156,7 +177,7 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
           <div className="relative h-[230px] w-full">
             <Image
               src="/items/table.png"
-              alt="Restaurant"
+              alt={t("restaurantAlt")}
               fill
               className="object-cover"
             />
@@ -165,15 +186,15 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
 
             <div className="absolute bottom-5 left-6 text-white">
               <p className="text-sm font-medium text-orange-400">
-                Upcoming Dining experience
+                {t("upcomingExperience")}
               </p>
 
               <h2 className="mt-1 text-[22px] font-semibold">
-                Your Reservation
+                {t("yourReservation")}
               </h2>
 
               <p className="mt-1 text-sm text-gray-200">
-                Status: {data?.status || "CONFIRMED"}
+                {t("status")}: {statusLabel}
               </p>
             </div>
           </div>
@@ -182,19 +203,19 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
           <div className="grid grid-cols-2 gap-y-6 px-6 py-6 text-sm">
             <Detail
               icon={<FaRegCalendarAlt />}
-              label="Date"
+              label={t("date")}
               value={formattedDate}
             />
-            <Detail icon={<FaClock />} label="Time" value={formattedTime} />
+            <Detail icon={<FaClock />} label={t("time")} value={formattedTime} />
             <Detail
               icon={<FaUsers />}
-              label="Guests"
-              value={`${data?.guestCount || 0} People`}
+              label={t("guests")}
+              value={t("people", { count: data?.guestCount || 0 })}
             />
             <Detail
               icon={<FaMapMarkerAlt />}
-              label="Seating"
-              value={String(data?.note || "Standard Seating")}
+              label={t("seating")}
+              value={String(data?.note || t("standardSeating"))}
             />
           </div>
 
@@ -202,14 +223,14 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
           <div className="px-6 pb-6">
             <div className="flex items-center justify-between rounded-xl border-l-4 border-orange-500 bg-gray-100 px-5 py-4">
               <div>
-                <p className="text-xs text-gray-400">Confirmation ID</p>
+                <p className="text-xs text-gray-400">{t("confirmationId")}</p>
                 <p className="mt-1 text-lg font-semibold text-orange-600">
                   #{data?.id ? String(data.id).slice(0, 8).toUpperCase() : "N/A"}
                 </p>
               </div>
 
               <span className="rounded-full bg-green-100 px-3 py-1 text-xs text-green-700">
-                {data?.status || "Booked"}
+                {statusLabel || t("booked")}
               </span>
             </div>
           </div>
@@ -222,13 +243,13 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
                   {branchName}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {addressText || "Branch address not available"}
+                  {addressText || t("branchAddressUnavailable")}
                 </p>
               </div>
 
               <div className="relative h-[220px] w-full">
                 <iframe
-                  title="Reservation branch location"
+                  title={t("mapTitle")}
                   src={iframeMapSrc}
                   className="h-full w-full border-0"
                   loading="lazy"
@@ -242,19 +263,18 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
                   rel="noreferrer"
                   className="absolute bottom-3 left-3 rounded-md bg-white px-3 py-1.5 text-xs font-medium text-gray-900 shadow transition hover:bg-gray-50"
                 >
-                  Get Direction
+                  {t("getDirection")}
                 </a>
               </div>
 
               <div className="border-t border-gray-200 bg-white px-4 py-3 text-xs text-gray-500">
                 {coordinates ? (
                   <span>
-                    Location: {coordinates.lat}, {coordinates.lng}
+                    {t("location", { lat: coordinates.lat, lng: coordinates.lng })}
                   </span>
                 ) : (
                   <span>
-                    Map is using branch address because latitude/longitude are
-                    not available.
+                    {t("mapAddressFallback")}
                   </span>
                 )}
               </div>

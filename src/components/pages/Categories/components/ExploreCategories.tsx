@@ -11,6 +11,7 @@ import { getStoredGroupOrderCode, setStoredGroupOrderCode } from "@/lib/group-or
 import type { GroupOrderParticipant } from "@/types/group-order";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 interface Category {
   id: string;
@@ -19,6 +20,7 @@ interface Category {
 }
 
 export default function ExploreCategories() {
+  const t = useTranslations("categories.explore");
   const router = useRouter();
 
 const { token, user, loading: authLoading } = useAuth();
@@ -88,7 +90,7 @@ const handleJoinGroupOrder = async (inviteCode: string) => {
   const res = await joinGroupOrder({ inviteCode });
 
   if (!res || res.error) {
-    toast.error(res?.message || "Failed to join group order");
+    toast.error(res?.message || t("failedJoinGroupOrder"));
 
     return false;
   }
@@ -124,10 +126,10 @@ useEffect(() => {
         {/* HEADER */}
         <div className="mb-10">
           <h2 className="text-[32px] md:text-[36px] font-semibold text-[#4A1F1A]">
-            Explore Categories
+            {t("title")}
           </h2>
           <p className="text-[#8B5E57] mt-2 text-sm">
-            Curated collections from the finest kitchens.
+            {t("description")}
           </p>
         </div>
 
@@ -142,7 +144,7 @@ useEffect(() => {
             ))}
           </div>
         ) : categories.length === 0 ? (
-          <p className="text-gray-400">No categories found</p>
+          <p className="text-gray-400">{t("empty")}</p>
         ) : (
            <div className="flex flex-wrap justify-between gap-y-10 w-full">
            {categories.map((item) => {
@@ -198,7 +200,7 @@ useEffect(() => {
         {hasNext && (
           <div className="flex justify-center mt-10">
             <Button onClick={handleLoadMore}>
-              Load More
+              {t("loadMore")}
             </Button>
           </div>
         )}

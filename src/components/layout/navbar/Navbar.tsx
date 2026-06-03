@@ -18,11 +18,13 @@ import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { useAuthContext } from "@/hooks/useAuth"
 import { useAuth } from "@/hooks/useAuth"
 import useMenu from "@/hooks/useMenu"
-import BranchSwitcher from "@/components/common/branch-selector/BranchSwitcher"
+import { BranchSwitcher } from "@/components/common/branch-selector/BranchSwitcher"
 import { BrandLogo } from "@/components/common/BrandLogo"
+import { LanguageSelector } from "@/components/layout/navbar/LanguageSelector"
 
 type MenuItem = {
   id: string
@@ -95,7 +97,7 @@ type SearchResponse = {
 const isSearchResponse = (value: unknown): value is SearchResponse =>
   typeof value === "object" && value !== null && "success" in value
 
-const Navbar = () => {
+export const Navbar = () => {
   const { user, logout } = useAuthContext()
   const { token, loading: authLoading, restaurantId } = useAuth()
   const { get } = useMenu(token)
@@ -118,6 +120,8 @@ const Navbar = () => {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
+  const tNav = useTranslations("navigation")
+  const tCommon = useTranslations("common")
 
   const getSafeImageSrc = (src?: string | null) => {
     if (!src || typeof src !== "string") return "/placeholder-food.png"
@@ -167,7 +171,7 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout()
-    toast.success("Logged out successfully")
+    toast.success(tNav("logoutSuccess"))
     setDropdownOpen(false)
     router.push("/auth/login")
   }
@@ -272,7 +276,7 @@ const Navbar = () => {
               className="flex items-center gap-2 hover:text-primary transition-colors"
             >
               <Search size={18} className="text-primary font-semibold" />
-              <span className="font-semibold">Search Food</span>
+              <span className="font-semibold">{tNav("searchFood")}</span>
             </button>
 
             {/* Reserve */}
@@ -282,7 +286,7 @@ const Navbar = () => {
                 <path d="M9.99992 17.0859C10.649 17.0906 11.2847 16.9008 11.8249 16.5409C11.9448 16.4565 12.0301 16.3315 12.0652 16.1891C12.1003 16.0467 12.0827 15.8964 12.0158 15.7659C11.7274 15.2176 11.1083 14.5859 9.99992 14.5859C8.89159 14.5859 8.27242 15.2193 7.98409 15.7651C7.91713 15.8956 7.89957 16.0459 7.93464 16.1883C7.9697 16.3307 8.05503 16.4556 8.17492 16.5401C8.67492 16.8818 9.30992 17.0859 9.99992 17.0859Z" fill="#CE181B" stroke="#CE181B" strokeWidth="1.25" strokeLinejoin="round" />
                 <path d="M10 14.5846V7.91797" stroke="#CE181B" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="text-primary font-semibold">Reserve a Table</span>
+              <span className="text-primary font-semibold">{tNav("reserveTable")}</span>
             </Link>
 
             {/* Cart */}
@@ -291,9 +295,10 @@ const Navbar = () => {
               className="flex items-center gap-2 hover:text-primary"
             >
               <ShoppingBag size={18} className="text-primary" />
-              <span className="text-primary font-semibold">Cart</span>
+              <span className="text-primary font-semibold">{tNav("cart")}</span>
             </Link>
- <BranchSwitcher />
+            <BranchSwitcher />
+            <LanguageSelector />
             {/* USER */}
             {isAuth ? (
               <div ref={dropdownRef} className="relative">
@@ -327,7 +332,7 @@ const Navbar = () => {
 
                       <div>
                         <p className="font-semibold text-gray-900 text-sm">
-                          {userName || "User"}
+                          {userName || tNav("user")}
                         </p>
                         <p className="text-xs text-gray-500">
                           {user?.email}
@@ -345,7 +350,7 @@ const Navbar = () => {
                           <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
                             <User size={16} />
                           </div>
-                          <span className="text-sm text-gray-700">My Profile</span>
+                          <span className="text-sm text-gray-700">{tNav("myProfile")}</span>
                         </div>
                         <ChevronDown className="rotate-[-90deg]" size={16} />
                       </Link>
@@ -359,7 +364,7 @@ const Navbar = () => {
                           <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
                             <ShoppingCart size={16} />
                           </div>
-                          <span className="text-sm text-gray-700">My Orders</span>
+                          <span className="text-sm text-gray-700">{tNav("myOrders")}</span>
                         </div>
                         <ChevronDown className="rotate-[-90deg]" size={16} />
                       </Link>
@@ -373,7 +378,7 @@ const Navbar = () => {
                           <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
                             <Coffee size={16} />
                           </div>
-                          <span className="text-sm text-gray-700">My Reservations</span>
+                          <span className="text-sm text-gray-700">{tNav("myReservations")}</span>
                         </div>
                         <ChevronDown className="rotate-[-90deg]" size={16} />
                       </Link>
@@ -387,7 +392,7 @@ const Navbar = () => {
                           <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
                             <Bell size={16} />
                           </div>
-                          <span className="text-sm text-gray-700">Notifications</span>
+                          <span className="text-sm text-gray-700">{tNav("notifications")}</span>
                         </div>
                         <ChevronDown className="rotate-[-90deg]" size={16} />
                       </Link>
@@ -401,7 +406,7 @@ const Navbar = () => {
                           <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
                             <HelpCircle size={16} />
                           </div>
-                          <span className="text-sm text-gray-700">Help Center</span>
+                          <span className="text-sm text-gray-700">{tNav("helpCenter")}</span>
                         </div>
                         <ChevronDown className="rotate-[-90deg]" size={16} />
                       </Link>
@@ -416,7 +421,7 @@ const Navbar = () => {
                       <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
                         <LogOut size={16} />
                       </div>
-                      Logout
+                      {tNav("logout")}
                     </button>
                   </div>
                 )}
@@ -427,7 +432,7 @@ const Navbar = () => {
                 className="flex items-center gap-2 text-primary"
               >
                 <User size={18} />
-                Login
+                {tNav("login")}
               </Link>
             )}
           </div>
@@ -457,7 +462,7 @@ const Navbar = () => {
                 type="text"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
-                placeholder="Search burgers, bowls, drinks..."
+                placeholder={tNav("searchPlaceholder")}
                 className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
               />
 
@@ -466,7 +471,7 @@ const Navbar = () => {
                   onClick={clearSearchState}
                   className="text-sm font-medium text-gray-400 hover:text-primary"
                 >
-                  Clear
+                  {tCommon("clear")}
                 </button>
               )}
 
@@ -484,15 +489,15 @@ const Navbar = () => {
             <div className="max-h-[420px] overflow-y-auto">
               {searchLoading ? (
                 <div className="px-5 py-10 text-center text-sm text-gray-500">
-                  Searching menu items...
+                  {tNav("searchingItems")}
                 </div>
               ) : !searchValue.trim() ? (
                 <div className="px-5 py-10 text-center text-sm text-gray-500">
-                  Start typing to search food items
+                  {tNav("startTyping")}
                 </div>
               ) : searchResults.length === 0 ? (
                 <div className="px-5 py-10 text-center text-sm text-gray-500">
-                  No menu items found
+                  {tNav("noMenuItems")}
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
@@ -519,7 +524,7 @@ const Navbar = () => {
                               {item.name}
                             </h4>
                             <p className="mt-1 text-xs font-medium text-primary">
-                              {item.category?.name || "Uncategorized"}
+                              {item.category?.name || tNav("uncategorized")}
                             </p>
                           </div>
 
@@ -537,7 +542,7 @@ const Navbar = () => {
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                           {item.prepTimeMinutes ? (
                             <span className="rounded-full bg-gray-100 px-2.5 py-1">
-                              {item.prepTimeMinutes} min
+                              {tNav("minutesShort", { count: item.prepTimeMinutes })}
                             </span>
                           ) : null}
 
@@ -549,7 +554,7 @@ const Navbar = () => {
 
                           {!item.isActive ? (
                             <span className="rounded-full bg-red-100 px-2.5 py-1 text-red-600">
-                              Inactive
+                              {tCommon("inactive")}
                             </span>
                           ) : null}
                         </div>
@@ -563,10 +568,16 @@ const Navbar = () => {
             {!!searchResults.length && searchMeta && (
               <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
                 <span>
-                  Showing {searchResults.length} of {searchMeta.total} results
+                  {tNav("showingResults", {
+                    count: searchResults.length,
+                    total: searchMeta.total,
+                  })}
                 </span>
                 <span>
-                  Page {searchMeta.page} of {searchMeta.totalPages}
+                  {tNav("pageOf", {
+                    page: searchMeta.page,
+                    totalPages: searchMeta.totalPages,
+                  })}
                 </span>
               </div>
             )}
@@ -592,20 +603,22 @@ const Navbar = () => {
               }}
               className="flex items-center gap-3"
             >
-              <Search /> Search Food
+              <Search /> {tNav("searchFood")}
             </button>
 
             <Link href="/reservetable" className="flex items-center gap-3 text-primary">
-              <span>🍽️</span> Reserve a Table
+              <span>🍽️</span> {tNav("reserveTable")}
             </Link>
 
             <Link href="/checkout" className="flex items-center gap-3">
-              <ShoppingBag /> Cart
+              <ShoppingBag /> {tNav("cart")}
             </Link>
+
+            <LanguageSelector className="w-full justify-between" />
 
             {!isAuth && (
               <Link href="/auth/login" className="flex items-center gap-3">
-                <User /> Login
+                <User /> {tNav("login")}
               </Link>
             )}
           </div>
@@ -614,5 +627,3 @@ const Navbar = () => {
     </>
   )
 }
-
-export default Navbar

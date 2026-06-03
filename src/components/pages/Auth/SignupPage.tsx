@@ -1,5 +1,5 @@
 import { AuthHero } from "@/components/pages/Auth/components/hero"
-import SignUpForm from "@/components/forms/SignupForm"
+import { SignUpForm } from "@/components/forms/SignupForm"
 import { AUTH_FORM_PANEL_CLASS, AUTH_PAGE_CLASS } from "@/components/common/common-classes"
 
 export const metadata = {

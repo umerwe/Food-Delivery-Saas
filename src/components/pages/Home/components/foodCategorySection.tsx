@@ -19,6 +19,7 @@ import {
 import { useRouter } from "next/navigation";
 import type { UseEmblaCarouselType } from "embla-carousel-react";
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/useAuth";
 import { useHomeCategories, useHomePromotions } from "@/hooks/useHomeCategories";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
@@ -31,7 +32,7 @@ const toNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const formatDiscount = (promotion: PromotionCampaign) => {
+const formatDiscount = (promotion: PromotionCampaign, fallbackLabel: string) => {
   const value = toNumber(promotion.discountValue, 0);
 
   if (promotion.discountType === "PERCENTAGE") {
@@ -42,7 +43,7 @@ const formatDiscount = (promotion: PromotionCampaign) => {
     return `$${value} OFF`;
   }
 
-  return "SPECIAL OFFER";
+  return fallbackLabel;
 };
 
 const formatAmount = (value: unknown) => {
@@ -62,7 +63,10 @@ const formatDate = (value?: string) => {
   });
 };
 
-const getScopeText = (promotion: PromotionCampaign) => {
+const getScopeText = (
+  promotion: PromotionCampaign,
+  formatMessage: (key: string, values?: Record<string, number>) => string
+) => {
   const itemCount = Array.isArray(promotion.scopeMenuItems)
     ? promotion.scopeMenuItems.length
     : 0;
@@ -72,24 +76,22 @@ const getScopeText = (promotion: PromotionCampaign) => {
     : 0;
 
   if (promotion.applyMode === "ORDER_TOTAL") {
-    return "Full order";
+    return formatMessage("fullOrder");
   }
 
   if (itemCount && categoryCount) {
-    return `${itemCount} item${itemCount > 1 ? "s" : ""} & ${categoryCount} categor${
-      categoryCount > 1 ? "ies" : "y"
-    }`;
+    return formatMessage("itemAndCategoryCount", { itemCount, categoryCount });
   }
 
   if (itemCount) {
-    return `${itemCount} item${itemCount > 1 ? "s" : ""}`;
+    return formatMessage("itemCount", { count: itemCount });
   }
 
   if (categoryCount) {
-    return `${categoryCount} categor${categoryCount > 1 ? "ies" : "y"}`;
+    return formatMessage("categoryCount", { count: categoryCount });
   }
 
-  return "Eligible items";
+  return formatMessage("eligibleItems");
 };
 
 const getPromotionImage = (promotion: PromotionCampaign) => {
@@ -132,6 +134,7 @@ function PromotionBannerCard({
   promotion: PromotionCampaign;
   index: number;
 }) {
+  const t = useTranslations("home.promotions");
   const router = useRouter();
 
   const image = getPromotionImage(promotion);
@@ -180,7 +183,7 @@ function PromotionBannerCard({
         <div className="absolute bottom-4 right-4 h-[110px] w-[110px] overflow-hidden rounded-[24px] border border-white/20 bg-white/10 shadow-2xl transition group-hover:scale-105">
           <Image
             src={image}
-            alt={promotion.title || "Promotion"}
+            alt={promotion.title || t("specialPromotion")}
             fill
             className="object-cover"
             unoptimized
@@ -195,17 +198,17 @@ function PromotionBannerCard({
       <div className="relative z-10 flex min-h-[210px] max-w-[74%] flex-col">
         <div className="mb-4 flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-white/20">
           <Sparkles size={13} />
-          Active Deal
+          {t("activeDeal")}
         </div>
 
         <div className="mb-3 w-fit rounded-[18px] bg-white px-4 py-2 text-primary shadow-lg">
           <p className="text-[22px] font-black leading-none sm:text-[26px]">
-            {formatDiscount(promotion)}
+            {formatDiscount(promotion, t("specialOffer"))}
           </p>
         </div>
 
         <h3 className="line-clamp-2 text-[19px] font-bold leading-tight sm:text-[22px]">
-          {promotion.title || "Special promotion"}
+          {promotion.title || t("specialPromotion")}
         </h3>
 
         {promotion.description ? (
@@ -218,25 +221,25 @@ function PromotionBannerCard({
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium ring-1 ring-white/15">
               <Tag size={12} />
-              {getScopeText(promotion)}
+              {getScopeText(promotion, t)}
             </span>
 
             <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium ring-1 ring-white/15">
               <Store size={12} />
-              {promotion.branch?.name || "All Branches"}
+              {promotion.branch?.name || t("allBranches")}
             </span>
           </div>
 
           {(startsAt || expiresAt) && (
             <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium ring-1 ring-white/15">
               <CalendarDays size={12} />
-              {startsAt || "Now"} {expiresAt ? `- ${expiresAt}` : ""}
+              {startsAt || t("now")} {expiresAt ? `- ${expiresAt}` : ""}
             </span>
           )}
 
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/75">
-            {minOrder ? <span>Min order {minOrder}</span> : null}
-            {maxDiscount ? <span>Max discount {maxDiscount}</span> : null}
+            {minOrder ? <span>{t("minOrder", { amount: minOrder })}</span> : null}
+            {maxDiscount ? <span>{t("maxDiscount", { amount: maxDiscount })}</span> : null}
           </div>
         </div>
       </div>
@@ -245,6 +248,8 @@ function PromotionBannerCard({
 }
 
 export default function FoodCategorySection() {
+  const tCategories = useTranslations("home.categories");
+  const tPromotions = useTranslations("home.promotions");
   const router = useRouter();
   const { token, user, restaurantId: authRestaurantId } = useAuth();
   const restaurantId = resolveHomeRestaurantId(user, authRestaurantId);
@@ -269,7 +274,7 @@ export default function FoodCategorySection() {
     <section className="mx-auto max-w-[1400px] px-4 pt-[40px] sm:px-6 sm:pt-[80px]">
       <div className="mb-[30px] flex items-center justify-between sm:mb-[60px]">
         <h2 className="text-[24px] font-semibold text-[#212121] sm:text-[32px] lg:text-[42px]">
-          Categories
+          {tCategories("title")}
         </h2>
 
         <div className="flex items-center gap-3 sm:gap-[16.5px]">
@@ -278,7 +283,7 @@ export default function FoodCategorySection() {
             className="p-0 text-sm font-bold text-primary sm:text-lg"
             onClick={() => router.push("/items")}
           >
-            View All
+            {tCategories("viewAll")}
             <ChevronRight className="h-[16px] w-[10px]" strokeWidth={3} />
           </Button>
 
@@ -312,7 +317,7 @@ export default function FoodCategorySection() {
           ))}
         </div>
       ) : categories.length === 0 ? (
-        <p className="text-sm text-gray-400">No categories found</p>
+        <p className="text-sm text-gray-400">{tCategories("empty")}</p>
       ) : (
         <Carousel
           className="w-full"
@@ -361,7 +366,7 @@ export default function FoodCategorySection() {
           className="w-full rounded-full border border-primary/15 bg-primary/5 text-primary transition hover:bg-primary/10 sm:w-auto"
           onClick={() => router.push("/group-order")}
         >
-          Group Order
+          {tCategories("groupOrder")}
         </Button>
 
         <Button
@@ -369,17 +374,17 @@ export default function FoodCategorySection() {
           className="w-full sm:w-auto"
           onClick={() => router.push("/categories")}
         >
-          Order Now
+          {tCategories("orderNow")}
         </Button>
       </div>
 
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-primary">
-            Live Offers
+            {tPromotions("liveOffers")}
           </p>
           <h3 className="mt-1 text-2xl font-bold text-gray-900">
-            Deals picked for you
+            {tPromotions("dealsPickedForYou")}
           </h3>
         </div>
 
@@ -388,7 +393,7 @@ export default function FoodCategorySection() {
           className="p-0 text-sm font-semibold text-primary"
           onClick={() => router.push("/items")}
         >
-          Explore Menu
+          {tPromotions("exploreMenu")}
           <ChevronRight size={16} />
         </Button>
       </div>
@@ -412,12 +417,11 @@ export default function FoodCategorySection() {
           </div>
 
           <h3 className="mt-4 text-lg font-semibold text-gray-900">
-            No active promotions right now
+            {tPromotions("noActivePromotions")}
           </h3>
 
           <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
-            Explore the menu and check back later for fresh deals and exclusive
-            branch offers.
+            {tPromotions("noActivePromotionsDescription")}
           </p>
         </div>
       )}

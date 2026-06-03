@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { FaChevronDown, FaMapMarkerAlt } from "react-icons/fa";
+import { useTranslations } from "next-intl";
 import { useAuthContext } from "@/hooks/useAuth";
-import BranchSelectorModal from "./BranchSelectorModal";
+import { BranchSelectorModal } from "./BranchSelectorModal";
 
 type BranchSwitcherProps = {
   restaurantId?: string | number | null;
@@ -11,11 +12,12 @@ type BranchSwitcherProps = {
   className?: string;
 };
 
-export default function BranchSwitcher({
+export function BranchSwitcher({
   restaurantId,
   endpoint,
   className = "",
 }: BranchSwitcherProps) {
+  const t = useTranslations("branchSelector");
   const { user } = useAuthContext();
   const [open, setOpen] = useState(false);
 
@@ -23,11 +25,11 @@ export default function BranchSwitcher({
     return restaurantId || user?.restaurantId || user?.tenantId || null;
   }, [restaurantId, user]);
 
-  const branchName = user?.branch?.name || "Select Branch";
+  const branchName = user?.branch?.name || t("selectBranch");
   const branchArea =
     user?.branch?.address?.area ||
     user?.branch?.address?.city ||
-    "Change branch";
+    t("changeBranchShort");
 
   return (
     <>
@@ -54,8 +56,8 @@ export default function BranchSwitcher({
         onClose={() => setOpen(false)}
         restaurantId={resolvedRestaurantId}
         endpoint={endpoint}
-        badgeText="Switch Branch"
-        title="Change Branch"
+        badgeText={t("switchBranch")}
+        title={t("changeBranch")}
         description=""
       />
     </>

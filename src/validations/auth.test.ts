@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createLoginSchema,
+  defaultEnglishValidationMessages,
   forgotPasswordSchema,
   guestLoginSchema,
   loginSchema,
@@ -45,6 +47,19 @@ describe("auth validation schemas", () => {
 
   it("rejects invalid login email", () => {
     expect(loginSchema.safeParse({ ...validLogin, email: "not-an-email" }).success).toBe(false);
+  });
+
+  it("keeps English defaults while allowing translated schema factories", () => {
+    const translatedLoginSchema = createLoginSchema({
+      ...defaultEnglishValidationMessages,
+      emailRequired: "E-Mail ist erforderlich",
+    });
+
+    const defaultResult = loginSchema.safeParse({ ...validLogin, email: "" });
+    const translatedResult = translatedLoginSchema.safeParse({ ...validLogin, email: "" });
+
+    expect(defaultResult.error?.issues[0]?.message).toBe("Please enter your email");
+    expect(translatedResult.error?.issues[0]?.message).toBe("E-Mail ist erforderlich");
   });
 
   it("requires guest login names, phone, and restaurantId", () => {

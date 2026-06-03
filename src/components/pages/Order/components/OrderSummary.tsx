@@ -4,22 +4,25 @@ import Image from "next/image";
 import { Info, MessageCircle, TicketPercent } from "lucide-react";
 import Link from "next/link";
 import type { Order, OrderItem } from "@/services/orders";
+import { useTranslations } from "next-intl";
 
 export default function OrderSummary({
-  title = "Order Details",
+  title,
   order,
 }: {
   title?: string;
   order?: Order | null;
 }) {
+  const t = useTranslations("orders");
   const orderItems = order?.items || [];
+  const resolvedTitle = title ?? t("orderDetails");
 
   return (
     <div className="sticky top-10 space-y-[42.63px]">
       {/* ITEMS */}
       <section className="space-y-[20.37px]">
         <h2 className="text-[20px] font-medium text-gray-900">
-          {title}
+          {resolvedTitle}
         </h2>
 
         <div className="space-y-[19px]">
@@ -28,7 +31,7 @@ export default function OrderSummary({
               <div className="relative w-[76px] h-[76px] rounded-[12px] overflow-hidden">
                 <Image
                   src={item.menuItem?.imageUrl || "/placeholder.png"}
-                  alt={item.menuItemName || "item"}
+                  alt={item.menuItemName || t("itemFallback")}
                   fill
                   className="object-cover"
                 />
@@ -49,7 +52,7 @@ export default function OrderSummary({
                   </p>
 
                   <div className="text-sm text-gray-700">
-                    Qty: {item.quantity}
+                    {t("quantityShort")}: {item.quantity}
                   </div>
                 </div>
               </div>
@@ -61,18 +64,18 @@ export default function OrderSummary({
       {/* BILL */}
       <section className="space-y-[15px]">
         <h2 className="text-[18px] font-semibold text-gray-900">
-          Bill details
+          {t("billDetails")}
         </h2>
 
         <div className="space-y-4 text-gray-500 text-sm">
           <div className="flex justify-between">
-            <span>Item Total</span>
+            <span>{t("itemTotal")}</span>
             <span>${order?.subtotal}</span>
           </div>
 
           <div className="flex justify-between">
             <div className="flex items-center gap-1">
-              <span>Delivery Fee</span>
+              <span>{t("deliveryFee")}</span>
               <Info size={14} />
             </div>
             <span>${order?.deliveryFee}</span>
@@ -80,7 +83,7 @@ export default function OrderSummary({
 
           <div className="flex justify-between">
             <div className="flex items-center gap-1">
-              <span>Taxes</span>
+              <span>{t("taxes")}</span>
               <Info size={14} />
             </div>
             <span>${order?.taxAmount}</span>
@@ -90,18 +93,18 @@ export default function OrderSummary({
         {Number(order?.discountAmount || 0) > 0 && (
           <div className="bg-primary/20 text-primary p-3 rounded-md flex items-center gap-2 text-sm">
             <TicketPercent size={16} />
-            Discount Applied
+            {t("discountApplied")}
           </div>
         )}
 
         <div className="space-y-[10px] pt-[10px]">
           <div className="flex justify-between text-sm text-gray-500">
-            <span>Discount</span>
+            <span>{t("discount")}</span>
             <span>${order?.discountAmount}</span>
           </div>
 
           <div className="flex justify-between text-lg font-semibold text-gray-900">
-            <span>Total</span>
+            <span>{t("total")}</span>
             <span>${order?.totalAmount}</span>
           </div>
         </div>
@@ -118,7 +121,7 @@ export default function OrderSummary({
                  group-hover:opacity-100 group-hover:translate-x-0 
                  transition-all duration-300 shadow-md whitespace-nowrap"
     >
-      Chat about this order
+      {t("chatAboutOrder")}
     </span>
 
     {/* ICON BUTTON */}

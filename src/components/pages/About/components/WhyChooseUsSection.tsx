@@ -1,34 +1,34 @@
 "use client";
 
 import { MousePointerClick, Zap, ShieldCheck } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function WhyChooseUsSection() {
+  const t = useTranslations("about.whyChooseUs");
+
   const features = [
     {
-      title: "Easy to Order",
-      description:
-        "A seamless interface designed for speed and clarity.",
+      title: t("easyTitle"),
+      description: t("easyDescription"),
       icon: MousePointerClick,
     },
     {
-      title: "Fastest Delivery",
-      description:
-        "Our AI-powered routing ensures your food arrives piping hot.",
+      title: t("fastTitle"),
+      description: t("fastDescription"),
       icon: Zap,
     },
     {
-      title: "Best Quality",
-      description:
-        "We only partner with top-tier, hygiene-certified restaurants.",
+      title: t("qualityTitle"),
+      description: t("qualityDescription"),
       icon: ShieldCheck,
     },
   ];
 
   const stats = [
-    { value: "2M+", label: "Happy Customers" },
-    { value: "98%", label: "Satisfaction" },
-    { value: "20+", label: "Branches" },
-    { value: "100+", label: "Employees" },
+    { value: "2M+", label: t("happyCustomers") },
+    { value: "98%", label: t("satisfaction") },
+    { value: "20+", label: t("branches") },
+    { value: "100+", label: t("employees") },
   ];
 
   return (
@@ -37,7 +37,7 @@ export default function WhyChooseUsSection() {
       {/* TOP: WHY CHOOSE US */}
       <div className="py-25 md:py-20 text-center">
         <h2 className="text-2xl md:text-3xl font-semibold text-gray-900">
-          Why Choose Us
+          {t("title")}
         </h2>
 
         {/* underline */}

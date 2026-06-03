@@ -1,6 +1,18 @@
 import { z } from "zod";
 
-const optionalAvatarUrl = z
+export type ProfileValidationMessages = {
+  firstNameRequired: string;
+  lastNameRequired: string;
+  avatarUrlInvalid: string;
+};
+
+export const defaultEnglishProfileValidationMessages: ProfileValidationMessages = {
+  firstNameRequired: "First name is required",
+  lastNameRequired: "Last name is required",
+  avatarUrlInvalid: "Avatar must be a valid URL or relative path",
+};
+
+const createOptionalAvatarUrl = (message: string) => z
   .string()
   .trim()
   .refine((value) => {
@@ -13,18 +25,20 @@ const optionalAvatarUrl = z
     } catch {
       return false;
     }
-  }, "Avatar must be a valid URL or relative path");
+  }, message);
 
-export const profileSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required"),
-  lastName: z.string().trim().min(1, "Last name is required"),
+export const createProfileSchema = (messages: ProfileValidationMessages) => z.object({
+  firstName: z.string().trim().min(1, messages.firstNameRequired),
+  lastName: z.string().trim().min(1, messages.lastNameRequired),
   email: z.string().trim(),
   phone: z.string().trim(),
-  avatarUrl: optionalAvatarUrl,
+  avatarUrl: createOptionalAvatarUrl(messages.avatarUrlInvalid),
   bio: z.string().trim(),
   gender: z.string().trim(),
   country: z.string().trim(),
   language: z.string().trim(),
 });
+
+export const profileSchema = createProfileSchema(defaultEnglishProfileValidationMessages);
 
 export type ProfileFormValues = z.infer<typeof profileSchema>;

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Check, MapPin, Clock, Power } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { GroupOrderParticipant, GroupOrderSuccessData } from "@/types/group-order";
 
 type OrderSuccessProps = {
@@ -9,6 +10,7 @@ type OrderSuccessProps = {
 };
 
 const OrderSuccess = ({ data }: OrderSuccessProps) => {
+  const t = useTranslations("groupOrder.success");
   const order = data?.order;
   const session = data?.session;
 
@@ -25,11 +27,11 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
         </div>
       </div>
       <h1 className="text-3xl md:text-4xl font-semibold text-gray-900">
-        Success!
+        {t("title")}
       </h1>
 
       <p className="text-gray-500 mt-2 text-sm md:text-base">
-        Your group order has been placed successfully.
+        {t("description")}
       </p>
       <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg shadow-[0_12px_32px_rgba(26,28,28,0.06)] mt-12 p-6 md:p-8 overflow-hidden">
 
@@ -37,7 +39,7 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
         <div className="absolute top-0 right-0 opacity-60">
           <Image
             src="/group-order/abstract_accent.png"
-            alt="accent"
+            alt={t("accentAlt")}
             width={120}
             height={120}
           />
@@ -48,7 +50,7 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
           {/* LEFT SIDE */}
           <div>
             <p className="text-[11px] uppercase text-gray-500 tracking-wider font-semibold">
-              Total Paid
+              {t("totalPaid")}
             </p>
             <h2 className="text-2xl font-semibold text-orange-500 mt-1">
               ${total}
@@ -57,15 +59,15 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
             {/* ADDRESS */}
             <div className="mt-6">
               <p className="text-[11px] uppercase text-gray-500 tracking-wider font-semibold">
-                Delivery Address
+                {t("deliveryAddress")}
               </p>
 
               <div className="flex items-start gap-2 mt-2 text-sm text-gray-700">
                 <MapPin className="w-4 h-4 mt-0.5 text-gray-400" />
                 <span>
                   {session?.deliveryAddress
-                    ? "Saved address"
-                    : "Pickup from restaurant"}
+                    ? t("savedAddress")
+                    : t("pickupFromRestaurant")}
                 </span>
               </div>
             </div>
@@ -73,7 +75,7 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
             {/* TIME */}
             <div className="mt-6">
               <p className="text-[11px] uppercase text-gray-500 tracking-wider font-semibold">
-                Estimated Arrival
+                {t("estimatedArrival")}
               </p>
 
               <div className="flex items-start gap-2 mt-2 text-sm text-gray-700">
@@ -85,7 +87,7 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
                       : "—"}
                   </p>
                   <p className="text-xs text-gray-400">
-                    {order?.isScheduled ? "Scheduled Order" : "ASAP"}
+                    {order?.isScheduled ? t("scheduledOrder") : t("asap")}
                   </p>
                 </div>
               </div>
@@ -96,11 +98,11 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
           <div className="bg-[#F3F3F3] rounded-sm p-4">
             <div className="flex justify-between items-center mb-4">
               <p className="text-[11px] uppercase text-gray-500 tracking-wider font-semibold">
-                Notified Members
+                {t("notifiedMembers")}
               </p>
 
               <span className="text-[10px] bg-sky-100 text-sky-700 px-2 py-1 rounded-full font-medium">
-                ORDER TRACKING SHARED
+                {t("trackingShared")}
               </span>
             </div>
 
@@ -125,7 +127,7 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
                       {p?.user?.firstName} {p?.user?.lastName}
                     </p>
                     <p className="text-xs text-green-600">
-                      Active participant
+                      {t("activeParticipant")}
                     </p>
                   </div>
                 </div>
@@ -138,14 +140,14 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
       <div className="mt-10 flex gap-4 flex-col sm:flex-row">
         <button className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full font-medium shadow-md hover:opacity-90 transition">
           <Power className="w-4 h-4" />
-          Track Order
+          {t("trackOrder")}
         </button>
 
         <button
           onClick={() => (window.location.href = "/")}
           className="px-6 py-3 rounded-full border border-gray-300 text-gray-600 font-medium hover:bg-gray-100 transition"
         >
-          Back to Home
+          {t("backHome")}
         </button>
       </div>
     </section>

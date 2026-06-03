@@ -6,6 +6,7 @@ import useItems from "@/hooks/useItems";
 import { useAuth } from "@/hooks/useAuth";
 import { getStoredRestaurantId } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { ItemsCategory, MenuItem } from "@/components/pages/Items/types";
 import { mergeUniqueById, resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
 
@@ -51,6 +52,7 @@ export function ItemsListing({
   scrollTarget,
   onActiveCategoryChange,
 }: ItemsListingProps) {
+  const t = useTranslations("items.common");
   const { token, restaurantId: authRestaurantId, user } = useAuth();
   const { fetchMenuItemsPage } = useItems(token);
 
@@ -454,7 +456,7 @@ export function ItemsListing({
 
   const renderItemsGrid = ({
     categoryId,
-    emptyLabel = "No items found",
+    emptyLabel = t("noItems"),
   }: {
     categoryId: string;
     emptyLabel?: string;
@@ -465,7 +467,7 @@ export function ItemsListing({
       return (
         <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white text-sm text-gray-500">
           <Loader2 size={18} className="mr-2 animate-spin text-primary" />
-          Loading items...
+          {t("loadingItems")}
         </div>
       );
     }
@@ -497,10 +499,10 @@ export function ItemsListing({
               {state.loadingMore ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Loading more...
+                  {t("loadingMore")}
                 </>
               ) : (
-                "Load More Items"
+                t("loadMoreItems")
               )}
             </button>
           </div>
@@ -513,15 +515,15 @@ export function ItemsListing({
     return (
       <div className="min-w-0 space-y-10">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900">Full Menu</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{t("fullMenu")}</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Items of all categories are shown.
+            {t("menuDescription")}
           </p>
         </div>
 
         {categories.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
-            No categories found
+            {t("noCategories")}
           </div>
         ) : (
           categories.map((category) => {
@@ -542,7 +544,7 @@ export function ItemsListing({
                 <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900">
-                      {category?.name || "Category"}
+                      {category?.name || t("category")}
                     </h2>
 
                     {category?.description ? (
@@ -553,14 +555,13 @@ export function ItemsListing({
                   </div>
 
                   <span className="w-fit rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-                    {state.items.length} item
-                    {state.items.length === 1 ? "" : "s"}
+                    {t("itemCount", { count: state.items.length })}
                   </span>
                 </div>
 
                 {renderItemsGrid({
                   categoryId: id,
-                  emptyLabel: "No items found in this category",
+                  emptyLabel: t("noItemsInCategory"),
                 })}
               </section>
             );
@@ -574,7 +575,7 @@ export function ItemsListing({
     <div>
       <div className="mb-6 mt-1">
         <h2 className="text-xl font-semibold text-gray-900">
-          {activeCategory?.name || "Menu"}
+          {activeCategory?.name || t("menu")}
         </h2>
 
         {activeCategory?.description ? (
@@ -586,12 +587,12 @@ export function ItemsListing({
 
       {!activeCategoryId ? (
         <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
-          Select a category to view items
+          {t("selectCategory")}
         </div>
       ) : (
         renderItemsGrid({
           categoryId: activeCategoryId,
-          emptyLabel: "No items found",
+          emptyLabel: t("noItems"),
         })
       )}
     </div>

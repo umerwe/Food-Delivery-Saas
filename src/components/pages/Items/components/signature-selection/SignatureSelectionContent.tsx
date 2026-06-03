@@ -15,12 +15,13 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { useCart } from "@/hooks/useCart";
 import useMenu from "@/hooks/useMenu";
 import { useAuth } from "@/hooks/useAuth";
 import { getSignatureMenuViewMode, setSignatureMenuViewMode } from "@/lib/view-preferences";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import AsyncSelect from "@/components/ui/AsyncSelect";
+import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuRecord, MenuVariation, Modifier, ModifierGroup, ModifierLink, ProductCardData, RawModifierLink, SelectedModifier, SelectedModifiersMap, SplitPizzaSelection, VariationPriceOverride } from "./types";
 import { normalizeArray, sortBySortOrder, toNumber } from "./signature-selection-utils";
 import { getSplitPizzaPricingVariation } from "@/components/pages/Items/utils/restaurant-card-utils";
@@ -466,6 +467,10 @@ export function SignatureSelectionContent({
   branchId,
   onCartRefresh,
 }: SignatureSelectionContentProps) {
+  const tCommon = useTranslations("items.common");
+  const tProduct = useTranslations("items.productCard");
+  const tSignature = useTranslations("items.signature");
+  const tErrors = useTranslations("errors");
   const { token } = useAuth();
   const { fetchSignatureMenus, fetchSignatureSplitPizzaItems } = useMenu(token);
   const { addCustomerCartItem, clearCustomerCart } = useCart(token);
@@ -577,7 +582,7 @@ export function SignatureSelectionContent({
         setActiveOnePageMenuId("");
       }
     } catch (error) {
-      toast.error("Failed to fetch menus");
+      toast.error(tSignature("failedFetchMenus"));
     } finally {
       setLoadingMenus(false);
     }
@@ -1070,7 +1075,7 @@ export function SignatureSelectionContent({
         sortOrder: 999,
         modifierGroup: {
           id: `standalone-modifiers-${item.id}`,
-          name: "Add-ons",
+          name: tProduct("addons"),
           description: "Available add-ons for this item.",
           minSelect: 0,
           maxSelect: undefined,
@@ -1456,8 +1461,8 @@ export function SignatureSelectionContent({
       return `Max ${maxSelect}`;
     }
 
-    return "Optional";
-  }, [addonSelectionRules]);
+    return tProduct("optional");
+  }, [addonSelectionRules, tProduct]);
 
   const quantityLabel = useMemo(() => {
     const { minQuantity, maxQuantity } = itemQuantityRules;
@@ -1559,12 +1564,12 @@ export function SignatureSelectionContent({
     modifiersMap?: SelectedModifiersMap
   ) => {
     if (!customerId) {
-      toast.error("Customer not found");
+      toast.error(tProduct("customerNotFound"));
       return;
     }
 
     if (!branchId) {
-      toast.error("Please select a branch first");
+      toast.error(tProduct("selectBranchFirst"));
       return;
     }
 
@@ -1575,7 +1580,7 @@ export function SignatureSelectionContent({
     }
 
     if (splitPizzaEnabled && !splitPizzaItem?.id) {
-      toast.error("Please select the other pizza half");
+      toast.error(tProduct("selectOtherPizzaHalf"));
       return;
     }
 
@@ -1616,13 +1621,13 @@ export function SignatureSelectionContent({
       let res = await addCartItem();
 
       if (isBranchCartConflictResponse(res)) {
-        toast.info("Your cart had items from another branch. Clearing cart...");
+        toast.info(tSignature("cartBranchConflict"));
 
         const clearCartRes = await clearCustomerCart({ customerId });
 
         if (!clearCartRes || clearCartRes.error) {
           toast.error(
-            getApiErrorMessage(clearCartRes, "Failed to clear cart")
+            getApiErrorMessage(clearCartRes, tSignature("failedClearCart"))
           );
           return;
         }
@@ -1631,15 +1636,15 @@ export function SignatureSelectionContent({
       }
 
       if (!res || res.error) {
-        toast.error(getApiErrorMessage(res, "Failed to add to cart"));
+        toast.error(getApiErrorMessage(res, tProduct("failedAddToCart")));
         return;
       }
 
-      toast.success("Added to cart");
+      toast.success(tProduct("addedToCart"));
       setModalOpen(false);
       onCartRefresh?.();
     } catch (error) {
-      toast.error("Something went wrong");
+      toast.error(tErrors("somethingWentWrong"));
     } finally {
       setAddingId(null);
     }
@@ -1706,14 +1711,12 @@ export function SignatureSelectionContent({
       const current = prev[ADDONS_GROUP_ID] || [];
       const isSelected = current.some((addon) => addon.id === modifier.id);
       const { minSelect, maxSelect } = addonSelectionRules;
-      const itemName = selectedItem?.name || "This item";
+      const itemName = selectedItem?.name || tProduct("thisItem");
 
       if (isSelected) {
         if (minSelect > 0 && current.length <= minSelect) {
           toast.error(
-            `${itemName} requires at least ${minSelect} add-on${
-              minSelect === 1 ? "" : "s"
-            }`
+            tProduct("minimumAddons", { itemName, count: minSelect })
           );
           return prev;
         }
@@ -1730,9 +1733,7 @@ export function SignatureSelectionContent({
 
       if (maxSelect && current.length >= maxSelect) {
         toast.error(
-          `${itemName} allows at most ${maxSelect} add-on${
-            maxSelect === 1 ? "" : "s"
-          }`
+          tProduct("maximumAddons", { itemName, count: maxSelect })
         );
         return prev;
       }
@@ -1765,22 +1766,18 @@ export function SignatureSelectionContent({
     );
     const rawMaxSelect = toNumber(item?.maxSelect, 0);
     const maxSelect = rawMaxSelect > 0 ? rawMaxSelect : undefined;
-    const itemName = item?.name || "This item";
+    const itemName = item?.name || tProduct("thisItem");
 
     if (minSelect > 0 && selectedCount < minSelect) {
       toast.error(
-        `${itemName} requires at least ${minSelect} add-on${
-          minSelect === 1 ? "" : "s"
-        }`
+        tProduct("minimumAddons", { itemName, count: minSelect })
       );
       return false;
     }
 
     if (maxSelect && selectedCount > maxSelect) {
       toast.error(
-        `${itemName} allows at most ${maxSelect} add-on${
-          maxSelect === 1 ? "" : "s"
-        }`
+        tProduct("maximumAddons", { itemName, count: maxSelect })
       );
       return false;
     }
@@ -1798,13 +1795,13 @@ export function SignatureSelectionContent({
       <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <p className="font-medium text-gray-900">Add-ons</p>
+            <p className="font-medium text-gray-900">{tProduct("addons")}</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
                 {addonSelectionLabel}
               </span>
               <span className="text-xs text-gray-500">
-                Choose from available add-ons
+                {tProduct("addonsDescription")}
               </span>
             </div>
           </div>
@@ -1938,7 +1935,7 @@ export function SignatureSelectionContent({
                     : `Select up to ${maxSelect}`
                   : minSelect > 0
                   ? `Select at least ${minSelect}`
-                  : "Optional"}
+                  : tProduct("optional")}
               </p>
             </div>
 
@@ -2041,7 +2038,7 @@ export function SignatureSelectionContent({
               type="button"
               onClick={() => openInfoModal(product.raw)}
               className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm backdrop-blur transition hover:bg-primary hover:text-white"
-              title="View ingredients and allergens"
+              title={tProduct("viewIngredients")}
             >
               <Eye size={16} />
             </button>
@@ -2072,7 +2069,7 @@ export function SignatureSelectionContent({
             {addingId === product.id ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              "+ Add to Cart"
+              tSignature("addToCartWithPlus")
             )}
           </button>
         </div>
@@ -2087,11 +2084,10 @@ export function SignatureSelectionContent({
           <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <h1 className="text-[21px] font-semibold leading-tight tracking-[-0.02em] text-[#1f1f1f] sm:text-[32px]">
-                Our Signature Selection
+                {tSignature("title")}
               </h1>
               <p className="mt-2 max-w-[560px] text-[13px] leading-6 text-[#8a8a8a] sm:text-sm">
-                Every dish is a curated masterpiece, crafted with locally sourced
-                ingredients and a passion for culinary excellence.
+                {tSignature("description")}
               </p>
             </div>
 
@@ -2183,7 +2179,7 @@ export function SignatureSelectionContent({
             </div>
           ) : menus.length === 0 ? (
             <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fafafa] p-8 text-center">
-              <p className="text-sm text-[#777]">No menus found.</p>
+              <p className="text-sm text-[#777]">{tSignature("noMenus")}</p>
             </div>
           ) : viewMode === "onePage" ? (
             <div className="space-y-10">
@@ -2208,21 +2204,20 @@ export function SignatureSelectionContent({
                         </p>
                       ) : (
                         <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
-                          Explore available items from this menu.
+                          {tSignature("exploreMenuItems")}
                         </p>
                       )}
                     </div>
 
                     <span className="w-fit rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-                      {products.length} item
-                      {products.length === 1 ? "" : "s"}
+                      {tCommon("itemCount", { count: products.length })}
                     </span>
                   </div>
 
                   {products.length === 0 ? (
                     <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fafafa] p-8 text-center">
                       <p className="text-sm text-[#777]">
-                        No menu items found in this menu.
+                        {tSignature("noMenuItemsInMenu")}
                       </p>
                     </div>
                   ) : (
@@ -2235,7 +2230,7 @@ export function SignatureSelectionContent({
             </div>
           ) : products.length === 0 ? (
             <div className="rounded-[20px] border border-dashed border-black/10 bg-[#fafafa] p-8 text-center">
-              <p className="text-sm text-[#777]">No menu items found.</p>
+              <p className="text-sm text-[#777]">{tSignature("noMenuItems")}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
@@ -2270,7 +2265,7 @@ export function SignatureSelectionContent({
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">
-                  Product Information
+                  {tProduct("viewIngredients")}
                 </h2>
                 <p className="mt-1 text-sm text-gray-500">{infoItem.name}</p>
               </div>
@@ -2319,14 +2314,14 @@ export function SignatureSelectionContent({
                     {selectedItem.name}
                   </h2>
                   <p className="mt-1 text-sm text-gray-500">
-                    Select variation, add-ons, and quantity
+                    {tSignature("selectOptions")}
                   </p>
                 </div>
               </div>
 
               {getItemVariations(selectedItem).length > 0 ? (
                 <div className="mb-5">
-                  <p className="mb-2 font-medium text-gray-900">Size</p>
+                  <p className="mb-2 font-medium text-gray-900">{tProduct("size")}</p>
 
                   <div className="grid grid-cols-1 gap-3">
                     {getItemVariations(selectedItem).map((variation) => (
@@ -2412,7 +2407,7 @@ export function SignatureSelectionContent({
                         <AsyncSelect
                           value={splitPizzaItem}
                           onChange={handleSplitPizzaItemChange}
-                          placeholder="Select split-pizza item"
+                          placeholder={tProduct("selectSplitPizzaItem")}
                           fetchOptions={fetchPizzaItems}
                           labelKey="name"
                           valueKey="id"
@@ -2422,7 +2417,7 @@ export function SignatureSelectionContent({
                       {splitPizzaItem ? (
                         <div className="rounded-xl bg-white p-3">
                           <p className="text-sm font-semibold text-gray-900">
-                            Selected second half
+                            {tProduct("selectedSecondHalf")}
                           </p>
 
                           <div className="mt-2 flex items-start justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
@@ -2462,13 +2457,13 @@ export function SignatureSelectionContent({
 
               <div className="mb-5">
                 <p className="mb-2 font-medium text-gray-900">
-                  Special Instructions
+                  {tProduct("specialInstructions")}
                 </p>
 
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add cooking notes, e.g. no onions, extra spicy..."
+                  placeholder={tProduct("notesPlaceholder")}
                   className="h-24 w-full rounded-xl bg-gray-100 p-3 text-sm outline-none"
                 />
               </div>
@@ -2544,7 +2539,7 @@ export function SignatureSelectionContent({
                 {addingId === selectedItem.id ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : null}
-                {addingId === selectedItem.id ? "Processing..." : "Add to Cart"}
+                {addingId === selectedItem.id ? tProduct("processing") : tProduct("addToCart")}
               </button>
             </>
           ) : null}

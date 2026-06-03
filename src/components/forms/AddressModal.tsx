@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, MapPin, Navigation, X } from "lucide-react";
@@ -18,12 +18,13 @@ import { toast } from "sonner";
 import useCheckout from "@/hooks/useCheckout";
 import { reverseGeocode } from "@/services/geocoding";
 import { useAuth } from "@/hooks/useAuth";
-import { checkoutAddressSchema, type CheckoutAddressValues } from "@/validations/checkout";
+import { createCheckoutAddressSchema, type CheckoutAddressValues } from "@/validations/checkout";
+import { useTranslations } from "next-intl";
 
 type AddressModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (address?: { id?: string | number }) => void;
   editData?: (Partial<CheckoutAddressValues> & { id?: string | number }) | null;
 };
 
@@ -37,14 +38,49 @@ const initialForm: CheckoutAddressValues = {
   lng: "",
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getSavedAddress = (value: unknown): { id?: string | number } | undefined => {
+  if (isRecord(value) && isRecord(value.data)) {
+    return {
+      id:
+        typeof value.data.id === "string" || typeof value.data.id === "number"
+          ? value.data.id
+          : undefined,
+    };
+  }
+
+  if (isRecord(value)) {
+    return {
+      id: typeof value.id === "string" || typeof value.id === "number" ? value.id : undefined,
+    };
+  }
+
+  return undefined;
+};
+
 export default function AddressModal({
   open,
   onOpenChange,
   onSuccess,
   editData,
 }: AddressModalProps) {
+  const t = useTranslations("addresses");
+  const commonT = useTranslations("common");
+  const errorT = useTranslations("errors");
+  const validationT = useTranslations("validation");
   const { token } = useAuth();
   const { post, patch } = useCheckout(token);
+  const checkoutAddressSchema = useMemo(
+    () =>
+      createCheckoutAddressSchema({
+        streetRequired: validationT("streetRequired"),
+        cityRequired: validationT("cityRequired"),
+        countryRequired: validationT("countryRequired"),
+      }),
+    [validationT]
+  );
 
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -73,7 +109,7 @@ export default function AddressModal({
 
   const handleGetCurrentLocation = async () => {
     if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported in this browser");
+      toast.error(t("geolocationUnsupported"));
       return;
     }
 
@@ -99,7 +135,7 @@ export default function AddressModal({
       const data = await reverseGeocode(position.coords.latitude, position.coords.longitude);
 
       if (!data.ok) {
-        toast.success("Location fetched. Please complete address details manually.");
+        toast.success(t("locationFetchedManual"));
         return;
       }
 
@@ -131,19 +167,19 @@ export default function AddressModal({
       setValue("lat", lat);
       setValue("lng", lng);
 
-      toast.success("Current location fetched successfully");
+      toast.success(t("locationFetched"));
     } catch (error) {
 
       const geolocationError = error instanceof GeolocationPositionError ? error : null;
 
       if (geolocationError?.code === 1) {
-        toast.error("Location permission denied");
+        toast.error(t("locationPermissionDenied"));
       } else if (geolocationError?.code === 2) {
-        toast.error("Unable to detect your location");
+        toast.error(t("unableDetectLocation"));
       } else if (geolocationError?.code === 3) {
-        toast.error("Location request timed out");
+        toast.error(t("locationTimedOut"));
       } else {
-        toast.error("Failed to get current location");
+        toast.error(t("failedGetLocation"));
       }
     } finally {
       setLocating(false);
@@ -173,11 +209,11 @@ export default function AddressModal({
         throw new Error(res.error);
       }
 
-      toast.success(editData ? "Address updated" : "Address added");
-      onSuccess?.();
+      toast.success(editData ? t("addressUpdated") : t("addressAdded"));
+      onSuccess?.(getSavedAddress(res));
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      toast.error(err instanceof Error ? err.message : errorT("somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -191,12 +227,12 @@ export default function AddressModal({
         <div className="px-5 py-5 md:px-8 md:py-8">
           <DialogHeader className="space-y-1 pr-8">
             <DialogTitle className="text-[28px] font-bold leading-tight text-[#171717]">
-              {editData ? "Edit Address" : "Add New Address"}
+              {editData ? t("editAddress") : t("addNewAddress")}
             </DialogTitle>
             <DialogDescription className="text-[13px] text-[#7A7A7A]">
               {editData
-                ? "Update your delivery destination details."
-                : "Create a new delivery destination for your culinary journeys."}
+                ? t("editDescription")
+                : t("addDescription")}
             </DialogDescription>
           </DialogHeader>
 
@@ -204,7 +240,7 @@ export default function AddressModal({
             type="button"
             onClick={() => onOpenChange(false)}
             className="absolute right-5 top-5 rounded-full p-2 text-[#8C8C8C] transition hover:bg-[#F5F5F5] hover:text-black"
-            aria-label="Close modal"
+            aria-label={t("closeModal")}
           >
             <X size={18} />
           </button>
@@ -213,10 +249,10 @@ export default function AddressModal({
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className={LABEL_TEXT_CLASS}>
-                  Quick fill
+                  {t("quickFill")}
                 </p>
                 <p className="mt-1 text-[13px] text-[#8A8A8A]">
-                  Use your browser location to auto-fill the address.
+                  {t("quickFillDescription")}
                 </p>
               </div>
 
@@ -229,12 +265,12 @@ export default function AddressModal({
                 {locating ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Getting location...
+                    {t("gettingLocation")}
                   </>
                 ) : (
                   <>
                     <Navigation className="mr-2 h-4 w-4" />
-                    Get Current Location
+                    {t("getCurrentLocation")}
                   </>
                 )}
               </Button>
@@ -245,12 +281,12 @@ export default function AddressModal({
             {/* STREET */}
             <div className="space-y-2">
               <label className={LABEL_TEXT_CLASS}>
-                Street Address
+                {t("streetAddress")}
               </label>
               <div className="relative">
                 <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A3A3A3]" />
                 <Input
-                  placeholder="123 Gastronomy Lane"
+                  placeholder={t("streetPlaceholder")}
                   {...register("street")}
                   className="h-[56px] rounded-[16px] border-0 bg-[#F6F6F6] pl-11 pr-4 text-[15px] shadow-none focus-visible:ring-1 focus-visible:ring-[#D91F26]"
                 />
@@ -260,10 +296,10 @@ export default function AddressModal({
             {/* AREA */}
             <div className="space-y-2">
               <label className={LABEL_TEXT_CLASS}>
-                Area
+                {t("area")}
               </label>
               <Input
-                placeholder="Apartment, suite, unit, area"
+                placeholder={t("areaPlaceholder")}
                 {...register("area")}
                 className={INPUT_BASE_CLASS}
               />
@@ -273,10 +309,10 @@ export default function AddressModal({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.4fr_1fr]">
               <div className="space-y-2">
                 <label className={LABEL_TEXT_CLASS}>
-                  City
+                  {t("city")}
                 </label>
                 <Input
-                  placeholder="New York"
+                  placeholder={t("cityPlaceholder")}
                   {...register("city")}
                   className={INPUT_BASE_CLASS}
                 />
@@ -284,10 +320,10 @@ export default function AddressModal({
 
               <div className="space-y-2">
                 <label className={LABEL_TEXT_CLASS}>
-                  State
+                  {t("state")}
                 </label>
                 <Input
-                  placeholder="NY"
+                  placeholder={t("statePlaceholder")}
                   {...register("state")}
                   className={INPUT_BASE_CLASS}
                 />
@@ -297,10 +333,10 @@ export default function AddressModal({
             {/* COUNTRY */}
             <div className="space-y-2">
               <label className={LABEL_TEXT_CLASS}>
-                Country
+                {t("country")}
               </label>
               <Input
-                placeholder="United States"
+                placeholder={t("countryPlaceholder")}
                 {...register("country")}
                 className={INPUT_BASE_CLASS}
               />
@@ -310,10 +346,10 @@ export default function AddressModal({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className={LABEL_TEXT_CLASS}>
-                  Latitude
+                  {t("latitude")}
                 </label>
                 <Input
-                  placeholder="Latitude"
+                  placeholder={t("latitude")}
                   {...register("lat")}
                   className={INPUT_BASE_CLASS}
                 />
@@ -321,10 +357,10 @@ export default function AddressModal({
 
               <div className="space-y-2">
                 <label className={LABEL_TEXT_CLASS}>
-                  Longitude
+                  {t("longitude")}
                 </label>
                 <Input
-                  placeholder="Longitude"
+                  placeholder={t("longitude")}
                   {...register("lng")}
                   className={INPUT_BASE_CLASS}
                 />
@@ -338,7 +374,7 @@ export default function AddressModal({
                 onClick={() => onOpenChange(false)}
                 className="h-[52px] rounded-full px-6 text-[#4B4B4B] hover:bg-[#F4F4F4]"
               >
-                Cancel
+                {commonT("cancel")}
               </Button>
 
               <Button
@@ -350,12 +386,12 @@ export default function AddressModal({
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    {t("saving")}
                   </>
                 ) : editData ? (
-                  "Update Address"
+                  t("updateAddress")
                 ) : (
-                  "Save Address"
+                  t("saveAddress")
                 )}
               </Button>
             </div>

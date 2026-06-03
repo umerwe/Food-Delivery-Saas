@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useAuthContext } from "@/hooks/useAuth";
-import BranchSelectorModal from "./BranchSelectorModal";
+import { BranchSelectorModal } from "./BranchSelectorModal";
 import { Branch } from "@/types/branch-selector";
 
 type RequiredBranchSelectionModalProps = {
@@ -11,11 +12,12 @@ type RequiredBranchSelectionModalProps = {
   onSelected?: (branch: Branch) => void;
 };
 
-export default function RequiredBranchSelectionModal({
+export function RequiredBranchSelectionModal({
   restaurantId,
   endpoint,
   onSelected,
 }: RequiredBranchSelectionModalProps) {
+  const t = useTranslations("branchSelector");
   const { token, user } = useAuthContext();
   const [open, setOpen] = useState(false);
   const [dismissedEmptyState, setDismissedEmptyState] = useState(false);
@@ -65,8 +67,8 @@ export default function RequiredBranchSelectionModal({
       restaurantId={resolvedRestaurantId}
       endpoint={endpoint}
       forceSelection
-      badgeText="Branch Required"
-      title="Choose Your Branch"
+      badgeText={t("branchRequired")}
+      title={t("chooseYourBranch")}
       description=""
       onSelected={handleSelected}
     />

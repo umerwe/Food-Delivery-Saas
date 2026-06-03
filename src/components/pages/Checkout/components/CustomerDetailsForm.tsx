@@ -1,4 +1,5 @@
 import { SECTION_TITLE_CLASS } from '@/components/common/common-classes'
+import { useTranslations } from "next-intl"
 
 interface Props {
   customer: {
@@ -14,10 +15,12 @@ interface Props {
 }
 
 const CustomerDetailsForm = ({ customer, setCustomer }: Props) => {
+  const t = useTranslations("checkout")
+
   return (
     <section className="space-y-[36px] -mt-[20px]">
       <h2 className={`${SECTION_TITLE_CLASS} pt-[8px] border-b-2 border-gray-300`}>
-        Customer Details
+        {t("customerDetails")}
       </h2>
 
       <div className="space-y-[36px]">
@@ -25,7 +28,7 @@ const CustomerDetailsForm = ({ customer, setCustomer }: Props) => {
         {/* Name */}
        <div className="space-y-[16px]">
   <label className="text-md font-medium text-gray-900">
-    Name
+    {t("name")}
   </label>
 
   <div className="h-[55px] flex items-center px-4 bg-gray-50 border border-gray-200 rounded-md text-gray-900 mt-3">
@@ -36,7 +39,7 @@ const CustomerDetailsForm = ({ customer, setCustomer }: Props) => {
         {/* Contact */}
      <div className="space-y-[16px]">
   <label className="text-md font-medium text-gray-900">
-    Contact
+    {t("contact")}
   </label>
 
   <div className="h-[55px] flex items-center px-4 bg-gray-50 border border-gray-200 rounded-md text-gray-900 mt-3">
@@ -46,7 +49,7 @@ const CustomerDetailsForm = ({ customer, setCustomer }: Props) => {
         {/* Email */}
       <div className="space-y-[16px]">
   <label className="text-md font-medium text-gray-900">
-    Email
+    {t("email")}
   </label>
 
   <div className="h-[55px] flex items-center px-4 bg-gray-50 border border-gray-200 rounded-md text-gray-700 mt-3">
@@ -55,7 +58,7 @@ const CustomerDetailsForm = ({ customer, setCustomer }: Props) => {
 </div>
 
 <p className="text-sm text-gray-500 mt-2">
-  These details are automatically filled from your account.
+  {t("customerDetailsAutoFilled")}
 </p>
       </div>
     </section>

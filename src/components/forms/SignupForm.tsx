@@ -3,11 +3,12 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { FaFacebook } from "react-icons/fa"
 import { FcGoogle } from "react-icons/fc"
 import { toast } from "sonner"
+import { useTranslations } from "next-intl"
 
 import { MUTED_TEXT_CLASS } from "@/components/common/common-classes"
 import { Button } from "@/components/ui/button"
@@ -18,11 +19,36 @@ import { clearSignupAccessToken, getSignupAccessToken, setSignupAccessToken } fr
 import { roboto } from "@/lib/fonts"
 import { signupCustomer, verifySignupOtp } from "@/services/auth"
 import {
-  signupSchema,
+  createSignupSchema,
+  type AuthValidationMessages,
   type SignupFormValues,
 } from "@/validations/auth"
 
-export default function SignUpForm() {
+const useAuthValidationMessages = (): AuthValidationMessages => {
+  const t = useTranslations("validation")
+
+  return useMemo(
+    () => ({
+      emailRequired: t("emailRequired"),
+      emailInvalid: t("emailInvalid"),
+      passwordRequired: t("passwordRequired"),
+      restaurantIdRequired: t("restaurantIdRequired"),
+      firstNameRequired: t("firstNameRequired"),
+      lastNameRequired: t("lastNameRequired"),
+      phoneRequired: t("phoneRequired"),
+      confirmPasswordRequired: t("confirmPasswordRequired"),
+      acceptTermsRequired: t("acceptTermsRequired"),
+      passwordsDoNotMatch: t("passwordsDoNotMatch"),
+      otpRequired: t("otpRequired"),
+      newPasswordRequired: t("newPasswordRequired"),
+      restaurantIdMissing: t("restaurantIdMissing"),
+    }),
+    [t]
+  )
+}
+
+export function SignUpForm() {
+  const t = useTranslations("auth")
   const router = useRouter()
 
   const [isLoading, setIsLoading] = useState(false)
@@ -30,9 +56,14 @@ export default function SignUpForm() {
   const [accessToken, setAccessToken] = useState("")
   const [otp, setOtp] = useState("")
   const [showOtpField, setShowOtpField] = useState(false)
+  const validationMessages = useAuthValidationMessages()
+  const translatedSignupSchema = useMemo(
+    () => createSignupSchema(validationMessages),
+    [validationMessages]
+  )
 
   const form = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
+    resolver: zodResolver(translatedSignupSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -72,7 +103,7 @@ export default function SignUpForm() {
       setAccessToken(token)
       setSignupAccessToken(token)
 
-      toast.success("Account created! Please verify your email")
+      toast.success(t("accountCreatedVerifyEmail"))
 
       /* ===== SWITCH TO OTP MODE ===== */
 
@@ -93,12 +124,12 @@ export default function SignUpForm() {
     const token = accessToken || getSignupAccessToken()
 
     if (!otp) {
-      toast.error("Please enter OTP")
+      toast.error(t("pleaseEnterOtp"))
       return
     }
 
     if (!token) {
-      toast.error("Missing access token")
+      toast.error(t("missingAccessToken"))
       return
     }
 
@@ -109,7 +140,7 @@ export default function SignUpForm() {
         otp: otp,
       }, token)
 
-      toast.success("Email verified successfully!")
+      toast.success(t("emailVerified"))
 
       clearSignupAccessToken()
 
@@ -118,7 +149,7 @@ export default function SignUpForm() {
       }, 1200)
 
     } catch (error) {
-      toast.error(getAuthErrorMessage(error, "Verification failed"))
+      toast.error(getAuthErrorMessage(error, t("verificationFailed")))
     } finally {
       setIsVerifying(false)
     }
@@ -130,13 +161,13 @@ export default function SignUpForm() {
 
       <div className="space-y-1">
         <h1 className="text-headline-sm font-bold font-roboto text-primary">
-          {showOtpField ? "Verify Email" : "Sign Up"}
+          {showOtpField ? t("verifyEmail") : t("signUp")}
         </h1>
 
         <p className={MUTED_TEXT_CLASS}>
           {showOtpField
-            ? "Enter the OTP sent to your email"
-            : "Please, fill in this form to sign up"}
+            ? t("verifyEmailDescription")
+            : t("signupDescription")}
         </p>
       </div>
 
@@ -148,7 +179,7 @@ export default function SignUpForm() {
           <Input
             id="otp"
             type="text"
-            placeholder="Enter OTP"
+            placeholder={t("enterOtp")}
             value={otp}
             onChange={(e) => setOtp(e.target.value)}
             required
@@ -159,7 +190,7 @@ export default function SignUpForm() {
             disabled={isVerifying}
             className="w-full h-[50px] text-lg font-semibold bg-primary hover:bg-primary/90 text-white rounded-base"
           >
-            {isVerifying ? "Verifying..." : "Verify Email"}
+            {isVerifying ? t("verifying") : t("verifyEmail")}
           </Button>
 
         </form>
@@ -173,13 +204,13 @@ export default function SignUpForm() {
         <div className="grid grid-cols-2 gap-4">
           <Input
             id="firstName"
-            placeholder="First name"
+            placeholder={t("firstName")}
             required
             {...form.register("firstName")}
           />
           <Input
             id="lastName"
-            placeholder="Last name"
+            placeholder={t("lastName")}
             required
             {...form.register("lastName")}
           />
@@ -189,7 +220,7 @@ export default function SignUpForm() {
         <Input
           id="email"
           type="email"
-          placeholder="Email"
+          placeholder={t("email")}
           required
           {...form.register("email")}
         />
@@ -197,14 +228,14 @@ export default function SignUpForm() {
         {/* Phone */}
         <Input
           id="phone"
-          placeholder="Phone"
+          placeholder={t("phone")}
           {...form.register("phone")}
         />
 
         {/* Restaurant */}
         <Input
           id="restaurantId"
-          placeholder="Restaurant ID"
+          placeholder={t("restaurantIdUpper")}
           required
           {...form.register("restaurantId")}
         />
@@ -213,7 +244,7 @@ export default function SignUpForm() {
         <Input
           id="password"
           type="password"
-          placeholder="Password"
+          placeholder={t("password")}
           required
           {...form.register("password")}
         />
@@ -222,7 +253,7 @@ export default function SignUpForm() {
         <Input
           id="confirmPassword"
           type="password"
-          placeholder="Confirm Password"
+          placeholder={t("confirmPassword")}
           required
           {...form.register("confirmPassword")}
         />
@@ -237,10 +268,10 @@ export default function SignUpForm() {
             }
           />
           <label className="text-sm text-gray-500">
-            I accept the{" "}
-            <Link href="#" className="hover:underline">Terms</Link>
-            {" & "}
-            <Link href="#" className="hover:underline">Privacy Policy</Link>
+            {t("acceptTermsPrefix")}{" "}
+            <Link href="#" className="hover:underline">{t("terms")}</Link>
+            {` ${t("and")} `}
+            <Link href="#" className="hover:underline">{t("privacyPolicy")}</Link>
           </label>
         </div>
 
@@ -250,7 +281,7 @@ export default function SignUpForm() {
           disabled={isLoading}
           className="w-full h-[50px] text-lg font-semibold bg-primary hover:bg-primary/90 text-white rounded-base"
         >
-          {isLoading ? "Signing up..." : "Sign Up"}
+          {isLoading ? t("signingUp") : t("signUp")}
         </Button>
 
       </form>
@@ -266,7 +297,7 @@ export default function SignUpForm() {
           >
             <FaFacebook className="w-[23px] h-[23px] mr-[15px]" />
             <span className={`${roboto.className} font-medium text-xl`}>
-              SignIn with Facebook
+              {t("signInWithFacebook")}
             </span>
           </Link>
 
@@ -276,7 +307,7 @@ export default function SignUpForm() {
           >
             <FcGoogle className="w-[24px] h-[24px] mr-[15px]" />
             <p className={`${roboto.className} font-medium text-xl text-gray-500`}>
-              Sign In with Google
+              {t("signInWithGoogle")}
             </p>
           </Link>
 
@@ -286,9 +317,9 @@ export default function SignUpForm() {
       {/* Login Link */}
       {!showOtpField && (
         <p className="text-center text-sm text-muted-foreground mt-2">
-          Already have an account?{" "}
+          {t("alreadyHaveAccount")}{" "}
           <Link href="/auth/login" className="text-blue hover:underline">
-            Login now
+            {t("loginNow")}
           </Link>
         </p>
       )}

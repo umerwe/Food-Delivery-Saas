@@ -1,25 +1,26 @@
 import Image from 'next/image';
+import { useTranslations } from "next-intl";
 
 const features = [
   {
     id: 1,
-    title: "Easy To Order",
-    desc: "You only need a few steps in ordering food",
+    titleKey: "easyTitle",
+    descKey: "easyDescription",
     img: "/whychooseus1.png",
   },
   {
     id: 2,
-    title: "Fastest Delivery",
-    desc: "Delivery that is always ontime even faster",
+    titleKey: "deliveryTitle",
+    descKey: "deliveryDescription",
     img: "/whychooseus2.png",
   },
   {
     id: 3,
-    title: "Best Quality",
-    desc: "Not only fast for us quality is also number one",
+    titleKey: "qualityTitle",
+    descKey: "qualityDescription",
     img: "/whychooseus3.png",
   },
-];
+] as const;
 
 const FeatureCard = ({
   title,
@@ -59,6 +60,8 @@ const FeatureCard = ({
 );
 
 export default function WhyChooseUs() {
+  const t = useTranslations("home.whyChooseUs");
+
   return (
     <section className="py-12 md:py-[80px] px-4 max-w-[1400px] mx-auto">
       
@@ -70,7 +73,7 @@ export default function WhyChooseUs() {
         leading-tight md:leading-[30px] 
         mb-10 md:mb-[60px]
       ">
-        Why Choose Us
+        {t("title")}
       </h2>
 
       {/* GRID */}
@@ -79,7 +82,7 @@ export default function WhyChooseUs() {
         gap-10 sm:gap-12 md:gap-[135px]
       ">
         {features.map((f) => (
-          <FeatureCard key={f.id} {...f} />
+          <FeatureCard key={f.id} title={t(f.titleKey)} desc={t(f.descKey)} img={f.img} />
         ))}
       </div>
 

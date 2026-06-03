@@ -1,6 +1,7 @@
 "use client";
 
 import { FaMapMarkerAlt, FaTimes, FaStore } from "react-icons/fa";
+import { useTranslations } from "next-intl";
 import type { BranchRecord } from "@/types/branch-selector";
 
 type BranchPopupProps = {
@@ -11,13 +12,16 @@ type BranchPopupProps = {
   onSelect: (branch: BranchRecord) => void;
 };
 
-export default function BranchPopup({
+export function BranchPopup({
   show,
   onClose,
   branches,
   loading,
   onSelect,
 }: BranchPopupProps) {
+  const t = useTranslations("branchSelector");
+  const tCommon = useTranslations("common");
+
   if (!show) return null;
 
   return (
@@ -32,18 +36,18 @@ export default function BranchPopup({
               </div>
 
               <h2 className="text-[22px] font-semibold text-gray-900">
-                Select Branch
+                {t("selectBranch")}
               </h2>
 
               <p className="mt-1 text-sm leading-relaxed text-gray-500">
-                Choose your preferred branch to continue with this order.
+                {t("choosePreferredBranch")}
               </p>
             </div>
 
             <button
               onClick={onClose}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition hover:border-[#EC5834] hover:bg-[#FFF7F4] hover:text-[#EC5834]"
-              aria-label="Close branch popup"
+              aria-label={t("closeBranchPopup")}
             >
               <FaTimes className="text-[14px]" />
             </button>
@@ -56,10 +60,10 @@ export default function BranchPopup({
             <div className="flex flex-col items-center justify-center py-14 text-center">
               <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-[#F3C5B8] border-t-[#EC5834]" />
               <p className="text-sm font-medium text-gray-700">
-                Loading branches...
+                {t("loadingBranches")}
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                Please wait while we fetch available locations.
+                {t("fetchingAvailableLocations")}
               </p>
             </div>
           ) : branches.length === 0 ? (
@@ -68,11 +72,10 @@ export default function BranchPopup({
                 <FaMapMarkerAlt className="text-[18px]" />
               </div>
               <p className="text-sm font-semibold text-gray-700">
-                No active branches found
+                {t("noActiveBranchesFound")}
               </p>
               <p className="mt-1 max-w-[280px] text-xs leading-relaxed text-gray-400">
-                There are no available branches at the moment. Please try again
-                later.
+                {t("noActiveBranchesDescription")}
               </p>
             </div>
           ) : (
@@ -96,11 +99,11 @@ export default function BranchPopup({
                     <p className="mt-1 text-sm leading-relaxed text-gray-500">
                       {[branch.address?.area, branch.address?.city]
                         .filter(Boolean)
-                        .join(", ") || "Branch location available"}
+                        .join(", ") || t("branchLocationAvailable")}
                     </p>
 
                     <span className="mt-3 inline-flex items-center text-[12px] font-semibold text-[#EC5834]">
-                      Select this branch
+                      {t("selectThisBranch")}
                     </span>
                   </div>
                 </button>
@@ -115,7 +118,7 @@ export default function BranchPopup({
             onClick={onClose}
             className="w-full rounded-2xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
           >
-            Cancel
+            {tCommon("cancel")}
           </button>
         </div>
       </div>

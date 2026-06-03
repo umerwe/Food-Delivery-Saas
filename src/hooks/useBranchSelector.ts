@@ -6,8 +6,10 @@ import useBranches from "@/hooks/useBranches";
 import { useAuthContext } from "@/hooks/useAuth";
 import { persistSelectedBranch } from "@/lib/branch-selector";
 import type { BranchRecord } from "@/types/branch-selector";
+import { useTranslations } from "next-intl";
 
 export default function useBranchSelector(onSelect?: () => void) {
+  const t = useTranslations("branchSelector");
   const { token, setUser } = useAuthContext();
   const { fetchBranches } = useBranches(token);
 
@@ -24,7 +26,7 @@ export default function useBranchSelector(onSelect?: () => void) {
       setBranches(activeBranches);
       setShowBranchPopup(true);
     } catch {
-      toast.error("Failed to load branches");
+      toast.error(t("failedToLoadBranches"));
     } finally {
       setLoadingBranches(false);
     }
@@ -34,13 +36,13 @@ export default function useBranchSelector(onSelect?: () => void) {
     try {
       persistSelectedBranch(branch, setUser, { includeBranch: false });
 
-      toast.success("Branch selected");
+      toast.success(t("branchSelected", { name: branch.name }));
       setShowBranchPopup(false);
 
       if (onSelect) onSelect();
 
     } catch {
-      toast.error("Failed to set branch");
+      toast.error(t("failedToSetBranch"));
     }
   };
 

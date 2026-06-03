@@ -2,13 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export default function ProfileTabs({ activeTab }: { activeTab: string }) {
+  const t = useTranslations("profile");
   const router = useRouter();
   const tabs = [
-    { id: "profile", label: "Profile" },
-    { id: "payment-method", label: "Payment Method" },
-    { id: "history", label: "History" },
+    { id: "profile", label: t("tabs.profile") },
+    { id: "payment-method", label: t("tabs.paymentMethod") },
+    { id: "history", label: t("tabs.history") },
   ];
 
   const handleTabChange = (tabId: string) => {

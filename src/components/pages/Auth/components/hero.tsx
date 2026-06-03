@@ -1,11 +1,16 @@
+"use client"
+
 import Image from "next/image"
-// @ts-ignore
+import { useTranslations } from "next-intl"
+
 export function AuthHero() {
+  const t = useTranslations("auth")
+
   return (
     <div className="hidden lg:flex w-1/2 relative">
       <Image
         src="/auth-hero.jpg"
-        alt="Brand hero image"
+        alt={t("brandHeroAlt")}
         fill
         className="object-cover"
         priority

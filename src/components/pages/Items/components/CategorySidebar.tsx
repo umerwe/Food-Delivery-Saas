@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { List, Loader2, Menu, Search } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type MenuViewMode = "multiple" | "onePage";
 
@@ -38,6 +39,8 @@ export default function CategorySidebar({
   onViewModeChange,
   onCategorySelect,
 }: CategorySidebarProps) {
+  const tCommon = useTranslations("items.common");
+  const tSidebar = useTranslations("items.sidebar");
   const router = useRouter();
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -89,9 +92,9 @@ export default function CategorySidebar({
     <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-xl font-semibold text-gray-900">Full menu</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{tCommon("fullMenuLower")}</h2>
           <p className="mt-1 text-xs text-gray-500">
-            Browse by category or view the full menu.
+            {tSidebar("description")}
           </p>
         </div>
       </div>
@@ -109,7 +112,7 @@ export default function CategorySidebar({
             }`}
           >
             <Menu size={15} className="shrink-0" />
-            <span className="truncate">By Category</span>
+            <span className="truncate">{tSidebar("byCategory")}</span>
           </button>
 
           <button
@@ -122,7 +125,7 @@ export default function CategorySidebar({
             }`}
           >
             <List size={15} className="shrink-0" />
-            <span className="truncate">1 Page</span>
+            <span className="truncate">{tSidebar("onePage")}</span>
           </button>
         </div>
       </div>
@@ -137,7 +140,7 @@ export default function CategorySidebar({
         <input
           value={search || ""}
           onChange={(e) => onSearchChange?.(e.target.value)}
-          placeholder="Search categories"
+          placeholder={tSidebar("searchCategories")}
           className="h-11 w-full rounded-xl bg-gray-100 pl-10 pr-4 text-sm text-gray-800 outline-none transition focus:bg-white focus:ring-2 focus:ring-primary/15"
         />
       </div>
@@ -150,11 +153,11 @@ export default function CategorySidebar({
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-400">
             <Loader2 size={16} className="animate-spin" />
-            Loading categories...
+            {tSidebar("loadingCategories")}
           </div>
         ) : categories.length === 0 ? (
           <p className="py-6 text-center text-sm text-gray-400">
-            No categories found
+            {tCommon("noCategories")}
           </p>
         ) : (
           <>
@@ -197,10 +200,10 @@ export default function CategorySidebar({
                 {loadingMore ? (
                   <>
                     <Loader2 size={15} className="animate-spin" />
-                    Loading...
+                    {tCommon("loadingMore")}
                   </>
                 ) : (
-                  "Load More Categories"
+                  tSidebar("loadMoreCategories")
                 )}
               </button>
             ) : null}

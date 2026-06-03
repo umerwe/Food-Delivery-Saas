@@ -1,8 +1,11 @@
 // @refresh reset
 import { Star } from 'lucide-react';
 import Image from 'next/image';
+import { useTranslations } from "next-intl";
 
 export default function AppPromo() {
+const t = useTranslations("home.appPromo");
+
 return (
   <section className="px-4 pt-5 pb-[80px]">
     <div className="max-w-[1400px] mx-auto">
@@ -10,7 +13,7 @@ return (
 
         <Image
           src="/banner-bg.png"
-          alt="Banner Background"
+          alt={t("bannerAlt")}
           width={1920}
           height={1080}
           className="w-full h-[560px] md:h-full object-cover"
@@ -26,7 +29,7 @@ return (
           <div className="w-[180px] sm:w-[250px] md:w-[240px] lg:w-[430px]">
             <img
               src="/banner-mobile.png"
-              alt="App Preview"
+              alt={t("appPreviewAlt")}
               className="w-full h-auto drop-shadow-2xl"
             />
           </div>
@@ -43,8 +46,8 @@ return (
           <div className="text-white max-w-xl md:max-w-2xl text-center md:text-left">
 
             <h2 className="text-[22px] sm:text-[28px] md:text-[40px] font-bold mb-4 md:mb-8 leading-tight">
-              Great food and lots<br className="hidden sm:block" />
-              of discounted prices
+              {t("titleLineOne")}<br className="hidden sm:block" />
+              {t("titleLineTwo")}
             </h2>
 
             <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8 justify-center md:justify-start">
@@ -57,7 +60,7 @@ return (
                   >
                     <img
                       src={`https://i.pravatar.cc/150?img=${i}`}
-                      alt="Customer"
+                      alt={t("customerAlt")}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -66,13 +69,13 @@ return (
 
               <div className="flex flex-col items-center md:items-start">
                 <span className="text-sm md:text-lg font-bold">
-                  Our Happy Customer
+                  {t("happyCustomer")}
                 </span>
                 <div className="flex items-center gap-2">
                   <Star size={16} fill="#FFD700" stroke="#FFD700" />
                   <span className="text-sm md:text-lg font-bold">4.8</span>
                   <span className="text-xs md:text-base opacity-90">
-                    (1.9k Review)
+                    {t("review")}
                   </span>
                 </div>
               </div>

@@ -2,8 +2,11 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import PaymentForm from "@/components/forms/PaymentForm";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 export default function PaymentMethodSection() {
+  const t = useTranslations("profile.payment");
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-[30px] items-start">
       <div className="border border-gray-300 rounded-xl px-[24px] py-[40px] space-y-[32px] shadow-sm">
@@ -16,13 +19,13 @@ export default function PaymentMethodSection() {
             variant="outline"
             className="flex-1 rounded-lg text-lg h-[50px] text-primary border-primary bg-white"
           >
-            Add New Method
+            {t("addNewMethod")}
           </Button>
           <Button
             variant="primary"
             className="flex-1 rounded-lg text-lg h-[50px]"
           >
-            Select Payment
+            {t("selectPayment")}
           </Button>
         </div>
       </div>

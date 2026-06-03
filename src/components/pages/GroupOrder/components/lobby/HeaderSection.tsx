@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import type { GroupOrder } from "@/types/group-order";
 
 type HeaderSectionProps = {
@@ -5,6 +6,7 @@ type HeaderSectionProps = {
 };
 
 export default function HeaderSection({ order }: HeaderSectionProps) {
+  const t = useTranslations("groupOrder.lobby.header");
   const total = order?.participantCount || 0;
   const ready = order?.participants?.filter((p) => (p.items?.length || 0) > 0)?.length || 0;
 
@@ -15,18 +17,18 @@ export default function HeaderSection({ order }: HeaderSectionProps) {
 
       <div>
         <h1 className="text-3xl font-semibold text-gray-900 tracking-tight">
-          {order?.restaurant?.name || "Lobby"}
+          {order?.restaurant?.name || t("fallbackTitle")}
         </h1>
         <p className="text-gray-500 mt-1 text-sm">
-          Everyone's picks for tonight's feast.
+          {t("description")}
         </p>
       </div>
 
       <div className="bg-white rounded-2xl px-5 py-4 shadow-md border border-gray-100">
         <p className="text-xs text-gray-500 uppercase tracking-wide">
-          Group Status{" "}
+          {t("groupStatus")}{" "}
           <span className="text-orange-500 font-semibold ml-1">
-            {ready}/{total} Ready
+            {t("readyCount", { ready, total })}
           </span>
         </p>
 

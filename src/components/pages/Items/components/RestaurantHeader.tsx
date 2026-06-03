@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Star, MapPin, Clock, Utensils, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import useItems from "@/hooks/useItems";
 import { useAuth } from "@/hooks/useAuth";
 import { getStoredAuthState } from "@/lib/auth";
@@ -24,6 +25,7 @@ const getCategoryItemCount = (category: ItemsCategory) => {
 };
 
 export default function RestaurantHeader() {
+  const t = useTranslations("items.common");
   const searchParams = useSearchParams();
   const categoryId = searchParams.get("categoryId");
   const router = useRouter();
@@ -147,13 +149,13 @@ export default function RestaurantHeader() {
   const ratingInfo = restaurant?.ratingInfo;
   const bannerImage = getImageUrl(category, restaurant);
 
-  const title = category?.name ? category.name : "Full Menu";
+  const title = category?.name ? category.name : t("fullMenu");
 
   const description = hasText(category?.description)
     ? String(category?.description)
     : category?.name
-    ? "Explore freshly prepared items in this category."
-    : "Browse all available categories and menu items from this restaurant.";
+    ? t("categoryDescription")
+    : t("menuDescription");
 
   if (loading) {
     return (
@@ -172,13 +174,13 @@ export default function RestaurantHeader() {
         <div className="flex min-w-0 flex-col justify-center p-6 md:p-8 lg:p-10">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
-              {category?.name ? "Category" : "Restaurant Menu"}
+              {category?.name ? t("category") : t("restaurantMenu")}
             </span>
 
             {categoryItemCount !== null ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
                 <Utensils size={13} />
-                {categoryItemCount} item{categoryItemCount === 1 ? "" : "s"}
+                {t("itemCount", { count: categoryItemCount })}
               </span>
             ) : null}
           </div>
@@ -201,8 +203,7 @@ export default function RestaurantHeader() {
 
                 {ratingInfo.reviews ? (
                   <span className="text-yellow-700/80">
-                    · {ratingInfo.reviews} review
-                    {ratingInfo.reviews === 1 ? "" : "s"}
+                    · {t("reviewCount", { count: ratingInfo.reviews })}
                   </span>
                 ) : null}
               </div>
@@ -227,11 +228,11 @@ export default function RestaurantHeader() {
               onClick={() => router.push("/reservetable")}
               className="rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-white transition hover:bg-primary/90"
             >
-              Reserve Table
+              {t("reserveTable")}
             </button>
 
             <div className="text-xs text-gray-400">
-              {restaurant?.name ? `Serving from ${restaurant.name}` : null}
+              {restaurant?.name ? t("servingFrom", { name: restaurant.name }) : null}
             </div>
           </div>
         </div>
@@ -240,7 +241,7 @@ export default function RestaurantHeader() {
         <div className="relative h-[260px] w-full overflow-hidden bg-gray-100 md:h-[340px] lg:h-auto">
           <Image
             src={bannerImage}
-            alt={category?.name || restaurant?.name || "Restaurant menu"}
+            alt={category?.name || restaurant?.name || t("restaurantMenuImageAlt")}
             fill
             className="object-cover"
             priority
@@ -252,7 +253,7 @@ export default function RestaurantHeader() {
           {category?.name ? (
             <div className="absolute bottom-5 left-5 right-5 rounded-2xl bg-white/90 p-4 shadow-sm backdrop-blur">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                Current Category
+                {t("currentCategory")}
               </p>
               <p className="mt-1 truncate text-base font-semibold text-gray-900">
                 {category.name}

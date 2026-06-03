@@ -7,10 +7,12 @@ import InviteSection from "@/components/pages/GroupOrder/components/lobby/Invite
 import OrderSuccess from "@/components/pages/GroupOrder/components/Success/OrderSuccess";
 import useGroupOrder from "@/hooks/useGroupOrder";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import type { GroupOrderParticipant, GroupOrderSuccessData } from "@/types/group-order";
 
 export function GroupOrderLobbyPage() {
+  const t = useTranslations("groupOrder.lobby");
   const [successData, setSuccessData] = useState<GroupOrderSuccessData | null>(null);
 
   const { order, loading, redirecting } = useGroupOrder();
@@ -28,13 +30,13 @@ export function GroupOrderLobbyPage() {
           </div>
 
           <p className="text-sm font-semibold text-gray-900">
-            {redirecting ? "Group order is already checked out" : "Loading lobby"}
+            {redirecting ? t("alreadyCheckedOut") : t("loadingLobby")}
           </p>
 
           <p className="mt-1 text-xs text-gray-500">
             {redirecting
-              ? "Redirecting you back to group orders..."
-              : "Please wait while we prepare your group order."}
+              ? t("redirecting")
+              : t("preparing")}
           </p>
         </div>
       </div>
@@ -46,19 +48,18 @@ export function GroupOrderLobbyPage() {
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
         <div className="max-w-md rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm">
           <h1 className="text-lg font-semibold text-gray-900">
-            Group order not found
+            {t("notFoundTitle")}
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-gray-500">
-            This group order may have expired, been checked out, or the invite
-            code is no longer valid.
+            {t("notFoundDescription")}
           </p>
 
           <a
             href="/group-order"
             className="mt-5 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white"
           >
-            Go to Group Order
+            {t("goToGroupOrder")}
           </a>
         </div>
       </div>

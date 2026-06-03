@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import usePayments from "@/hooks/usePayments";
 import type { PaymentItem, PaymentMeta, WalletItem } from "@/services/payments";
 import { Button } from "@/components/ui/button";
-import PaginationSection from "@/components/ui/PaginationComponent";
+import { PaginationSection } from "@/components/ui/PaginationComponent";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -21,8 +21,12 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import Balance from "./Balance";
+import { useTranslations } from "next-intl";
 
 export default function PaymentsHistory() {
+  const t = useTranslations("payments");
+  const orderStatusT = useTranslations("orderStatus");
+  const commonT = useTranslations("common");
   const { token, restaurantId } = useAuth();
   const { fetchPaymentsPage, fetchWallet: fetchWalletData } = usePayments(token);
 
@@ -125,12 +129,50 @@ export default function PaymentsHistory() {
   }, [wallet, debouncedSearch, status]);
 
   const title =
-    tab === "payments" ? "Payments History" : "Wallet History";
+    tab === "payments" ? t("paymentsHistory") : t("walletHistory");
 
   const subtitle =
     tab === "payments"
-      ? "Track all payment transactions."
-      : "Monitor wallet credits & debits.";
+      ? t("paymentsSubtitle")
+      : t("walletSubtitle");
+
+  const mapPaymentStatus = (value: string) => {
+    switch (value) {
+      case "PAID":
+        return t("status.paid");
+      case "PENDING":
+        return t("status.pending");
+      case "FAILED":
+        return t("status.failed");
+      default:
+        return value;
+    }
+  };
+
+  const mapOrderStatus = (value?: string | null) => {
+    switch (String(value || "").toUpperCase()) {
+      case "PAID":
+        return t("status.paid");
+      case "PENDING":
+        return t("status.pending");
+      case "FAILED":
+        return t("status.failed");
+      case "PLACED":
+        return orderStatusT("status.placed");
+      case "CONFIRMED":
+        return orderStatusT("status.confirmed");
+      case "PREPARING":
+        return orderStatusT("status.preparing");
+      case "PICKED_UP":
+        return orderStatusT("status.pickedUp");
+      case "DELIVERED":
+        return orderStatusT("status.delivered");
+      case "CANCELLED":
+        return orderStatusT("status.cancelled");
+      default:
+        return value || t("orderFallback");
+    }
+  };
 
   return (
     <section className="mx-auto w-full px-4 pb-[100px] pt-[20px] md:px-40">
@@ -170,7 +212,7 @@ export default function PaymentsHistory() {
                 : {}
             }
           >
-            Payments
+            {t("payments")}
           </Button>
 
           <Button
@@ -190,7 +232,7 @@ export default function PaymentsHistory() {
                 : {}
             }
           >
-            Wallet
+            {t("wallet")}
           </Button>
         </div>
 
@@ -203,8 +245,8 @@ export default function PaymentsHistory() {
               <Input
                 placeholder={
                   tab === "payments"
-                    ? "Search by order id"
-                    : "Search wallet note"
+                    ? t("searchByOrderId")
+                    : t("searchWalletNote")
                 }
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -219,7 +261,7 @@ export default function PaymentsHistory() {
                 setPage(1);
               }}
             >
-              Search
+              {commonT("search")}
             </Button>
           </div>
 
@@ -232,26 +274,26 @@ export default function PaymentsHistory() {
               }}
             >
               <SelectTrigger className="!h-10 min-w-[150px] rounded-full border-none bg-[#F5F5F5] px-4">
-                <SelectValue placeholder="All Status" />
+                <SelectValue placeholder={t("allStatus")} />
               </SelectTrigger>
 
               <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
+                <SelectItem value="ALL">{t("all")}</SelectItem>
 
                 {tab === "payments" ? (
                   <>
-                    <SelectItem value="PAID">Paid</SelectItem>
+                    <SelectItem value="PAID">{t("paid")}</SelectItem>
                     <SelectItem value="PENDING">
-                      Pending
+                      {t("pending")}
                     </SelectItem>
-                    <SelectItem value="FAILED">Failed</SelectItem>
+                    <SelectItem value="FAILED">{t("failed")}</SelectItem>
                   </>
                 ) : (
                   <>
                     <SelectItem value="CREDIT">
-                      Credit
+                      {t("credit")}
                     </SelectItem>
-                    <SelectItem value="DEBIT">Debit</SelectItem>
+                    <SelectItem value="DEBIT">{t("debit")}</SelectItem>
                   </>
                 )}
               </SelectContent>
@@ -263,12 +305,12 @@ export default function PaymentsHistory() {
         <div className="space-y-3">
           {loading ? (
             <p className="py-10 text-center text-gray-400">
-              Loading...
+              {commonT("loading")}
             </p>
           ) : tab === "payments" ? (
             payments.length === 0 ? (
               <p className="py-10 text-center text-gray-400">
-                No payments found
+                {t("noPaymentsFound")}
               </p>
             ) : (
               payments.map((item) => {
@@ -320,7 +362,7 @@ export default function PaymentsHistory() {
                           </div>
 
                           <p className="truncate text-xs text-gray-500">
-                            Order #{item.orderId}
+                            {t("orderNumber", { id: item.orderId })}
                           </p>
 
                           <p className="mt-0.5 text-[11px] text-gray-400">
@@ -346,11 +388,11 @@ export default function PaymentsHistory() {
                               "bg-zinc-100 text-zinc-700"
                             }`}
                           >
-                            {item.status}
+                            {mapPaymentStatus(item.status)}
                           </span>
 
                           <span className="text-[11px] text-gray-400">
-                            {item.order?.status || "Order"}
+                            {mapOrderStatus(item.order?.status)}
                           </span>
                         </div>
                       </div>
@@ -361,7 +403,7 @@ export default function PaymentsHistory() {
             )
           ) : filteredWallet.length === 0 ? (
             <p className="py-10 text-center text-gray-400">
-              No wallet history found
+              {t("noWalletHistoryFound")}
             </p>
           ) : (
             filteredWallet.map((item) => {
@@ -399,7 +441,7 @@ export default function PaymentsHistory() {
                       </p>
 
                       <p className="text-xs text-gray-500">
-                        Balance After: {item.balanceAfter}
+                        {t("balanceAfter", { amount: item.balanceAfter })}
                       </p>
                     </div>
                   </div>

@@ -2,15 +2,18 @@
 
 import Image from "next/image";
 import { MapPin } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 const FoodBanner = () => {
+  const t = useTranslations("categories.banner");
+
   return (
     <section className="relative w-full h-[320px] md:h-[430px] flex items-center justify-center overflow-hidden">
 
       {/* Background Image */}
       <Image
         src="/categories/background_banner.png"
-        alt="Food Background"
+        alt={t("foodBackgroundAlt")}
         fill
         priority
         className="object-cover"
@@ -30,7 +33,7 @@ const FoodBanner = () => {
 
         {/* Heading */}
         <h1 className="text-[32px] md:text-[48px] font-semibold text-[#5A1E14] mb-6">
-          Are you starving?
+          {t("title")}
         </h1>
 
         {/* Search Bar */}
@@ -41,14 +44,14 @@ const FoodBanner = () => {
             <MapPin className="w-5 h-5 text-[#AD2A08] mr-2" />
             <input
               type="text"
-              placeholder="Enter your delivery address"
+              placeholder={t("addressPlaceholder")}
               className="w-full outline-none text-sm text-gray-600 placeholder:text-gray-400"
             />
           </div>
 
           {/* Button */}
           <button className="bg-[#AD2A08] text-white px-5 py-2.5 rounded-full flex items-center gap-2 text-sm font-medium hover:opacity-90 transition">
-            Find Food
+            {t("findFood")}
             <span className="text-lg">→</span>
           </button>
         </div>

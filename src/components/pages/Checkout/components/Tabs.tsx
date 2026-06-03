@@ -2,8 +2,10 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 export default function CheckoutTabs({ activeTab }: { activeTab: string }) {
+    const t = useTranslations("checkout");
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -26,7 +28,7 @@ export default function CheckoutTabs({ activeTab }: { activeTab: string }) {
                             : "text-gray-500 hover:text-gray-700"
                     )}
                 >
-                    Delivery
+                    {t("delivery")}
                 </button>
                 <button
                     onClick={() => handleTabChange('pickup')}
@@ -37,7 +39,7 @@ export default function CheckoutTabs({ activeTab }: { activeTab: string }) {
                             : "text-gray-500 hover:text-gray-700"
                     )}
                 >
-                    Pickup
+                    {t("pickup")}
                 </button>
             </div>
         </div>

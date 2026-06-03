@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { poppins } from "@/lib/fonts";
 import { Toaster } from "sonner";
-import Providers from "@/app/providers";
+import { Providers } from "@/app/providers";
 
 export const metadata: Metadata = {
   title: "Home | Food",

@@ -2,31 +2,34 @@
 
 import Image from "next/image";
 import { FaStar } from "react-icons/fa";
+import { useTranslations } from "next-intl";
 
 export default function TestimonialsSection() {
+  const t = useTranslations("about.testimonials");
+
   const testimonials = [
     {
       name: "Lisa Vandermeer",
-      role: "Loyal Customer",
+      role: t("loyalCustomer"),
       image:
         "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200",
-      text: "The only app that delivers food that actually looks like the pictures. Absolute perfection every time.",
+      text: t("lisaText"),
       highlighted: false,
     },
     {
       name: "David Chen",
-      role: "Food Critic",
+      role: t("foodCritic"),
       image:
         "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200",
-      text: "Lightning fast delivery. I don’t know how they do it, but my pasta is always steaming hot.",
+      text: t("davidText"),
       highlighted: true,
     },
     {
       name: "Mia Roberts",
-      role: "Local Guide",
+      role: t("localGuide"),
       image:
         "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200",
-      text: "Sustainability and quality all in one. The packaging is eco-friendly and the taste is 5-star.",
+      text: t("miaText"),
       highlighted: false,
     },
   ];
@@ -37,7 +40,7 @@ export default function TestimonialsSection() {
 
         {/* Heading */}
         <h2 className="text-center text-2xl md:text-3xl font-semibold text-gray-900">
-          What Our Users Say
+          {t("title")}
         </h2>
 
         {/* Cards */}
@@ -60,7 +63,7 @@ export default function TestimonialsSection() {
 
               {/* Text */}
               <p className="mt-4 text-sm text-gray-600 leading-relaxed">
-                "{item.text}"
+                {t("quote", { text: item.text })}
               </p>
 
               {/* User */}

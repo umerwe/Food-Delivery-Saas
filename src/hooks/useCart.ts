@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 import { useAuthContext } from "@/components/providers/auth-provider";
 import { buildDealCartItemsInput } from "@/components/pages/Home/utils/customer-deal-cart";
@@ -127,6 +128,7 @@ export const useCart = (token: string | null): CartApi => {
 };
 
 export const useAddDealToCart = (branchId?: string | null) => {
+  const t = useTranslations("cart");
   const { token, user } = useAuthContext();
   const queryClient = useQueryClient();
   const { addCustomerCartItem: addCartItem, quoteCustomerCart: refreshCartQuote } = useCart(token);
@@ -135,21 +137,21 @@ export const useAddDealToCart = (branchId?: string | null) => {
   return useMutation({
     mutationFn: async (deal: CustomerDeal) => {
       if (!customerId) {
-        throw new Error("Customer not found");
+        throw new Error(t("customerNotFound"));
       }
 
       if (!branchId) {
-        throw new Error("Please select a branch first");
+        throw new Error(t("selectBranchFirst"));
       }
 
       if (deal.scopeMenuItems.length < 1) {
-        throw new Error("This deal has no available items.");
+        throw new Error(t("dealNoItems"));
       }
 
       const payloads = buildDealCartItemsInput(deal, branchId);
 
       if (payloads.length < 1) {
-        throw new Error("This deal has no available items.");
+        throw new Error(t("dealNoItems"));
       }
 
       for (const payload of payloads) {
@@ -159,14 +161,14 @@ export const useAddDealToCart = (branchId?: string | null) => {
         });
 
         if (!response || response.error || response.success === false) {
-          throw new Error(getApiErrorMessage(response, "Failed to add deal item to cart"));
+          throw new Error(getApiErrorMessage(response, t("failedAddDealItem")));
         }
       }
 
       const quoteResponse = await refreshCartQuote({ customerId });
 
       if (!quoteResponse || quoteResponse.error || quoteResponse.success === false) {
-        throw new Error(getApiErrorMessage(quoteResponse, "Failed to refresh cart quote"));
+        throw new Error(getApiErrorMessage(quoteResponse, t("failedRefreshQuote")));
       }
 
       return quoteResponse;
@@ -179,10 +181,10 @@ export const useAddDealToCart = (branchId?: string | null) => {
           predicate: ({ queryKey }) => queryKey[0] === "cart" || queryKey[0] === "checkout",
         }),
       ]);
-      toast.success("Deal items added to cart");
+      toast.success(t("dealItemsAdded"));
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, "Failed to add deal to cart"));
+      toast.error(getApiErrorMessage(error, t("failedAddDeal")));
     },
   });
 };

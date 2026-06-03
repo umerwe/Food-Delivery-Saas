@@ -5,8 +5,10 @@ import { Calendar, Wallet, Check } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import useNotifications from "@/hooks/useNotifications";
 import type { NotificationItem, NotificationMeta } from "@/services/notifications";
+import { useTranslations } from "next-intl";
 
 export function NotificationsPage() {
+  const t = useTranslations("notifications");
   const { token } = useAuth();
   const { fetchNotificationsPage } = useNotifications(token);
 
@@ -85,10 +87,10 @@ const disableMarkAll = !hasNotifications || !hasUnread;
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">
-              Notifications
+              {t("title")}
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Manage your restaurant alerts, updates, and customer activity.
+              {t("description")}
             </p>
           </div>
 
@@ -102,14 +104,14 @@ const disableMarkAll = !hasNotifications || !hasUnread;
     }
   `}
 >
-  Mark all as read
+  {t("markAllAsRead")}
 </button>
         </div>
 
         {/* Tabs */}
         <div className="flex items-center gap-6 text-sm text-gray-500 border-b border-gray-200 mb-4 overflow-x-auto">
           <button className="text-primary font-medium pb-2 border-b-2 border-primary whitespace-nowrap">
-            All
+            {t("all")}
           </button>
         </div>
 
@@ -119,12 +121,12 @@ const disableMarkAll = !hasNotifications || !hasUnread;
           {/* LOADING */}
           {loading ? (
             <div className="p-6 text-center text-gray-500">
-              Loading notifications...
+              {t("loading")}
             </div>
           ) : notifications.length === 0 ? (
             /* EMPTY STATE */
             <div className="p-10 text-center text-gray-400">
-              No notifications found
+              {t("empty")}
             </div>
           ) : (
             notifications.map((item, index) => {
@@ -154,7 +156,7 @@ const disableMarkAll = !hasNotifications || !hasUnread;
                       {/* Text */}
                       <div className="min-w-0">
                         <p className="text-md font-semibold text-gray-900 truncate">
-                          {item.title || "Notification"}
+                          {item.title || t("fallbackTitle")}
                         </p>
 
                         <p className="text-sm text-gray-600 mt-[2px] break-words">
@@ -190,7 +192,7 @@ const disableMarkAll = !hasNotifications || !hasUnread;
               disabled={loadingMore}
               className="text-sm text-blue-500 hover:underline disabled:opacity-50"
             >
-              {loadingMore ? "Loading..." : "Load more notifications"}
+              {loadingMore ? t("loadingMore") : t("loadMore")}
             </button>
           </div>
         )}

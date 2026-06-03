@@ -1,26 +1,25 @@
 "use client";
 
 import { Wallet, Clock, MessageCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function FeaturesSection() {
+  const t = useTranslations("groupOrder.invite.features");
   const features = [
     {
       icon: Wallet,
-      title: "Smart Split",
-      description:
-        "Pay only for what you order. Everyone covers their own tab seamlessly.",
+      title: t("smartSplitTitle"),
+      description: t("smartSplitDescription"),
     },
     {
       icon: Clock,
-      title: "Single Delivery",
-      description:
-        "Reduce fees and carbon footprint. All meals arrive in one go.",
+      title: t("singleDeliveryTitle"),
+      description: t("singleDeliveryDescription"),
     },
     {
       icon: MessageCircle,
-      title: "Group Chat",
-      description:
-        "Discuss toppings or shared appetizers in the live order room.",
+      title: t("groupChatTitle"),
+      description: t("groupChatDescription"),
     },
   ];
 

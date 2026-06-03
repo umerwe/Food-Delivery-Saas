@@ -6,12 +6,15 @@ import FeaturesSection from "./FeaturesSection";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/useAuth";
 import { buildGroupOrderInviteLink } from "@/lib/group-order";
 import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import type { GroupOrder } from "@/types/group-order";
 
 export default function InviteFriends() {
+  const t = useTranslations("groupOrder.invite");
+  const errorT = useTranslations("errors");
   const { token } = useAuth();
   const { fetchGroupOrders } = useGroupOrderApi(token);
   const router = useRouter();
@@ -28,7 +31,7 @@ export default function InviteFriends() {
       const { response: res, groupOrders: orders } = await fetchGroupOrders();
 
       if (!res || res.error) {
-        toast.error("Failed to fetch group orders");
+        toast.error(t("failedFetchOrders"));
         return;
       }
 
@@ -41,8 +44,8 @@ export default function InviteFriends() {
         orders.find((o) => o.status === "OPEN") || orders[0];
 
       setOrder(latestOrder);
-    } catch (err) {
-      toast.error("Something went wrong");
+    } catch {
+      toast.error(errorT("somethingWentWrong"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -61,7 +64,7 @@ export default function InviteFriends() {
   const handleCopy = async () => {
     const link = buildGroupOrderInviteLink({ origin: window.location.origin, inviteCode: order?.inviteCode });
     await navigator.clipboard.writeText(link);
-    toast.success("Link copied");
+    toast.success(t("linkCopied"));
   };
 
   const Skeleton = () => (
@@ -90,7 +93,7 @@ export default function InviteFriends() {
   }
 
   if (!order) {
-    return <div className="text-center py-20">No active order</div>;
+    return <div className="text-center py-20">{t("noActiveOrder")}</div>;
   }
 
   return (
@@ -101,10 +104,10 @@ export default function InviteFriends() {
         {/* HEADER */}
         <div className="text-center">
           <h2 className="text-2xl md:text-3xl font-semibold text-gray-900">
-            Invite your friends
+            {t("title")}
           </h2>
           <p className="text-gray-500 mt-3 text-sm">
-            Share this link to start ordering together.
+            {t("description")}
           </p>
         </div>
 
@@ -122,7 +125,7 @@ export default function InviteFriends() {
         {/* INVITE LINK */}
         <div className="mt-10">
           <p className="text-[11px] font-medium text-gray-500 uppercase mb-2">
-            Unique Invite Link
+            {t("uniqueInviteLink")}
           </p>
 
           <div className="flex items-center bg-gray-100 rounded-full px-4 py-2 gap-3">
@@ -134,7 +137,7 @@ export default function InviteFriends() {
               onClick={handleCopy}
               className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-2 rounded-full text-sm"
             >
-              Copy
+              {t("copy")}
             </button>
           </div>
         </div>
@@ -142,14 +145,14 @@ export default function InviteFriends() {
         {/* MEMBERS HEADER */}
         <div className="mt-10 flex justify-between items-center">
           <h3 className="text-sm font-semibold text-gray-900">
-            Joined Members ({order.participantCount})
+            {t("joinedMembers", { count: order.participantCount || 0 })}
           </h3>
 
           <div className="flex items-center gap-3">
             {/* LIVE */}
             <div className="flex items-center gap-2 text-[11px] text-red-500">
               <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-              LIVE
+              {t("live")}
             </div>
 
             {/* REFRESH */}
@@ -197,18 +200,20 @@ export default function InviteFriends() {
 
                         {p.isHost && (
                           <span className="text-[10px] px-2 py-0.5 bg-gray-200 rounded">
-                            HOST
+                            {t("host")}
                           </span>
                         )}
                       </div>
 
                       <p className="text-xs text-gray-500">
-                        {p.status === "ACTIVE" ? "Ready" : "Waiting..."}
+                        {p.status === "ACTIVE" ? t("ready") : t("waiting")}
                       </p>
                     </div>
                   </div>
 
-                  <div className="text-xs text-green-600">{p.status}</div>
+                  <div className="text-xs text-green-600">
+                    {p.status === "ACTIVE" ? t("activeStatus") : t("pendingStatus")}
+                  </div>
                 </div>
               ))}
             </div>
@@ -223,11 +228,11 @@ export default function InviteFriends() {
             }
             className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full font-semibold shadow-md"
           >
-            Go to Menu →
+            {t("goToMenu")}
           </button>
 
           <p className="text-[10px] text-gray-400 mt-4">
-            Or wait for friends to join
+            {t("waitForFriends")}
           </p>
         </div>
       </div>

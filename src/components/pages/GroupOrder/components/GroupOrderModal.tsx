@@ -7,9 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useAuth } from "@/hooks/useAuth";
-import BranchSelect from "@/components/ui/BranchSelect";
+import { BranchSelect } from "@/components/ui/BranchSelect";
 import { X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { setStoredGroupOrderCode } from "@/lib/group-order";
 import type { CreateGroupOrderPayload, GroupOrderType } from "@/types/group-order";
 import type { BranchRecord } from "@/types/branch-selector";
@@ -17,6 +18,9 @@ import type { BranchRecord } from "@/types/branch-selector";
 type GroupOrderModalProps = { open: boolean; onClose: () => void };
 
 export default function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
+  const t = useTranslations("groupOrder.modal");
+  const commonT = useTranslations("common");
+  const errorT = useTranslations("errors");
   const { user, token } = useAuth();
   const { createGroupOrder, loading } = useGroupOrderApi(token);
 const router = useRouter();
@@ -32,8 +36,8 @@ const router = useRouter();
   try {
     const branchId = user?.branchId || selectedBranch?.id;
 
-    if (!branchId) return toast.error("Select branch");
-    if (!date || !time) return toast.error("Select date & time");
+    if (!branchId) return toast.error(t("selectBranch"));
+    if (!date || !time) return toast.error(t("selectDateTime"));
 
     const orderTime = new Date(`${date}T${time}`).toISOString();
 
@@ -48,25 +52,25 @@ const router = useRouter();
     const res = await createGroupOrder({ payload });
 
     if (!res || res.error) {
-      return toast.error(res?.error || "Failed to create group order");
+      return toast.error(res?.error || t("failedCreate"));
     }
 
 const dataRecord = typeof res?.data === "object" && res.data !== null ? res.data as Record<string, unknown> : null;
 const inviteCode = String(dataRecord?.inviteCode || "");
 
 if (!inviteCode) {
-  return toast.error("Invite code missing");
+  return toast.error(t("inviteCodeMissing"));
 }
 
 setStoredGroupOrderCode(inviteCode);
 
-toast.success("Group order created 🎉");
+toast.success(t("created"));
 
 onClose();
     router.push(`/group-order/invite?code=${inviteCode}`);
 
   } catch (err) {
-    toast.error("Something went wrong");
+    toast.error(errorT("somethingWentWrong"));
   }
 };
 
@@ -86,10 +90,10 @@ onClose();
         {/* HEADER */}
         <div className="mb-6">
           <h2 className="text-2xl font-semibold text-gray-900">
-            Start Group Order
+            {t("title")}
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Set up your order and invite friends to join
+            {t("description")}
           </p>
         </div>
 
@@ -104,11 +108,11 @@ onClose();
           {/* ORDER TYPE */}
           <div>
             <label className="text-sm font-medium text-gray-700">
-              Order Type
+              {t("orderType")}
             </label>
 
             <div className="grid grid-cols-3 gap-2 mt-2">
-              {["DINE_IN", "TAKEAWAY", "DELIVERY"].map((type) => (
+              {(["DINE_IN", "TAKEAWAY", "DELIVERY"] as GroupOrderType[]).map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -119,7 +123,7 @@ onClose();
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  {type.replace("_", " ")}
+                  {t(`orderTypes.${type}`)}
                 </button>
               ))}
             </div>
@@ -128,7 +132,7 @@ onClose();
           {/* DATE + TIME */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-gray-600">Date</label>
+              <label className="text-sm text-gray-600">{t("date")}</label>
               <Input
                 type="date"
                 value={date}
@@ -138,7 +142,7 @@ onClose();
             </div>
 
             <div>
-              <label className="text-sm text-gray-600">Time</label>
+              <label className="text-sm text-gray-600">{t("time")}</label>
               <Input
                 type="time"
                 value={time}
@@ -151,10 +155,10 @@ onClose();
           {/* NOTE */}
           <div>
             <label className="text-sm text-gray-600">
-              Host Note (Optional)
+              {t("hostNote")}
             </label>
             <Textarea
-              placeholder="Any instructions for your group..."
+              placeholder={t("hostNotePlaceholder")}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               className="mt-1 resize-none h-[100px] bg-[#FAFAF9] border border-gray-200 rounded-xl"
@@ -169,7 +173,7 @@ onClose();
               className="w-fit rounded-full"
               onClick={onClose}
             >
-              Cancel
+              {commonT("cancel")}
             </Button>
 
             <Button
@@ -177,7 +181,7 @@ onClose();
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? "Creating..." : "Start Order"}
+              {loading ? t("creating") : t("startOrder")}
             </Button>
 
           </div>

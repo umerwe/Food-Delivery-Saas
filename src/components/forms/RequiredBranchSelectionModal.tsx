@@ -1,1 +1,1 @@
-export { default } from "@/components/common/branch-selector/RequiredBranchSelectionModal";
+export { RequiredBranchSelectionModal } from "@/components/common/branch-selector/RequiredBranchSelectionModal";

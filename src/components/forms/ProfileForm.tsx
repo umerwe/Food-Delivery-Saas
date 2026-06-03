@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import {
   Camera,
@@ -29,11 +29,15 @@ import {
   type WalletSummary,
 } from "@/services/profile";
 import {
-  profileSchema,
+  createProfileSchema,
   type ProfileFormValues,
 } from "@/validations/profile";
+import { useTranslations } from "next-intl";
 
 export function ProfileForm() {
+  const t = useTranslations("profile");
+  const commonT = useTranslations("common");
+  const validationT = useTranslations("validation");
   const { token, user } = useAuth();
   const {
     deleteAddress,
@@ -44,6 +48,15 @@ export function ProfileForm() {
   } = useProfileApi(token);
 
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const profileSchema = useMemo(
+    () =>
+      createProfileSchema({
+        firstNameRequired: validationT("profileFirstNameRequired"),
+        lastNameRequired: validationT("profileLastNameRequired"),
+        avatarUrlInvalid: validationT("avatarUrlInvalid"),
+      }),
+    [validationT]
+  );
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -79,10 +92,10 @@ export function ProfileForm() {
 
       return summary;
     } catch {
-      toast.error("Failed to load wallet");
+      toast.error(t("failedLoadWallet"));
       return null;
     }
-  }, [fetchProfileWallet]);
+  }, [fetchProfileWallet, t]);
 
   const fetchAddresses = useCallback(async (skipStateUpdate = false) => {
     const shouldShowLoading = !skipStateUpdate && !addressesLoadedRef.current;
@@ -121,10 +134,10 @@ export function ProfileForm() {
   const handleDelete = async (id: string) => {
     try {
       await deleteAddress(id);
-      toast.success("Address deleted");
+      toast.success(t("addressDeleted"));
       fetchAddresses();
     } catch {
-      toast.error("Delete failed");
+      toast.error(t("deleteFailed"));
     }
   };
 
@@ -139,9 +152,9 @@ export function ProfileForm() {
 
       form.setValue("avatarUrl", fileUrl, { shouldDirty: true, shouldValidate: true });
 
-      toast.success("Avatar uploaded");
+      toast.success(t("avatarUploaded"));
     } catch {
-      toast.error("Upload failed");
+      toast.error(t("uploadFailed"));
     } finally {
       setUpdating(false);
     }
@@ -155,10 +168,10 @@ export function ProfileForm() {
 
       await updateProfile(payload);
 
-      toast.success("Profile updated successfully");
+      toast.success(t("profileUpdated"));
       setIsEditing(false);
     } catch {
-      toast.error("Update failed");
+      toast.error(t("updateFailed"));
     } finally {
       setUpdating(false);
     }
@@ -173,7 +186,9 @@ export function ProfileForm() {
     <AddressModal
       open={addressOpen}
       onOpenChange={setAddressOpen}
-      onSuccess={fetchAddresses}
+      onSuccess={() => {
+        void fetchAddresses();
+      }}
       editData={selectedAddress}
     />
 
@@ -183,7 +198,7 @@ export function ProfileForm() {
         <div className="relative w-[88px] h-[88px] rounded-full overflow-hidden">
           <Image
             fill
-            alt="profile"
+            alt={t("profileImageAlt")}
             className="object-cover"
             src={
               profile.avatarUrl?.startsWith("http")
@@ -217,7 +232,7 @@ export function ProfileForm() {
           <p className="text-[#8A8A8A] mt-2 font-normal">{profile.email}</p>
 
           <span className="inline-block mt-2 text-[11px] bg-[#f2f2f2] px-3 py-1 rounded-full text-[#8a8a8a] uppercase">
-            User
+            {t("user")}
           </span>
         </div>
       </div>
@@ -227,7 +242,7 @@ export function ProfileForm() {
           onClick={() => setIsEditing(true)}
           className="rounded-full bg-primary  text-white border border-black/10 px-6 font-medium"
         >
-          Edit Profile
+          {t("editProfile")}
         </Button>
       )}
     </div>
@@ -239,20 +254,20 @@ export function ProfileForm() {
         {!isEditing ? (
           <>
             <h3 className="text-[22px] font-medium text-[#222] mb-6">
-              Personal Information
+              {t("personalInformation")}
             </h3>
 
             <div className="grid md:grid-cols-2 gap-y-6 gap-x-10">
               <div>
                 <p className="text-[11px] text-[#9A9A9A] uppercase">
-                  Full Name
+                  {t("fullName")}
                 </p>
                 <p className="mt-1 font-normal text-[#303030]">{fullName}</p>
               </div>
 
               <div>
                 <p className="text-[11px] text-[#9A9A9A] uppercase">
-                  Email Address
+                  {t("emailAddress")}
                 </p>
                 <p className="mt-1 font-normal text-[#303030]">
                   {profile.email}
@@ -261,7 +276,7 @@ export function ProfileForm() {
 
               <div>
                 <p className="text-[11px] text-[#9A9A9A] uppercase">
-                  Phone Number
+                  {t("phoneNumber")}
                 </p>
                 <p className="mt-1 font-normal text-[#303030]">
                   {profile.phone || "-"}
@@ -269,7 +284,7 @@ export function ProfileForm() {
               </div>
 
               <div>
-                <p className="text-[11px] text-[#9A9A9A] uppercase">Bio</p>
+                <p className="text-[11px] text-[#9A9A9A] uppercase">{t("bio")}</p>
                 <p className="mt-1 font-normal text-[#303030]">
                   {profile.bio || "-"}
                 </p>
@@ -279,32 +294,32 @@ export function ProfileForm() {
         ) : (
           <>
             <h3 className="text-[22px] font-medium text-[#222] mb-6">
-              Edit Profile
+              {t("editProfile")}
             </h3>
 
             <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
             <div className="grid md:grid-cols-2 gap-4">
               <Input
                 id="firstName"
-                placeholder="First Name"
+                placeholder={t("firstName")}
                 {...form.register("firstName")}
               />
 
               <Input
                 id="lastName"
-                placeholder="Last Name"
+                placeholder={t("lastName")}
                 {...form.register("lastName")}
               />
 
               <Input
                 id="phone"
-                placeholder="Phone"
+                placeholder={t("phone")}
                 {...form.register("phone")}
               />
 
               <Input
                 id="bio"
-                placeholder="Bio"
+                placeholder={t("bio")}
                 {...form.register("bio")}
               />
             </div>
@@ -314,7 +329,7 @@ export function ProfileForm() {
                 variant="outline"
                 onClick={() => setIsEditing(false)}
               >
-                Cancel
+                {commonT("cancel")}
               </Button>
 
               <Button
@@ -322,7 +337,7 @@ export function ProfileForm() {
                 disabled={updating}
                 className="bg-red-600 hover:bg-red-700"
               >
-                {updating ? "Saving..." : "Save Changes"}
+                {updating ? t("saving") : t("saveChanges")}
               </Button>
             </div>
             </form>
@@ -347,12 +362,12 @@ export function ProfileForm() {
       href="/payments-history"
       className="px-3 py-1.5 rounded-full bg-white text-red-600 text-sm font-medium hover:bg-white"
     >
-      View Wallet
+      {t("viewWallet")}
     </Link>
   </div>
 
   <p className="uppercase text-[11px] tracking-[0.18em] text-white/75 mt-5 font-normal">
-    Current Balance
+    {t("currentBalance")}
   </p>
 
   <h3 className="text-[38px] md:text-[42px] font-semibold mt-2 leading-none">
@@ -362,7 +377,7 @@ export function ProfileForm() {
   <div className="grid grid-cols-2 gap-3 mt-8">
     <div className="rounded-2xl bg-white/10 px-4 py-3">
       <p className="text-[11px] uppercase text-white/70">
-        Transactions
+        {t("transactions")}
       </p>
       <p className="text-[22px] font-semibold mt-1">
         {walletTxns}
@@ -371,17 +386,17 @@ export function ProfileForm() {
 
     <div className="rounded-2xl bg-white/10 px-4 py-3">
       <p className="text-[11px] uppercase text-white/70">
-        Status
+        {t("status")}
       </p>
       <p className="text-[16px] font-medium mt-2 flex items-center gap-1">
-        Active
+        {t("active")}
         <ArrowUpRight size={14} />
       </p>
     </div>
   </div>
 
   <p className="text-xs text-white/70 mt-5">
-    Manage wallet funds & payment activity anytime.
+    {t("walletDescription")}
   </p>
 </div>
     </div>
@@ -391,10 +406,10 @@ export function ProfileForm() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h3 className="text-[28px] font-medium text-[#222]">
-            Your Addresses
+            {t("yourAddresses")}
           </h3>
           <p className="text-[#8A8A8A] text-sm font-normal">
-            Manage where you want your deliveries delivered.
+            {t("addressesDescription")}
           </p>
         </div>
 
@@ -406,12 +421,12 @@ export function ProfileForm() {
           className="rounded-full bg-[#1A1C1C] hover:bg-[#1A1C1C] text-white px-5 font-medium"
         >
           <Plus size={14} className="mr-1" />
-          New Address
+          {t("newAddress")}
         </Button>
       </div>
 
       {loadingAddresses && !addressesLoaded ? (
-        <p>Loading...</p>
+        <p>{commonT("loading")}</p>
       ) : (
         <div className="grid md:grid-cols-3 gap-4">
           {addresses.map((addr) => (
@@ -425,7 +440,7 @@ export function ProfileForm() {
                 </div>
 
                 <p className="font-medium text-[#222]">
-                  Saved Address
+                  {t("savedAddress")}
                 </p>
               </div>
 
@@ -468,7 +483,7 @@ export function ProfileForm() {
           >
             <Plus />
             <span className="mt-2 font-medium">
-              Add New Location
+              {t("addNewLocation")}
             </span>
           </button>
         </div>

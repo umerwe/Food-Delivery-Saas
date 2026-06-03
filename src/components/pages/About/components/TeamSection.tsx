@@ -1,30 +1,33 @@
 "use client";
 
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 export default function TeamSection() {
+  const t = useTranslations("about.team");
+
   const team = [
     {
       name: "Julian Sterling",
-      role: "Founder & CEO",
+      role: t("founderRole"),
       image:
         "https://images.unsplash.com/photo-1607746882042-944635dfe10e?q=80&w=800",
     },
     {
       name: "Elena Rossi",
-      role: "Executive Chef",
+      role: t("chefRole"),
       image:
         "https://images.unsplash.com/photo-1607631568010-a87245c0daf8?q=80&w=800",
     },
     {
       name: "Marcus Chen",
-      role: "Head of Operations",
+      role: t("operationsRole"),
       image:
         "https://images.unsplash.com/photo-1556157382-97eda2d62296?q=80&w=800",
     },
     {
       name: "Sarah Jenkins",
-      role: "Logistics Director",
+      role: t("logisticsRole"),
       image:
         "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?q=80&w=800",
     },
@@ -37,10 +40,10 @@ export default function TeamSection() {
         {/* Heading */}
         <div className="mb-10">
           <h2 className="text-2xl md:text-3xl font-semibold text-gray-900">
-            Meet Our Team
+            {t("title")}
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            The visionaries behind the flavor.
+            {t("description")}
           </p>
         </div>
 

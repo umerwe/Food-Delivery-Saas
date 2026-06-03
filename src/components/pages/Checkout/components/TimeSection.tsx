@@ -11,6 +11,7 @@ import {
   isPastDateValue,
 } from "@/components/pages/Checkout/utils/pickup-schedule";
 import type { BranchRecord } from "@/types/branch-selector";
+import { useTranslations } from "next-intl";
 
 interface Props {
   pickupDate: Date | null;
@@ -41,6 +42,7 @@ export function SelectPickupTimeSection({
   setPickupTime,
   selectedBranch,
 }: Props) {
+  const t = useTranslations("checkout");
   const dateValue = pickupDate ? getDateValue(pickupDate) : "";
   const dates = useMemo(() => buildUpcomingDates(), []);
   const timeSlots = useMemo(
@@ -57,12 +59,12 @@ export function SelectPickupTimeSection({
     const schedule = scheduleState.schedule;
 
     if (!dateValue || !schedule) return "";
-    if (schedule.isClosed) return "Closed";
+    if (schedule.isClosed) return t("closed");
 
     return `${formatPickupTimeLabel(schedule.openTime || "")} - ${formatPickupTimeLabel(
       schedule.closeTime || ""
     )}`;
-  }, [dateValue, scheduleState.schedule]);
+  }, [dateValue, scheduleState.schedule, t]);
 
   const selectedTimeAvailable =
     !hasOpeningHours || timeSlots.some((slot) => slot.value === pickupTime);
@@ -76,13 +78,13 @@ export function SelectPickupTimeSection({
   return (
     <section className="max-w-[520px] space-y-[22px]">
       <h2 className="text-[24px] font-semibold text-gray-900">
-        Select Pickup Time
+        {t("selectPickupTime")}
       </h2>
 
       {/* DATE */}
       <div className="space-y-[14px]">
         <h3 className="text-xl font-medium text-gray-900">
-          Choose date
+          {t("chooseDate")}
         </h3>
 
         <div className="rounded-xl bg-white px-5 py-4 shadow-sm">
@@ -138,12 +140,12 @@ export function SelectPickupTimeSection({
           {dateValue && openingHoursLabel ? (
             <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
               <Clock size={14} />
-              Pickup hours: {openingHoursLabel}
+              {t("pickupHours", { hours: openingHoursLabel })}
             </p>
           ) : dateValue && !hasOpeningHours ? (
             <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
               <Clock size={14} />
-              Branch pickup hours are not configured, so any pickup time is allowed.
+              {t("pickupHoursNotConfigured")}
             </p>
           ) : null}
         </div>
@@ -152,7 +154,7 @@ export function SelectPickupTimeSection({
       {/* TIME */}
       <div className="space-y-[16px] mt-[52px]">
         <h3 className="text-xl font-medium text-gray-900">
-          Choose Pickup Time
+          {t("choosePickupTime")}
         </h3>
 
         {hasOpeningHours ? (
@@ -174,13 +176,13 @@ export function SelectPickupTimeSection({
               ))
             ) : (
               <p className="col-span-full rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
-                Select another pickup date. No available pickup slots for this day.
+                {t("noPickupSlots")}
               </p>
             )}
           </div>
         ) : (
           <label className="block max-w-[220px]">
-            <span className="sr-only">Pickup time</span>
+            <span className="sr-only">{t("pickupTime")}</span>
             <input
               type="time"
               value={pickupTime || ""}

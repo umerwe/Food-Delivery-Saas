@@ -1,13 +1,17 @@
+import { useTranslations } from "next-intl";
+
 import { montserrat } from "@/lib/fonts";
 
 const stats = [
-  { label: "Happy Customers", value: "2M+" },
-  { label: "Customer Satisfaction", value: "98%" },
-  { label: "Our Branches", value: "20+" },
-  { label: "Total Employees", value: "100+" },
-];
+  { labelKey: "happyCustomers", value: "2M+" },
+  { labelKey: "customerSatisfaction", value: "98%" },
+  { labelKey: "branches", value: "20+" },
+  { labelKey: "employees", value: "100+" },
+] as const;
 
 export default function Stats() {
+  const t = useTranslations("home.stats");
+
   return (
     <section className={`max-w-6xl mx-auto py-12 md:py-16 px-4 ${montserrat.className}`}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center text-primary">
@@ -30,7 +34,7 @@ export default function Stats() {
               font-semibold 
               leading-normal md:leading-[30%]
             ">
-              {stat.label}
+              {t(stat.labelKey)}
             </span>
 
           </div>

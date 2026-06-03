@@ -3,6 +3,7 @@
 import { Users, Copy, Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { buildGroupOrderInviteLink } from "@/lib/group-order";
 import type { GroupOrder } from "@/types/group-order";
 
@@ -11,13 +12,14 @@ type InviteSectionProps = {
 };
 
 export default function InviteSection({ order }: InviteSectionProps) {
+  const t = useTranslations("groupOrder.lobby.invite");
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     const link = buildGroupOrderInviteLink({ origin: window.location.origin, inviteCode: order?.inviteCode });
     await navigator.clipboard.writeText(link);
     setCopied(true);
-    toast.success("Link copied");
+    toast.success(t("linkCopied"));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -29,18 +31,18 @@ export default function InviteSection({ order }: InviteSectionProps) {
       </div>
 
       <h3 className="mt-4 font-semibold text-gray-900 text-lg">
-        Waiting for more friends?
+        {t("title")}
       </h3>
 
       <p className="text-sm text-gray-500 mt-1">
-        Send this link to anyone you want to join the feast.
+        {t("description")}
       </p>
 
       <center>
         <div className="max-w-xl mt-5 flex items-center bg-white rounded-full px-4 py-2 justify-between text-sm border border-gray-200 shadow-sm">
 
           <span className="text-gray-500 truncate pr-3">
-            {order?.inviteCode ? buildGroupOrderInviteLink({ origin: window.location.origin, inviteCode: order?.inviteCode }) : "Generating..."}
+            {order?.inviteCode ? buildGroupOrderInviteLink({ origin: window.location.origin, inviteCode: order?.inviteCode }) : t("generating")}
           </span>
 
           <button
@@ -50,12 +52,12 @@ export default function InviteSection({ order }: InviteSectionProps) {
             {copied ? (
               <>
                 <Check className="w-4 h-4" />
-                Copied
+                {t("copied")}
               </>
             ) : (
               <>
                 <Copy className="w-4 h-4" />
-                Copy
+                {t("copy")}
               </>
             )}
           </button>

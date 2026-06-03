@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import ReservationCard from "@/components/pages/Reservations/components/ReservationCard";
 import { useAuth } from "@/hooks/useAuth";
 import useReservations from "@/hooks/useReservations";
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/select";
 
 export function ReservationsPage() {
+  const t = useTranslations("reservations");
   const { token } = useAuth();
   const { cancelReservation, fetchReservations: fetchReservationList } = useReservations(token);
 
@@ -70,39 +72,39 @@ export function ReservationsPage() {
   return (
     <div className="p-4 sm:p-6 md:px-20 lg:px-40 mx-auto bg-white min-h-screen">
       <h1 className="text-2xl sm:text-3xl font-semibold">
-        My Reservations
+        {t("title")}
       </h1>
 
       {/* Tabs + Sort */}
       <div className="flex flex-col sm:flex-row sm:justify-between mt-6 gap-4">
         <div className="flex bg-gray-100 rounded-lg p-1 w-fit">
-          {["all", "upcoming", "past", "cancelled"].map((t) => (
+          {["all", "upcoming", "past", "cancelled"].map((tab) => (
             <button
-              key={t}
-              onClick={() => setFilter(t)}
+              key={tab}
+              onClick={() => setFilter(tab)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                filter === t
+                filter === tab
                   ? "bg-white shadow text-black"
                   : "text-gray-500 hover:text-black"
               }`}
             >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {t(`filters.${tab}`)}
             </button>
           ))}
         </div>
 
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-500">SORT BY</span>
+          <span className="text-gray-500">{t("sortBy")}</span>
           <Select value={sort} onValueChange={setSort}>
             <SelectTrigger className="w-[185px] border-none shadow-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="nearest">
-                Date (Nearest First)
+                {t("sortNearest")}
               </SelectItem>
               <SelectItem value="farthest">
-                Date (Farthest First)
+                {t("sortFarthest")}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -140,7 +142,7 @@ export function ReservationsPage() {
             onClick={fetchReservations}
             className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
           >
-            Retry
+            {t("retry")}
           </button>
         </div>
       )}
@@ -151,10 +153,10 @@ export function ReservationsPage() {
       {!isInitialLoading && !error && sorted.length === 0 && (
         <div className="mt-16 text-center">
           <h2 className="text-lg font-semibold text-gray-700">
-            No reservations found
+            {t("emptyTitle")}
           </h2>
           <p className="text-sm text-gray-500 mt-2">
-            Try changing filters or make a new booking.
+            {t("emptyDescription")}
           </p>
         </div>
       )}

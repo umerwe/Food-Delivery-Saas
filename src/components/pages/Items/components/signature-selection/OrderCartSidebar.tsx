@@ -9,6 +9,7 @@ import type { CartItemRecord } from "./types";
 import { getCartItemUnitPrice, toNumber } from "./signature-selection-utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 type CartItem = {
   id: string;
@@ -33,6 +34,7 @@ export function OrderCartSidebar({
   cartRefreshKey,
   onCartRefresh,
 }: OrderCartSidebarProps) {
+  const t = useTranslations("cart");
   const router = useRouter();
   const { token } = useAuth();
   const { fetchCustomerCart, updateCustomerCartItemQuantity, deleteCustomerCartItem } = useCart(token);
@@ -62,7 +64,7 @@ export function OrderCartSidebar({
           id: String(item.id ?? ""),
           menuItemId: item.menuItemId ? String(item.menuItemId) : undefined,
           quantity,
-          name: item.menuItem?.name || "Untitled Item",
+          name: item.menuItem?.name || t("untitledItem"),
           unitPrice,
           lineTotal: unitPrice * quantity,
           desc: item.menuItem?.description || "",
@@ -106,7 +108,7 @@ export function OrderCartSidebar({
       const res = await updateCustomerCartItemQuantity({ customerId, cartItemId: id, quantity: newQty });
 
       if (!res || res.error) {
-        toast.error(res?.error || "Failed to update quantity");
+        toast.error(res?.error || t("failedUpdateQuantity"));
         return;
       }
 
@@ -124,7 +126,7 @@ export function OrderCartSidebar({
 
       onCartRefresh?.();
     } catch (err) {
-      toast.error("Failed to update quantity");
+      toast.error(t("failedUpdateQuantity"));
     } finally {
       setActionId(null);
     }
@@ -139,15 +141,15 @@ export function OrderCartSidebar({
       const res = await deleteCustomerCartItem({ customerId, cartItemId: id });
 
       if (!res || res.error) {
-        toast.error(res?.error || "Failed to remove item");
+        toast.error(res?.error || t("failedRemoveItem"));
         return;
       }
 
-      toast.success("Item removed");
+      toast.success(t("itemRemoved"));
       setCartItems((prev) => prev.filter((i) => i.id !== id));
       onCartRefresh?.();
     } catch (err) {
-      toast.error("Failed to remove item");
+      toast.error(t("failedRemoveItem"));
     } finally {
       setActionId(null);
     }
@@ -158,11 +160,11 @@ export function OrderCartSidebar({
       <div className="mx-auto flex h-full max-w-[320px] flex-col">
         <div className="mb-6 flex items-center justify-between gap-3">
           <h2 className="text-[22px] font-bold tracking-[-0.02em] text-[#1f1f1f]">
-            Your Order
+            {t("yourOrder")}
           </h2>
 
           <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
-            {totalItems} {totalItems === 1 ? "Item" : "Items"}
+            {t("itemCount", { count: totalItems })}
           </span>
         </div>
 
@@ -172,7 +174,7 @@ export function OrderCartSidebar({
           </div>
         ) : cartItems.length === 0 ? (
           <div className="rounded-[18px] border border-dashed border-black/10 bg-[#fafafa] p-5 text-center">
-            <p className="text-sm text-[#777]">Your cart is empty.</p>
+            <p className="text-sm text-[#777]">{t("empty")}</p>
           </div>
         ) : (
           <>
@@ -252,7 +254,7 @@ export function OrderCartSidebar({
             <div className="mt-5 rounded-[18px] border border-sky-100 bg-sky-50/80 p-4">
               <div className="flex items-start gap-2 text-[13px] leading-5 text-sky-700">
                 <Tag className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Add ‘Vivid Signature Sauce’ for just $2.00?</span>
+                <span>{t("sauceUpsell")}</span>
               </div>
             </div>
           </>
@@ -261,20 +263,20 @@ export function OrderCartSidebar({
         <div className="mt-auto pt-12">
           <div className="space-y-3 border-t border-black/5 pt-6">
             <div className="flex items-center justify-between text-[13px] text-[#8b8b8b]">
-              <span>Subtotal</span>
+              <span>{t("subtotal")}</span>
               <span className="font-medium text-[#666]">
                 ${subtotal.toFixed(2)}
               </span>
             </div>
 
             <div className="flex items-center justify-between text-[13px] text-[#8b8b8b]">
-              <span>Delivery Fee</span>
-              <span className="font-medium text-sky-600">FREE</span>
+              <span>{t("deliveryFee")}</span>
+              <span className="font-medium text-sky-600">{t("free")}</span>
             </div>
 
             <div className="flex items-center justify-between pt-2">
               <span className="text-[22px] font-semibold tracking-[-0.02em] text-[#222]">
-                Total
+                {t("total")}
               </span>
               <span className="text-[22px] font-semibold tracking-[-0.02em] text-[#222]">
                 ${subtotal.toFixed(2)}
@@ -287,12 +289,12 @@ export function OrderCartSidebar({
             disabled={!cartItems.length}
             className="mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-[14px] font-medium text-primary-foreground shadow-[0_10px_24px_rgba(0,0,0,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Proceed to Checkout
+            {t("proceedToCheckout")}
             <ArrowRight className="h-4 w-4" />
           </button>
 
           <p className="mt-4 text-center text-[11px] text-[#b0b0b0]">
-            Average delivery time: 25–35 mins
+            {t("averageDeliveryTime")}
           </p>
         </div>
       </div>

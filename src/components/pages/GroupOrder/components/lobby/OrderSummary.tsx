@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useState } from "react";
 
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 import {
   Dialog,
@@ -22,6 +23,9 @@ type OrderSummaryProps = {
 };
 
 export default function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
+  const t = useTranslations("groupOrder.lobby.summary");
+  const cartT = useTranslations("cart");
+  const errorT = useTranslations("errors");
   const summary = order?.summary;
 const { canCheckout, isHost } = useGroupOrder();
   const { checkoutGroupOrder, leaveGroupOrder } = useGroupOrderApi(null);
@@ -39,10 +43,10 @@ const { canCheckout, isHost } = useGroupOrder();
     try {
       setLoadingLeave(true);
       await leaveGroupOrder({ orderId: order.id });
-      toast.success("Left group successfully");
+      toast.success(t("leftGroup"));
       window.location.href = "/";
     } catch (err) {
-      toast.error("Failed to leave group");
+      toast.error(t("failedLeaveGroup"));
     } finally {
       setLoadingLeave(false);
     }
@@ -62,17 +66,17 @@ const { canCheckout, isHost } = useGroupOrder();
     const res = await checkoutGroupOrder({ orderId: order.id, payload });
 
     if (!res || res.error) {
-      toast.error(res?.error || res?.message || "Checkout failed");
+      toast.error(res?.error || res?.message || t("checkoutFailed"));
 
       return;
     }
 
-    toast.success("Order placed successfully");
+    toast.success(t("orderPlaced"));
     setCheckoutOpen(false);
 onSuccess((res?.data || {}) as GroupOrderSuccessData);
 clearStoredGroupOrderCode();
   } catch {
-    toast.error("Something went wrong");
+    toast.error(errorT("somethingWentWrong"));
   } finally {
     setLoadingCheckout(false);
   }
@@ -88,7 +92,7 @@ clearStoredGroupOrderCode();
         {/* TOP ROW */}
         <div className="flex justify-between items-center mb-5">
           <h2 className="font-semibold text-gray-900 text-lg">
-            Order Summary
+            {t("title")}
           </h2>
 
           {/* LEAVE BUTTON */}
@@ -102,22 +106,22 @@ clearStoredGroupOrderCode();
             ) : (
               <LogOut className="w-4 h-4" />
             )}
-            Leave
+            {t("leave")}
           </button> )}
         </div>
 
         {/* PRICES */}
         <div className="space-y-3 text-sm text-gray-600">
           <div className="flex justify-between">
-            <span>Subtotal ({summary?.itemCount || 0} items)</span>
+            <span>{cartT("subtotal")} ({cartT("itemCount", { count: summary?.itemCount || 0 })})</span>
             <span>${summary?.subtotal || 0}</span>
           </div>
           <div className="flex justify-between">
-            <span>Delivery Fee</span>
+            <span>{cartT("deliveryFee")}</span>
             <span>${summary?.deliveryFee || 0}</span>
           </div>
           <div className="flex justify-between">
-            <span>Platform Fee</span>
+            <span>{t("platformFee")}</span>
             <span>$1.50</span>
           </div>
         </div>
@@ -125,7 +129,7 @@ clearStoredGroupOrderCode();
         <div className="border-t my-5" />
 
         <div className="flex justify-between font-semibold text-lg">
-          <span>Total</span>
+          <span>{cartT("total")}</span>
           <span className="text-orange-500">
             ${summary?.totalAmount || 0}
           </span>
@@ -135,14 +139,14 @@ clearStoredGroupOrderCode();
        <button
   onClick={() => {
     if (!canCheckout) {
-      toast.error("Only host can finalize order");
+      toast.error(t("onlyHostCanFinalize"));
       return;
     }
     setCheckoutOpen(true);
   }}
   className="w-full mt-5 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-full font-medium shadow-md hover:shadow-lg transition"
 >
-  Finalize and Checkout
+  {t("finalizeCheckout")}
 </button>
 
         {/* NOTE BUTTON */}
@@ -150,18 +154,17 @@ clearStoredGroupOrderCode();
           onClick={() => setNoteOpen(true)}
           className="w-full mt-2 bg-gray-100 text-gray-600 py-2 rounded-full text-sm hover:bg-gray-200 transition"
         >
-          Add a Note for Restaurant
+          {t("addRestaurantNote")}
         </button>
 
         <p className="text-xs text-gray-400 mt-3">
-          Orders will only be processed once the host clicks finalize.
+          {t("hostFinalizeNotice")}
         </p>
       </div>
       <div className="flex items-start gap-3 bg-sky-100/40 text-sky-900 rounded-xl px-4 py-4">
         <Info className="w-5 h-5 mt-0.5 text-sky-700" strokeWidth={2.5} />
         <p className="text-xs leading-relaxed">
-          Orders will only be processed once the host clicks finalize.
-          You can still edit your individual items.
+          {t("editNotice")}
         </p>
       </div>
 
@@ -169,7 +172,7 @@ clearStoredGroupOrderCode();
       <div className="relative rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition">
         <Image
           src="https://images.unsplash.com/photo-1604908176997-125f25cc6f3d"
-          alt="offer"
+          alt={t("offerImageAlt")}
           width={400}
           height={200}
           className="object-cover"
@@ -177,10 +180,10 @@ clearStoredGroupOrderCode();
 
         <div className="absolute inset-0 bg-black/50 p-4 flex flex-col justify-end">
           <span className="text-xs bg-orange-500 text-white px-2 py-1 w-fit rounded">
-            OFFER
+            {t("offer")}
           </span>
           <p className="text-white font-semibold mt-2">
-            Get 20% off your next group order!
+            {t("offerText")}
           </p>
         </div>
       </div>
@@ -191,17 +194,17 @@ clearStoredGroupOrderCode();
 
     <DialogHeader>
       <DialogTitle className="text-xl font-semibold text-gray-900">
-        Add Note
+        {t("noteTitle")}
       </DialogTitle>
       <p className="text-sm text-gray-500 mt-1">
-        Add any special instructions for your order.
+        {t("noteDescription")}
       </p>
     </DialogHeader>
 
     <textarea
       value={note}
       onChange={(e) => setNote(e.target.value)}
-      placeholder="Allergies, instructions, etc."
+      placeholder={t("notePlaceholder")}
       className="w-full mt-4 bg-white border border-gray-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-primary/30"
       rows={4}
     />
@@ -210,7 +213,7 @@ clearStoredGroupOrderCode();
       onClick={() => setNoteOpen(false)}
       className="w-full mt-5 bg-primary text-white py-3 rounded-full font-medium hover:opacity-90 transition"
     >
-      Save Note
+      {t("saveNote")}
     </button>
 
   </DialogContent>
@@ -222,21 +225,21 @@ clearStoredGroupOrderCode();
 
     <DialogHeader>
       <DialogTitle className="text-xl font-semibold text-gray-900">
-        Checkout Details
+        {t("checkoutDetails")}
       </DialogTitle>
       <p className="text-sm text-gray-500 mt-1">
-        Complete your order details below.
+        {t("checkoutDescription")}
       </p>
     </DialogHeader>
 
     {/* PAYMENT */}
     <div className="mt-5">
       <p className="text-sm font-medium text-gray-700 mb-2">
-        Payment Method
+        {t("paymentMethod")}
       </p>
 
       <div className="grid grid-cols-2 gap-3">
-        {["COD", "BANK_TRANSFER", "EASYPESA", "JAZZCASH"].map((method) => (
+        {(["COD", "BANK_TRANSFER", "EASYPESA", "JAZZCASH"] as GroupOrderPaymentMethod[]).map((method) => (
           <button
             key={method}
             onClick={() => setPaymentMethod(method as GroupOrderPaymentMethod)}
@@ -246,7 +249,7 @@ clearStoredGroupOrderCode();
                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
             }`}
           >
-            {method}
+            {t(`paymentMethods.${method}`)}
           </button>
         ))}
       </div>
@@ -255,12 +258,12 @@ clearStoredGroupOrderCode();
     {/* COUPON */}
     <div className="mt-5">
       <p className="text-sm font-medium text-gray-700 mb-1">
-        Coupon Code
+        {t("couponCode")}
       </p>
       <input
         value={coupon}
         onChange={(e) => setCoupon(e.target.value)}
-        placeholder="Enter coupon"
+        placeholder={t("couponPlaceholder")}
         className="w-full bg-white border border-gray-200 rounded-full px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30"
       />
     </div>
@@ -274,7 +277,7 @@ clearStoredGroupOrderCode();
       {loadingCheckout && (
         <Loader2 className="w-4 h-4 animate-spin" />
       )}
-      Confirm Order
+      {t("confirmOrder")}
     </button>
 
   </DialogContent>

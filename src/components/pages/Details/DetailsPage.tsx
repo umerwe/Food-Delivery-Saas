@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 const categories = ["All", "Burgers", "Pizza", "Bread", "Chiffon & Rolls", "Donut", "Pastry & Danish", "Cakes", "Drinks"];
 
@@ -39,6 +40,10 @@ const cartItems = [
 
 export function DetailsPage() {
     const router = useRouter();
+    const t = useTranslations("productDetails.detailsPage");
+    const cartT = useTranslations("cart");
+    const checkoutT = useTranslations("checkout");
+
     return (
         <div className="max-w-[1400px] mx-auto px-4 pt-[25.5px] pb-[108px]">
 
@@ -60,15 +65,15 @@ export function DetailsPage() {
                         <div className="flex items-center gap-2 text-base font-medium text-gray-600">
                             <div className="flex items-center text-primary">
                                 <Star size={18} className='text-gray-900 fill-gray-900' />
-                                <span className="ml-1 text-gray-900">4.5 Stars</span>
+                                <span className="ml-1 text-gray-900">{t("stars", { rating: "4.5" })}</span>
                             </div>
                             <span>|</span>
-                            <span className="underline cursor-pointer text-primary">450 Reviews</span>
+                            <span className="underline cursor-pointer text-primary">{t("reviews", { count: 450 })}</span>
                         </div>
                     </div>
 
                     <Button onClick={() => router.push('/reservetable')} variant="primary" className="rounded-[8px] h-[50px] w-[228px] px-8 text-base font-semibold">
-                        Reserve table
+                        {t("reserveTable")}
                     </Button>
                 </div>
 
@@ -77,12 +82,12 @@ export function DetailsPage() {
                     <div className="space-y-4">
                         <div className="flex items-center gap-3 text-gray-700">
                             <IndianRupee size={20} />
-                            <span className="text-base font-medium">₹ 2,000 for 2 | North Indian</span>
+                            <span className="text-base font-medium">{t("priceCuisine")}</span>
                         </div>
                         <div className="flex items-center gap-3 text-gray-700">
                             <Navigation size={20} />
                             <span className="text-base font-medium">
-                                <span className="text-primary">0.7 km</span> from Banaras Ghats
+                                <span className="text-primary">0.7 km</span> {t("distanceFrom", { place: "Banaras Ghats" })}
                             </span>
                         </div>
                     </div>
@@ -90,12 +95,12 @@ export function DetailsPage() {
                     <div className="space-y-4">
                         <div className="flex items-center gap-3 text-gray-700">
                             <MapPin size={20} />
-                            <span className="text-base font-medium">Connaught Place, Central Delhi</span>
+                            <span className="text-base font-medium">{t("branchAddress")}</span>
                         </div>
                         <div className="flex items-center gap-3 text-gray-700">
                             <Clock size={20} />
                             <span className="text-base font-medium">
-                                <span className="text-primary">Open from</span> 10:00 AM - 11:00 PM
+                                <span className="text-primary">{t("openFrom")}</span> 10:00 AM - 11:00 PM
                             </span>
                         </div>
                     </div>
@@ -107,12 +112,12 @@ export function DetailsPage() {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-primary" size={20} />
                     <Input
                         type="text"
-                        placeholder="Search Menu"
+                        placeholder={t("searchMenu")}
                         className='pl-12 h-[50px] bg-[#F9F9F9] border-none rounded-[12px] text-base'
                     />
                 </div>
                 <Button variant="primary" className='rounded-[12px] h-[50px] w-[184px] text-base font-semibold'>
-                    Find Food
+                    {t("findFood")}
                 </Button>
             </div>
 
@@ -172,7 +177,7 @@ export function DetailsPage() {
                 <div className="lg:col-span-1 w-[372px]">
                     <Card className="border-none shadow-none p-0 sticky top-8">
                         <CardContent className="p-0">
-                            <h2 className="text-[24px] text-gray-900 mb-[40px]">Cart</h2>
+                            <h2 className="text-[24px] text-gray-900 mb-[40px]">{cartT("yourOrder")}</h2>
 
                             {/* Cart Items List */}
                             <div className="space-y-[19px] pb-4 border-b border-gray-200">
@@ -214,13 +219,13 @@ export function DetailsPage() {
                             {/* Total & Coupon */}
                             <div className="space-y-6 mt-[24px]">
                                 <div className="flex justify-between items-center text-[22px] font-medium text-gray-900 mb-[55px]">
-                                    <span>Total Cost:</span>
+                                    <span>{t("totalCost")}</span>
                                     <span>$120</span>
                                 </div>
 
                                 <div className="relative pb-[35px] border-b border-gray-200">
                                     <Input
-                                        placeholder="Apply Coupon Code here"
+                                        placeholder={t("couponPlaceholder")}
                                         className="pl-[26px] pr-18 border border-gray-200 placeholder:text-gray-800"
                                     />
                                     <button className="absolute right-[36px] top-0 translate-y-1/2 text-primary hover:text-primary/80">
@@ -236,14 +241,14 @@ export function DetailsPage() {
                                 {/* Delivery Option (Active) */}
                                 <button className="flex flex-col items-center justify-center p-4 rounded-lg bg-[#F9F9F9] border-2 border-gray-200 transition-all">
                                     <Bike size={28} className="text-primary" />
-                                    <span className="text-base font-semibold text-gray-900 mt-2">Delivery</span>
-                                    <span className="text-[15px] text-gray-900 font-medium">Starts at 17:50</span>
+                                    <span className="text-base font-semibold text-gray-900 mt-2">{checkoutT("delivery")}</span>
+                                    <span className="text-[15px] text-gray-900 font-medium">{t("startsAt", { time: "17:50" })}</span>
                                 </button>
                                 {/* Pickup Option (Inactive) */}
                                 <button className="flex flex-col items-center justify-center p-4 rounded-[16px] bg-white border-2 border-transparent hover:border-gray-200 transition-all">
                                     <Store size={28} className="text-gray-400" />
-                                    <span className="text-base font-semibold text-gray-400 mt-2">Pickup</span>
-                                    <span className="text-[15px] text-gray-400 font-medium">Starts at 16:50</span>
+                                    <span className="text-base font-semibold text-gray-400 mt-2">{checkoutT("pickup")}</span>
+                                    <span className="text-[15px] text-gray-400 font-medium">{t("startsAt", { time: "16:50" })}</span>
                                 </button>
                             </div>
 
@@ -253,7 +258,7 @@ export function DetailsPage() {
                                 onClick={() => router.push("/checkout")}
                                 className='w-full rounded-[10px] text-[24px]'
                             >
-                                Checkout
+                                {cartT("proceedToCheckout")}
                             </Button>
 
                         </CardContent>
