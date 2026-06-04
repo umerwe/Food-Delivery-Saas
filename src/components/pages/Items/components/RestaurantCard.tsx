@@ -15,6 +15,10 @@ import { getStoredGroupOrderCode } from "@/lib/group-order";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuVariation, Modifier, ModifierGroup, ModifierLink, SelectedModifiersMap, PromotionInfo, PromotionPricing, RawModifierLink, SelectedModifier, VariationPriceOverride } from "@/components/pages/Items/types";
 import { hasText, formatPrice, getSplitPizzaPricingVariation, toNumber } from "@/components/pages/Items/utils/restaurant-card-utils";
+import {
+  buildModifierSelections,
+  validateModifierSelections,
+} from "@/components/pages/Items/utils/modifier-selections";
 
 
 const getApiResponseMessage = (res: ApiRecord | null | undefined) => {
@@ -630,17 +634,25 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
   const normalizeGroup = (group: ModifierGroup | ApiRecord | null | undefined): ModifierGroup | null => {
     if (!group?.id) return null;
     if (group?.isActive === false) return null;
+    const modifiers = getNormalizedModifiersFromGroup(group);
+    const minSelect = Math.max(0, toNumber(group?.minSelect, 0));
+    const rawMaxSelect = toNumber(group?.maxSelect, modifiers.length);
+    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const maxSelect = selectionType === "SINGLE"
+      ? 1
+      : Math.max(minSelect, rawMaxSelect > 0 ? rawMaxSelect : modifiers.length);
 
     return {
       id: String(group.id),
       name: String(group?.name || ""),
       description: typeof group?.description === "string" ? group.description : "",
-      minSelect: typeof group?.minSelect === "number" ? group.minSelect : undefined,
-      maxSelect: typeof group?.maxSelect === "number" ? group.maxSelect : undefined,
-      isRequired: Boolean(group?.isRequired),
+      selectionType,
+      minSelect,
+      maxSelect,
+      isRequired: typeof group?.isRequired === "boolean" ? group.isRequired : minSelect > 0,
       sortOrder: toNumber(group?.sortOrder, 0),
       isActive: group?.isActive !== false,
-      modifiers: getNormalizedModifiersFromGroup(group),
+      modifiers,
       modifierLinks: Array.isArray(group?.modifierLinks)
         ? group.modifierLinks
         : [],
@@ -764,13 +776,25 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       ? menuItem.categoryModifierGroups
       : [];
 
+    const rawNestedCategoryModifierGroups = Array.isArray(
+      menuItem?.category?.categoryModifierGroups,
+    )
+      ? menuItem.category.categoryModifierGroups
+      : [];
+
     const rawModifierGroups = Array.isArray(menuItem?.modifierGroups)
       ? menuItem.modifierGroups
       : [];
 
+    const rawNestedCategoryGroups = Array.isArray(menuItem?.category?.modifierGroups)
+      ? menuItem.category.modifierGroups
+      : [];
+
     const normalizedModifierGroups: ModifierLink[] = [
       ...rawModifierGroups,
+      ...rawNestedCategoryGroups,
       ...rawCategoryModifierGroups,
+      ...rawNestedCategoryModifierGroups,
     ]
       .map((group: ModifierGroup | ApiRecord, index: number) => {
         const normalizedGroup = normalizeGroup(group);
@@ -828,8 +852,9 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
             id: `standalone-modifiers-${menuItem?.id || "item"}`,
             name: t("addons"),
             description: t("addonsDescription"),
+            selectionType: "MULTIPLE",
             minSelect: 0,
-            maxSelect: undefined,
+            maxSelect: standaloneModifiers.length,
             isRequired: false,
             sortOrder: 999,
             isActive: true,
@@ -874,13 +899,15 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
         ? toNumber(group.maxSelect, 0)
         : undefined;
 
-    const isRequired = Boolean(group?.isRequired);
+    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isRequired = Boolean(group?.isRequired) || rawMin > 0;
     const minSelect = Math.max(isRequired ? 1 : 0, rawMin);
 
     return {
       minSelect,
-      maxSelect: rawMax,
+      maxSelect: selectionType === "SINGLE" ? 1 : rawMax,
       isRequired,
+      selectionType,
     };
   };
 
@@ -985,9 +1012,26 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
   const itemVariations = useMemo(() => getItemVariations(item), [item]);
 
+  const visibleModifierLinks = useMemo(() => {
+    return getVisibleModifierLinks(item, selectedVariation);
+  }, [item, selectedVariation]);
+
+  const groupedModifierLinks = useMemo(() => {
+    return visibleModifierLinks.filter((link) => {
+      const groupId = String(link?.modifierGroup?.id || "");
+      return groupId && groupId !== ADDONS_GROUP_ID && !groupId.startsWith("standalone-modifiers-");
+    });
+  }, [visibleModifierLinks]);
+
+  const groupedModifierGroups = useMemo(
+    () => groupedModifierLinks.map((link) => link.modifierGroup),
+    [groupedModifierLinks],
+  );
+
   const itemAddons = useMemo(() => {
+    if (groupedModifierGroups.length > 0) return [];
     return getStandaloneItemModifiers(item, new Set<string>());
-  }, [item]);
+  }, [groupedModifierGroups.length, item]);
 
   const itemQuantityRules = useMemo(() => {
     const minQuantity = Math.max(1, toNumber(item?.minQuantity, 1));
@@ -1054,6 +1098,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
   const hasOptions =
     itemVariations.length > 0 ||
     itemAddons.length > 0 ||
+    groupedModifierLinks.length > 0 ||
     itemSupportsSplitPizza;
 
   useEffect(() => {
@@ -1099,24 +1144,39 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
   useEffect(() => {
     const validAddonIds = new Set(itemAddons.map((addon) => String(addon.id)));
+    const validGroupIds = new Set(groupedModifierGroups.map((group) => String(group?.id || "")));
 
     queueMicrotask(() => {
       setSelectedModifiers((prev): SelectedModifiersMap => {
-      const existingAddons = prev[ADDONS_GROUP_ID] || [];
-      const nextAddons = existingAddons.filter((addon) =>
-        validAddonIds.has(String(addon.id)),
-      );
+        const existingAddons = prev[ADDONS_GROUP_ID] || [];
+        const nextAddons = existingAddons.filter((addon) =>
+          validAddonIds.has(String(addon.id)),
+        );
 
-      const next: SelectedModifiersMap = {};
+        const next: SelectedModifiersMap = {};
 
-      if (nextAddons.length) {
-        next[ADDONS_GROUP_ID] = nextAddons;
-      }
+        if (nextAddons.length) {
+          next[ADDONS_GROUP_ID] = nextAddons;
+        }
+
+        for (const [groupId, modifiers] of Object.entries(prev)) {
+          if (!validGroupIds.has(groupId)) continue;
+
+          const group = groupedModifierGroups.find((entry) => String(entry?.id || "") === groupId);
+          const validModifierIds = new Set(
+            normalizeArray<Modifier>(group?.modifiers).map((modifier) => String(modifier?.id || "")),
+          );
+          const nextModifiers = modifiers.filter((modifier) => validModifierIds.has(String(modifier?.id || "")));
+
+          if (nextModifiers.length) {
+            next[groupId] = nextModifiers;
+          }
+        }
 
         return next;
       });
     });
-  }, [itemAddons]);
+  }, [groupedModifierGroups, itemAddons]);
 
   const handleAddonToggle = (modifier: Modifier) => {
     setSelectedModifiers((prev) => {
@@ -1151,6 +1211,64 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       return {
         ...prev,
         [ADDONS_GROUP_ID]: [
+          ...current,
+          {
+            ...modifier,
+            selectedQuantity: 1,
+          },
+        ],
+      };
+    });
+  };
+
+  const handleGroupedModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
+    const groupId = String(group.id);
+    const { minSelect, maxSelect, isRequired, selectionType } = getGroupValidation(group);
+    const itemName = item?.name || t("thisItem");
+
+    setSelectedModifiers((prev) => {
+      const current = prev[groupId] || [];
+      const isSelected = current.some((selected) => selected.id === modifier.id);
+
+      if (selectionType === "SINGLE" || maxSelect === 1) {
+        if (isSelected && !isRequired) {
+          const next = { ...prev };
+          delete next[groupId];
+          return next;
+        }
+
+        return {
+          ...prev,
+          [groupId]: [{ ...modifier, selectedQuantity: 1 }],
+        };
+      }
+
+      if (isSelected) {
+        if (minSelect > 0 && current.length <= minSelect) {
+          toast.error(t("minimumAddons", { itemName, count: minSelect }));
+          return prev;
+        }
+
+        const nextModifiers = current.filter((selected) => selected.id !== modifier.id);
+        const next = { ...prev };
+
+        if (nextModifiers.length) {
+          next[groupId] = nextModifiers;
+        } else {
+          delete next[groupId];
+        }
+
+        return next;
+      }
+
+      if (maxSelect && current.length >= maxSelect) {
+        toast.error(t("maximumAddons", { itemName, count: maxSelect }));
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [groupId]: [
           ...current,
           {
             ...modifier,
@@ -1299,6 +1417,116 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
     setSplitPizzaItem(selectedItem || null);
   };
 
+  const renderModifierGroupSections = () => {
+    if (!groupedModifierLinks.length) return null;
+
+    return groupedModifierLinks.map((link) => {
+      const group = link.modifierGroup;
+      const groupId = String(group?.id || "");
+      const selectedInGroup = selectedModifiers[groupId] || [];
+      const { maxSelect, isRequired, selectionType } = getGroupValidation(group);
+      const groupModifiers = normalizeArray<Modifier>(group?.modifiers).filter(
+        (modifier) => modifier?.isActive !== false,
+      );
+
+      if (!groupModifiers.length) return null;
+
+      const selectedCount = selectedInGroup.length;
+      const inputType = selectionType === "SINGLE" || maxSelect === 1 ? "radio" : "checkbox";
+      const groupSelectionLabel =
+        maxSelect && maxSelect > 0
+          ? `Min ${Math.max(0, toNumber(group?.minSelect, 0))} · Max ${maxSelect}`
+          : isRequired
+            ? "Required"
+            : t("optional");
+
+      return (
+        <div
+          key={`${String(link?.variationId || "common")}-${groupId}`}
+          className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
+        >
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="font-medium text-gray-900">{group?.name}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                  {groupSelectionLabel}
+                </span>
+                {group?.description ? (
+                  <span className="text-xs text-gray-500">
+                    {group.description}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+              {selectedCount}
+              {maxSelect ? ` / ${maxSelect}` : ""} selected
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            {groupModifiers.map((modifier) => {
+              const checked = selectedInGroup.some(
+                (selected) => selected.id === modifier.id,
+              );
+              const disableBecauseMaxReached =
+                inputType !== "radio" && !checked && !!maxSelect && selectedCount >= maxSelect;
+              const effectivePrice = getModifierEffectivePrice(
+                modifier,
+                item?.id ? String(item.id) : undefined,
+                selectedVariation,
+              );
+
+              return (
+                <label
+                  key={modifier.id}
+                  className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl border px-3 py-3 text-sm transition ${
+                    disableBecauseMaxReached
+                      ? "cursor-not-allowed border-gray-100 bg-gray-100 opacity-70"
+                      : checked
+                        ? "border-primary/25 bg-primary/5 ring-1 ring-primary/20"
+                        : "border-gray-100 bg-gray-50 hover:border-primary/25 hover:bg-white"
+                  }`}
+                >
+                  <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
+                    <input
+                      type={inputType}
+                      name={`modifier-group-${item?.id}-${groupId}`}
+                      checked={checked}
+                      disabled={disableBecauseMaxReached}
+                      onChange={() => handleGroupedModifierToggle(group, modifier)}
+                      className="mt-1 accent-[var(--primary)]"
+                    />
+
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-gray-900">
+                        {modifier.displayText || modifier.name}
+                      </span>
+
+                      {modifier.description ? (
+                        <span className="mt-1 block text-xs leading-relaxed text-gray-500">
+                          {modifier.description}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+
+                  {effectivePrice > 0 ? (
+                    <span className="shrink-0 font-semibold text-primary">
+                      +${effectivePrice.toFixed(2)}
+                    </span>
+                  ) : null}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      );
+    });
+  };
+
   const renderAddonSection = () => {
     if (!itemAddons.length) return null;
 
@@ -1432,6 +1660,13 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
         return;
       }
 
+      const groupedValidation = validateModifierSelections(groupedModifierGroups, selectedModifiers);
+
+      if (!groupedValidation.isValid) {
+        toast.error(Object.values(groupedValidation.errors)[0] || t("failedAddToCart"));
+        return;
+      }
+
       if (!validateAddonSelections()) {
         return;
       }
@@ -1473,9 +1708,14 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
         menuItemId: item?.id,
         quantity: qty,
         variationId: selectedVariation?.id || undefined,
-        modifiers: buildModifiersPayload(selectedModifiers),
         note: note.trim() || "",
       };
+
+      if (groupedModifierGroups.length > 0) {
+        basePayload.modifierSelections = buildModifierSelections(groupedModifierGroups, selectedModifiers);
+      } else {
+        basePayload.modifiers = buildModifiersPayload(selectedModifiers);
+      }
 
       if (splitSections) {
         basePayload.sections = splitSections;
@@ -1909,6 +2149,8 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
               ) : null}
             </div>
           ) : null}
+
+          {renderModifierGroupSections()}
 
           {renderAddonSection()}
 

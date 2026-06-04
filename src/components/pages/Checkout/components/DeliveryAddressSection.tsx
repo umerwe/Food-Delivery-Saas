@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { MapPin, Plus } from "lucide-react";
-import AddressModal from "@/components/forms/AddressModal";
+import { AddressModal } from "@/components/forms/AddressModal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import useCheckout from "@/hooks/useCheckout";
+import { useCheckout } from "@/hooks/useCheckout";
 import { useAuth } from "@/hooks/useAuth";
 import {
   fetchAddresses as fetchProfileAddresses,
@@ -18,7 +18,7 @@ interface Props {
   setSelectedAddress: (value: string) => void;
 }
 
-export default function DeliveryAddressSection({
+export function DeliveryAddressSection({
   selectedAddress,
   setSelectedAddress,
 }: Props) {

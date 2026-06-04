@@ -13,10 +13,15 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import useReservations from "@/hooks/useReservations";
 import { useAuth } from "@/hooks/useAuth";
-import ReservationSuccess from "@/components/pages/Reservations/components/ReservationSuccess";
+import { ReservationSuccess } from "@/components/pages/Reservations/components/ReservationSuccess";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import { createReservationSchema, type ReservationFormValues } from "@/validations/reservations";
-import type { Reservation, ReservationPayload } from "@/services/reservations";
+import {
+  getReservationStatusLabelKey,
+  normalizeReservationResponse,
+  type Reservation,
+  type ReservationPayload,
+} from "@/services/reservations";
 import type { BranchRecord } from "@/types/branch-selector";
 
 const SLOT_INTERVAL_MINUTES = 30;
@@ -503,10 +508,19 @@ export function ReserveTablePage() {
         return toast.error(res?.error || t("failedFallback"));
       }
 
-      toast.success(t("reservationConfirmedToast"));
+      const reservation = normalizeReservationResponse(res);
+      const statusKey = getReservationStatusLabelKey(reservation?.status);
+      const toastMessage =
+        statusKey === "confirmed"
+          ? t("reservationConfirmedToast")
+          : statusKey === "requested"
+            ? t("reservationRequestedToast")
+            : t("reservationCreatedToast");
+
+      toast.success(toastMessage);
 
       setSuccess(true);
-      setReservationData(res.data as Reservation);
+      setReservationData(reservation);
 
       reset({ branchId: "", date: "", time: "", guestCount: 2, note: "" });
       setSelectedBranch(null);

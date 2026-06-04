@@ -1,3 +1,5 @@
+import type { CartAppliedPromotion, CartQuote as NormalizedCartQuote } from "@/types/cart";
+
 export type ApiRecord = Record<string, unknown>;
 
 export type BackendErrorState = {
@@ -9,10 +11,12 @@ export type BackendErrorState = {
 };
 
 export type CartModifier = {
+  id?: string;
   modifierId?: string;
   name: string;
   quantity: number;
   unitPrice: number;
+  priceDelta?: number | string | null;
   total: number;
 };
 
@@ -40,7 +44,7 @@ export type CartItem = {
   desc: string;
   img: string;
   selectedVariationName: string;
-  selectedVariation?: ApiRecord;
+  selectedVariation?: ApiRecord | null;
   variationId?: string | number;
   selectedModifiers: CartModifier[];
   selectedSections: CartSection[];
@@ -53,11 +57,12 @@ export type CartItem = {
   pickupUnitPrice?: unknown;
   takeawayPriceAdjustment?: unknown;
   deliveryPriceAdjustment?: unknown;
+  dealId?: string | null;
 };
 
 export type CartResponse = {
   items: ApiRecord[];
-  quote: ApiRecord | null;
+  quote: NormalizedCartQuote | null;
 };
 
 export const toNumber = (value: unknown, fallback = 0) => {
@@ -130,7 +135,13 @@ export const hasBackendError = (res: unknown) => {
 
 const getModifierPriceFromGroups = (cartItem: ApiRecord, modifierId: string) => {
   const menuItem = asRecord(cartItem.menuItem);
-  const modifierGroups = normalizeArray<ApiRecord>(menuItem.modifierGroups);
+  const category = asRecord(menuItem.category);
+  const modifierGroups = [
+    ...normalizeArray<ApiRecord>(menuItem.modifierGroups),
+    ...normalizeArray<ApiRecord>(category.modifierGroups),
+    ...normalizeArray<ApiRecord>(menuItem.categoryModifierGroups),
+    ...normalizeArray<ApiRecord>(category.categoryModifierGroups),
+  ];
 
   for (const group of modifierGroups) {
     const modifiers = normalizeArray<ApiRecord>(group.modifiers);
@@ -157,12 +168,38 @@ export const getSelectedModifiers = (cartItemInput: unknown): CartModifier[] => 
       const total = toNumber(modifier.total, unitPrice * quantity);
 
       return {
+        id: getStringValue(modifier.id),
         modifierId: getStringValue(modifier.modifierId),
         name: getStringValue(modifier.name, "Add-on"),
         quantity,
         unitPrice,
+        priceDelta: modifier.priceDelta as number | string | null | undefined,
         total,
       };
+    });
+  }
+
+  if (Array.isArray(cartItem.modifierSelections)) {
+    return normalizeArray<ApiRecord>(cartItem.modifierSelections).flatMap((selection) => {
+      const groupName = getStringValue(selection.groupName || selection.name, "");
+
+      return normalizeArray<ApiRecord>(selection.modifiers).map((modifier) => {
+        const modifierId = String(modifier.modifierId || modifier.id || "");
+        const quantity = Math.max(1, toNumber(modifier.quantity, 1));
+        const fallbackModifier = getModifierPriceFromGroups(cartItem, modifierId);
+        const unitPrice = toNumber(modifier.unitPrice ?? modifier.priceDelta, fallbackModifier.unitPrice);
+        const modifierName = getStringValue(modifier.name, fallbackModifier.name);
+
+        return {
+          id: getStringValue(modifier.id),
+          modifierId,
+          name: groupName ? `${groupName}: ${modifierName}` : modifierName,
+          quantity,
+          unitPrice,
+          priceDelta: modifier.priceDelta as number | string | null | undefined,
+          total: toNumber(modifier.total, unitPrice * quantity),
+        };
+      });
     });
   }
 
@@ -173,10 +210,12 @@ export const getSelectedModifiers = (cartItemInput: unknown): CartModifier[] => 
     const unitPrice = fallbackModifier.unitPrice;
 
     return {
+      id: getStringValue(modifier.id),
       modifierId,
       name: fallbackModifier.name,
       quantity,
       unitPrice,
+      priceDelta: modifier.priceDelta as number | string | null | undefined,
       total: unitPrice * quantity,
     };
   });
@@ -245,7 +284,11 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
   const item = asRecord(itemInput);
   const menuItem = asRecord(item.menuItem);
   const category = asRecord(menuItem.category);
-  const selectedVariation = asRecord(menuItem.selectedVariation);
+  const itemSelectedVariation = asRecord(item.selectedVariation);
+  const menuItemSelectedVariation = asRecord(menuItem.selectedVariation);
+  const selectedVariation = Object.keys(itemSelectedVariation).length
+    ? itemSelectedVariation
+    : menuItemSelectedVariation;
   const quantity = Math.max(1, toNumber(item.quantity, 1));
   const selectedModifiers = getSelectedModifiers(item);
   const selectedSections = getSelectedSections(item);
@@ -293,7 +336,32 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
     pickupUnitPrice: item.pickupUnitPrice,
     takeawayPriceAdjustment: menuItem.takeawayPriceAdjustment,
     deliveryPriceAdjustment: menuItem.deliveryPriceAdjustment,
+    dealId: typeof item.dealId === "string" ? item.dealId : null,
   };
+};
+
+export const getCartItemLineTotal = (
+  item: {
+    lineTotal?: unknown;
+    unitPriceWithModifiers?: unknown;
+    price?: unknown;
+    quantity?: unknown;
+  }
+) => {
+  const quantity = Math.max(1, toNumber(item.quantity, 1));
+  const explicitLineTotal = toNumber(item.lineTotal, Number.NaN);
+
+  if (Number.isFinite(explicitLineTotal)) {
+    return explicitLineTotal;
+  }
+
+  const unitPriceWithModifiers = toNumber(item.unitPriceWithModifiers, Number.NaN);
+
+  if (Number.isFinite(unitPriceWithModifiers)) {
+    return unitPriceWithModifiers * quantity;
+  }
+
+  return toNumber(item.price, 0) * quantity;
 };
 
 export const recalculateCartItemQuantity = (item: CartItem, quantity: number): CartItem => {
@@ -310,6 +378,71 @@ export const recalculateCartItemQuantity = (item: CartItem, quantity: number): C
   };
 };
 
+export const normalizeCartAppliedPromotion = (value: unknown): CartAppliedPromotion | null => {
+  const promotion = asRecord(value);
+  const id = getStringValue(promotion.id);
+  const title = getStringValue(promotion.title);
+
+  if (!id && !title) {
+    return null;
+  }
+
+  return {
+    id,
+    title,
+    applyMode: getStringValue(promotion.applyMode) || undefined,
+    autoApply: typeof promotion.autoApply === "boolean" ? promotion.autoApply : undefined,
+    discountType: getStringValue(promotion.discountType) || undefined,
+    discountValue: toNumber(promotion.discountValue, 0),
+    discountAmount: toNumber(promotion.discountAmount, 0),
+  };
+};
+
+export const normalizeCartQuote = (value: unknown): NormalizedCartQuote | null => {
+  const quote = asRecord(value);
+
+  if (!Object.keys(quote).length) {
+    return null;
+  }
+
+  return {
+    subtotal: toNumber(quote.subtotal, 0),
+    discountAmount: toNumber(quote.discountAmount, 0),
+    totalAmount: toNumber(quote.totalAmount, 0),
+    appliedPromotion: normalizeCartAppliedPromotion(quote.appliedPromotion),
+  };
+};
+
+export const getAppliedPromotionDiscountLine = (
+  quote?: {
+    subtotal?: unknown;
+    discountAmount?: unknown;
+    totalAmount?: unknown;
+    appliedPromotion?: {
+      id?: string;
+      title?: string;
+      discountAmount?: unknown;
+      discountValue?: unknown;
+    } | null;
+  } | null
+) => {
+  const promotion = quote?.appliedPromotion ?? null;
+  const discountAmount = Math.max(
+    0,
+    toNumber(quote?.discountAmount ?? promotion?.discountAmount, 0)
+  );
+
+  if (!promotion && discountAmount <= 0) {
+    return null;
+  }
+
+  return {
+    label: promotion?.title || "Deal discount",
+    amount: discountAmount,
+    discountValue: promotion?.discountValue,
+  };
+};
+
 export const normalizeCartResponse = (res: unknown): CartResponse => {
   const record = asRecord(res);
   const data = asRecord(record.data);
@@ -318,6 +451,6 @@ export const normalizeCartResponse = (res: unknown): CartResponse => {
 
   return {
     items: normalizeArray<ApiRecord>(cart.items),
-    quote: asRecord(cart.quote),
+    quote: normalizeCartQuote(cart.quote),
   };
 };

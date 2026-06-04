@@ -11,6 +11,8 @@ import type { CustomerDeal } from "@/types/customer-deals";
 const deal: CustomerDeal = {
   id: "deal-1",
   title: "Deal",
+  dealSelectionMode: "FIXED_ITEMS",
+  dealRequiredQuantity: null,
   applyMode: "SCOPED_ITEMS",
   discountType: "FIXED_PRICE",
   discountValue: 799,

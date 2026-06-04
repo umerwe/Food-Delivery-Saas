@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import ReservationCard from "@/components/pages/Reservations/components/ReservationCard";
+import { ReservationCard } from "@/components/pages/Reservations/components/ReservationCard";
 import { useAuth } from "@/hooks/useAuth";
 import useReservations from "@/hooks/useReservations";
 import type { Reservation, ReservationMeta } from "@/services/reservations";

@@ -188,7 +188,12 @@
       "includes": "Enthält {items}",
       "noAvailableItems": "Dieses Angebot enthält keine verfügbaren Artikel.",
       "adding": "Wird hinzugefügt...",
-      "addDeal": "Angebot hinzufügen"
+      "addDeal": "Angebot hinzufügen",
+      "chooseItems": "Artikel auswählen",
+      "browseItems": "Artikel ansehen",
+      "selectEligibleItems": "Wählen Sie mindestens {count, plural, one {# berechtigten Artikel} other {# berechtigte Artikel}}.",
+      "addSelectedItems": "Ausgewählte Artikel hinzufügen",
+      "categoryDealToast": "Sehen Sie berechtigte Kategorien an, um dieses Angebot zu aktivieren."
     },
     "whyChooseUs": {
       "title": "Warum wir?",
@@ -569,6 +574,8 @@
     "cashOnDelivery": "Barzahlung bei Lieferung",
     "cardStripe": "Kredit-/Debitkarte (Stripe)",
     "wallet": "Wallet",
+    "scheduledDelivery": "Geplante Lieferung",
+    "scheduledDeliveryOptional": "Optional. Leer lassen für sofortige Lieferung.",
     "selectPickupTime": "Abholzeit auswählen",
     "chooseDate": "Datum auswählen",
     "closed": "Geschlossen",
@@ -583,6 +590,7 @@
     "addMoreItems": "Weitere Artikel hinzufügen",
     "clearCart": "Warenkorb leeren",
     "backendError": "Backend-Fehler",
+    "loadingCart": "Warenkorb wird geladen",
     "yourCartIsEmpty": "Ihr Warenkorb ist leer",
     "emptyCartDescription": "Fügen Sie Artikel aus dem Menü hinzu, um die Bestellung zu beginnen.",
     "browseItems": "Artikel ansehen",
@@ -639,9 +647,11 @@
       "failedClearCart": "Warenkorb konnte nicht geleert werden",
       "failedSetOrderType": "Bestellart konnte nicht festgelegt werden",
       "failedSetAddress": "Adresse konnte nicht festgelegt werden",
+      "failedSetSchedule": "Geplante Lieferung konnte nicht festgelegt werden",
       "cartEmpty": "Warenkorb ist leer",
       "selectAddress": "Bitte wählen Sie eine Adresse aus",
       "selectPickupDateTime": "Bitte wählen Sie Abholdatum und Abholzeit aus",
+      "invalidScheduledDelivery": "Ungültige geplante Lieferzeit",
       "invalidOrderTime": "Ungültige Bestellzeit",
       "checkoutFailed": "Checkout fehlgeschlagen",
       "invalidOrderResponse": "Ungültige Bestellantwort",
@@ -810,6 +820,15 @@
       "failedCreatePayment": "Zahlung konnte nicht erstellt werden",
       "choosePaymentMethod": "Wählen Sie unten eine Zahlungsmethode",
       "selectPaymentMethod": "Zahlungsmethode auswählen"
+    },
+    "giftCards": {
+      "redeemTitle": "Geschenkkarte einlösen",
+      "redeemDescription": "Geben Sie Ihren Geschenkkartencode ein, um Guthaben zu Ihrer Wallet hinzuzufügen.",
+      "code": "Geschenkkartencode",
+      "redeem": "Einlösen",
+      "redeeming": "Wird eingelöst...",
+      "creditedAmount": "Gutgeschriebener Betrag",
+      "walletBalance": "Wallet-Guthaben"
     }
   },
   "addresses": {
@@ -872,7 +891,9 @@
     "cancel": "Stornieren",
     "statusLabels": {
       "pending": "Ausstehend",
+      "requested": "Angefragt",
       "confirmed": "Bestätigt",
+      "seated": "Platziert",
       "cancelled": "Storniert",
       "completed": "Abgeschlossen",
       "noShow": "Nicht erschienen",
@@ -912,6 +933,8 @@
     "selectDateTime": "Datum und Uhrzeit wählen",
     "selectedTimeUnavailable": "Die gewählte Zeit ist nicht mehr verfügbar",
     "reservationConfirmedToast": "Reservierung bestätigt",
+    "reservationRequestedToast": "Reservierungsanfrage gesendet",
+    "reservationCreatedToast": "Reservierung erstellt",
     "failedFallback": "Fehlgeschlagen",
     "reserving": "Reservierung läuft...",
     "confirmReservation": "Reservierung bestätigen",
@@ -927,6 +950,8 @@
     "success": {
       "title": "Reservierung bestätigt",
       "description": "Wir freuen uns darauf, dich willkommen zu heißen. Deine Reservierung wurde erfolgreich erstellt.",
+      "confirmedDescription": "Deine Reservierung ist bestätigt.",
+      "requestedDescription": "Deine Reservierungsanfrage wurde gesendet und wartet auf Bestätigung.",
       "upcomingExperience": "Bevorstehendes Dining-Erlebnis",
       "yourReservation": "Deine Reservierung",
       "status": "Status",
@@ -1291,6 +1316,7 @@
     "profileFirstNameRequired": "Vorname ist erforderlich",
     "profileLastNameRequired": "Nachname ist erforderlich",
     "avatarUrlInvalid": "Avatar muss eine gültige URL oder ein relativer Pfad sein",
+    "giftCardCodeRequired": "Geschenkkartencode ist erforderlich",
     "reservationBranchRequired": "Bitte wähle eine Filiale",
     "reservationDateTimeRequired": "Datum und Uhrzeit wählen",
     "reservationPastDate": "Vergangene Daten sind für Reservierungen nicht verfügbar.",

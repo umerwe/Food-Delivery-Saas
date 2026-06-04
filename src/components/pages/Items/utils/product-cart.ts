@@ -1,4 +1,5 @@
 import type { CartPayload, MenuItem, MenuVariation, ModifierSelectionMap } from "../types";
+import { buildModifierSelections } from "./modifier-selections";
 
 const getId = (value: unknown) => {
   if (value === undefined || value === null) return "";
@@ -19,13 +20,18 @@ type CartPayloadBuilderInput = {
   selectedVariation?: MenuVariation | null;
   qty: number;
   selectedModifiers: ModifierSelectionMap;
+  modifierGroups?: CartPayloadBuilderModifierGroup[];
   instructions?: string;
   splitPizzaEnabled: boolean;
   splitPizzaItem: MenuItem | null;
   includeMenuItem: boolean;
   includeBranch: boolean;
   clearSectionsWhenEmpty: boolean;
+  dealId?: string | null;
+  shouldSendDealId?: boolean;
 };
+
+type CartPayloadBuilderModifierGroup = NonNullable<MenuItem["modifierGroups"]>[number];
 
 const getSplitSections = ({
   splitPizzaEnabled,
@@ -60,12 +66,15 @@ export const buildCartPayload = ({
   selectedVariation,
   qty,
   selectedModifiers,
+  modifierGroups = [],
   instructions,
   splitPizzaEnabled,
   splitPizzaItem,
   includeMenuItem,
   includeBranch,
   clearSectionsWhenEmpty,
+  dealId,
+  shouldSendDealId = false,
 }: CartPayloadBuilderInput): CartPayload & Record<string, unknown> => {
   const splitSections = getSplitSections({ splitPizzaEnabled, splitPizzaItem, item });
   const restaurantMenuId = getRestaurantMenuId(item);
@@ -76,14 +85,29 @@ export const buildCartPayload = ({
     ...(restaurantMenuId ? { restaurantMenuId } : {}),
     variationId: selectedVariation?.id || null,
     quantity: qty,
-    modifiers: buildModifiersPayload(selectedModifiers),
     note: instructions?.trim() || "",
   };
+
+  const groupedFlowModifierGroups = modifierGroups.filter((group) => {
+    const groupId = String(group?.id || "");
+    return groupId && !groupId.startsWith("item-addons-") && groupId !== "__item_addons__";
+  });
+  const modifierSelections = buildModifierSelections(groupedFlowModifierGroups, selectedModifiers);
+
+  if (groupedFlowModifierGroups.length > 0) {
+    payload.modifierSelections = modifierSelections;
+  } else {
+    payload.modifiers = buildModifiersPayload(selectedModifiers);
+  }
 
   if (splitSections) {
     payload.sections = splitSections;
   } else if (clearSectionsWhenEmpty) {
     payload.sections = [];
+  }
+
+  if (shouldSendDealId && dealId) {
+    payload.dealId = dealId;
   }
 
   return payload;

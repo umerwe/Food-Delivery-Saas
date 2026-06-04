@@ -11,24 +11,7 @@ import {
   FaMapMarkerAlt,
 } from "react-icons/fa";
 import { useAuth } from "@/hooks/useAuth";
-import type { Reservation, ReservationBranch } from "@/services/reservations";
-
-const getReservationStatusKey = (status?: string | null) => {
-  switch (String(status || "").toUpperCase()) {
-    case "PENDING":
-      return "pending";
-    case "CONFIRMED":
-      return "confirmed";
-    case "CANCELLED":
-      return "cancelled";
-    case "COMPLETED":
-      return "completed";
-    case "NO_SHOW":
-      return "noShow";
-    default:
-      return null;
-  }
-};
+import { getReservationStatusLabelKey, type Reservation, type ReservationBranch } from "@/services/reservations";
 
 const toFiniteNumber = (value: unknown) => {
   const parsed = Number(value);
@@ -68,7 +51,7 @@ const getCoordinatesFromCandidates = (candidates: unknown[]) => {
   return null;
 };
 
-export default function ReservationSuccess({ data }: { data: Reservation | null }) {
+export function ReservationSuccess({ data }: { data: Reservation | null }) {
   const t = useTranslations("reserveTable.success");
   const statusT = useTranslations("reservations.statusLabels");
   const { user } = useAuth();
@@ -119,8 +102,14 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
   );
 
   const addressText = buildAddressText(branchAddress);
-  const statusKey = getReservationStatusKey(data?.status);
-  const statusLabel = statusKey ? statusT(statusKey) : data?.status || statusT("booked");
+  const statusKey = getReservationStatusLabelKey(data?.status);
+  const statusLabel = statusKey !== "unknown" ? statusT(statusKey) : data?.status || statusT("booked");
+  const description =
+    statusKey === "confirmed"
+      ? t("confirmedDescription")
+      : statusKey === "requested"
+        ? t("requestedDescription")
+        : t("description");
 
   const coordinates = useMemo(() => {
     return getCoordinatesFromCandidates([
@@ -168,7 +157,7 @@ export default function ReservationSuccess({ data }: { data: Reservation | null 
           </h1>
 
           <p className="mx-auto mt-2 max-w-[520px] text-[15px] text-gray-500">
-            {t("description")}
+            {description}
           </p>
         </div>
 

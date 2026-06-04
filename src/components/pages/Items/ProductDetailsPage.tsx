@@ -21,6 +21,9 @@ import {
   isCartBranchConflict,
 } from "@/components/pages/Items/utils/product-cart";
 import {
+  validateModifierSelections,
+} from "@/components/pages/Items/utils/modifier-selections";
+import {
   getDepositAmount,
   getProductDetailsQuantityLimits,
   normalizeApiList,
@@ -798,6 +801,7 @@ function ProductDetailsPageContent() {
   const slug = params.get("slug");
   const itemIdParam = params.get("itemId") || "";
   const cartItemId = params.get("cartItemId") || "";
+  const dealIdContext = params.get("dealId") || "";
   const checkoutType = getCheckoutType(params.get("type"));
 
   const isEditingCartItem = Boolean(cartItemId);
@@ -828,6 +832,7 @@ function ProductDetailsPageContent() {
 
   const [selectedModifiers, setSelectedModifiers] =
     useState<ModifierSelectionMap>({});
+  const [modifierErrors, setModifierErrors] = useState<Record<string, string>>({});
 
   const [splitPizzaEnabled, setSplitPizzaEnabled] = useState(false);
   const [splitPizzaItem, setSplitPizzaItem] = useState<MenuItem | null>(null);
@@ -1044,26 +1049,119 @@ function ProductDetailsPageContent() {
     return sortBySortOrder(Array.from(deduped.values()));
   };
 
+  const getNormalizedModifiersFromGroup = (group: ModifierGroup | ApiRecord | null | undefined): Modifier[] => {
+    const directModifiers = Array.isArray(group?.modifiers) ? group.modifiers : [];
+    const fromModifierLinks = Array.isArray(group?.modifierLinks)
+      ? group.modifierLinks.map((link: RawModifierLink) => link?.modifier).filter(Boolean)
+      : [];
+    const deduped = new Map<string, Modifier>();
+
+    [...directModifiers, ...fromModifierLinks].forEach((raw) => {
+      const normalized = normalizeModifier(raw as ApiRecord);
+      if (!normalized?.id) return;
+      deduped.set(normalized.id, normalized);
+    });
+
+    return sortBySortOrder(Array.from(deduped.values()));
+  };
+
+  const normalizeGroup = (group: ModifierGroup | ApiRecord | null | undefined): ModifierGroup | null => {
+    if (!group?.id) return null;
+    if (group?.isActive === false) return null;
+
+    const modifiers = getNormalizedModifiersFromGroup(group);
+    const minSelect = Math.max(0, toNumber(group?.minSelect, 0));
+    const rawMaxSelect = toNumber(group?.maxSelect, modifiers.length);
+    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const maxSelect = selectionType === "SINGLE"
+      ? 1
+      : Math.max(minSelect, rawMaxSelect > 0 ? rawMaxSelect : modifiers.length);
+
+    return {
+      id: String(group.id),
+      name: String(group?.name || ""),
+      description: typeof group?.description === "string" ? group.description : "",
+      selectionType,
+      minSelect,
+      maxSelect,
+      isRequired: typeof group?.isRequired === "boolean" ? group.isRequired : minSelect > 0,
+      sortOrder: toNumber(group?.sortOrder, 0),
+      isActive: group?.isActive !== false,
+      modifiers,
+      modifierLinks: Array.isArray(group?.modifierLinks) ? group.modifierLinks : [],
+    };
+  };
+
   const getItemModifierLinks = (menuItem: MenuItem | null): ModifierLink[] => {
     if (!menuItem) return [];
 
-    /*
-     * Current payload no longer uses modifier groups for customer selection.
-     * Add-ons are controlled directly at the item level:
-     * - minSelect / maxSelect = how many add-ons can be selected
-     * - minQuantity / maxQuantity = item quantity limits, not add-on quantity
-     */
-    const standaloneModifiers = getStandaloneItemModifiers(menuItem, new Set());
+    const fromLinks: ModifierLink[] = [
+      ...normalizeArray<RawModifierLink | ApiRecord>(menuItem?.modifierLinks),
+      ...normalizeArray<RawModifierLink | ApiRecord>(menuItem?.category?.modifierLinks),
+    ]
+      .map((link, index) => {
+        const linkRecord = link as ApiRecord & { modifierGroup?: ModifierGroup | ApiRecord };
+        const normalizedGroup = normalizeGroup(linkRecord.modifierGroup);
+        if (!normalizedGroup) return null;
 
-    if (!standaloneModifiers.length) return [];
+        return {
+          id: String(linkRecord?.id || `modifier-link-${normalizedGroup.id}-${index}`),
+          variationId: linkRecord?.variationId ? String(linkRecord.variationId) : null,
+          sortOrder: toNumber(linkRecord?.sortOrder ?? normalizedGroup.sortOrder, 0),
+          modifierGroup: normalizedGroup,
+        };
+      })
+      .filter(Boolean) as ModifierLink[];
 
-    const minSelect = Math.max(0, toNumber(menuItem?.minSelect, 0));
-    const rawMaxSelect = toNumber(menuItem?.maxSelect, 0);
-    const maxSelect = rawMaxSelect > 0 ? Math.max(minSelect, rawMaxSelect) : undefined;
-    const isRequired = Boolean(menuItem?.isRequired) || minSelect > 0;
+    const fromGroups: ModifierLink[] = [
+      ...normalizeArray<ModifierGroup | ApiRecord>(menuItem?.modifierGroups),
+      ...normalizeArray<ModifierGroup | ApiRecord>(menuItem?.category?.modifierGroups),
+      ...normalizeArray<ModifierGroup | ApiRecord>(menuItem?.categoryModifierGroups),
+      ...normalizeArray<ModifierGroup | ApiRecord>(menuItem?.category?.categoryModifierGroups),
+    ]
+      .map((group, index) => {
+        const groupRecord = group as ApiRecord & { modifierGroup?: ModifierGroup | ApiRecord };
+        const normalizedGroup = normalizeGroup(groupRecord.modifierGroup || group);
+        if (!normalizedGroup) return null;
 
-    return [
-      {
+        return {
+          id: `modifier-group-${normalizedGroup.id}-${index}`,
+          variationId: null,
+          sortOrder: toNumber(normalizedGroup.sortOrder, 0),
+          modifierGroup: normalizedGroup,
+        };
+      })
+      .filter(Boolean) as ModifierLink[];
+
+    const deduped = new Map<string, ModifierLink>();
+
+    [...fromLinks, ...fromGroups].forEach((link) => {
+      const groupId = String(link?.modifierGroup?.id || "");
+      if (!groupId) return;
+
+      const key = `${String(link?.variationId || "common")}::${groupId}`;
+      if (!deduped.has(key)) {
+        deduped.set(key, link);
+      }
+    });
+
+    const linkedModifierIds = new Set<string>();
+
+    Array.from(deduped.values()).forEach((link) => {
+      normalizeArray<Modifier>(link?.modifierGroup?.modifiers).forEach((modifier) => {
+        if (modifier?.id) linkedModifierIds.add(String(modifier.id));
+      });
+    });
+
+    const standaloneModifiers = getStandaloneItemModifiers(menuItem, linkedModifierIds);
+
+    if (standaloneModifiers.length) {
+      const minSelect = Math.max(0, toNumber(menuItem?.minSelect, 0));
+      const rawMaxSelect = toNumber(menuItem?.maxSelect, 0);
+      const maxSelect = rawMaxSelect > 0 ? Math.max(minSelect, rawMaxSelect) : undefined;
+      const isRequired = Boolean(menuItem?.isRequired) || minSelect > 0;
+
+      deduped.set(`common::item-addons-${menuItem.id}`, {
         id: `item-addons-${menuItem.id}`,
         variationId: null,
         sortOrder: 999,
@@ -1071,6 +1169,7 @@ function ProductDetailsPageContent() {
           id: `item-addons-${menuItem.id}`,
           name: t("addons"),
           description: t("addonsDescription"),
+          selectionType: maxSelect === 1 ? "SINGLE" : "MULTIPLE",
           minSelect,
           maxSelect,
           isRequired,
@@ -1079,8 +1178,10 @@ function ProductDetailsPageContent() {
           modifiers: standaloneModifiers,
           modifierLinks: [],
         },
-      },
-    ];
+      });
+    }
+
+    return sortBySortOrder(Array.from(deduped.values()));
   };
 
   const getDefaultVariation = (menuItem: MenuItem | null) => {
@@ -1189,12 +1290,14 @@ function ProductDetailsPageContent() {
         ? toNumber(group.maxSelect, 0)
         : undefined;
 
-    const isRequired = Boolean(group?.isRequired);
+    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isRequired = Boolean(group?.isRequired) || rawMin > 0;
 
     return {
       minSelect: Math.max(isRequired ? 1 : 0, rawMin),
-      maxSelect: rawMax && rawMax > 0 ? rawMax : undefined,
+      maxSelect: selectionType === "SINGLE" ? 1 : rawMax && rawMax > 0 ? rawMax : undefined,
       isRequired,
+      selectionType,
     };
   };
 
@@ -1304,6 +1407,11 @@ function ProductDetailsPageContent() {
   const filteredModifierLinks = useMemo(() => {
     return getVisibleModifierLinks(item, selectedVariation);
   }, [item, selectedVariation]);
+
+  const filteredModifierGroups = useMemo(
+    () => filteredModifierLinks.map((link) => link.modifierGroup),
+    [filteredModifierLinks]
+  );
 
   const itemSupportsSplitPizza = Boolean(item?.supportsSplitPizza);
 
@@ -1469,8 +1577,19 @@ function ProductDetailsPageContent() {
 
     setSelectedVariation(variation);
 
+    const groupedModifierRecords = normalizeArray<ApiRecord>(cartItemToEdit?.modifierSelections)
+      .flatMap((selection) => {
+        const modifierGroupId = String(selection?.modifierGroupId || "");
+
+        return normalizeArray<ApiRecord>(selection?.modifiers).map((modifier) => ({
+          ...modifier,
+          modifierGroupId,
+        }));
+      });
     const selectedModifierRecords = normalizeArray<ApiRecord>(
-      normalizeArray(cartItemToEdit?.selectedModifiers).length
+      groupedModifierRecords.length
+        ? groupedModifierRecords
+        : normalizeArray(cartItemToEdit?.selectedModifiers).length
         ? cartItemToEdit.selectedModifiers
         : cartItemToEdit?.modifiers
     );
@@ -1488,6 +1607,10 @@ function ProductDetailsPageContent() {
       for (const link of visibleLinks) {
         const group = link?.modifierGroup;
         const groupId = String(group?.id || "");
+
+        if (selectedRecord?.modifierGroupId && String(selectedRecord.modifierGroupId) !== groupId) {
+          continue;
+        }
         const modifier = normalizeArray<Modifier>(group?.modifiers).find((entry) => {
           return String(entry?.id || "") === modifierId;
         });
@@ -1584,7 +1707,13 @@ function ProductDetailsPageContent() {
 
   const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
     const groupId = String(group.id);
-    const { minSelect, maxSelect, isRequired } = getGroupValidation(group);
+    const { minSelect, maxSelect, isRequired, selectionType } = getGroupValidation(group);
+
+    setModifierErrors((prev) => {
+      const next = { ...prev };
+      delete next[groupId];
+      return next;
+    });
 
     setSelectedModifiers((prev) => {
       const current = prev[groupId] || [];
@@ -1592,7 +1721,7 @@ function ProductDetailsPageContent() {
         (selected) => selected.id === modifier.id
       );
 
-      if (maxSelect === 1) {
+      if (selectionType === "SINGLE" || maxSelect === 1) {
         if (alreadySelected && !isRequired) {
           const next = { ...prev };
           delete next[groupId];
@@ -1658,31 +1787,18 @@ function ProductDetailsPageContent() {
   };
 
   const validateSelections = (
-    links: ModifierLink[],
+    groups: ModifierGroup[],
     selectionMap: ModifierSelectionMap
   ) => {
-    for (const link of links) {
-      const group = link?.modifierGroup;
-      const groupId = String(group?.id || "");
-      const selected = selectionMap[groupId] || [];
-      const { minSelect, maxSelect } = getGroupValidation(group);
-      const itemName = item?.name || t("thisItem");
+    const validation = validateModifierSelections(groups, selectionMap);
 
-      if (minSelect > 0 && selected.length < minSelect) {
-        toast.error(
-          t("minimumAddons", { itemName, count: minSelect })
-        );
-        return false;
-      }
-
-      if (maxSelect && selected.length > maxSelect) {
-        toast.error(
-          t("maximumAddons", { itemName, count: maxSelect })
-        );
-        return false;
-      }
+    if (!validation.isValid) {
+      setModifierErrors(validation.errors);
+      toast.error(Object.values(validation.errors)[0] || t("minimumAddons", { itemName: item?.name || t("thisItem"), count: 1 }));
+      return false;
     }
 
+    setModifierErrors({});
     return true;
   };
 
@@ -1746,7 +1862,7 @@ function ProductDetailsPageContent() {
       const group = link.modifierGroup;
       const groupId = String(group?.id || "");
       const selectedInGroup = selectionMap[groupId] || [];
-      const { maxSelect, isRequired } = getGroupValidation(group);
+      const { maxSelect, isRequired, selectionType } = getGroupValidation(group);
 
       const groupModifiers = Array.isArray(group?.modifiers)
         ? group.modifiers.filter((modifier) => modifier?.isActive !== false)
@@ -1765,7 +1881,7 @@ function ProductDetailsPageContent() {
           <div className="mb-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold text-gray-900">{t("addons")}</p>
+                <p className="font-semibold text-gray-900">{group?.name || t("addons")}</p>
                 {isRequired ? (
                   <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                     Required
@@ -1781,6 +1897,12 @@ function ProductDetailsPageContent() {
                 <span className="mt-2 inline-flex rounded-full bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary ring-1 ring-primary/10">
                   {selectionLimit}
                 </span>
+              ) : null}
+
+              {modifierErrors[groupId] ? (
+                <p className="mt-2 text-xs font-medium text-red-600">
+                  {modifierErrors[groupId]}
+                </p>
               ) : null}
             </div>
 
@@ -1804,7 +1926,7 @@ function ProductDetailsPageContent() {
                 variation
               );
 
-              const inputType = maxSelect === 1 ? "radio" : "checkbox";
+              const inputType = selectionType === "SINGLE" || maxSelect === 1 ? "radio" : "checkbox";
               const disableBecauseMaxReached =
                 maxSelect !== 1 &&
                 !checked &&
@@ -1881,12 +2003,14 @@ function ProductDetailsPageContent() {
     selectedVariation,
     qty,
     selectedModifiers,
+    modifierGroups: filteredModifierGroups,
     instructions,
     splitPizzaEnabled,
     splitPizzaItem,
     includeMenuItem: true,
     includeBranch: true,
     clearSectionsWhenEmpty: false,
+    dealId: dealIdContext,
   });
 
   const buildPatchCartPayload = () => buildCartPayload({
@@ -1894,12 +2018,14 @@ function ProductDetailsPageContent() {
     selectedVariation,
     qty,
     selectedModifiers,
+    modifierGroups: filteredModifierGroups,
     instructions,
     splitPizzaEnabled,
     splitPizzaItem,
     includeMenuItem: false,
     includeBranch: false,
     clearSectionsWhenEmpty: true,
+    dealId: dealIdContext,
   });
 
   const clearCartAndRetryAdd = async () => {
@@ -1935,7 +2061,7 @@ function ProductDetailsPageContent() {
         return;
       }
 
-      if (!validateSelections(filteredModifierLinks, selectedModifiers)) {
+      if (!validateSelections(filteredModifierGroups, selectedModifiers)) {
         return;
       }
 

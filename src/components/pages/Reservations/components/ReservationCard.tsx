@@ -9,26 +9,9 @@ import {
   Star,
   Sofa,
 } from "lucide-react";
-import type { Reservation } from "@/services/reservations";
+import { getReservationStatusLabelKey, type Reservation } from "@/services/reservations";
 
-const getReservationStatusKey = (status?: string | null) => {
-  switch (String(status || "").toUpperCase()) {
-    case "PENDING":
-      return "pending";
-    case "CONFIRMED":
-      return "confirmed";
-    case "CANCELLED":
-      return "cancelled";
-    case "COMPLETED":
-      return "completed";
-    case "NO_SHOW":
-      return "noShow";
-    default:
-      return null;
-  }
-};
-
-export default function ReservationCard({
+export function ReservationCard({
   res,
   onCancel,
 }: {
@@ -48,8 +31,8 @@ export default function ReservationCard({
   );
 
   const isCancelled = res.status === "CANCELLED";
-  const statusKey = getReservationStatusKey(res.status);
-  const statusLabel = statusKey ? t(`statusLabels.${statusKey}`) : res.status;
+  const statusKey = getReservationStatusLabelKey(res.status);
+  const statusLabel = statusKey !== "unknown" ? t(`statusLabels.${statusKey}`) : res.status;
 
   return (
     <div className="bg-white rounded-2xl shadow-md overflow-hidden">

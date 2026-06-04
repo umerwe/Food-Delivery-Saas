@@ -53,6 +53,11 @@ export const queryKeys = {
     all: ["payments"] as const,
     request: (endpoint: string) => ["payments", "request", endpoint] as const,
   },
+  wallet: {
+    all: ["wallet"] as const,
+    summary: ["wallet", "summary"] as const,
+    history: ["wallet", "history"] as const,
+  },
   reservations: {
     all: ["reservations"] as const,
     request: (endpoint: string) => ["reservations", "request", endpoint] as const,

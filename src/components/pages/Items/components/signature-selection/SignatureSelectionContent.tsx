@@ -25,6 +25,10 @@ import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuRecord, MenuVariation, Modifier, ModifierGroup, ModifierLink, ProductCardData, RawModifierLink, SelectedModifier, SelectedModifiersMap, SplitPizzaSelection, VariationPriceOverride } from "./types";
 import { normalizeArray, sortBySortOrder, toNumber } from "./signature-selection-utils";
 import { getSplitPizzaPricingVariation } from "@/components/pages/Items/utils/restaurant-card-utils";
+import {
+  buildModifierSelections,
+  validateModifierSelections,
+} from "@/components/pages/Items/utils/modifier-selections";
 
 type SignatureSelectionContentProps = {
   restaurantId?: string | null;
@@ -870,17 +874,25 @@ export function SignatureSelectionContent({
   const normalizeGroup = (group: ModifierGroup | ApiRecord | null | undefined): ModifierGroup | null => {
     if (!group?.id) return null;
     if (group?.isActive === false) return null;
+    const modifiers = getNormalizedModifiersFromGroup(group);
+    const minSelect = Math.max(0, toNumber(group?.minSelect, 0));
+    const rawMaxSelect = toNumber(group?.maxSelect, modifiers.length);
+    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const maxSelect = selectionType === "SINGLE"
+      ? 1
+      : Math.max(minSelect, rawMaxSelect > 0 ? rawMaxSelect : modifiers.length);
 
     return {
       id: String(group.id),
       name: String(group?.name || ""),
       description: typeof group?.description === "string" ? group.description : "",
-      minSelect: typeof group?.minSelect === "number" ? group.minSelect : undefined,
-      maxSelect: typeof group?.maxSelect === "number" ? group.maxSelect : undefined,
-      isRequired: Boolean(group?.isRequired),
+      selectionType,
+      minSelect,
+      maxSelect,
+      isRequired: typeof group?.isRequired === "boolean" ? group.isRequired : minSelect > 0,
       sortOrder: toNumber(group?.sortOrder, 0),
       isActive: group?.isActive !== false,
-      modifiers: getNormalizedModifiersFromGroup(group),
+      modifiers,
       modifierLinks: Array.isArray(group?.modifierLinks)
         ? group.modifierLinks
         : [],
@@ -1183,12 +1195,14 @@ export function SignatureSelectionContent({
         ? toNumber(group.maxSelect, 0)
         : undefined;
 
-    const isRequired = Boolean(group?.isRequired);
+    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isRequired = Boolean(group?.isRequired) || rawMin > 0;
 
     return {
       minSelect: Math.max(isRequired ? 1 : 0, rawMin),
-      maxSelect: rawMax,
+      maxSelect: selectionType === "SINGLE" ? 1 : rawMax,
       isRequired,
+      selectionType,
     };
   };
 
@@ -1206,10 +1220,10 @@ export function SignatureSelectionContent({
       scope === "main" ? setSelectedModifiers : setSplitPizzaModifiers;
 
     const current = selectionMap[groupId] || [];
-    const { maxSelect } = getGroupValidation(group);
+    const { maxSelect, selectionType } = getGroupValidation(group);
     const alreadySelected = current.some((m) => m.id === modifier.id);
 
-    if (maxSelect === 1) {
+    if (selectionType === "SINGLE" || maxSelect === 1) {
       setSelectionMap((prev) => ({
         ...prev,
         [groupId]: alreadySelected
@@ -1575,6 +1589,18 @@ export function SignatureSelectionContent({
 
     const safeModifiersMap = modifiersMap || {};
 
+    const visibleModifierGroups = getVisibleModifierLinks(item, variation).map((link) => link.modifierGroup);
+    const groupedFlowModifierGroups = visibleModifierGroups.filter((group) => {
+      const groupId = String(group?.id || "");
+      return groupId && groupId !== ADDONS_GROUP_ID && !groupId.startsWith("standalone-modifiers-");
+    });
+    const groupedValidation = validateModifierSelections(groupedFlowModifierGroups, safeModifiersMap);
+
+    if (!groupedValidation.isValid) {
+      toast.error(Object.values(groupedValidation.errors)[0] || tProduct("failedAddToCart"));
+      return;
+    }
+
     if (!validateAddonSelections(item, safeModifiersMap)) {
       return;
     }
@@ -1607,8 +1633,13 @@ export function SignatureSelectionContent({
         variationId: variation?.id ?? null,
         branchId,
         note: note.trim() || "",
-        modifiers: buildModifiersPayload(safeModifiersMap),
       };
+
+      if (groupedFlowModifierGroups.length > 0) {
+        payload.modifierSelections = buildModifierSelections(groupedFlowModifierGroups, safeModifiersMap);
+      } else {
+        payload.modifiers = buildModifiersPayload(safeModifiersMap);
+      }
 
       if (splitSections) {
         payload.sections = splitSections;

@@ -1,3 +1,4 @@
+import { getDealImage } from "@/components/pages/Home/utils/customer-deal-cart";
 import type { CustomerDeal, CustomerDealMenuItem } from "@/types/customer-deals";
 
 const toNumber = (value: number | string | null | undefined, fallback = 0) => {
@@ -51,14 +52,6 @@ export const getDealItemNames = (items: CustomerDealMenuItem[]): string =>
     .filter(Boolean)
     .join(", ");
 
-export const getDealImage = (deal: CustomerDeal): string | null => {
-  const itemImage = deal.scopeMenuItems.find(({ imageUrl }) =>
-    String(imageUrl || "").startsWith("http")
-  )?.imageUrl;
-
-  return itemImage ?? null;
-};
-
 export const isDealActive = (deal: CustomerDeal): boolean => {
   const now = Date.now();
   const startDate = parseDate(deal.startsAt);
@@ -74,3 +67,5 @@ export const isDealActive = (deal: CustomerDeal): boolean => {
 
   return true;
 };
+
+export { getDealImage };

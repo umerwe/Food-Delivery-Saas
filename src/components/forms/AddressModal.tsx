@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { INPUT_BASE_CLASS, LABEL_TEXT_CLASS } from "@/components/common/common-classes";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import useCheckout from "@/hooks/useCheckout";
+import { useCheckout } from "@/hooks/useCheckout";
 import { reverseGeocode } from "@/services/geocoding";
 import { useAuth } from "@/hooks/useAuth";
 import { createCheckoutAddressSchema, type CheckoutAddressValues } from "@/validations/checkout";
@@ -60,7 +60,7 @@ const getSavedAddress = (value: unknown): { id?: string | number } | undefined =
   return undefined;
 };
 
-export default function AddressModal({
+export function AddressModal({
   open,
   onOpenChange,
   onSuccess,

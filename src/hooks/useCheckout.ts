@@ -1,8 +1,18 @@
 "use client";
 
+import { useCallback, useMemo } from "react";
+
 import { queryKeys } from "@/config/query-keys";
-import { useDomainApi } from "@/hooks/useDomainApi";
-import { deleteCheckout, getCheckout, patchCheckout, postCheckout } from "@/services/checkout";
+import { useDomainApi, type DomainApiHook } from "@/hooks/useDomainApi";
+import {
+  checkoutCustomerCart,
+  deleteCheckout,
+  getCheckout,
+  patchCheckout,
+  postCheckout,
+  type CheckoutCartPayload,
+} from "@/services/checkout";
+import type { ApiResult } from "@/services/http";
 
 const service = {
   get: getCheckout,
@@ -11,7 +21,24 @@ const service = {
   del: deleteCheckout,
 };
 
-export const useCheckout = (token: string | null) =>
-  useDomainApi(token, { service, requestKey: queryKeys.checkout.request });
+export type CheckoutApi = DomainApiHook & {
+  checkoutCustomerCart: (args: { customerId: string; payload: CheckoutCartPayload }) => Promise<ApiResult>;
+};
 
-export default useCheckout;
+export const useCheckout = (token: string | null): CheckoutApi => {
+  const api = useDomainApi(token, { service, requestKey: queryKeys.checkout.request });
+
+  const checkoutCart = useCallback(
+    ({ customerId, payload }: { customerId: string; payload: CheckoutCartPayload }) =>
+      checkoutCustomerCart({ customerId, payload, token }),
+    [token]
+  );
+
+  return useMemo(
+    () => ({
+      ...api,
+      checkoutCustomerCart: checkoutCart,
+    }),
+    [api, checkoutCart]
+  );
+};

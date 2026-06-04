@@ -1,37 +1,18 @@
 import { createDomainApiService } from "@/services/domain-api";
 import type { ApiResult } from "@/services/http";
 import type { BranchRecord } from "@/types/branch-selector";
-
-export type ReservationStatus = "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW" | string;
-
-export type ReservationBranch = BranchRecord & {
-  coverImage?: string | null;
-  description?: string | null;
-};
-
-export type Reservation = {
-  id: string;
-  branchId?: string | null;
-  branch?: ReservationBranch | null;
-  reservationDate: string;
-  guestCount: number;
-  note?: string | null;
-  status: ReservationStatus;
-};
-
-export type ReservationPayload = {
-  branchId: string;
-  reservationDate: string;
-  guestCount: number;
-  note?: string;
-};
-
-export type ReservationMeta = {
-  page?: number;
-  totalPages?: number;
-  hasPrevious?: boolean;
-  hasNext?: boolean;
-};
+import type { Reservation, ReservationMeta, ReservationPayload } from "@/types/reservations";
+export type {
+  Reservation,
+  ReservationBranch,
+  ReservationMeta,
+  ReservationPayload,
+  ReservationStatus,
+} from "@/types/reservations";
+export {
+  getReservationStatusLabel,
+  getReservationStatusLabelKey,
+} from "@/types/reservations";
 
 const reservationsService = createDomainApiService();
 
@@ -69,6 +50,13 @@ const normalizeReservationMeta = (response: ApiResult): ReservationMeta | null =
   const meta = dataRecord?.meta || dataRecord?.pagination || nestedData?.meta || nestedData?.pagination || response.meta;
 
   return getRecord(meta) as ReservationMeta | null;
+};
+
+export const normalizeReservationResponse = (response: ApiResult): Reservation | null => {
+  const dataRecord = getRecord(response.data);
+  const nestedData = getRecord(dataRecord?.data);
+
+  return (nestedData || dataRecord) as Reservation | null;
 };
 
 export const fetchReservations = async (token?: string | null) => {

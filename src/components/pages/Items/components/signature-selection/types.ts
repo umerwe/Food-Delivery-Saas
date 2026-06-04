@@ -56,6 +56,32 @@ export type Modifier = {
   variationPriceOverrides?: VariationPriceOverride[];
 };
 
+export type CustomerModifierCategory = {
+  id: string;
+  name: string;
+  slug?: string;
+};
+
+export type CustomerGroupedModifier = {
+  id: string;
+  name: string;
+  priceDelta?: string | number | null;
+  sortOrder?: number;
+  category?: CustomerModifierCategory | null;
+};
+
+export type CustomerModifierGroup = {
+  id: string;
+  name: string;
+  description?: string | null;
+  selectionType: "SINGLE" | "MULTIPLE";
+  minSelect: number;
+  maxSelect: number;
+  isRequired?: boolean;
+  sortOrder?: number;
+  modifiers: CustomerGroupedModifier[];
+};
+
 export type SelectedModifier = Modifier & {
   selectedQuantity: number;
 };
@@ -72,6 +98,7 @@ export type ModifierGroup = {
   id: string;
   name: string;
   description?: string;
+  selectionType?: "SINGLE" | "MULTIPLE";
   minSelect?: number;
   maxSelect?: number;
   isRequired?: boolean;
@@ -177,6 +204,14 @@ export type ProductCardData = {
 
 export type SelectedModifiersMap = Record<string, SelectedModifier[]>;
 
+export type CartModifierSelectionInput = {
+  modifierGroupId: string;
+  modifiers: Array<{
+    modifierId: string;
+    quantity: number;
+  }>;
+};
+
 export type SplitPizzaSelection = {
   menuItemId?: string;
   menuItemName?: string;
@@ -188,7 +223,8 @@ export type CartPayload = {
   menuItemId?: string;
   quantity: number;
   checkoutType?: string;
-  modifiers: Array<{ modifierId: string; quantity: number }>;
+  modifierSelections?: CartModifierSelectionInput[];
+  modifiers?: Array<{ modifierId: string; quantity: number }>;
   note?: string;
   branchId?: string | null;
   variationId?: string | null;

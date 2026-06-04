@@ -6,7 +6,12 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 
 import { useAuthContext } from "@/components/providers/auth-provider";
-import { buildDealCartItemsInput } from "@/components/pages/Home/utils/customer-deal-cart";
+import {
+  buildFixedDealCartItemsInput,
+  buildSelectedFlexibleDealCartItemsInput,
+  isFixedItemDeal,
+  isFlexibleItemDeal,
+} from "@/components/pages/Home/utils/customer-deal-cart";
 import { queryKeys } from "@/config/query-keys";
 import { useDomainApi, type DomainApiHook } from "@/hooks/useDomainApi";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -23,15 +28,23 @@ import {
   patchCart,
   postCart,
   quoteCustomerCart,
+  updateCustomerCart,
   updateCustomerCartItem,
   updateCustomerCartItemQuantity,
+  type CartUpdatePayload,
 } from "@/services/cart";
 import type { ApiResult } from "@/services/http";
 import type { CartItemRecord } from "@/components/pages/Items/components/signature-selection/types";
 import type { ApiRecord } from "@/components/pages/Items/types";
 import type { CustomerDeal } from "@/types/customer-deals";
+import type { CartQuote } from "@/types/cart";
 
 type CartMutationPayload = Record<string, unknown>;
+
+export type AddDealToCartInput = {
+  deal: CustomerDeal;
+  selectedMenuItemIds?: string[];
+};
 
 const service = {
   get: getCart,
@@ -41,10 +54,11 @@ const service = {
 };
 
 export type CartApi = DomainApiHook & {
-  fetchCustomerCart: (args: { customerId: string }) => Promise<{ response: ApiResult; items: CartItemRecord[] }>;
+  fetchCustomerCart: (args: { customerId: string }) => Promise<{ response: ApiResult; items: CartItemRecord[]; quote: CartQuote | null }>;
   fetchCustomerCartItem: (args: { customerId: string; cartItemId: string }) => Promise<ApiRecord | null>;
   addCustomerCartItem: (args: { customerId: string; payload: CartMutationPayload }) => Promise<ApiResult>;
   quoteCustomerCart: (args: { customerId: string }) => Promise<ApiResult>;
+  updateCustomerCart: (args: { customerId: string; payload: CartUpdatePayload }) => Promise<ApiResult>;
   updateCustomerCartItem: (args: { cartItemId: string; payload: CartMutationPayload }) => Promise<ApiResult>;
   clearCustomerCart: (args: { customerId: string }) => Promise<ApiResult>;
   updateCustomerCartItemQuantity: (args: { customerId: string; cartItemId: string; quantity: number }) => Promise<ApiResult>;
@@ -75,6 +89,12 @@ export const useCart = (token: string | null): CartApi => {
 
   const refreshCartQuote = useCallback(
     ({ customerId }: { customerId: string }) => quoteCustomerCart({ customerId, token }),
+    [token]
+  );
+
+  const updateCart = useCallback(
+    ({ customerId, payload }: { customerId: string; payload: CartUpdatePayload }) =>
+      updateCustomerCart({ customerId, payload, token }),
     [token]
   );
 
@@ -116,6 +136,7 @@ export const useCart = (token: string | null): CartApi => {
       fetchCustomerCartItem: fetchCartItem,
       addCustomerCartItem: addCartItem,
       quoteCustomerCart: refreshCartQuote,
+      updateCustomerCart: updateCart,
       updateCustomerCartItem: updateCartItem,
       clearCustomerCart: clearCart,
       updateCustomerCartItemQuantity: updateCartItemQuantity,
@@ -123,7 +144,7 @@ export const useCart = (token: string | null): CartApi => {
       fetchGroupOrders: fetchGroups,
       addGroupOrderItem: addGroupItem,
     }),
-    [addCartItem, addGroupItem, api, clearCart, deleteCartItem, fetchCart, fetchCartItem, fetchGroups, refreshCartQuote, updateCartItem, updateCartItemQuantity]
+    [addCartItem, addGroupItem, api, clearCart, deleteCartItem, fetchCart, fetchCartItem, fetchGroups, refreshCartQuote, updateCart, updateCartItem, updateCartItemQuantity]
   );
 };
 
@@ -135,7 +156,7 @@ export const useAddDealToCart = (branchId?: string | null) => {
   const customerId = user?.id ?? "";
 
   return useMutation({
-    mutationFn: async (deal: CustomerDeal) => {
+    mutationFn: async ({ deal, selectedMenuItemIds = [] }: AddDealToCartInput) => {
       if (!customerId) {
         throw new Error(t("customerNotFound"));
       }
@@ -144,13 +165,27 @@ export const useAddDealToCart = (branchId?: string | null) => {
         throw new Error(t("selectBranchFirst"));
       }
 
-      if (deal.scopeMenuItems.length < 1) {
+      if (isFixedItemDeal(deal) && deal.scopeMenuItems.length < 1) {
         throw new Error(t("dealNoItems"));
       }
 
-      const payloads = buildDealCartItemsInput(deal, branchId);
+      if (isFlexibleItemDeal(deal) && selectedMenuItemIds.length < 1) {
+        throw new Error(t("dealNoItems"));
+      }
+
+      const payloads = isFlexibleItemDeal(deal)
+        ? buildSelectedFlexibleDealCartItemsInput(deal, branchId, selectedMenuItemIds)
+        : buildFixedDealCartItemsInput(deal, branchId);
+      const requiredQuantity = Number(deal.dealRequiredQuantity);
+      const minimumEligibleItems = Number.isFinite(requiredQuantity) && requiredQuantity > 0
+        ? Math.floor(requiredQuantity)
+        : 1;
 
       if (payloads.length < 1) {
+        throw new Error(t("dealNoItems"));
+      }
+
+      if (isFlexibleItemDeal(deal) && payloads.length < minimumEligibleItems) {
         throw new Error(t("dealNoItems"));
       }
 

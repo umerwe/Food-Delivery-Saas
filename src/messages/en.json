@@ -188,7 +188,12 @@
       "includes": "Includes {items}",
       "noAvailableItems": "This deal has no available items.",
       "adding": "Adding...",
-      "addDeal": "Add Deal"
+      "addDeal": "Add Deal",
+      "chooseItems": "Choose Items",
+      "browseItems": "Browse Items",
+      "selectEligibleItems": "Choose at least {count, plural, one {# eligible item} other {# eligible items}}.",
+      "addSelectedItems": "Add Selected Items",
+      "categoryDealToast": "Browse eligible categories to activate this deal."
     },
     "whyChooseUs": {
       "title": "Why Choose Us",
@@ -569,6 +574,8 @@
     "cashOnDelivery": "Cash on Delivery",
     "cardStripe": "Credit / Debit Card (Stripe)",
     "wallet": "Wallet",
+    "scheduledDelivery": "Scheduled delivery",
+    "scheduledDeliveryOptional": "Optional. Leave empty for immediate delivery.",
     "selectPickupTime": "Select Pickup Time",
     "chooseDate": "Choose date",
     "closed": "Closed",
@@ -583,6 +590,7 @@
     "addMoreItems": "Add More Items",
     "clearCart": "Clear Cart",
     "backendError": "Backend Error",
+    "loadingCart": "Loading cart",
     "yourCartIsEmpty": "Your cart is empty",
     "emptyCartDescription": "Add items from the menu to start building the order.",
     "browseItems": "Browse Items",
@@ -639,9 +647,11 @@
       "failedClearCart": "Failed to clear cart",
       "failedSetOrderType": "Failed to set order type",
       "failedSetAddress": "Failed to set address",
+      "failedSetSchedule": "Failed to set scheduled delivery",
       "cartEmpty": "Cart is empty",
       "selectAddress": "Please select address",
       "selectPickupDateTime": "Please select pickup date and time",
+      "invalidScheduledDelivery": "Invalid scheduled delivery time",
       "invalidOrderTime": "Invalid order time",
       "checkoutFailed": "Checkout failed",
       "invalidOrderResponse": "Invalid order response",
@@ -810,6 +820,15 @@
       "failedCreatePayment": "Failed to create payment",
       "choosePaymentMethod": "Choose payment method below",
       "selectPaymentMethod": "Select Payment Method"
+    },
+    "giftCards": {
+      "redeemTitle": "Redeem Gift Card",
+      "redeemDescription": "Enter your gift card code to add credit to your wallet.",
+      "code": "Gift Card Code",
+      "redeem": "Redeem",
+      "redeeming": "Redeeming...",
+      "creditedAmount": "Credited Amount",
+      "walletBalance": "Wallet Balance"
     }
   },
   "addresses": {
@@ -872,7 +891,9 @@
     "cancel": "Cancel",
     "statusLabels": {
       "pending": "Pending",
+      "requested": "Requested",
       "confirmed": "Confirmed",
+      "seated": "Seated",
       "cancelled": "Cancelled",
       "completed": "Completed",
       "noShow": "No-show",
@@ -912,6 +933,8 @@
     "selectDateTime": "Select date & time",
     "selectedTimeUnavailable": "Selected time is no longer available",
     "reservationConfirmedToast": "Reservation confirmed",
+    "reservationRequestedToast": "Reservation request sent",
+    "reservationCreatedToast": "Reservation created",
     "failedFallback": "Failed",
     "reserving": "Reserving...",
     "confirmReservation": "Confirm Reservation",
@@ -927,6 +950,8 @@
     "success": {
       "title": "Reservation Confirmed",
       "description": "We look forward to welcoming you. Your reservation has been successfully created.",
+      "confirmedDescription": "Your reservation is confirmed.",
+      "requestedDescription": "Your reservation request has been sent and is awaiting confirmation.",
       "upcomingExperience": "Upcoming Dining experience",
       "yourReservation": "Your Reservation",
       "status": "Status",
@@ -1291,6 +1316,7 @@
     "profileFirstNameRequired": "First name is required",
     "profileLastNameRequired": "Last name is required",
     "avatarUrlInvalid": "Avatar must be a valid URL or relative path",
+    "giftCardCodeRequired": "Gift card code is required",
     "reservationBranchRequired": "Please select a branch",
     "reservationDateTimeRequired": "Select date & time",
     "reservationPastDate": "Past dates are not available for reservation.",

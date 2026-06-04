@@ -49,6 +49,66 @@ describe("product cart helpers", () => {
     ]);
   });
 
+  it("preserves variationId and grouped modifierSelections", () => {
+    const payload = buildCartPayload({
+      item: { id: "burger-1" },
+      branchId: "branch-1",
+      selectedVariation: { id: "large-variation-id", name: "Large" },
+      qty: 1,
+      selectedModifiers: {
+        group_sauces: [{ id: "modifier_garlic_sauce", name: "Garlic", selectedQuantity: 1 }],
+      },
+      modifierGroups: [
+        {
+          id: "group_sauces",
+          name: "Sauces",
+          selectionType: "MULTIPLE",
+          minSelect: 0,
+          maxSelect: 2,
+          modifiers: [{ id: "modifier_garlic_sauce", name: "Garlic" }],
+        },
+      ],
+      splitPizzaEnabled: false,
+      splitPizzaItem: null,
+      includeMenuItem: true,
+      includeBranch: true,
+      clearSectionsWhenEmpty: false,
+      dealId: "flexible-deal-id",
+    });
+
+    expect(payload.variationId).toBe("large-variation-id");
+    expect(payload.modifierSelections).toEqual([
+      {
+        modifierGroupId: "group_sauces",
+        modifiers: [{ modifierId: "modifier_garlic_sauce", quantity: 1 }],
+      },
+    ]);
+    expect(payload).not.toHaveProperty("modifiers");
+    expect(payload).not.toHaveProperty("dealId");
+  });
+
+  it("preserves legacy flat modifiers when grouped flow is inactive", () => {
+    const payload = buildCartPayload({
+      item: { id: "burger-1" },
+      branchId: "branch-1",
+      selectedVariation: null,
+      qty: 1,
+      selectedModifiers: {
+        legacy: [{ id: "extra_cheese", name: "Extra cheese", selectedQuantity: 1 }],
+      },
+      splitPizzaEnabled: false,
+      splitPizzaItem: null,
+      includeMenuItem: true,
+      includeBranch: true,
+      clearSectionsWhenEmpty: false,
+      dealId: "flexible-deal-id",
+    });
+
+    expect(payload.modifiers).toEqual([{ modifierId: "extra_cheese", quantity: 1 }]);
+    expect(payload).not.toHaveProperty("modifierSelections");
+    expect(payload).not.toHaveProperty("dealId");
+  });
+
   it("clears patch sections when split pizza is off", () => {
     expect(
       buildCartPayload({

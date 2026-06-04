@@ -17,7 +17,7 @@ import { CARD_PANEL_CLASS } from "@/components/common/common-classes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import AddressModal from "./AddressModal";
+import { AddressModal } from "./AddressModal";
 import useProfileApi from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
@@ -33,6 +33,7 @@ import {
   type ProfileFormValues,
 } from "@/validations/profile";
 import { useTranslations } from "next-intl";
+import { GiftCardRedeemCard } from "@/components/pages/Profile/components/GiftCardRedeemCard";
 
 export function ProfileForm() {
   const t = useTranslations("profile");
@@ -130,6 +131,18 @@ export function ProfileForm() {
     void loadAddresses();
     void loadWallet();
   }, [fetchAddresses, fetchWallet, form, user, token]);
+
+  useEffect(() => {
+    const handler = () => {
+      void fetchWallet();
+    };
+
+    window.addEventListener("wallet-updated", handler);
+
+    return () => {
+      window.removeEventListener("wallet-updated", handler);
+    };
+  }, [fetchWallet]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -399,6 +412,10 @@ export function ProfileForm() {
     {t("walletDescription")}
   </p>
 </div>
+    </div>
+
+    <div className="mb-5">
+      <GiftCardRedeemCard branchId={user?.branchId ?? user?.branch?.id ?? null} />
     </div>
 
     {/* ROW 2 */}
