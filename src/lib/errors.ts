@@ -11,15 +11,6 @@ const getStringProperty = (source: unknown, key: string): string | undefined => 
 };
 
 export const getApiErrorMessage = (error: unknown, fallback = "Something went wrong") => {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-
-  const directMessage = getStringProperty(error, "message");
-  if (directMessage) {
-    return directMessage;
-  }
-
   if (isRecord(error)) {
     const responseMessage = getStringProperty(error.response, "message");
     if (responseMessage) {
@@ -33,6 +24,31 @@ export const getApiErrorMessage = (error: unknown, fallback = "Something went wr
     if (responseDataMessage) {
       return responseDataMessage;
     }
+
+    const responseDataErrorMessage = isRecord(error.response) && isRecord(error.response.data)
+      ? getStringProperty(error.response.data.error, "message")
+      : undefined;
+
+    if (responseDataErrorMessage) {
+      return responseDataErrorMessage;
+    }
+  }
+
+  const directMessage = getStringProperty(error, "message");
+  if (directMessage) {
+    return directMessage;
+  }
+
+  const nestedErrorMessage = isRecord(error)
+    ? getStringProperty(error.error, "message")
+    : undefined;
+
+  if (nestedErrorMessage) {
+    return nestedErrorMessage;
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
   }
 
   return fallback;

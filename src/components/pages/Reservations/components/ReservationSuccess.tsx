@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ReactNode, useMemo } from "react";
+import { ReactNode, useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import {
   FaCheck,
@@ -55,6 +55,10 @@ export function ReservationSuccess({ data }: { data: Reservation | null }) {
   const t = useTranslations("reserveTable.success");
   const statusT = useTranslations("reservations.statusLabels");
   const { user } = useAuth();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const reservationDate = data?.reservationDate
     ? new Date(data.reservationDate)

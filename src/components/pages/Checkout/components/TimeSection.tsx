@@ -187,7 +187,7 @@ export function SelectPickupTimeSection({
               type="time"
               value={pickupTime || ""}
               onChange={(event) => setPickupTime(event.target.value || null)}
-              className="h-[48px] w-full rounded-[10px] border-2 border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 outline-none transition-all focus:border-orange-500"
+              className="h-[48px] w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 outline-none transition-all focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
             />
           </label>
         )}

@@ -1,7 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { redeemGiftCard } from "./gift-cards";
-import { normalizeGiftCardRedeemResponse } from "@/types/gift-cards";
+import { normalizeGiftCardPurchaseResponse, normalizeGiftCardRedeemResponse } from "@/types/gift-cards";
+
+import { purchaseGiftCard, redeemGiftCard } from "./gift-cards";
 
 const httpClientPostMock = vi.hoisted(() => vi.fn());
 
@@ -11,81 +12,136 @@ vi.mock("@/lib/axios", () => ({
   },
 }));
 
-describe("redeemGiftCard", () => {
+describe("gift card service", () => {
   beforeEach(() => {
     httpClientPostMock.mockReset();
   });
 
-  it("calls customer gift card redeem endpoint without api v1 duplication", async () => {
+  it("purchase calls customer gift card purchase endpoint without api v1 duplication", async () => {
     httpClientPostMock.mockResolvedValue({
       data: {
-        success: true,
         data: {
-          customerId: "customer-1",
-          giftCardId: "gift-card-1",
-          code: "GIFT-ABCD1234",
-          walletTransactionId: "wallet-tx-1",
-          creditedAmount: 1000,
-          walletBalance: 1500,
-          currency: "PKR",
+          code: "GIFT-ABCDEFGHIJ",
+          qrPayload: "DWGC:GIFT-ABCDEFGHIJ",
+          amount: 1000,
+          walletBalance: 500,
         },
       },
     });
 
-    await redeemGiftCard({ code: "gift-abcd1234" });
+    await purchaseGiftCard({ amount: 1000 });
+
+    const endpoint = httpClientPostMock.mock.calls[0][0];
+    expect(endpoint).toBe("/customer-app/gift-cards/purchase");
+    expect(endpoint).not.toContain("/api/v1");
+  });
+
+  it("purchase sends amount title message and expiresAt", async () => {
+    httpClientPostMock.mockResolvedValue({ data: { data: {} } });
+
+    await purchaseGiftCard({
+      amount: 1000,
+      title: " Birthday Gift Card ",
+      message: " Enjoy your meal! ",
+      expiresAt: "2027-06-05T00:00",
+    });
+
+    expect(httpClientPostMock).toHaveBeenCalledWith(
+      "/customer-app/gift-cards/purchase",
+      {
+        amount: 1000,
+        title: "Birthday Gift Card",
+        message: "Enjoy your meal!",
+        expiresAt: new Date("2027-06-05T00:00").toISOString(),
+      }
+    );
+  });
+
+  it("purchase normalizes code qrPayload amount and walletBalance", () => {
+    expect(
+      normalizeGiftCardPurchaseResponse({
+        success: true,
+        data: {
+          code: "GIFT-ABCDEFGHIJ",
+          qrPayload: "DWGC:GIFT-ABCDEFGHIJ",
+          amount: "1000",
+          walletBalance: 500,
+        },
+        message: "Purchased",
+      })
+    ).toEqual({
+      result: {
+        code: "GIFT-ABCDEFGHIJ",
+        qrPayload: "DWGC:GIFT-ABCDEFGHIJ",
+        amount: 1000,
+        walletBalance: 500,
+      },
+      message: "Purchased",
+    });
+  });
+
+  it("redeem calls customer gift card redeem endpoint", async () => {
+    httpClientPostMock.mockResolvedValue({
+      data: {
+        data: {
+          code: "GIFT-ABCDEFGHIJ",
+          creditedAmount: 1000,
+          walletBalance: 1500,
+        },
+      },
+    });
+
+    await redeemGiftCard({ code: "gift-abcdefghij" });
 
     const endpoint = httpClientPostMock.mock.calls[0][0];
     expect(endpoint).toBe("/customer-app/gift-cards/redeem");
     expect(endpoint).not.toContain("/api/v1");
   });
 
-  it("sends uppercase code and omits empty branch id", async () => {
+  it("redeem sends uppercase normal code only", async () => {
     httpClientPostMock.mockResolvedValue({ data: { data: {} } });
 
-    await redeemGiftCard({ code: " gift-abcd1234 ", branchId: " " });
+    await redeemGiftCard({ code: " gift-abcdefghij " });
 
     expect(httpClientPostMock).toHaveBeenCalledWith(
       "/customer-app/gift-cards/redeem",
-      { code: "GIFT-ABCD1234" },
+      { code: "GIFT-ABCDEFGHIJ" },
       { params: {} }
     );
   });
 
-  it("passes optional customer id as query", async () => {
+  it("redeem sends uppercase QR payload", async () => {
     httpClientPostMock.mockResolvedValue({ data: { data: {} } });
 
-    await redeemGiftCard(
-      { code: "GIFT-ABCD1234", branchId: "branch-1" },
-      { customerId: "customer-1" }
-    );
+    await redeemGiftCard({ code: " dwgc:gift-abcdefghij " });
 
     expect(httpClientPostMock).toHaveBeenCalledWith(
       "/customer-app/gift-cards/redeem",
-      { code: "GIFT-ABCD1234", branchId: "branch-1" },
-      { params: { customerId: "customer-1" } }
+      { code: "DWGC:GIFT-ABCDEFGHIJ" },
+      { params: {} }
     );
   });
 
-  it("normalizes redeem response", () => {
-    const response = normalizeGiftCardRedeemResponse({
-      success: true,
-      data: {
-        customerId: "customer-123",
-        giftCardId: "gift-card-id",
-        code: "GIFT-ABCD1234",
-        walletTransactionId: "wallet-tx-id",
-        creditedAmount: "1000",
-        walletBalance: 1500,
-        currency: "PKR",
-      },
-      message: "Gift card redeemed successfully",
-    });
-
-    expect(response).toEqual({
+  it("redeem normalizes creditedAmount and walletBalance", () => {
+    expect(
+      normalizeGiftCardRedeemResponse({
+        success: true,
+        data: {
+          customerId: "customer-123",
+          giftCardId: "gift-card-id",
+          code: "GIFT-ABCDEFGHIJ",
+          walletTransactionId: "wallet-tx-id",
+          creditedAmount: "1000",
+          walletBalance: 1500,
+          currency: "PKR",
+        },
+        message: "Gift card redeemed successfully",
+      })
+    ).toEqual({
       result: {
         customerId: "customer-123",
         giftCardId: "gift-card-id",
-        code: "GIFT-ABCD1234",
+        code: "GIFT-ABCDEFGHIJ",
         walletTransactionId: "wallet-tx-id",
         creditedAmount: 1000,
         walletBalance: 1500,

@@ -111,7 +111,7 @@ describe("getCustomerDeals", () => {
         discountType: "FIXED_PRICE",
         discountValue: 20,
         scopeMenuItems: [
-          { id: "item-1", name: "Burger" },
+          { id: "item-1", name: "Burger", slug: "burger" },
           { id: "item-2", name: "Drink" },
         ],
         scopeCategories: [],
@@ -130,7 +130,7 @@ describe("getCustomerDeals", () => {
         dealRequiredQuantity: 2,
         discountValue: 20,
         scopeMenuItems: [
-          { id: "item-1", name: "Burger" },
+          { id: "item-1", name: "Burger", slug: "burger" },
           { id: "item-2", name: "Drink" },
           {
             id: "item-3",
@@ -146,6 +146,7 @@ describe("getCustomerDeals", () => {
     expect(response.deals[0].dealSelectionMode).toBe("FLEXIBLE_ITEMS");
     expect(response.deals[0].dealRequiredQuantity).toBe(2);
     expect(response.deals[0].scopeMenuItems).toHaveLength(3);
+    expect(response.deals[0].scopeMenuItems[0].slug).toBe("burger");
     expect(response.deals[0].scopeMenuItems[2].description).toBe("Crispy fries");
     expect(response.deals[0].scopeMenuItems[2].category?.name).toBe("Sides");
   });

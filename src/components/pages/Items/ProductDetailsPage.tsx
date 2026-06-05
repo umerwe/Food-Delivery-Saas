@@ -18,6 +18,7 @@ import {
   buildCartPayload,
   buildModifiersPayload,
   getApiErrorMessage,
+  hasUnsupportedDealMenuItemCustomization,
   isCartBranchConflict,
 } from "@/components/pages/Items/utils/product-cart";
 import {
@@ -802,6 +803,7 @@ function ProductDetailsPageContent() {
   const itemIdParam = params.get("itemId") || "";
   const cartItemId = params.get("cartItemId") || "";
   const dealIdContext = params.get("dealId") || "";
+  const dealContext = params.get("dealContext") || "";
   const checkoutType = getCheckoutType(params.get("type"));
 
   const isEditingCartItem = Boolean(cartItemId);
@@ -1997,6 +1999,17 @@ function ProductDetailsPageContent() {
     });
   };
 
+  const isDealMenuItemContext = Boolean(
+    dealIdContext &&
+      (dealContext === "chooser" ||
+        item?.supportsDealIdCartPayload === true ||
+        item?.supportsDealCartPayload === true ||
+        item?.isDealMenuItem === true)
+  );
+  const isUnsupportedDealCustomization =
+    isDealMenuItemContext &&
+    (hasUnsupportedDealMenuItemCustomization(item) || splitPizzaEnabled);
+
   const buildCreateCartPayload = () => buildCartPayload({
     item,
     branchId,
@@ -2011,6 +2024,8 @@ function ProductDetailsPageContent() {
     includeBranch: true,
     clearSectionsWhenEmpty: false,
     dealId: dealIdContext,
+    shouldSendDealId: isDealMenuItemContext,
+    isDealMenuItemContext,
   });
 
   const buildPatchCartPayload = () => buildCartPayload({
@@ -2026,6 +2041,8 @@ function ProductDetailsPageContent() {
     includeBranch: false,
     clearSectionsWhenEmpty: true,
     dealId: dealIdContext,
+    shouldSendDealId: isDealMenuItemContext,
+    isDealMenuItemContext,
   });
 
   const clearCartAndRetryAdd = async () => {
@@ -2058,6 +2075,11 @@ function ProductDetailsPageContent() {
 
       if (!item?.id) {
         toast.error(t("itemNotFound"));
+        return;
+      }
+
+      if (isUnsupportedDealCustomization) {
+        toast.error(t("unsupportedDealCustomization"));
         return;
       }
 

@@ -5,19 +5,49 @@ import { toast } from "sonner";
 
 import { queryKeys } from "@/config/query-keys";
 import { getApiErrorMessage } from "@/lib/errors";
-import { redeemGiftCard } from "@/services/gift-cards";
+import { purchaseGiftCard, redeemGiftCard } from "@/services/gift-cards";
 import type {
+  GiftCardPurchasePayload,
   GiftCardRedeemParams,
   GiftCardRedeemPayload,
 } from "@/types/gift-cards";
+
+type PurchaseGiftCardVariables = {
+  payload: GiftCardPurchasePayload;
+};
 
 type RedeemGiftCardVariables = {
   payload: GiftCardRedeemPayload;
   params?: GiftCardRedeemParams;
 };
 
-const formatWalletAmount = (amount: number, currency: string) =>
-  `${currency} ${Number(amount || 0).toLocaleString()}`;
+const invalidateWalletQueries = async (
+  queryClient: ReturnType<typeof useQueryClient>
+) => {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.wallet.summary }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.wallet.history }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.profile.all }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.payments.all }),
+  ]);
+};
+
+export const usePurchaseGiftCard = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ payload }: PurchaseGiftCardVariables) =>
+      purchaseGiftCard(payload),
+    onSuccess: () => {
+      void invalidateWalletQueries(queryClient);
+      window.dispatchEvent(new Event("wallet-updated"));
+      toast.success("Gift card purchased successfully");
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error));
+    },
+  });
+};
 
 export const useRedeemGiftCard = () => {
   const queryClient = useQueryClient();
@@ -26,22 +56,10 @@ export const useRedeemGiftCard = () => {
     mutationFn: ({ payload, params }: RedeemGiftCardVariables) =>
       redeemGiftCard(payload, params),
     onSuccess: (response) => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.wallet.summary }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.wallet.history }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.profile.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.payments.all }),
-      ]);
-
+      void invalidateWalletQueries(queryClient);
       window.dispatchEvent(new Event("wallet-updated"));
       toast.success(
-        `${response.message || "Gift card redeemed successfully"}: ${formatWalletAmount(
-          response.result.creditedAmount,
-          response.result.currency
-        )} credited, ${formatWalletAmount(
-          response.result.walletBalance,
-          response.result.currency
-        )} balance`
+        response.message || "Gift card redeemed successfully"
       );
     },
     onError: (error) => {

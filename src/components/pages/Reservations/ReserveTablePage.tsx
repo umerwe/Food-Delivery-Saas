@@ -1,9 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { Clock, Info, Star } from "lucide-react";
+import { Clock, Info, LoaderCircle, Star } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -15,6 +22,7 @@ import useReservations from "@/hooks/useReservations";
 import { useAuth } from "@/hooks/useAuth";
 import { ReservationSuccess } from "@/components/pages/Reservations/components/ReservationSuccess";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
+import { getApiErrorMessage } from "@/lib/errors";
 import { createReservationSchema, type ReservationFormValues } from "@/validations/reservations";
 import {
   getReservationStatusLabelKey,
@@ -333,7 +341,13 @@ export function ReserveTablePage() {
     },
   });
 
-  const { handleSubmit: handleFormSubmit, setValue, watch, reset } = form;
+  const {
+    formState: { isSubmitting },
+    handleSubmit: handleFormSubmit,
+    setValue,
+    watch,
+    reset,
+  } = form;
   const date = watch("date");
   const time = watch("time");
   const guestCount = watch("guestCount");
@@ -505,7 +519,7 @@ export function ReserveTablePage() {
       const res = await createReservation({ customerId, payload });
 
       if (!res || res.error) {
-        return toast.error(res?.error || t("failedFallback"));
+        return toast.error(getApiErrorMessage(res, t("failedFallback")));
       }
 
       const reservation = normalizeReservationResponse(res);
@@ -597,23 +611,35 @@ export function ReserveTablePage() {
                   fetchOptions={fetchBranches}
                 />
 
-                {/* INFO TOOLTIP */}
+                {/* INFO POPUP */}
                 {selectedBranch?.settings ? (
-                  <div className="group relative">
-                    <Info className="h-4 w-4 cursor-pointer text-gray-500" />
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={t("openingHours")}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-primary hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
+                    </DialogTrigger>
 
-                    <div className="absolute left-0 top-6 z-50 hidden w-[280px] rounded-xl border bg-white p-3 text-xs shadow-xl group-hover:block">
-                      <p className="mb-2 font-semibold">{t("openingHours")}</p>
+                    <DialogContent className="max-h-[85vh] w-[calc(100%-32px)] max-w-[420px] overflow-y-auto rounded-2xl p-5">
+                      <DialogHeader className="pr-8 text-left">
+                        <DialogTitle>{t("openingHours")}</DialogTitle>
+                      </DialogHeader>
 
                       {hasOpeningHours ? (
-                        <div className="space-y-1">
+                        <div className="space-y-2 text-sm">
                           {normalizeArray<OpeningHours>(selectedBranch.settings.openingHours).map((h) => (
                             <div
                               key={h.dayOfWeek}
-                              className="flex justify-between gap-3"
+                              className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-3 py-2"
                             >
-                              <span>{String(h.dayOfWeek || "").slice(0, 3)}</span>
-                              <span className="text-right">
+                              <span className="font-medium text-gray-700">
+                                {String(h.dayOfWeek || "").slice(0, 3)}
+                              </span>
+                              <span className="text-right text-gray-600">
                                 {h.isClosed
                                   ? t("closed")
                                   : `${h.openTime} - ${h.closeTime}`}
@@ -622,30 +648,32 @@ export function ReserveTablePage() {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-500">
+                        <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-500">
                           {t("openingHoursNotConfigured")}
                         </p>
                       )}
 
                       {dateRangeRules.length > 0 ? (
-                        <div className="mt-3 border-t pt-2">
-                          <p className="mb-1 font-semibold">{t("dateRangeRules")}</p>
-                          <div className="space-y-1">
+                        <div className="border-t pt-4">
+                          <p className="mb-2 text-sm font-semibold text-gray-900">
+                            {t("dateRangeRules")}
+                          </p>
+                          <div className="space-y-2 text-sm">
                             {dateRangeRules.slice(0, 5).map((rule, index) => {
                               const { fromDate, toDate } = getDateRangeDates(rule);
 
                               return (
                                 <div
                                   key={`date-rule-${index}`}
-                                  className="flex justify-between gap-3"
+                                  className="flex justify-between gap-4 rounded-xl bg-gray-50 px-3 py-2"
                                 >
-                                  <span>
+                                  <span className="text-gray-700">
                                     {fromDate}
                                     {toDate && toDate !== fromDate
-                                      ? ` → ${toDate}`
+                                      ? ` -> ${toDate}`
                                       : ""}
                                   </span>
-                                  <span className="text-right">
+                                  <span className="text-right text-gray-600">
                                     {rule?.isClosed
                                       ? t("closed")
                                       : `${rule?.openTime || "--:--"} - ${
@@ -658,8 +686,8 @@ export function ReserveTablePage() {
                           </div>
                         </div>
                       ) : null}
-                    </div>
-                  </div>
+                    </DialogContent>
+                  </Dialog>
                 ) : null}
               </div>
             </div>
@@ -763,9 +791,16 @@ export function ReserveTablePage() {
             {/* SUBMIT */}
             <Button
               className="w-full py-4 text-white disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading || !canSubmit}
+              disabled={loading || isSubmitting || !canSubmit}
             >
-              {loading ? t("reserving") : t("confirmReservation")}
+              {isSubmitting ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  {t("reserving")}
+                </>
+              ) : (
+                t("confirmReservation")
+              )}
             </Button>
           </form>
         </div>

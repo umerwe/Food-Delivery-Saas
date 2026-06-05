@@ -36,7 +36,12 @@ export type Order = {
   subtotal?: number | string | null;
   deliveryFee?: number | string | null;
   taxAmount?: number | string | null;
+  serviceChargeType?: string | null;
+  serviceChargeValue?: number | string | null;
+  serviceChargeAmount?: number | string | null;
+  tipAmount?: number | string | null;
   discountAmount?: number | string | null;
+  payableAmount?: number | string | null;
   totalAmount?: number | string | null;
   items?: OrderItem[];
   itemsPreview?: OrderItem[];
@@ -58,6 +63,10 @@ export type ReorderPayload = {
   quantity: number;
   branchId: string | number;
   note: string;
+};
+
+export type DirectOrderPayload = Record<string, unknown> & {
+  tipAmount?: number;
 };
 
 const ordersService = createDomainApiService();

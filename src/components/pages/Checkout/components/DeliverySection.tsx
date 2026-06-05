@@ -33,7 +33,7 @@ export function DeliverySection(props: DeliverySectionProps) {
           type="datetime-local"
           value={props.scheduledDeliveryValue}
           onChange={(event) => props.setScheduledDeliveryValue(event.target.value)}
-          className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+          className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition-colors focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
         />
         <p className="mt-2 text-sm text-gray-500">
           {t("scheduledDeliveryOptional")}

@@ -39,6 +39,85 @@ describe("checkout normalizers", () => {
     ]);
   });
 
+  it("ready-made deal item with empty modifiers has no displayable modifiers", () => {
+    expect(
+      getSelectedModifiers({
+        dealId: "deal-1",
+        modifiers: [],
+        menuItem: { name: "Ready-made Combo" },
+      })
+    ).toEqual([]);
+  });
+
+  it("customizable deal item renders grouped selected modifiers", () => {
+    expect(
+      getSelectedModifiers({
+        dealId: "deal-1",
+        modifierSelections: [
+          {
+            modifierGroupId: "group-1",
+            groupName: "Sauce",
+            modifiers: [
+              {
+                modifierId: "modifier-1",
+                quantity: 1,
+                modifier: {
+                  id: "modifier-1",
+                  name: "Garlic Sauce",
+                  priceDelta: 25,
+                },
+              },
+            ],
+          },
+        ],
+        menuItem: { name: "Custom Combo" },
+      })
+    ).toEqual([
+      {
+        id: "",
+        modifierId: "modifier-1",
+        name: "Sauce: Garlic Sauce",
+        quantity: 1,
+        unitPrice: 25,
+        priceDelta: 25,
+        total: 25,
+      },
+    ]);
+  });
+
+  it("customizable deal item renders grouped selectedModifiers if backend returns them later", () => {
+    expect(
+      getSelectedModifiers({
+        dealId: "deal-1",
+        selectedModifiers: [
+          {
+            modifierGroupId: "group-1",
+            groupName: "Sauce",
+            modifiers: [
+              {
+                modifierId: "modifier-1",
+                quantity: 2,
+                name: "Garlic Sauce",
+                priceDelta: 25,
+              },
+            ],
+          },
+        ],
+        menuItem: { name: "Custom Combo" },
+      })
+    ).toEqual([
+      {
+        id: "",
+        modifierId: "modifier-1",
+        name: "Sauce: Garlic Sauce",
+        quantity: 2,
+        unitPrice: 25,
+        priceDelta: 25,
+        total: 50,
+      },
+    ]);
+  });
+
   it("normalizes selected sections", () => {
     expect(
       getSelectedSections({
@@ -90,7 +169,9 @@ describe("checkout normalizers", () => {
     expect(normalized.modifiersTotal).toBe(150);
     expect(normalized.unitPriceWithModifiers).toBe(750);
     expect(normalized.lineTotal).toBe(1500);
-    expect(normalized.selectedVariation?.id).toBe("large");
+    expect(normalized.selectedVariation).toBeNull();
+    expect(normalized.selectedVariationName).toBe("");
+    expect(normalized.variationId).toBeUndefined();
     expect(normalized.selectedModifiers[0]).toMatchObject({
       id: "selected-mod-1",
       modifierId: "extra-cheese",
@@ -113,16 +194,30 @@ describe("checkout normalizers", () => {
             discountAmount: 301,
           },
           subtotal: 1300,
+          taxAmount: 0,
+          deliveryFee: 150,
+          serviceChargeType: "PERCENTAGE",
+          serviceChargeValue: 10,
+          serviceChargeAmount: 100,
+          tipAmount: 150,
           discountAmount: 301,
           totalAmount: 999,
+          payableAmount: 1400,
         },
       },
     });
 
     expect(quote).toEqual({
       subtotal: 1300,
+      taxAmount: 0,
+      deliveryFee: 150,
+      serviceChargeType: "PERCENTAGE",
+      serviceChargeValue: 10,
+      serviceChargeAmount: 100,
+      tipAmount: 150,
       discountAmount: 301,
       totalAmount: 999,
+      payableAmount: 1400,
       appliedPromotion: {
         id: "deal-1",
         title: "Burger Combo",
@@ -175,17 +270,97 @@ describe("checkout normalizers", () => {
     });
   });
 
-  it("quote total uses backend totalAmount", () => {
+  it("does not allocate applied promotion discount per cart item", () => {
+    const { items, quote } = normalizeCartResponse({
+      data: {
+        items: [
+          {
+            id: "cart-item-1",
+            quantity: 1,
+            unitPrice: 500,
+            lineTotal: 500,
+            dealId: "deal-1",
+            modifiers: [],
+            menuItem: { name: "Burger A" },
+          },
+          {
+            id: "cart-item-2",
+            quantity: 1,
+            unitPrice: 500,
+            lineTotal: 500,
+            dealId: "deal-1",
+            modifiers: [],
+            menuItem: { name: "Burger B" },
+          },
+        ],
+        quote: {
+          subtotal: 1000,
+          discountAmount: 200,
+          totalAmount: 800,
+          payableAmount: 800,
+          appliedPromotion: {
+            id: "deal-1",
+            title: "Any 2 Burgers",
+            discountAmount: 200,
+          },
+        },
+      },
+    });
+
+    const normalizedItems = items.map((item) => normalizeCartItem(item));
+
+    expect(normalizedItems.map((item) => item.lineTotal)).toEqual([500, 500]);
+    expect(getAppliedPromotionDiscountLine(quote)).toEqual({
+      label: "Any 2 Burgers",
+      amount: 200,
+      discountValue: 0,
+    });
+  });
+
+  it("quote total uses backend totalAmount and payableAmount", () => {
     const { quote } = normalizeCartResponse({
       data: {
         quote: {
           subtotal: 1300,
           discountAmount: 301,
           totalAmount: 999,
+          payableAmount: 899,
         },
       },
     });
 
     expect(quote?.totalAmount).toBe(999);
+    expect(quote?.payableAmount).toBe(899);
+  });
+
+  it("quote normalizer preserves service charge tip and payable amount", () => {
+    const { quote } = normalizeCartResponse({
+      data: {
+        quote: {
+          subtotal: 1000,
+          taxAmount: 0,
+          deliveryFee: 150,
+          serviceChargeType: "PERCENTAGE",
+          serviceChargeValue: 10,
+          serviceChargeAmount: 100,
+          tipAmount: 150,
+          discountAmount: 0,
+          totalAmount: 1400,
+          payableAmount: 1400,
+        },
+      },
+    });
+
+    expect(quote).toMatchObject({
+      serviceChargeType: "PERCENTAGE",
+      serviceChargeValue: 10,
+      serviceChargeAmount: 100,
+      tipAmount: 150,
+      payableAmount: 1400,
+      taxAmount: 0,
+      deliveryFee: 150,
+      discountAmount: 0,
+      totalAmount: 1400,
+    });
   });
 });

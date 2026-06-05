@@ -33,6 +33,7 @@ import {
   type ProfileFormValues,
 } from "@/validations/profile";
 import { useTranslations } from "next-intl";
+import { GiftCardPurchaseCard } from "@/components/pages/Profile/components/GiftCardPurchaseCard";
 import { GiftCardRedeemCard } from "@/components/pages/Profile/components/GiftCardRedeemCard";
 
 export function ProfileForm() {
@@ -414,8 +415,12 @@ export function ProfileForm() {
 </div>
     </div>
 
-    <div className="mb-5">
-      <GiftCardRedeemCard branchId={user?.branchId ?? user?.branch?.id ?? null} />
+    <div className="mb-5 grid gap-5 lg:grid-cols-2">
+      <GiftCardPurchaseCard
+        walletBalance={walletBalance}
+        walletCurrency={walletCurrency}
+      />
+      <GiftCardRedeemCard />
     </div>
 
     {/* ROW 2 */}

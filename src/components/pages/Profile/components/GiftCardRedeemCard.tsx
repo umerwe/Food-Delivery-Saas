@@ -1,46 +1,35 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
 import { Gift } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { CARD_PANEL_CLASS } from "@/components/common/common-classes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRedeemGiftCard } from "@/hooks/useGiftCards";
+import type { GiftCardRedeemResult } from "@/types/gift-cards";
 import {
   buildGiftCardRedeemPayload,
   giftCardRedeemSchema,
   type GiftCardRedeemFormValues,
 } from "@/validations/gift-cards";
-import type { GiftCardRedeemResult } from "@/types/gift-cards";
-
-type GiftCardRedeemCardProps = {
-  branchId?: string | null;
-};
 
 const defaultValues: GiftCardRedeemFormValues = {
   code: "",
-  branchId: "",
 };
 
-const formatWalletAmount = (amount: number, currency: string) =>
+const formatWalletAmount = (amount: number, currency = "PKR") =>
   `${currency} ${Number(amount || 0).toLocaleString()}`;
 
-export const GiftCardRedeemCard = ({ branchId }: GiftCardRedeemCardProps) => {
+export const GiftCardRedeemCard = () => {
   const t = useTranslations("profile.giftCards");
   const validationT = useTranslations("validation");
   const redeemGiftCard = useRedeemGiftCard();
   const [redeemResult, setRedeemResult] = useState<GiftCardRedeemResult | null>(null);
-  const formValues = useMemo(
-    () => ({
-      ...defaultValues,
-      branchId: branchId ?? "",
-    }),
-    [branchId]
-  );
+  const formValues = useMemo(() => defaultValues, []);
   const {
     formState: { errors },
     handleSubmit,
@@ -79,19 +68,17 @@ export const GiftCardRedeemCard = ({ branchId }: GiftCardRedeemCardProps) => {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <input type="hidden" {...register("branchId")} />
-
         <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-start">
           <div>
             <label
               htmlFor="gift-card-code"
               className="mb-2 block text-[11px] uppercase text-[#9A9A9A]"
             >
-              {t("code")}
+              {t("codeOrQrPayload")}
             </label>
             <Input
               id="gift-card-code"
-              placeholder="GIFT-ABCD1234"
+              placeholder="GIFT-XXXXXXXXXX or DWGC:GIFT-XXXXXXXXXX"
               autoComplete="off"
               className="h-11 rounded-full"
               {...register("code")}

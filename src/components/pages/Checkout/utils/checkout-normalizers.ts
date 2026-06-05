@@ -86,6 +86,9 @@ const getStringValue = (value: unknown, fallback = "") => {
   return fallback;
 };
 
+const getServiceChargeType = (value: unknown) =>
+  typeof value === "string" && value.trim() ? value : null;
+
 export const getBackendErrorMessage = (res: unknown, fallback = "Something went wrong") => {
   const record = asRecord(res);
   const error = record.error;
@@ -158,13 +161,59 @@ const getModifierPriceFromGroups = (cartItem: ApiRecord, modifierId: string) => 
   return { name: "Add-on", unitPrice: 0 };
 };
 
+const normalizeGroupedModifiers = (
+  cartItem: ApiRecord,
+  selections: ApiRecord[]
+): CartModifier[] => {
+  return selections.flatMap((selection) => {
+    const groupName = getStringValue(selection.groupName || selection.name, "");
+
+    return normalizeArray<ApiRecord>(selection.modifiers).map((modifier) => {
+      const nestedModifier = asRecord(modifier.modifier);
+      const modifierId = String(
+        modifier.modifierId || nestedModifier.id || modifier.id || ""
+      );
+      const quantity = Math.max(1, toNumber(modifier.quantity, 1));
+      const fallbackModifier = getModifierPriceFromGroups(cartItem, modifierId);
+      const unitPrice = toNumber(
+        modifier.unitPrice ?? modifier.priceDelta ?? nestedModifier.priceDelta,
+        fallbackModifier.unitPrice
+      );
+      const modifierName = getStringValue(
+        modifier.name || nestedModifier.name,
+        fallbackModifier.name
+      );
+
+      return {
+        id: getStringValue(modifier.id),
+        modifierId,
+        name: groupName ? `${groupName}: ${modifierName}` : modifierName,
+        quantity,
+        unitPrice,
+        priceDelta: (modifier.priceDelta ?? nestedModifier.priceDelta) as
+          | number
+          | string
+          | null
+          | undefined,
+        total: toNumber(modifier.total, unitPrice * quantity),
+      };
+    });
+  });
+};
+
 export const getSelectedModifiers = (cartItemInput: unknown): CartModifier[] => {
   const cartItem = asRecord(cartItemInput);
 
   if (Array.isArray(cartItem.selectedModifiers)) {
-    return normalizeArray<ApiRecord>(cartItem.selectedModifiers).map((modifier) => {
+    const selectedModifiers = normalizeArray<ApiRecord>(cartItem.selectedModifiers);
+
+    if (selectedModifiers.some((modifier) => Array.isArray(modifier.modifiers))) {
+      return normalizeGroupedModifiers(cartItem, selectedModifiers);
+    }
+
+    return selectedModifiers.map((modifier) => {
       const quantity = Math.max(1, toNumber(modifier.quantity, 1));
-      const unitPrice = toNumber(modifier.unitPrice, 0);
+      const unitPrice = toNumber(modifier.unitPrice ?? modifier.priceDelta, 0);
       const total = toNumber(modifier.total, unitPrice * quantity);
 
       return {
@@ -180,27 +229,10 @@ export const getSelectedModifiers = (cartItemInput: unknown): CartModifier[] => 
   }
 
   if (Array.isArray(cartItem.modifierSelections)) {
-    return normalizeArray<ApiRecord>(cartItem.modifierSelections).flatMap((selection) => {
-      const groupName = getStringValue(selection.groupName || selection.name, "");
-
-      return normalizeArray<ApiRecord>(selection.modifiers).map((modifier) => {
-        const modifierId = String(modifier.modifierId || modifier.id || "");
-        const quantity = Math.max(1, toNumber(modifier.quantity, 1));
-        const fallbackModifier = getModifierPriceFromGroups(cartItem, modifierId);
-        const unitPrice = toNumber(modifier.unitPrice ?? modifier.priceDelta, fallbackModifier.unitPrice);
-        const modifierName = getStringValue(modifier.name, fallbackModifier.name);
-
-        return {
-          id: getStringValue(modifier.id),
-          modifierId,
-          name: groupName ? `${groupName}: ${modifierName}` : modifierName,
-          quantity,
-          unitPrice,
-          priceDelta: modifier.priceDelta as number | string | null | undefined,
-          total: toNumber(modifier.total, unitPrice * quantity),
-        };
-      });
-    });
+    return normalizeGroupedModifiers(
+      cartItem,
+      normalizeArray<ApiRecord>(cartItem.modifierSelections)
+    );
   }
 
   return normalizeArray<ApiRecord>(cartItem.modifiers).map((modifier) => {
@@ -282,6 +314,7 @@ export const getSelectedSections = (cartItemInput: unknown): CartSection[] => {
 
 export const normalizeCartItem = (itemInput: unknown): CartItem => {
   const item = asRecord(itemInput);
+  const dealId = typeof item.dealId === "string" ? item.dealId : null;
   const menuItem = asRecord(item.menuItem);
   const category = asRecord(menuItem.category);
   const itemSelectedVariation = asRecord(item.selectedVariation);
@@ -322,9 +355,13 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
     lineTotal,
     desc: getStringValue(menuItem.description),
     img: getStringValue(menuItem.imageUrl),
-    selectedVariationName: getStringValue(selectedVariation.displayText || selectedVariation.name),
-    selectedVariation,
-    variationId: (item.variationId || selectedVariation.id) as string | number | undefined,
+    selectedVariationName: dealId
+      ? ""
+      : getStringValue(selectedVariation.displayText || selectedVariation.name),
+    selectedVariation: dealId ? null : selectedVariation,
+    variationId: dealId
+      ? undefined
+      : (item.variationId || selectedVariation.id) as string | number | undefined,
     selectedModifiers,
     selectedSections,
     sections: selectedSections,
@@ -336,7 +373,7 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
     pickupUnitPrice: item.pickupUnitPrice,
     takeawayPriceAdjustment: menuItem.takeawayPriceAdjustment,
     deliveryPriceAdjustment: menuItem.deliveryPriceAdjustment,
-    dealId: typeof item.dealId === "string" ? item.dealId : null,
+    dealId,
   };
 };
 
@@ -407,8 +444,17 @@ export const normalizeCartQuote = (value: unknown): NormalizedCartQuote | null =
 
   return {
     subtotal: toNumber(quote.subtotal, 0),
+    taxAmount: toNumber(quote.taxAmount, 0),
+    deliveryFee: toNumber(quote.deliveryFee, 0),
+    serviceChargeType: getServiceChargeType(quote.serviceChargeType),
+    serviceChargeValue: quote.serviceChargeValue === null || quote.serviceChargeValue === undefined
+      ? null
+      : toNumber(quote.serviceChargeValue, 0),
+    serviceChargeAmount: toNumber(quote.serviceChargeAmount, 0),
+    tipAmount: toNumber(quote.tipAmount, 0),
     discountAmount: toNumber(quote.discountAmount, 0),
     totalAmount: toNumber(quote.totalAmount, 0),
+    payableAmount: toNumber(quote.payableAmount, toNumber(quote.totalAmount, 0)),
     appliedPromotion: normalizeCartAppliedPromotion(quote.appliedPromotion),
   };
 };

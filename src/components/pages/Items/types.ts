@@ -167,6 +167,9 @@ export type MenuItem = {
   modifierLinks?: RawModifierLink[];
   modifierGroups?: ModifierGroup[];
   categoryModifierGroups?: ModifierGroup[];
+  supportsDealIdCartPayload?: boolean | null;
+  supportsDealCartPayload?: boolean | null;
+  isDealMenuItem?: boolean | null;
   minSelect?: string | number | null;
   maxSelect?: string | number | null;
   isRequired?: boolean | null;
@@ -213,6 +216,7 @@ export type CartModifierSelectionInput = {
 export type CartPayload = {
   customerId?: string;
   menuItemId?: string | number;
+  dealId?: string;
   quantity: number;
   checkoutType?: CheckoutType;
   variationId?: string | null;

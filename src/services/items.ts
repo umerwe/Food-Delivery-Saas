@@ -26,19 +26,22 @@ export const fetchMenuItemsPage = async ({
   token,
 }: {
   restaurantId: string;
-  categoryId: string;
+  categoryId?: string;
   page: number;
   limit: number;
   token?: string | null;
 }) => {
   const params = new URLSearchParams({
     restaurantId,
-    categoryId,
     page: String(page),
     limit: String(limit),
     sortBy: "sortOrder",
     sortOrder: "ASC",
   });
+
+  if (categoryId) {
+    params.set("categoryId", categoryId);
+  }
 
   const response = await getItems(`/v1/menu/items?${params.toString()}`, token);
 

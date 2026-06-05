@@ -26,6 +26,13 @@ export const createCheckoutNotesSchema = () => z.object({
   note: z.string(),
 });
 
+export const checkoutTipSchema = z.object({
+  tipAmount: z
+    .number()
+    .min(0, "Tip amount must be 0 or greater")
+    .optional(),
+});
+
 export const createCheckoutAddressSchema = (
   messages: Pick<
     CheckoutValidationMessages,
@@ -52,3 +59,13 @@ export const checkoutAddressSchema = createCheckoutAddressSchema(
 export type CheckoutCustomerValues = z.infer<typeof checkoutCustomerSchema>;
 export type CheckoutNotesValues = z.infer<typeof checkoutNotesSchema>;
 export type CheckoutAddressValues = z.infer<typeof checkoutAddressSchema>;
+export type CheckoutTipValues = z.infer<typeof checkoutTipSchema>;
+
+export const normalizeCheckoutTipAmount = (value: unknown) => {
+  if (value === "" || value === null || value === undefined) {
+    return 0;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+};

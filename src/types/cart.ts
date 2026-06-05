@@ -9,9 +9,19 @@ export type CartSelectedVariation = {
 export type CartSelectedModifier = {
   id?: string;
   modifierId?: string;
+  modifierGroupId?: string;
+  groupName?: string;
   name?: string;
   quantity?: number;
+  unitPrice?: number;
   priceDelta?: number | string | null;
+  total?: number;
+  modifier?: {
+    id?: string;
+    name?: string;
+    priceDelta?: number | string | null;
+  } | null;
+  modifiers?: CartSelectedModifier[];
 };
 
 export type CartItem = {
@@ -37,15 +47,42 @@ export type CartAppliedPromotion = {
   discountAmount?: number;
 };
 
+export type ServiceChargeType = "PERCENTAGE" | "AMOUNT" | string;
+
 export type CartQuote = {
   subtotal: number;
-  discountAmount: number;
+  taxAmount?: number;
+  deliveryFee?: number;
+  serviceChargeType?: ServiceChargeType | null;
+  serviceChargeValue?: number | null;
+  serviceChargeAmount?: number;
+  tipAmount?: number;
+  discountAmount?: number;
   totalAmount: number;
+  payableAmount?: number;
   appliedPromotion?: CartAppliedPromotion | null;
 };
 
+export type CartModifierSelectionInput = {
+  modifierGroupId: string;
+  modifiers: Array<{
+    modifierId: string;
+    quantity: number;
+  }>;
+};
+
+export type AddCartItemPayload = {
+  branchId: string;
+  menuItemId: string;
+  dealId?: string;
+  variationId?: string;
+  quantity: number;
+  modifiers?: Array<{ modifierId: string; quantity: number }>;
+  modifierSelections?: CartModifierSelectionInput[];
+  note?: string;
+};
+
 export type {
-  CartModifierSelectionInput,
   CartPayload,
 } from "@/components/pages/Items/types";
 export type { CartUpdatePayload } from "@/services/cart";

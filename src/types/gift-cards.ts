@@ -1,6 +1,24 @@
+export type GiftCardPurchasePayload = {
+  amount: number;
+  title?: string;
+  message?: string;
+  expiresAt?: string;
+};
+
+export type GiftCardPurchaseResult = {
+  code: string;
+  qrPayload: string;
+  amount: number;
+  walletBalance: number;
+};
+
+export type GiftCardPurchaseResponse = {
+  result: GiftCardPurchaseResult;
+  message?: string;
+};
+
 export type GiftCardRedeemPayload = {
   code: string;
-  branchId?: string;
 };
 
 export type GiftCardRedeemParams = {
@@ -8,13 +26,13 @@ export type GiftCardRedeemParams = {
 };
 
 export type GiftCardRedeemResult = {
-  customerId: string;
-  giftCardId: string;
+  customerId?: string;
+  giftCardId?: string;
   code: string;
-  walletTransactionId: string;
+  walletTransactionId?: string;
   creditedAmount: number;
   walletBalance: number;
-  currency: string;
+  currency?: string;
 };
 
 export type GiftCardRedeemResponse = {
@@ -33,22 +51,66 @@ const getNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-export const normalizeGiftCardRedeemResponse = (
+const getEnvelopeRecord = (response: unknown) =>
+  isRecord(response) ? response : {};
+
+const getDataRecord = (response: unknown) => {
+  const root = getEnvelopeRecord(response);
+  return isRecord(root.data) ? root.data : root;
+};
+
+const getResultRecord = (response: unknown) => {
+  const data = getDataRecord(response);
+
+  if (isRecord(data.result)) {
+    return data.result;
+  }
+
+  if (isRecord(data.data)) {
+    return data.data;
+  }
+
+  return data;
+};
+
+const getResponseMessage = (response: unknown) => {
+  const root = getEnvelopeRecord(response);
+  const data = getDataRecord(response);
+
+  return getString(root.message) || getString(data.message) || undefined;
+};
+
+export const normalizeGiftCardPurchaseResponse = (
   response: unknown
-): GiftCardRedeemResponse => {
-  const root = isRecord(response) ? response : {};
-  const data = isRecord(root.data) ? root.data : root;
+): GiftCardPurchaseResponse => {
+  const result = getResultRecord(response);
 
   return {
     result: {
-      customerId: getString(data.customerId),
-      giftCardId: getString(data.giftCardId),
-      code: getString(data.code),
-      walletTransactionId: getString(data.walletTransactionId),
-      creditedAmount: getNumber(data.creditedAmount),
-      walletBalance: getNumber(data.walletBalance),
-      currency: getString(data.currency, "PKR"),
+      code: getString(result.code),
+      qrPayload: getString(result.qrPayload),
+      amount: getNumber(result.amount),
+      walletBalance: getNumber(result.walletBalance),
     },
-    message: getString(root.message) || undefined,
+    message: getResponseMessage(response),
+  };
+};
+
+export const normalizeGiftCardRedeemResponse = (
+  response: unknown
+): GiftCardRedeemResponse => {
+  const result = getResultRecord(response);
+
+  return {
+    result: {
+      customerId: getString(result.customerId) || undefined,
+      giftCardId: getString(result.giftCardId) || undefined,
+      code: getString(result.code),
+      walletTransactionId: getString(result.walletTransactionId) || undefined,
+      creditedAmount: getNumber(result.creditedAmount),
+      walletBalance: getNumber(result.walletBalance),
+      currency: getString(result.currency) || undefined,
+    },
+    message: getResponseMessage(response),
   };
 };

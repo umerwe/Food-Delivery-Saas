@@ -17,7 +17,7 @@ const service = {
 
 export type ItemsApi = DomainApiHook & {
   fetchMenuItems: (endpoint: string) => Promise<{ response: ApiResult; items: MenuItem[] }>;
-  fetchMenuItemsPage: (args: { restaurantId: string; categoryId: string; page: number; limit: number }) => Promise<{ response: ApiResult; items: MenuItem[]; meta: ApiMeta }>;
+  fetchMenuItemsPage: (args: { restaurantId: string; categoryId?: string; page: number; limit: number }) => Promise<{ response: ApiResult; items: MenuItem[]; meta: ApiMeta }>;
   fetchSplitPizzaMenuItems: (args: { restaurantId?: string | number | null; search: string; page: number }) => Promise<{ data: MenuItem[]; meta?: ApiMeta }>;
   fetchMenuCategoriesPage: (args: { restaurantId: string; page: number; limit: number; search?: string }) => Promise<{ response: ApiResult; categories: ItemsCategory[]; meta: ApiMeta }>;
 };
@@ -31,7 +31,7 @@ export const useItems = (token: string | null): ItemsApi => {
   );
 
   const fetchMenuItemPage = useCallback(
-    (args: { restaurantId: string; categoryId: string; page: number; limit: number }) =>
+    (args: { restaurantId: string; categoryId?: string; page: number; limit: number }) =>
       fetchMenuItemsPage({ ...args, token }),
     [token]
   );

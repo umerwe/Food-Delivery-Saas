@@ -23,6 +23,7 @@ import type { ApiRecord, BackendErrorState, CartItem } from "@/components/pages/
 import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorMeta, hasBackendError, normalizeCartItem, normalizeCartResponse, recalculateCartItemQuantity, toNumber } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import type { BranchRecord } from "@/types/branch-selector";
 import { useTranslations } from "next-intl";
+import { normalizeCheckoutTipAmount } from "@/validations/checkout";
 
 function CheckoutPageContent() {
   const t = useTranslations("checkout");
@@ -33,6 +34,7 @@ function CheckoutPageContent() {
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [applyingTip, setApplyingTip] = useState(false);
 
   const { user, token } = useAuthContext();
   const { get, patch, del, post, checkoutCustomerCart } = useCheckout(token);
@@ -41,6 +43,7 @@ function CheckoutPageContent() {
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartQuote, setCartQuote] = useState<ApiRecord | null>(null);
+  const [appliedTipAmount, setAppliedTipAmount] = useState(0);
   const [loadingCart, setLoadingCart] = useState(true);
   const [backendError, setBackendError] = useState<BackendErrorState | null>(
     null
@@ -65,6 +68,17 @@ function CheckoutPageContent() {
 
   const clearBackendError = () => {
     setBackendError(null);
+  };
+
+  const applyTipToCurrentQuote = (tipAmount: number) => {
+    setCartQuote((currentQuote) => {
+      if (!currentQuote) return currentQuote;
+
+      return {
+        ...currentQuote,
+        tipAmount,
+      };
+    });
   };
 
   const [stripePayment, setStripePayment] = useState<{ open: boolean; clientSecret: string; publishableKey: string; paymentId: string; orderId: string | number }>({
@@ -104,6 +118,9 @@ function CheckoutPageContent() {
 
       setCartItems(formatted);
       setCartQuote(quote);
+      setAppliedTipAmount((previousTipAmount) =>
+        quote ? Math.max(0, toNumber(quote.tipAmount, 0)) : previousTipAmount
+      );
       clearBackendError();
     } catch (err) {
       reportBackendError(
@@ -122,6 +139,7 @@ function CheckoutPageContent() {
     } else {
       setCartItems([]);
       setCartQuote(null);
+      setAppliedTipAmount(0);
       setLoadingCart(false);
     }
   }, [customerId]);
@@ -257,16 +275,19 @@ function CheckoutPageContent() {
   const clearCart = async () => {
     const previousCartItems = cartItems;
     const previousCartQuote = cartQuote;
+    const previousAppliedTipAmount = appliedTipAmount;
 
     try {
       setCartItems([]);
       setCartQuote(null);
+      setAppliedTipAmount(0);
 
       const res = await del(`/v1/cart?customerId=${customerId}`);
 
       if (hasBackendError(res)) {
         setCartItems(previousCartItems);
         setCartQuote(previousCartQuote);
+        setAppliedTipAmount(previousAppliedTipAmount);
         reportBackendError(
           t("toast.failedClearCart"),
           res,
@@ -280,6 +301,7 @@ function CheckoutPageContent() {
     } catch (err) {
       setCartItems(previousCartItems);
       setCartQuote(previousCartQuote);
+      setAppliedTipAmount(previousAppliedTipAmount);
       reportBackendError(
         t("toast.failedClearCart"),
         err,
@@ -427,6 +449,50 @@ function CheckoutPageContent() {
     }
   };
 
+  const applyTip = async (tipAmount: number) => {
+    if (!customerId) return;
+
+    const normalizedTip = normalizeCheckoutTipAmount(tipAmount);
+
+    if (normalizedTip === null) return;
+
+    try {
+      setApplyingTip(true);
+
+      const res = await updateCustomerCart({
+        customerId,
+        payload: {
+          tipAmount: normalizedTip,
+        },
+      });
+
+      if (hasBackendError(res)) {
+        reportBackendError(
+          t("toast.failedSetTip"),
+          res,
+          t("toast.failedSetTip")
+        );
+        return;
+      }
+
+      await fetchCart();
+      setAppliedTipAmount(normalizedTip);
+      applyTipToCurrentQuote(normalizedTip);
+      clearBackendError();
+      toast.success(
+        normalizedTip > 0 ? t("toast.tipApplied") : t("toast.tipRemoved")
+      );
+    } catch (err) {
+      reportBackendError(
+        t("toast.failedSetTip"),
+        err,
+        err instanceof Error ? err.message : t("toast.failedSetTip")
+      );
+    } finally {
+      setApplyingTip(false);
+    }
+  };
+
   const handlePlaceOrder = async () => {
     try {
       setPlacingOrder(true);
@@ -471,10 +537,16 @@ function CheckoutPageContent() {
       const scheduleUpdated = await setCartSchedule(scheduledDeliveryAt);
       if (!scheduleUpdated) return;
 
+      const checkoutTipAmount = Math.max(
+        0,
+        toNumber(cartQuote?.tipAmount, appliedTipAmount)
+      );
+
       const res = await checkoutCustomerCart({
         customerId,
         payload: {
           ...(scheduledDeliveryAt ? { scheduledDeliveryAt } : {}),
+          ...(checkoutTipAmount > 0 ? { tipAmount: checkoutTipAmount } : {}),
           paymentMethod:
             paymentMethod === "card"
               ? "STRIPE"
@@ -657,6 +729,7 @@ function CheckoutPageContent() {
           <CartSummarySection
             cartItems={cartItems}
             quote={cartQuote}
+            appliedTipAmount={appliedTipAmount}
             updateQuantity={updateQuantity}
             deleteItem={deleteItem}
             clearCart={clearCart}
@@ -670,6 +743,8 @@ function CheckoutPageContent() {
             couponDiscount={couponDiscount}
             validatingCoupon={validatingCoupon}
             loadingCart={loadingCart}
+            onApplyTip={applyTip}
+            applyingTip={applyingTip}
           />
         </div>
       </div>

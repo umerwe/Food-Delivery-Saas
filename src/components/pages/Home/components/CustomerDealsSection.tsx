@@ -1,28 +1,20 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import Image from "next/image";
 import { BadgePercent, CalendarDays, PackageCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DealChooserDrawer } from "@/components/pages/Home/components/deals/DealChooserDrawer";
 import {
   getDealImage,
   getDealActionLabel,
   getDealRequirementText,
   getDealTypeLabel,
-  canAutoAddFixedDeal,
-  canUseInlineFlexibleDealSelection,
+  getDealActionKind,
   isFixedItemDeal,
+  isFlexibleAllItemsDeal,
   isFlexibleCategoryDeal,
   isFlexibleItemDeal,
 } from "@/components/pages/Home/utils/customer-deal-cart";
@@ -32,14 +24,14 @@ import {
   getDealItemNames,
   isDealActive,
 } from "@/components/pages/Home/utils/customer-deals-formatters";
-import type { CustomerDeal, CustomerDealMenuItem } from "@/types/customer-deals";
+import type { CustomerDeal } from "@/types/customer-deals";
 
 type CustomerDealsSectionProps = {
   deals: CustomerDeal[];
   isLoading?: boolean;
   addingDealId?: string | null;
+  branchId?: string | null;
   onAddDeal?: (deal: CustomerDeal, selectedMenuItemIds?: string[]) => void;
-  onBrowseDeal?: (deal: CustomerDeal) => void;
 };
 
 const CustomerDealsSkeleton = () => (
@@ -53,24 +45,14 @@ const CustomerDealsSkeleton = () => (
   </div>
 );
 
-const getMenuItemInitial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
-
-const getMenuItemPrice = (item: CustomerDealMenuItem) =>
-  item.discountedBasePrice ?? item.basePrice;
-
-const hasMenuItemPrice = (value: CustomerDealMenuItem["basePrice"]) =>
-  value !== null && value !== undefined && value !== "";
-
 const CustomerDealCard = ({
   deal,
   isAdding,
   onAddDeal,
-  onBrowseDeal,
 }: {
   deal: CustomerDeal;
   isAdding: boolean;
   onAddDeal?: (deal: CustomerDeal, selectedMenuItemIds?: string[]) => void;
-  onBrowseDeal?: (deal: CustomerDeal) => void;
 }) => {
   const t = useTranslations("home.deals");
   const image = getDealImage(deal);
@@ -81,19 +63,10 @@ const CustomerDealCard = ({
   const actionLabel = getDealActionLabel(deal);
   const hasDealItems = isFlexibleCategoryDeal(deal)
     ? deal.scopeCategories.length > 0
-    : deal.scopeMenuItems.length > 0;
+    : isFlexibleAllItemsDeal(deal) || deal.scopeMenuItems.length > 0;
   const handleAddDeal = useCallback(() => {
-    if (
-      isFlexibleCategoryDeal(deal) ||
-      (isFixedItemDeal(deal) && !canAutoAddFixedDeal(deal)) ||
-      (isFlexibleItemDeal(deal) && !canUseInlineFlexibleDealSelection(deal))
-    ) {
-      onBrowseDeal?.(deal);
-      return;
-    }
-
     onAddDeal?.(deal);
-  }, [deal, onAddDeal, onBrowseDeal]);
+  }, [deal, onAddDeal]);
   const translatedActionLabel =
     actionLabel === "Browse Items"
       ? t("browseItems")
@@ -173,6 +146,12 @@ const CustomerDealCard = ({
           </p>
         ) : null}
 
+        {isFlexibleAllItemsDeal(deal) ? (
+          <p className="mt-3 line-clamp-2 text-sm font-medium text-gray-700">
+            {requirementText}
+          </p>
+        ) : null}
+
         {!hasDealItems ? (
           <p className="mt-3 text-sm font-medium text-red-500">
             {t("noAvailableItems")}
@@ -194,75 +173,28 @@ const CustomerDealCard = ({
   );
 };
 
-const getRequiredQuantity = (deal: CustomerDeal) => {
-  const parsed = Number(deal.dealRequiredQuantity);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
-};
-
 export const CustomerDealsSection = ({
   deals,
   isLoading = false,
   addingDealId = null,
+  branchId = null,
   onAddDeal,
-  onBrowseDeal,
 }: CustomerDealsSectionProps) => {
   const t = useTranslations("home.deals");
   const activeDeals = deals.filter(isDealActive).slice(0, 6);
-  const [selectedFlexibleDeal, setSelectedFlexibleDeal] = useState<CustomerDeal | null>(null);
-  const [selectedMenuItemIds, setSelectedMenuItemIds] = useState<string[]>([]);
-  const requiredQuantity = selectedFlexibleDeal ? getRequiredQuantity(selectedFlexibleDeal) : 1;
-  const selectedCount = selectedMenuItemIds.length;
-  const canAddSelectedItems = Boolean(
-    selectedFlexibleDeal && selectedCount >= requiredQuantity
-  );
-  const selectedFlexibleItems = useMemo(
-    () => selectedFlexibleDeal?.scopeMenuItems ?? [],
-    [selectedFlexibleDeal]
-  );
-
-  const openFlexibleDeal = useCallback((deal: CustomerDeal) => {
-    setSelectedFlexibleDeal(deal);
-    setSelectedMenuItemIds([]);
-  }, []);
-
-  const closeFlexibleDeal = useCallback(() => {
-    setSelectedFlexibleDeal(null);
-    setSelectedMenuItemIds([]);
-  }, []);
+  const [selectedChooserDeal, setSelectedChooserDeal] = useState<CustomerDeal | null>(null);
 
   const handleDealClick = useCallback(
-    (deal: CustomerDeal, selectedIds?: string[]) => {
-      if (isFlexibleItemDeal(deal) && !selectedIds) {
-        if (!canUseInlineFlexibleDealSelection(deal)) {
-          onBrowseDeal?.(deal);
-          return;
-        }
-
-        openFlexibleDeal(deal);
+    (deal: CustomerDeal) => {
+      if (getDealActionKind(deal) === "OPEN_CHOOSER") {
+        setSelectedChooserDeal(deal);
         return;
       }
 
-      onAddDeal?.(deal, selectedIds);
+      onAddDeal?.(deal);
     },
-    [onAddDeal, onBrowseDeal, openFlexibleDeal]
+    [onAddDeal, setSelectedChooserDeal]
   );
-
-  const toggleSelectedItem = useCallback((menuItemId: string, checked: boolean) => {
-    setSelectedMenuItemIds((current) => {
-      if (checked) {
-        return current.includes(menuItemId) ? current : [...current, menuItemId];
-      }
-
-      return current.filter((id) => id !== menuItemId);
-    });
-  }, []);
-
-  const addSelectedItems = useCallback(() => {
-    if (!selectedFlexibleDeal || !canAddSelectedItems) return;
-
-    onAddDeal?.(selectedFlexibleDeal, selectedMenuItemIds);
-    closeFlexibleDeal();
-  }, [canAddSelectedItems, closeFlexibleDeal, onAddDeal, selectedFlexibleDeal, selectedMenuItemIds]);
 
   if (isLoading) {
     return (
@@ -296,100 +228,20 @@ export const CustomerDealsSection = ({
             deal={deal}
             isAdding={addingDealId === deal.id}
             onAddDeal={handleDealClick}
-            onBrowseDeal={onBrowseDeal}
           />
         ))}
       </div>
 
-      <Dialog
-        open={Boolean(selectedFlexibleDeal)}
+      <DealChooserDrawer
+        deal={selectedChooserDeal}
+        open={Boolean(selectedChooserDeal)}
+        branchId={branchId}
         onOpenChange={(open) => {
           if (!open) {
-            closeFlexibleDeal();
+            setSelectedChooserDeal(null);
           }
         }}
-      >
-        <DialogContent className="max-h-[90vh] overflow-auto rounded-[24px] sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{selectedFlexibleDeal?.title}</DialogTitle>
-            <DialogDescription>
-              {selectedFlexibleDeal
-                ? t("selectEligibleItems", {
-                    count: requiredQuantity,
-                  })
-                : ""}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            {selectedFlexibleItems.map((item) => {
-              const checked = selectedMenuItemIds.includes(item.id);
-              const itemPrice = getMenuItemPrice(item);
-              const categoryName = item.category?.name?.trim();
-              const description = item.description?.trim();
-
-              return (
-                <label
-                  key={item.id}
-                  className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-100 p-3 transition-colors hover:border-primary/30 hover:bg-primary/5"
-                >
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-primary/10 text-primary">
-                    {item.imageUrl ? (
-                      <Image
-                        src={item.imageUrl}
-                        alt={item.name}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <span className="flex h-full items-center justify-center text-lg font-bold">
-                        {getMenuItemInitial(item.name)}
-                      </span>
-                    )}
-                  </div>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-gray-900">
-                      {item.name}
-                    </span>
-                    <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500">
-                      {hasMenuItemPrice(itemPrice) ? (
-                        <span className="text-primary">
-                          {formatDealPrice(itemPrice)}
-                        </span>
-                      ) : null}
-                      {categoryName ? <span>{categoryName}</span> : null}
-                    </span>
-                    {description ? (
-                      <span className="mt-1 line-clamp-1 text-xs leading-5 text-gray-500">
-                        {description}
-                      </span>
-                    ) : null}
-                  </span>
-
-                  <Checkbox
-                    className="size-5"
-                    checked={checked}
-                    onCheckedChange={(value) => toggleSelectedItem(item.id, value === true)}
-                  />
-                </label>
-              );
-            })}
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="primary"
-              className="h-11 w-full px-6 py-2 sm:w-auto"
-              disabled={!canAddSelectedItems || Boolean(addingDealId)}
-              onClick={addSelectedItems}
-            >
-              {addingDealId ? t("adding") : t("addSelectedItems")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      />
     </section>
   );
 };
