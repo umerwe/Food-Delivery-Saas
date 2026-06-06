@@ -11,6 +11,7 @@ import {
   isCartBranchConflict,
   isDealMenuItemCustomizable,
   isDealMenuItemReadyMade,
+  shouldIncludeDealIdInCartPayload,
 } from "./product-cart";
 
 describe("product cart helpers", () => {
@@ -160,11 +161,11 @@ describe("product cart helpers", () => {
     });
   });
 
-  it("deal create payload strips variation and modifiers for ready-made deal items", () => {
+  it("deal create payload includes ready-made dealId only without customization", () => {
     const payload = buildCartPayload({
       item: { id: "ready-made-combo", supportsDealIdCartPayload: true },
       branchId: "branch-1",
-      selectedVariation: { id: "large", name: "Large" },
+      selectedVariation: null,
       qty: 1,
       selectedModifiers: {
         legacy: [{ id: "extra_cheese", name: "Extra cheese", selectedQuantity: 1 }],
@@ -187,6 +188,21 @@ describe("product cart helpers", () => {
     expect(payload).not.toHaveProperty("variationId");
     expect(payload).not.toHaveProperty("modifiers");
     expect(payload).not.toHaveProperty("modifierSelections");
+  });
+
+  it("URL/query dealId is not automatically added to normal or variation payloads", () => {
+    expect(shouldIncludeDealIdInCartPayload({
+      deal: { id: "query-deal-id" },
+      item: { id: "normal-item" },
+      isDealMenuItem: false,
+    })).toBe(false);
+
+    expect(shouldIncludeDealIdInCartPayload({
+      deal: { id: "query-deal-id" },
+      item: { id: "ready-made-combo", supportsDealIdCartPayload: true },
+      isDealMenuItem: true,
+      hasVariation: true,
+    })).toBe(false);
   });
 
   it("customizable deal payload includes modifierSelections and strips variation plus flat modifiers", () => {
@@ -232,7 +248,7 @@ describe("product cart helpers", () => {
     const payload = buildCartPayload({
       item,
       branchId: "branch-1",
-      selectedVariation: { id: "large", name: "Large" },
+      selectedVariation: null,
       qty: 1,
       selectedModifiers: {
         group_sauces: [{ id: "modifier_garlic_sauce", name: "Garlic", selectedQuantity: 1 }],
@@ -251,6 +267,53 @@ describe("product cart helpers", () => {
     expect(payload.modifierSelections).toEqual(modifierSelections);
     expect(payload).not.toHaveProperty("variationId");
     expect(payload).not.toHaveProperty("modifiers");
+  });
+
+  it("does not include dealId for customizable deal item when variation is selected", () => {
+    const payload = buildCartPayload({
+      item: {
+        id: "custom-combo",
+        supportsDealIdCartPayload: true,
+        variations: [{ id: "large", name: "Large" }],
+        modifierGroups: [
+          {
+            id: "group_sauces",
+            name: "Sauces",
+            selectionType: "MULTIPLE",
+            minSelect: 1,
+            maxSelect: 2,
+            modifiers: [{ id: "modifier_garlic_sauce", name: "Garlic" }],
+          },
+        ],
+      },
+      branchId: "branch-1",
+      selectedVariation: { id: "large", name: "Large" },
+      qty: 1,
+      selectedModifiers: {
+        group_sauces: [{ id: "modifier_garlic_sauce", name: "Garlic", selectedQuantity: 1 }],
+      },
+      modifierGroups: [
+        {
+          id: "group_sauces",
+          name: "Sauces",
+          selectionType: "MULTIPLE",
+          minSelect: 1,
+          maxSelect: 2,
+          modifiers: [{ id: "modifier_garlic_sauce", name: "Garlic" }],
+        },
+      ],
+      splitPizzaEnabled: false,
+      splitPizzaItem: null,
+      includeMenuItem: true,
+      includeBranch: true,
+      clearSectionsWhenEmpty: false,
+      dealId: "deal-1",
+      shouldSendDealId: true,
+      isDealMenuItemContext: true,
+    });
+
+    expect(payload).not.toHaveProperty("dealId");
+    expect(payload.variationId).toBe("large");
   });
 
   it("deal item with variations is not supported", () => {
@@ -307,6 +370,7 @@ describe("product cart helpers", () => {
 
   it("extracts API error messages and detects branch conflicts", () => {
     expect(getApiErrorMessage({ data: { error: { message: "Nested" } } })).toBe("Nested");
+    expect(getApiErrorMessage({ error: { message: "1. Basic Pizza Copy requires at least 1 modifier selection(s)" } })).toBe("1. Basic Pizza Copy requires at least 1 modifier selection(s)");
     expect(isCartBranchConflict({ error: "Cart already contains items from another branch" })).toBe(true);
   });
 });

@@ -1,34 +1,20 @@
+import type { BranchAddress, BranchOrderType, BranchSettings } from "@/types/branches";
+
 export type BranchRecord = {
   id: string;
   name: string;
   isActive?: boolean;
   restaurantId?: string | null;
-  address?: {
-    street?: string;
-    area?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    lat?: string | number | null;
-    lng?: string | number | null;
-  };
-  settings?: {
-    openingHours?: Array<{
-      dayOfWeek?: string;
-      isClosed?: boolean;
-      openTime?: string;
-      closeTime?: string;
-      breakTimes?: Array<{
-        startTime?: string;
-        endTime?: string;
-        note?: string;
-      }>;
-    }>;
-    holidayRanges?: unknown[];
-    reservationDateRanges?: unknown[];
-    tableReservationDateRanges?: unknown[];
-    reservationBlackoutRanges?: unknown[];
-  };
+  address?: BranchAddress;
+  settings?: BranchSettings;
+  distanceKm?: number | null;
+  availability?: {
+    isAvailable?: boolean;
+    isActive?: boolean;
+    status?: string;
+    reason?: string | null;
+  } | null;
+  selectedOrderType?: BranchOrderType;
   coverImage?: string | null;
   description?: string | null;
 };

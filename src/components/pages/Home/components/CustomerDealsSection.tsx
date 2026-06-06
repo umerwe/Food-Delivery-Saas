@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { BadgePercent, CalendarDays, PackageCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { DealChooserDrawer } from "@/components/pages/Home/components/deals/DealChooserDrawer";
@@ -13,10 +14,14 @@ import {
   getDealRequirementText,
   getDealTypeLabel,
   getDealActionKind,
+  getDealScopedItemCustomizationState,
+  getUnknownDealScopedItemIds,
+  canSelectFlexibleDealItem,
   isFixedItemDeal,
   isFlexibleAllItemsDeal,
   isFlexibleCategoryDeal,
   isFlexibleItemDeal,
+  mergeDealScopedItemDetails,
 } from "@/components/pages/Home/utils/customer-deal-cart";
 import {
   formatDealDateRange,
@@ -24,6 +29,7 @@ import {
   getDealItemNames,
   isDealActive,
 } from "@/components/pages/Home/utils/customer-deals-formatters";
+import { useDealScopedItemsDetails } from "@/hooks/useDealScopedItemsDetails";
 import type { CustomerDeal } from "@/types/customer-deals";
 
 type CustomerDealsSectionProps = {
@@ -183,18 +189,76 @@ export const CustomerDealsSection = ({
   const t = useTranslations("home.deals");
   const activeDeals = deals.filter(isDealActive).slice(0, 6);
   const [selectedChooserDeal, setSelectedChooserDeal] = useState<CustomerDeal | null>(null);
+  const [pendingDeal, setPendingDeal] = useState<CustomerDeal | null>(null);
+  const pendingUnknownItemIds = useMemo(
+    () => (pendingDeal ? getUnknownDealScopedItemIds(pendingDeal) : []),
+    [pendingDeal]
+  );
+  const scopedDetailsQuery = useDealScopedItemsDetails({
+    itemIds: pendingUnknownItemIds,
+    enabled: Boolean(pendingDeal && pendingUnknownItemIds.length > 0),
+  });
 
-  const handleDealClick = useCallback(
+  const resolveDealAction = useCallback(
     (deal: CustomerDeal) => {
-      if (getDealActionKind(deal) === "OPEN_CHOOSER") {
+      const states = deal.scopeMenuItems.map(getDealScopedItemCustomizationState);
+
+      if (states.includes("UNKNOWN")) {
+        toast.warning(t("reviewDealItems"));
+        return;
+      }
+
+      if (
+        states.includes("REQUIRES_UNSUPPORTED_VARIATION") &&
+        deal.scopeMenuItems.some((item) => !canSelectFlexibleDealItem(item))
+      ) {
+        toast.error(t("unsupportedDealCustomization"));
+        return;
+      }
+
+      if (states.includes("REQUIRES_MODIFIERS") || getDealActionKind(deal) === "OPEN_CHOOSER") {
         setSelectedChooserDeal(deal);
         return;
       }
 
       onAddDeal?.(deal);
     },
-    [onAddDeal, setSelectedChooserDeal]
+    [onAddDeal, setSelectedChooserDeal, t]
   );
+
+  const handleDealClick = useCallback(
+    (deal: CustomerDeal) => {
+      const unknownItemIds = getUnknownDealScopedItemIds(deal);
+
+      if (unknownItemIds.length > 0) {
+        setPendingDeal(deal);
+        return;
+      }
+
+      resolveDealAction(deal);
+    },
+    [resolveDealAction]
+  );
+
+  useEffect(() => {
+    if (!pendingDeal || pendingUnknownItemIds.length === 0 || scopedDetailsQuery.isLoading) {
+      return;
+    }
+
+    const resolvedDeal = mergeDealScopedItemDetails(
+      pendingDeal,
+      scopedDetailsQuery.detailsById
+    );
+
+    setPendingDeal(null);
+    resolveDealAction(resolvedDeal);
+  }, [
+    pendingDeal,
+    pendingUnknownItemIds.length,
+    resolveDealAction,
+    scopedDetailsQuery.detailsById,
+    scopedDetailsQuery.isLoading,
+  ]);
 
   if (isLoading) {
     return (
@@ -226,7 +290,7 @@ export const CustomerDealsSection = ({
           <CustomerDealCard
             key={deal.id}
             deal={deal}
-            isAdding={addingDealId === deal.id}
+            isAdding={addingDealId === deal.id || pendingDeal?.id === deal.id}
             onAddDeal={handleDealClick}
           />
         ))}

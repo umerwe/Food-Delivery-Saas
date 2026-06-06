@@ -1,14 +1,13 @@
+import type { BranchAddress, BranchOrderType } from "@/types/branches";
+
 export type AuthBranch = {
   id: string;
   name: string;
   isActive?: boolean;
   restaurantId?: string | null;
-  address?: {
-    area?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-  };
+  address?: BranchAddress;
+  distanceKm?: number | null;
+  selectedOrderType?: BranchOrderType;
 };
 
 export type AuthUser = {
@@ -19,6 +18,7 @@ export type AuthUser = {
   restaurantId?: string | null;
   branchId?: string | null;
   branch?: AuthBranch | null;
+  selectedOrderType?: BranchOrderType | null;
   profile?: {
     firstName: string;
     lastName: string;

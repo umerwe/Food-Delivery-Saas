@@ -1,375 +1,272 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Coffee, Loader2, Search, ShoppingBag } from "lucide-react";
+import { Store } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useTranslations } from "next-intl";
-import useItems from "@/hooks/useItems";
-import { useAuth } from "@/hooks/useAuth";
-import { getStoredRestaurantId } from "@/lib/auth";
+
+import { useAuthContext } from "@/hooks/useAuth";
+import { useNearbyBranches } from "@/hooks/useBranches";
+import { useUserLocation } from "@/hooks/useUserLocation";
+import { AddressLocationPicker } from "@/components/common/branch-selector/AddressLocationPicker";
+import {
+  branchSupportsDelivery,
+  branchSupportsPickup,
+  formatBranchAddress,
+  formatBranchDistance,
+  isBranchCurrentlyAvailable,
+  nearbyBranchToBranchRecord,
+  persistSelectedBranch,
+} from "@/lib/branch-selector";
 import { resolveHttpsImageUrl } from "@/lib/image-fallback";
+import type { BranchOrderType, NearbyBranch } from "@/types/branches";
 
 type HeroSectionProps = {
-    restaurantName?: string;
-    tagline?: string;
-    heroImage?: string | null;
+  restaurantName?: string;
+  tagline?: string;
+  heroImage?: string | null;
 };
 
-type SearchMode = "categories" | "items";
+type BranchSearchMode = "delivery" | "pickup";
 
-type HeroCategoryResult = {
-    id: string;
-    name: string;
-    imageUrl?: string | null;
-};
-
-type HeroItemResult = {
-    id: string;
-    name: string;
-    slug?: string | null;
-    description?: string | null;
-    imageUrl?: string | null;
-    basePrice?: string | number | null;
-    category?: {
-        name?: string | null;
-    } | null;
-};
-
-const SEARCH_DELAY_MS = 400;
-const SEARCH_LIMIT = 6;
-
-const getSafeImageSrc = (src?: string | null) => {
-    const trimmedSrc = src?.trim();
-
-    if (!trimmedSrc) return null;
-
-    if (trimmedSrc.startsWith("/")) return trimmedSrc;
-
-    try {
-        const parsedUrl = new URL(trimmedSrc);
-
-        return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:" ? trimmedSrc : null;
-    } catch {
-        return null;
-    }
-};
-
-const getResultInitial = (label?: string | null) => {
-    const trimmedLabel = label?.trim();
-
-    return trimmedLabel ? trimmedLabel.charAt(0).toUpperCase() : "?";
-};
-
-const getSearchResults = <T,>(response: unknown): T[] => {
-    if (
-        typeof response === "object" &&
-        response !== null &&
-        "data" in response &&
-        Array.isArray((response as { data?: unknown }).data)
-    ) {
-        return (response as { data: T[] }).data;
-    }
-
-    return [];
-};
+const getOrderType = (mode: BranchSearchMode): BranchOrderType =>
+  mode === "pickup" ? "TAKEAWAY" : "DELIVERY";
 
 const HeroSection = ({
-    restaurantName,
-    tagline,
-    heroImage = "/hero.png",
+  restaurantName,
+  tagline,
+  heroImage = "/hero.png",
 }: HeroSectionProps) => {
-    const t = useTranslations("home.hero");
-    const router = useRouter();
-    const { token, restaurantId: authRestaurantId, user, loading: authLoading } = useAuth();
-    const { get } = useItems(token);
-    const resolvedHeroImage = resolveHttpsImageUrl(heroImage, "/hero.png");
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
-
-    const [searchMode, setSearchMode] = useState<SearchMode>("categories");
-    const [searchValue, setSearchValue] = useState("");
-    const [loadingResults, setLoadingResults] = useState(false);
-    const [categoryResults, setCategoryResults] = useState<HeroCategoryResult[]>([]);
-    const [itemResults, setItemResults] = useState<HeroItemResult[]>([]);
-
-    const restaurantId = authRestaurantId || user?.restaurantId || getStoredRestaurantId() || "";
-    const trimmedSearch = searchValue.trim();
-    const activeResults = searchMode === "categories" ? categoryResults : itemResults;
-    const displayRestaurantName = restaurantName || t("defaultTitle");
-    const displayTagline = tagline || t("defaultTagline");
-
-    const clearResults = () => {
-        setCategoryResults([]);
-        setItemResults([]);
-        setLoadingResults(false);
-    };
-
-    const handleModeChange = (mode: SearchMode) => {
-        setSearchMode(mode);
-        clearResults();
-    };
-
-    const handleCategoryClick = (category: HeroCategoryResult) => {
-        if (!category.id) return;
-
-        router.push(`/items?categoryId=${encodeURIComponent(category.id)}`);
-    };
-
-    const handleItemClick = (item: HeroItemResult) => {
-        if (!item.id) return;
-
-        const params = new URLSearchParams({
-            itemId: String(item.id),
-        });
-
-        if (item.slug) {
-            params.set("slug", item.slug);
+  const t = useTranslations("home.hero");
+  const { user, setUser } = useAuthContext();
+  const resolvedHeroImage = resolveHttpsImageUrl(heroImage, "/hero.png");
+  const branchSearchRef = useRef<HTMLDivElement | null>(null);
+  const [mode, setMode] = useState<BranchSearchMode>("delivery");
+  const [showResults, setShowResults] = useState(false);
+  const {
+    coordinates,
+    locationLabel,
+    permissionState,
+    errorMessage,
+    requestLocation,
+    acceptCoordinates,
+  } = useUserLocation();
+  const nearbyQuery = useNearbyBranches(
+    coordinates
+      ? {
+          lat: coordinates.lat,
+          lng: coordinates.lng,
+          page: 1,
+          limit: 20,
         }
+      : null,
+    { enabled: showResults }
+  );
 
-        router.push(`/items/details?${params.toString()}`);
+  const displayRestaurantName = restaurantName || t("defaultTitle");
+  const displayTagline = tagline || t("defaultTagline");
+  const selectedBranch = user?.branch ?? null;
+  const selectedOrderType = user?.selectedOrderType ?? selectedBranch?.selectedOrderType ?? null;
+  const selectedOrderLabel = selectedOrderType === "TAKEAWAY" ? "Pickup" : selectedOrderType === "DELIVERY" ? "Delivery" : "";
+
+  const filteredBranches = useMemo(
+    () =>
+      nearbyQuery.branches.filter((branch) =>
+        mode === "pickup" ? branchSupportsPickup(branch) : branchSupportsDelivery(branch)
+      ),
+    [mode, nearbyQuery.branches]
+  );
+
+  useEffect(() => {
+    if (!showResults) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (!(target instanceof Node)) return;
+      if (branchSearchRef.current?.contains(target)) return;
+
+      setShowResults(false);
     };
 
-    const handleFindFood = () => {
-        const firstResult = activeResults[0];
-
-        if (searchMode === "categories") {
-            if (firstResult) {
-                handleCategoryClick(firstResult as HeroCategoryResult);
-                return;
-            }
-
-            router.push("/items");
-            return;
-        }
-
-        if (firstResult) {
-            handleItemClick(firstResult as HeroItemResult);
-            return;
-        }
-
-        router.push("/items");
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowResults(false);
+      }
     };
 
-    const renderResultImage = ({
-        imageUrl,
-        label,
-        sizeClassName = "h-12 w-12",
-    }: {
-        imageUrl?: string | null;
-        label: string;
-        sizeClassName?: string;
-    }) => {
-        const safeImageSrc = getSafeImageSrc(imageUrl);
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
 
-        return (
-            <div className={`relative shrink-0 overflow-hidden rounded-xl bg-primary/10 ${sizeClassName}`}>
-                {safeImageSrc ? (
-                    <Image
-                        src={safeImageSrc}
-                        alt={label}
-                        fill
-                        className="object-cover"
-                        sizes="48px"
-                        unoptimized
-                    />
-                ) : (
-                    <div className="flex h-full w-full items-center justify-center text-sm font-bold text-primary">
-                        {getResultInitial(label)}
-                    </div>
-                )}
-            </div>
-        );
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
+  }, [showResults]);
 
-    useEffect(() => {
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
-        }
+  const handleFindNearbyBranches = () => {
+    setShowResults(true);
 
-        if (!trimmedSearch || !restaurantId || authLoading) {
-            clearResults();
-            return;
-        }
+    if (!coordinates) {
+      requestLocation();
+    }
+  };
 
-        debounceRef.current = setTimeout(async () => {
-            try {
-                setLoadingResults(true);
+  const handleUseCurrentLocation = () => {
+    setShowResults(true);
+    requestLocation();
+  };
 
-                const params = new URLSearchParams({
-                    restaurantId: String(restaurantId),
-                    search: trimmedSearch,
-                    page: "1",
-                    limit: String(SEARCH_LIMIT),
-                });
+  const handleSelectSearchLocation = (nextCoordinates: { lat: number; lng: number }, label?: string) => {
+    acceptCoordinates(nextCoordinates, label || "Selected address");
+    setShowResults(true);
+  };
 
-                const endpoint =
-                    searchMode === "categories"
-                        ? `/v1/menu/categories?${params.toString()}`
-                        : `/v1/menu/items?${params.toString()}`;
+  const handleSelectBranch = (branch: NearbyBranch) => {
+    const orderType = getOrderType(mode);
 
-                const response = await get(endpoint);
+    persistSelectedBranch(nearbyBranchToBranchRecord(branch), setUser, {
+      orderType,
+    });
 
-                if (searchMode === "categories") {
-                    setCategoryResults(getSearchResults<HeroCategoryResult>(response));
-                    setItemResults([]);
-                } else {
-                    setItemResults(getSearchResults<HeroItemResult>(response));
-                    setCategoryResults([]);
-                }
-            } catch {
-                clearResults();
-            } finally {
-                setLoadingResults(false);
-            }
-        }, SEARCH_DELAY_MS);
+    toast.success(`${branch.name} selected for ${mode === "pickup" ? "pickup" : "delivery"}.`);
+    setShowResults(false);
+  };
 
-        return () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
-            }
-        };
-    }, [authLoading, get, restaurantId, searchMode, trimmedSearch]);
+  return (
+    <main className="relative flex min-h-[630px] w-full items-center justify-center py-10 md:py-16">
+      <div className="absolute inset-0 z-0">
+        <Image
+          src={resolvedHeroImage}
+          alt={t("heroImageAlt")}
+          fill
+          className="object-cover brightness-75"
+          priority
+        />
+      </div>
 
-    return (
-        <main className="relative h-[630px] w-full flex items-center justify-center">
-            <div className="absolute inset-0 z-0">
-                <Image
-                    src={resolvedHeroImage}
-                    alt={t("heroImageAlt")}
-                    fill
-                    className="object-cover brightness-75"
-                    priority
-                />
-            </div>
+      <div className="relative z-10 ml-0 flex w-full max-w-4xl flex-col items-center px-4 md:ml-20">
+        <h1 className="mb-2 text-5xl font-extrabold text-white drop-shadow-md md:text-7xl">
+          {displayRestaurantName}
+        </h1>
+        <p className="mb-8 text-[22px] font-medium text-white">
+          {displayTagline}
+        </p>
 
-            <div className="relative z-10 w-full max-w-4xl px-4 flex flex-col items-center ml-0 md:ml-20">
-                <h1 className="text-white text-5xl md:text-7xl font-extrabold mb-2 drop-shadow-md">
-                    {displayRestaurantName}
-                </h1>
-                <p className="text-white text-[22px] font-medium mb-8">
-                    {displayTagline}
-                </p>
+        <div className="w-full rounded-2xl bg-white p-6 shadow-xl md:p-8">
+          <div className="mb-6 inline-flex rounded-xl bg-[#F5F5F5] p-1">
+            {(["delivery", "pickup"] as const).map((nextMode) => (
+              <button
+                key={nextMode}
+                type="button"
+                onClick={() => setMode(nextMode)}
+                className={`min-w-[116px] rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                  mode === nextMode
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-[#757575] hover:bg-white"
+                }`}
+              >
+                {nextMode === "delivery" ? "Delivery" : "Pickup"}
+              </button>
+            ))}
+          </div>
 
-                <div className="bg-white rounded-2xl shadow-xl w-full p-6 md:p-8">
-                    <div className="flex gap-4 mb-6">
-                        <button
-                            type="button"
-                            onClick={() => handleModeChange("categories")}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition-all ${searchMode === "categories"
-                                ? "bg-primary/10 text-primary"
-                                : "text-[#757575] hover:bg-gray-50"
-                                }`}
-                        >
-                            <Coffee size={20} />
-                            {t("categories")}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => handleModeChange("items")}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-md font-semibold transition-all ${searchMode === "items"
-                                ? "bg-primary/10 text-primary"
-                                : "text-[#757575] hover:bg-gray-50"
-                                }`}
-                        >
-                            <ShoppingBag size={20} />
-                            {t("items")}
-                        </button>
-                    </div>
-
-                    <div className="relative flex flex-col md:flex-row gap-3">
-                        <div className="relative grow my-auto">
-                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                                <Search size={20} className="text-primary" />
-                            </div>
-                            <input
-                                type="text"
-                                value={searchValue}
-                                onChange={(event) => setSearchValue(event.target.value)}
-                                placeholder={searchMode === "categories" ? t("searchCategories") : t("searchItems")}
-                                className="w-full bg-[#F5F5F5] border-none rounded-xl h-[49px] pl-12 pr-4 text-gray-700 focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-gray-400"
-                            />
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleFindFood}
-                            className="bg-primary hover:bg-[#d94e24] text-white px-10 py-4 rounded-xl font-semibold text-lg flex items-center justify-center gap-2"
-                        >
-                            <Search size={18} strokeWidth={3} />
-                            {t("findFood")}
-                        </button>
-
-                        {(trimmedSearch || loadingResults) && (
-                            <div className="absolute left-0 right-0 top-[calc(100%+12px)] z-20 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.14)]">
-                                {loadingResults ? (
-                                    <div className="flex items-center justify-center gap-2 px-5 py-8 text-sm text-gray-500">
-                                        <Loader2 size={16} className="animate-spin" />
-                                        {t("searching", { mode: searchMode === "categories" ? t("categories").toLowerCase() : t("items").toLowerCase() })}
-                                    </div>
-                                ) : activeResults.length === 0 ? (
-                                    <div className="px-5 py-8 text-center text-sm text-gray-500">
-                                        {t("noneFound", { mode: searchMode === "categories" ? t("categories").toLowerCase() : t("items").toLowerCase() })}
-                                    </div>
-                                ) : (
-                                    <div className="divide-y divide-gray-100">
-                                        {searchMode === "categories"
-                                            ? categoryResults.map((category) => (
-                                                <button
-                                                    key={category.id}
-                                                    type="button"
-                                                    onClick={() => handleCategoryClick(category)}
-                                                    className="flex w-full items-center gap-3 px-5 py-4 text-left transition hover:bg-orange-50/50"
-                                                >
-                                                    {renderResultImage({
-                                                        imageUrl: category.imageUrl,
-                                                        label: category.name,
-                                                    })}
-                                                    <div className="min-w-0">
-                                                        <h4 className="truncate text-sm font-semibold text-gray-900">
-                                                            {category.name}
-                                                        </h4>
-                                                        <p className="mt-1 text-xs text-gray-500">
-                                                            {t("categoryFallback")}
-                                                        </p>
-                                                    </div>
-                                                </button>
-                                            ))
-                                            : itemResults.map((item) => (
-                                                <button
-                                                    key={item.id}
-                                                    type="button"
-                                                    onClick={() => handleItemClick(item)}
-                                                    className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition hover:bg-orange-50/50"
-                                                >
-                                                    <div className="flex min-w-0 items-start gap-3">
-                                                        {renderResultImage({
-                                                            imageUrl: item.imageUrl,
-                                                            label: item.name,
-                                                        })}
-                                                        <div className="min-w-0">
-                                                            <h4 className="truncate text-sm font-semibold text-gray-900">
-                                                                {item.name}
-                                                            </h4>
-                                                            <p className="mt-1 truncate text-xs text-gray-500">
-                                                                {item.category?.name || item.description || t("menuItemFallback")}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    {item.basePrice ? (
-                                                        <span className="shrink-0 text-sm font-semibold text-gray-900">
-                                                            ${Number(item.basePrice).toFixed(2)}
-                                                        </span>
-                                                    ) : null}
-                                                </button>
-                                            ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
+          {selectedBranch ? (
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-primary">
+                  <Store size={18} />
                 </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-[#111827]">
+                    {selectedBranch.name}
+                  </p>
+                  <p className="mt-1 text-xs text-[#6B7280]">
+                    {[formatBranchDistance(selectedBranch.distanceKm), selectedOrderLabel].filter(Boolean).join(" - ") || "Selected branch"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleFindNearbyBranches}
+                className="h-10 rounded-xl border border-primary/20 bg-white px-4 text-sm font-semibold text-primary transition hover:bg-primary/5"
+              >
+                Change
+              </button>
             </div>
-        </main>
-    )
-}
+          ) : null}
 
-export default HeroSection
+          <div ref={branchSearchRef} className="relative">
+            <AddressLocationPicker
+              coordinates={coordinates}
+              locationLabel={locationLabel}
+              onSelectLocation={handleSelectSearchLocation}
+              onUseCurrentLocation={handleUseCurrentLocation}
+              isLocating={permissionState === "requesting"}
+            />
+
+            {mode === "delivery" ? (
+              <p className="mt-3 text-xs text-[#8A8A8A]">
+                Delivery coverage is confirmed at checkout based on your address.
+              </p>
+            ) : null}
+
+            {showResults ? (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.14)]">
+                {permissionState === "denied" || permissionState === "unsupported" ? (
+                  <div className="px-5 py-6 text-sm text-gray-600">
+                    {errorMessage || "Location is unavailable. Please choose a branch from the branch selector."}
+                  </div>
+                ) : nearbyQuery.isFetching ? (
+                  <div className="flex items-center justify-center gap-2 px-5 py-8 text-sm text-gray-500">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+                    Finding nearby branches...
+                  </div>
+                ) : filteredBranches.length === 0 && coordinates ? (
+                  <div className="px-5 py-8 text-center text-sm text-gray-500">
+                    No nearby {mode === "pickup" ? "pickup" : "delivery"} branches found.
+                  </div>
+                ) : (
+                  <div className="max-h-[min(320px,36vh)] divide-y divide-gray-100 overflow-y-auto">
+                    {filteredBranches.map((branch) => {
+                      const available = isBranchCurrentlyAvailable(branch);
+
+                      return (
+                        <button
+                          key={branch.id}
+                          type="button"
+                          onClick={() => handleSelectBranch(branch)}
+                          className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition hover:bg-orange-50/50"
+                        >
+                          <div className="min-w-0">
+                            <h4 className="truncate text-sm font-semibold text-gray-900">
+                              {branch.name}
+                            </h4>
+                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">
+                              {formatBranchAddress(branch)}
+                            </p>
+                            <p className="mt-2 text-xs font-semibold text-primary">
+                              {[formatBranchDistance(branch.distanceKm), available ? "Available" : branch.availability?.reason || "Availability limited"]
+                                .filter(Boolean)
+                                .join(" - ")}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                            Select
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+};
+
+export default HeroSection;

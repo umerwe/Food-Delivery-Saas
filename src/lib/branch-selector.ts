@@ -1,5 +1,6 @@
 import { readAuthSession, saveAuthSession } from "@/lib/auth";
 import type { AuthContextValue, AuthUser } from "@/types/auth";
+import type { BranchOrderType, NearbyBranch } from "@/types/branches";
 import type { BranchApiResponse, BranchRecord } from "@/types/branch-selector";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -9,9 +10,17 @@ const getString = (value: unknown) => (typeof value === "string" ? value : undef
 
 const getBoolean = (value: unknown) => (typeof value === "boolean" ? value : undefined);
 
+const getNullableString = (value: unknown) =>
+  typeof value === "string" || typeof value === "number" ? String(value) : null;
+
 const getNumber = (value: unknown) => {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : undefined;
+};
+
+const getNullableNumber = (value: unknown) => {
+  const numberValue = getNumber(value);
+  return numberValue ?? null;
 };
 
 const normalizeBranchAddress = (value: unknown): BranchRecord["address"] | undefined => {
@@ -20,10 +29,15 @@ const normalizeBranchAddress = (value: unknown): BranchRecord["address"] | undef
   }
 
   return {
-    area: getString(value.area),
-    city: getString(value.city),
-    state: getString(value.state),
-    country: getString(value.country),
+    id: getString(value.id),
+    street: getNullableString(value.street),
+    area: getNullableString(value.area),
+    city: getNullableString(value.city),
+    state: getNullableString(value.state),
+    country: getNullableString(value.country),
+    postalCode: getNullableString(value.postalCode),
+    lat: getNullableString(value.lat),
+    lng: getNullableString(value.lng),
   };
 };
 
@@ -46,7 +60,27 @@ const normalizeBranchSettings = (value: unknown): BranchRecord["settings"] | und
   }
 
   return {
+    ...value,
+    allowedOrderTypes: Array.isArray(value.allowedOrderTypes)
+      ? value.allowedOrderTypes
+          .map((orderType) => getString(orderType))
+          .filter((orderType): orderType is BranchOrderType => Boolean(orderType))
+      : undefined,
+    deliveryConfig: value.deliveryConfig,
     openingHours: normalizeOpeningHours(value.openingHours),
+  };
+};
+
+const normalizeAvailability = (value: unknown): BranchRecord["availability"] => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    isAvailable: getBoolean(value.isAvailable),
+    isActive: getBoolean(value.isActive),
+    status: getString(value.status),
+    reason: getNullableString(value.reason),
   };
 };
 
@@ -69,6 +103,8 @@ export const normalizeBranch = (value: unknown): BranchRecord | null => {
     restaurantId: getString(value.restaurantId) ?? null,
     address: normalizeBranchAddress(value.address),
     settings: normalizeBranchSettings(value.settings),
+    distanceKm: getNullableNumber(value.distanceKm),
+    availability: normalizeAvailability(value.availability),
   };
 };
 
@@ -132,9 +168,12 @@ export const getActiveBranches = (response: unknown) =>
 export function persistSelectedBranch(
   branch: BranchRecord,
   setUser?: AuthContextValue["setUser"],
-  options: { includeBranch?: boolean } = {}
+  options: { includeBranch?: boolean; orderType?: BranchOrderType } = {}
 ) {
   const auth = readAuthSession();
+  const selectedBranch = options.orderType
+    ? { ...branch, selectedOrderType: options.orderType }
+    : branch;
 
   if (auth?.user) {
     saveAuthSession({
@@ -142,7 +181,9 @@ export function persistSelectedBranch(
       user: {
         ...auth.user,
         branchId: branch.id,
-        branch: options.includeBranch === false ? auth.user.branch : branch,
+        restaurantId: branch.restaurantId ?? auth.user.restaurantId ?? null,
+        selectedOrderType: options.orderType ?? auth.user.selectedOrderType ?? null,
+        branch: options.includeBranch === false ? auth.user.branch : selectedBranch,
       },
     });
   }
@@ -154,21 +195,71 @@ export function persistSelectedBranch(
       return {
         ...prev,
         branchId: branch.id,
-        branch: options.includeBranch === false ? prev.branch : branch,
+        restaurantId: branch.restaurantId ?? prev.restaurantId ?? null,
+        selectedOrderType: options.orderType ?? prev.selectedOrderType ?? null,
+        branch: options.includeBranch === false ? prev.branch : selectedBranch,
       };
     });
   }
 }
 
 export function getBranchAddressText(branch: BranchRecord) {
+  return formatBranchAddress(branch);
+}
+
+export const branchSupportsPickup = (branch: Pick<BranchRecord, "settings"> | NearbyBranch) =>
+  branch.settings?.allowedOrderTypes?.includes("TAKEAWAY") ?? false;
+
+export const branchSupportsDelivery = (branch: Pick<BranchRecord, "settings"> | NearbyBranch) =>
+  branch.settings?.allowedOrderTypes?.includes("DELIVERY") ?? false;
+
+export function formatBranchAddress(branch: Pick<BranchRecord, "address"> | NearbyBranch) {
   return (
     [
+      branch.address?.street,
       branch.address?.area,
       branch.address?.city,
       branch.address?.state,
       branch.address?.country,
+      branch.address?.postalCode,
     ]
       .filter(Boolean)
       .join(", ") || "Branch location available"
   );
 }
+
+export function formatBranchDistance(distanceKm?: number | null) {
+  if (typeof distanceKm !== "number" || !Number.isFinite(distanceKm)) {
+    return "";
+  }
+
+  if (distanceKm < 1) {
+    return `${Math.max(1, Math.round(distanceKm * 1000))} m away`;
+  }
+
+  return `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km away`;
+}
+
+export function isBranchCurrentlyAvailable(branch: Pick<BranchRecord, "availability" | "isActive"> | NearbyBranch) {
+  if (branch.isActive === false || branch.availability?.isActive === false) {
+    return false;
+  }
+
+  if (branch.availability?.isAvailable === false) {
+    return false;
+  }
+
+  const status = branch.availability?.status?.toLowerCase();
+  return status !== "closed" && status !== "inactive" && status !== "temporarily_closed";
+}
+
+export const nearbyBranchToBranchRecord = (branch: NearbyBranch): BranchRecord => ({
+  id: branch.id,
+  name: branch.name,
+  restaurantId: branch.restaurantId ?? null,
+  address: branch.address ?? undefined,
+  settings: branch.settings ?? undefined,
+  distanceKm: branch.distanceKm ?? null,
+  availability: branch.availability ?? null,
+  isActive: branch.isActive,
+});

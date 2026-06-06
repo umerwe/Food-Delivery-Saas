@@ -97,6 +97,32 @@ export const canSendDealIdWithModifierSelections = (
   item: MenuItem | null
 ): boolean => Boolean(deal.id && item?.id && isDealMenuItemCustomizable(item));
 
+export const shouldIncludeDealIdInCartPayload = ({
+  deal,
+  item,
+  isDealMenuItem,
+  hasModifierSelections,
+  hasVariation,
+  hasSplitSelection,
+}: {
+  deal?: { id?: string | null } | null;
+  item?: MenuItem | null;
+  isDealMenuItem?: boolean;
+  hasModifierSelections?: boolean;
+  hasVariation?: boolean;
+  hasSplitSelection?: boolean;
+}) => {
+  if (!deal?.id || !item?.id || !isDealMenuItem || hasVariation || hasSplitSelection) {
+    return false;
+  }
+
+  if (hasModifierSelections) {
+    return canSendDealIdWithModifierSelections(deal, item);
+  }
+
+  return canSendDealIdForReadyMadeItem(deal, item);
+};
+
 const getStringId = (value: unknown) => String(value ?? "").trim();
 
 export const buildReadyMadeDealCartItemPayload = ({
@@ -179,7 +205,16 @@ export const buildCartPayload = ({
     payload.sections = [];
   }
 
-  const shouldUseDealPayload = Boolean(shouldSendDealId && dealId && (supportsDealIdCartPayload(item) || isDealMenuItemContext));
+  const shouldUseDealPayload =
+    shouldSendDealId &&
+    shouldIncludeDealIdInCartPayload({
+      deal: { id: dealId },
+      item,
+      isDealMenuItem: isDealMenuItemContext || supportsDealIdCartPayload(item),
+      hasModifierSelections: modifierSelections.length > 0,
+      hasVariation: Boolean(selectedVariation?.id),
+      hasSplitSelection: Boolean(splitSections),
+    });
 
   if (shouldUseDealPayload && dealId) {
     payload.dealId = dealId;

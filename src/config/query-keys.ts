@@ -10,6 +10,8 @@ export const queryKeys = {
     all: ["branches"] as const,
     list: (restaurantId?: string | null) => ["branches", restaurantId ?? "all"] as const,
     request: (endpoint: string) => ["branches", "request", endpoint] as const,
+    nearby: (params: { lat?: number | null; lng?: number | null; page: number; limit: number }) =>
+      ["branches", "nearby", params] as const,
   },
   menu: {
     all: ["menu"] as const,
@@ -20,6 +22,7 @@ export const queryKeys = {
   items: {
     all: ["items"] as const,
     request: (endpoint: string) => ["items", "request", endpoint] as const,
+    dealScopedDetails: (itemIds: string[]) => ["items", "deal-scoped-details", itemIds] as const,
   },
   cart: {
     current: ["cart", "current"] as const,

@@ -29,14 +29,15 @@ function CheckoutPageContent() {
   const t = useTranslations("checkout");
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
-  const activeTab = type === "pickup" ? "pickup" : "delivery";
+  const { user, token } = useAuthContext();
+  const preferredCheckoutType = user?.selectedOrderType === "TAKEAWAY" ? "pickup" : "delivery";
+  const activeTab = type === "pickup" || type === "delivery" ? type : preferredCheckoutType;
 
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [applyingTip, setApplyingTip] = useState(false);
 
-  const { user, token } = useAuthContext();
   const { get, patch, del, post, checkoutCustomerCart } = useCheckout(token);
   const { updateCustomerCart } = useCart(token);
   const { fetchReservationBranch } = useReservations(token);

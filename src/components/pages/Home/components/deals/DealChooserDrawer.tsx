@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,20 +15,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { getDealTypeLabel, isFixedItemDeal } from "@/components/pages/Home/utils/customer-deal-cart";
 import {
-  buildCustomizableDealCartItemPayload,
-  canAutoAddDealItem,
-  canSendDealIdWithModifierSelections,
-  getDealTypeLabel,
-  hasUnsupportedDealMenuItemCustomization,
-  isDealMenuItemCustomizable,
-  isFixedItemDeal,
-  requiresCustomizationForDealItem,
-} from "@/components/pages/Home/utils/customer-deal-cart";
-import {
-  buildModifierSelections,
-  validateModifierSelections,
-} from "@/components/pages/Items/utils/modifier-selections";
+  buildDealCartItemPayload,
+  getDealChooserGroupHelperText,
+  getDealChooserId,
+  getDealChooserModifierGroups,
+  getDealChooserModifierName,
+  getDealChooserNumber,
+  getDealChooserVariations,
+  getSelectedModifiersByGroup,
+  isDealChooserItemConfigurable,
+  validateDealChooserItemConfiguration,
+  validateDealChooserSelectedCount,
+  type DealChooserItemConfiguration,
+  type DealChooserModifier,
+  type DealChooserModifierGroup,
+} from "@/components/pages/Home/utils/deal-chooser-validation";
 import { formatDealPrice } from "@/components/pages/Home/utils/customer-deals-formatters";
 import {
   canSubmitDealSelection,
@@ -36,6 +39,7 @@ import {
   useDealEligibleItems,
 } from "@/hooks/useDealEligibleItems";
 import { useAddDealToCart } from "@/hooks/useCart";
+import { useDealScopedItemsDetails } from "@/hooks/useDealScopedItemsDetails";
 import type { CustomerDeal, CustomerDealMenuItem } from "@/types/customer-deals";
 
 type DealChooserDrawerProps = {
@@ -52,121 +56,6 @@ const getMenuItemPrice = (item: CustomerDealMenuItem) =>
 
 const hasMenuItemPrice = (value: CustomerDealMenuItem["basePrice"]) =>
   value !== null && value !== undefined && value !== "";
-
-type DealModifier = {
-  id?: string | number | null;
-  name?: string | null;
-  modifierGroupId?: string | number | null;
-};
-
-type DealModifierGroup = {
-  id?: string | number | null;
-  name?: string | null;
-  selectionType?: "SINGLE" | "MULTIPLE" | string | null;
-  minSelect?: string | number | null;
-  maxSelect?: string | number | null;
-  modifiers?: DealModifier[];
-};
-
-type SelectedDealModifier = {
-  id: string;
-  name: string;
-  selectedQuantity: number;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const getId = (value: unknown) => String(value ?? "").trim();
-
-const getModifierName = (modifier: DealModifier) =>
-  String(modifier.name || "Option").trim();
-
-const getDealModifierGroups = (item: CustomerDealMenuItem | null): DealModifierGroup[] => {
-  if (Array.isArray(item?.modifierGroups) && item.modifierGroups.length > 0) {
-    return item.modifierGroups.filter(isRecord).map((group) => ({
-        id: group.id as string | number | null | undefined,
-        name: typeof group.name === "string" ? group.name : null,
-        selectionType: typeof group.selectionType === "string" ? group.selectionType : null,
-        minSelect: typeof group.minSelect === "string" || typeof group.minSelect === "number" ? group.minSelect : null,
-        maxSelect: typeof group.maxSelect === "string" || typeof group.maxSelect === "number" ? group.maxSelect : null,
-        modifiers: Array.isArray(group.modifiers)
-          ? group.modifiers.filter(isRecord).map((modifier) => ({
-              id: modifier.id as string | number | null | undefined,
-              name: typeof modifier.name === "string" ? modifier.name : null,
-            }))
-          : [],
-      }));
-  }
-
-  const linkedGroups = new Map<string, DealModifierGroup>();
-
-  if (Array.isArray(item?.modifierLinks)) {
-    item.modifierLinks.filter(isRecord).forEach((link) => {
-      const groupId = getId(link.modifierGroupId);
-      const modifier = isRecord(link.modifier) ? link.modifier : null;
-      const modifierId = getId(link.modifierId || modifier?.id);
-
-      if (!groupId || !modifierId) return;
-
-      const currentGroup = linkedGroups.get(groupId) || {
-        id: groupId,
-        name: "Options",
-        selectionType: "MULTIPLE",
-        minSelect: 0,
-        maxSelect: null,
-        modifiers: [],
-      };
-
-      currentGroup.modifiers = [
-        ...(currentGroup.modifiers || []),
-        {
-          id: modifierId,
-          name: typeof modifier?.name === "string" ? modifier.name : "Option",
-          modifierGroupId: groupId,
-        },
-      ];
-      linkedGroups.set(groupId, currentGroup);
-    });
-  }
-
-  if (linkedGroups.size > 0) {
-    return Array.from(linkedGroups.values());
-  }
-
-  const directModifiers = Array.isArray(item?.modifiers)
-    ? item.modifiers.filter(isRecord)
-    : [];
-  const directModifierGroups = new Map<string, DealModifierGroup>();
-
-  directModifiers.forEach((modifier) => {
-    const groupId = getId(modifier.modifierGroupId);
-    const modifierId = getId(modifier.id);
-
-    if (!groupId || !modifierId) return;
-
-    const currentGroup = directModifierGroups.get(groupId) || {
-      id: groupId,
-      name: "Options",
-      selectionType: "MULTIPLE",
-      minSelect: 0,
-      maxSelect: null,
-      modifiers: [],
-    };
-
-    currentGroup.modifiers = [
-      ...(currentGroup.modifiers || []),
-      {
-        id: modifierId,
-        name: typeof modifier.name === "string" ? modifier.name : "Option",
-        modifierGroupId: groupId,
-      },
-    ];
-    directModifierGroups.set(groupId, currentGroup);
-  });
-
-  return Array.from(directModifierGroups.values());
-};
 
 const getRequirementText = (
   deal: CustomerDeal | null,
@@ -188,6 +77,9 @@ const getRequirementText = (
   return t("flexibleRequirement", { count: requiredQuantity });
 };
 
+const getVariationLabel = (variation: { name?: string | null; displayText?: string | null }) =>
+  String(variation.displayText || variation.name || "Variation").trim();
+
 export function DealChooserDrawer({
   deal,
   open,
@@ -195,201 +87,516 @@ export function DealChooserDrawer({
   branchId,
 }: DealChooserDrawerProps) {
   const t = useTranslations("home.deals");
-  const router = useRouter();
   const addDealMutation = useAddDealToCart(branchId);
   const { items, isLoading, error } = useDealEligibleItems({ deal, open });
   const [selectedMenuItemIds, setSelectedMenuItemIds] = useState<string[]>([]);
-  const [customizingItem, setCustomizingItem] = useState<CustomerDealMenuItem | null>(null);
-  const [selectedModifiersByGroup, setSelectedModifiersByGroup] = useState<Record<string, SelectedDealModifier[]>>({});
-  const [modifierErrors, setModifierErrors] = useState<Record<string, string>>({});
+  const [expandedItemIds, setExpandedItemIds] = useState<string[]>([]);
+  const [configurationsByItemId, setConfigurationsByItemId] = useState<Record<string, DealChooserItemConfiguration>>({});
+  const [itemErrorsById, setItemErrorsById] = useState<Record<string, string>>({});
+  const [groupErrorsByItemId, setGroupErrorsByItemId] = useState<Record<string, Record<string, string>>>({});
 
   const requiredQuantity = getDealRequiredSelectionCount(deal);
   const selectedCount = selectedMenuItemIds.length;
+  const itemIds = useMemo(
+    () => items.map((item) => item.id.trim()).filter(Boolean),
+    [items]
+  );
+  const itemDetailsQuery = useDealScopedItemsDetails({
+    itemIds,
+    enabled: open && itemIds.length > 0,
+  });
+
+  const detailedItems = useMemo(
+    () =>
+      items.map((item) => {
+        const detail = itemDetailsQuery.detailsById[item.id.trim()];
+
+        return detail ? { ...item, ...detail, id: item.id, name: detail.name || item.name } : item;
+      }),
+    [itemDetailsQuery.detailsById, items]
+  );
+  const detailedItemsById = useMemo(
+    () => new Map(detailedItems.map((item) => [item.id, item])),
+    [detailedItems]
+  );
+  const selectedItems = useMemo(
+    () => detailedItems.filter((item) => selectedMenuItemIds.includes(item.id)),
+    [detailedItems, selectedMenuItemIds]
+  );
   const canAddSelectedItems = canSubmitDealSelection({
     selectedCount,
     requiredCount: requiredQuantity,
   });
 
-  const selectedItems = useMemo(
-    () => items.filter((item) => selectedMenuItemIds.includes(item.id)),
-    [items, selectedMenuItemIds]
-  );
-
   useEffect(() => {
     if (!open) {
       setSelectedMenuItemIds([]);
-      setCustomizingItem(null);
-      setSelectedModifiersByGroup({});
-      setModifierErrors({});
+      setExpandedItemIds([]);
+      setConfigurationsByItemId({});
+      setItemErrorsById({});
+      setGroupErrorsByItemId({});
     }
   }, [open]);
 
-  const customizationGroups = useMemo(
-    () => getDealModifierGroups(customizingItem),
-    [customizingItem]
-  );
-
-  const toggleSelectedItem = useCallback((menuItemId: string, checked: boolean) => {
-    setSelectedMenuItemIds((current) => {
-      if (checked) {
-        return current.includes(menuItemId) ? current : [...current, menuItemId];
-      }
-
-      return current.filter((id) => id !== menuItemId);
-    });
-  }, []);
-
-  const customizeItem = useCallback(
-    (item: CustomerDealMenuItem) => {
-      const params = new URLSearchParams();
-      params.set("itemId", item.id);
-      params.set("dealContext", "chooser");
-
-      if (item.slug) {
-        params.set("slug", item.slug);
-      }
-
-      onOpenChange(false);
-      router.push(`/items/details?${params.toString()}`);
-    },
-    [onOpenChange, router]
-  );
-
-  const startInlineCustomization = useCallback((item: CustomerDealMenuItem) => {
-    setCustomizingItem(item);
-    setSelectedModifiersByGroup({});
-    setModifierErrors({});
-  }, []);
-
-  const toggleModifier = useCallback(
-    (group: DealModifierGroup, modifier: DealModifier, checked: boolean) => {
-      const groupId = getId(group.id);
-      const modifierId = getId(modifier.id);
-
-      if (!groupId || !modifierId) return;
-
-      setSelectedModifiersByGroup((current) => {
-        const selected = current[groupId] || [];
-        const selectionType = group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
-        const nextModifier = {
-          id: modifierId,
-          name: getModifierName(modifier),
-          selectedQuantity: 1,
+  const updateItemConfiguration = useCallback(
+    (
+      menuItemId: string,
+      updater: (configuration: DealChooserItemConfiguration) => DealChooserItemConfiguration
+    ) => {
+      setConfigurationsByItemId((current) => {
+        const existing = current[menuItemId] || {
+          menuItemId,
+          selectedVariationId: null,
+          modifierSelections: [],
         };
-
-        if (!checked) {
-          return {
-            ...current,
-            [groupId]: selected.filter(({ id }) => id !== modifierId),
-          };
-        }
-
-        if (selectionType === "SINGLE") {
-          return {
-            ...current,
-            [groupId]: [nextModifier],
-          };
-        }
-
-        if (selected.some(({ id }) => id === modifierId)) {
-          return current;
-        }
 
         return {
           ...current,
-          [groupId]: [...selected, nextModifier],
+          [menuItemId]: updater(existing),
         };
+      });
+      setItemErrorsById((current) => {
+        const next = { ...current };
+        delete next[menuItemId];
+        return next;
       });
     },
     []
   );
 
-  const addCustomizedDealItem = useCallback(() => {
-    if (!deal || !customizingItem || !branchId) return;
+  const clearItemConfiguration = useCallback((menuItemId: string) => {
+    setConfigurationsByItemId((current) => {
+      const next = { ...current };
+      delete next[menuItemId];
+      return next;
+    });
+    setItemErrorsById((current) => {
+      const next = { ...current };
+      delete next[menuItemId];
+      return next;
+    });
+    setGroupErrorsByItemId((current) => {
+      const next = { ...current };
+      delete next[menuItemId];
+      return next;
+    });
+  }, []);
 
-    const validation = validateModifierSelections(
-      customizationGroups,
-      selectedModifiersByGroup
-    );
+  const toggleSelectedItem = useCallback(
+    (menuItemId: string, checked: boolean) => {
+      if (!checked) {
+        setSelectedMenuItemIds((current) => current.filter((id) => id !== menuItemId));
+        setExpandedItemIds((current) => current.filter((id) => id !== menuItemId));
+        clearItemConfiguration(menuItemId);
+        return;
+      }
 
-    if (!validation.isValid) {
-      setModifierErrors(validation.errors);
-      return;
-    }
+      const selectedItem = detailedItemsById.get(menuItemId);
+      const shouldExpand = selectedItem ? isDealChooserItemConfigurable(selectedItem) : true;
 
-    if (!canSendDealIdWithModifierSelections(deal, customizingItem)) {
-      setModifierErrors({
-        root: t("unsupportedDealCustomization"),
+      setSelectedMenuItemIds((current) => {
+        if (current.includes(menuItemId)) return current;
+
+        if (current.length >= requiredQuantity) {
+          if (requiredQuantity === 1) {
+            current.forEach(clearItemConfiguration);
+            return [menuItemId];
+          }
+
+          toast.error(t("maxDealItems", { count: requiredQuantity }));
+          return current;
+        }
+
+        return [...current, menuItemId];
       });
+
+      if (shouldExpand) {
+        setExpandedItemIds((current) =>
+          current.includes(menuItemId) ? current : [...current, menuItemId]
+        );
+      }
+      updateItemConfiguration(menuItemId, (configuration) => configuration);
+    },
+    [clearItemConfiguration, detailedItemsById, requiredQuantity, t, updateItemConfiguration]
+  );
+
+  const toggleExpandedItem = useCallback((menuItemId: string) => {
+    setExpandedItemIds((current) =>
+      current.includes(menuItemId)
+        ? current.filter((id) => id !== menuItemId)
+        : [...current, menuItemId]
+    );
+  }, []);
+
+  const selectVariation = useCallback(
+    (menuItemId: string, variationId: string) => {
+      updateItemConfiguration(menuItemId, (configuration) => ({
+        ...configuration,
+        selectedVariationId: variationId,
+      }));
+    },
+    [updateItemConfiguration]
+  );
+
+  const toggleModifier = useCallback(
+    (
+      menuItemId: string,
+      group: DealChooserModifierGroup,
+      modifier: DealChooserModifier,
+      checked: boolean
+    ) => {
+      const groupId = getDealChooserId(group.id);
+      const modifierId = getDealChooserId(modifier.id);
+
+      if (!groupId || !modifierId) return;
+
+      updateItemConfiguration(menuItemId, (configuration) => {
+        const selectedModifiersByGroup = getSelectedModifiersByGroup([group], configuration);
+        const selected = selectedModifiersByGroup[groupId] || [];
+        const selectionType = group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+        const modifiersCount = Array.isArray(group.modifiers) ? group.modifiers.length : 0;
+        const rawMaxSelect = getDealChooserNumber(group.maxSelect, modifiersCount);
+        const maxSelect = selectionType === "SINGLE"
+          ? 1
+          : rawMaxSelect > 0
+            ? rawMaxSelect
+            : modifiersCount;
+        const nextModifier = {
+          id: modifierId,
+          name: getDealChooserModifierName(modifier),
+          selectedQuantity: 1,
+        };
+        let nextSelected = selected;
+
+        if (!checked) {
+          nextSelected = selected.filter(({ id }) => id !== modifierId);
+        } else if (selectionType === "SINGLE") {
+          nextSelected = [nextModifier];
+        } else if (!selected.some(({ id }) => id === modifierId)) {
+          if (maxSelect > 0 && selected.length >= maxSelect) {
+            return configuration;
+          }
+          nextSelected = [...selected, nextModifier];
+        }
+
+        const otherSelections = configuration.modifierSelections.filter(
+          (selection) => selection.modifierGroupId !== groupId
+        );
+        const nextSelection = nextSelected.length > 0
+          ? [{
+              modifierGroupId: groupId,
+              modifiers: nextSelected.map((entry) => ({
+                modifierId: entry.id,
+                quantity: entry.selectedQuantity,
+              })),
+            }]
+          : [];
+
+        return {
+          ...configuration,
+          modifierSelections: [...otherSelections, ...nextSelection],
+        };
+      });
+      setGroupErrorsByItemId((current) => {
+        const nextItemErrors = { ...(current[menuItemId] || {}) };
+        delete nextItemErrors[groupId];
+
+        return {
+          ...current,
+          [menuItemId]: nextItemErrors,
+        };
+      });
+    },
+    [updateItemConfiguration]
+  );
+
+  const addSelectedItems = useCallback(() => {
+    if (!deal || !branchId) {
       return;
     }
 
-    const modifierSelections = buildModifierSelections(
-      customizationGroups,
-      selectedModifiersByGroup
-    );
+    const countError = validateDealChooserSelectedCount({
+      selectedCount,
+      requiredQuantity,
+    });
+
+    if (countError) {
+      toast.error(countError);
+      return;
+    }
+
+    if (itemDetailsQuery.isLoading) {
+      toast.error(t("loadingItemOptions"));
+      return;
+    }
+
+    const nextItemErrors: Record<string, string> = {};
+    const nextGroupErrors: Record<string, Record<string, string>> = {};
+    const dealForSelection = isFixedItemDeal(deal)
+      ? { ...deal, dealSelectionMode: "FLEXIBLE_ITEMS" as const, dealRequiredQuantity: requiredQuantity }
+      : deal;
+    const cartItemPayloads = selectedMenuItemIds
+      .map((menuItemId) => {
+        const item = detailedItemsById.get(menuItemId);
+
+        if (!item || itemDetailsQuery.isError) {
+          nextItemErrors[menuItemId] = t("unableToLoadItemOptions");
+          return null;
+        }
+
+        const validation = validateDealChooserItemConfiguration({
+          deal: dealForSelection,
+          item,
+          configuration: configurationsByItemId[menuItemId],
+        });
+
+        if (validation.itemError) {
+          nextItemErrors[menuItemId] = validation.itemError;
+        }
+
+        if (Object.keys(validation.groupErrors).length > 0) {
+          nextGroupErrors[menuItemId] = validation.groupErrors;
+        }
+
+        if (validation.itemError || Object.keys(validation.groupErrors).length > 0) {
+          return null;
+        }
+
+        return buildDealCartItemPayload({
+          deal: dealForSelection,
+          item,
+          branchId,
+          configuration: configurationsByItemId[menuItemId],
+        });
+      })
+      .filter((payload): payload is NonNullable<typeof payload> => payload !== null);
+
+    setItemErrorsById(nextItemErrors);
+    setGroupErrorsByItemId(nextGroupErrors);
+
+    if (Object.keys(nextItemErrors).length > 0 || Object.keys(nextGroupErrors).length > 0) {
+      const erroredItemIds = new Set([
+        ...Object.keys(nextItemErrors),
+        ...Object.keys(nextGroupErrors),
+      ]);
+      setExpandedItemIds((current) =>
+        Array.from(new Set([...current, ...Array.from(erroredItemIds)]))
+      );
+      return;
+    }
 
     addDealMutation.mutate(
       {
-        deal,
-        cartItemPayloads: [
-          buildCustomizableDealCartItemPayload({
-            deal,
-            item: customizingItem,
-            branchId,
-            modifierSelections,
-          }),
-        ],
+        deal: dealForSelection,
+        selectedMenuItemIds,
+        eligibleMenuItems: selectedItems,
+        cartItemPayloads,
       },
       {
         onSuccess: () => {
           onOpenChange(false);
-          router.push("/checkout");
         },
       }
     );
   }, [
     addDealMutation,
     branchId,
-    customizationGroups,
-    customizingItem,
+    configurationsByItemId,
     deal,
+    detailedItemsById,
+    itemDetailsQuery.isError,
+    itemDetailsQuery.isLoading,
     onOpenChange,
-    router,
-    selectedModifiersByGroup,
+    requiredQuantity,
+    selectedCount,
+    selectedItems,
+    selectedMenuItemIds,
     t,
   ]);
 
-  const addSelectedItems = useCallback(() => {
-    if (!deal || !canAddSelectedItems) {
-      return;
+  const canSubmitSelection =
+    canAddSelectedItems &&
+    !itemDetailsQuery.isLoading &&
+    selectedMenuItemIds.every((itemId) => {
+      const item = detailedItemsById.get(itemId);
+
+      if (!item || item.supportsSplitPizza === true) {
+        return false;
+      }
+
+      const variations = getDealChooserVariations(item);
+      const groups = getDealChooserModifierGroups(item);
+      const selectedModifiers = getSelectedModifiersByGroup(
+        groups,
+        configurationsByItemId[itemId]
+      );
+      const variationComplete =
+        variations.length === 0 || Boolean(configurationsByItemId[itemId]?.selectedVariationId);
+      const modifiersComplete = groups.every((group) => {
+        const groupId = getDealChooserId(group.id);
+        const minSelect = Math.max(0, getDealChooserNumber(group.minSelect, 0));
+
+        return (selectedModifiers[groupId]?.length ?? 0) >= minSelect;
+      });
+
+      return variationComplete && modifiersComplete;
+    });
+
+  const getItemStatus = useCallback(
+    (item: CustomerDealMenuItem, checked: boolean) => {
+      if (itemErrorsById[item.id]) return t("statusUnsupported");
+      if (!checked) return null;
+
+      const groups = getDealChooserModifierGroups(item);
+      const variations = getDealChooserVariations(item);
+
+      if (groups.length === 0 && variations.length === 0) return t("statusReady");
+
+      const validation = validateDealChooserItemConfiguration({
+        deal: deal || {
+          id: "",
+          title: "",
+          dealSelectionMode: "FLEXIBLE_ITEMS",
+          discountValue: 0,
+          scopeMenuItems: [],
+          scopeCategories: [],
+        },
+        item,
+        configuration: configurationsByItemId[item.id],
+      });
+
+      return validation.itemError || Object.keys(validation.groupErrors).length > 0
+        ? t("statusNeedsChoices")
+        : t("statusComplete");
+    },
+    [configurationsByItemId, deal, itemErrorsById, t]
+  );
+
+  const renderItemConfiguration = (item: CustomerDealMenuItem) => {
+    const groups = getDealChooserModifierGroups(item);
+    const variations = getDealChooserVariations(item);
+    const configuration = configurationsByItemId[item.id];
+    const selectedModifiersByGroup = getSelectedModifiersByGroup(groups, configuration);
+    const itemError = itemErrorsById[item.id];
+    const groupErrors = groupErrorsByItemId[item.id] || {};
+
+    if (!expandedItemIds.includes(item.id)) {
+      return null;
     }
 
-    addDealMutation.mutate(
-      {
-        deal: isFixedItemDeal(deal)
-          ? { ...deal, dealSelectionMode: "FLEXIBLE_ITEMS", dealRequiredQuantity: requiredQuantity }
-          : deal,
-        selectedMenuItemIds,
-        eligibleMenuItems: selectedItems,
-      },
-      {
-        onSuccess: () => {
-          onOpenChange(false);
-          router.push("/checkout");
-        },
-      }
+    return (
+      <div className="border-t border-gray-100 bg-gray-50/60 px-3 pb-3 pt-3">
+        {itemDetailsQuery.isLoading ? (
+          <p className="text-xs font-medium text-gray-500">{t("loadingItemOptions")}</p>
+        ) : null}
+
+        {itemError ? (
+          <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+            {itemError}
+          </p>
+        ) : null}
+
+        {variations.length > 0 && !itemError ? (
+          <div className="mb-3 rounded-2xl border border-gray-100 bg-white p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold text-gray-900">{t("variation")}</p>
+              <span className="text-xs font-medium text-gray-500">{t("chooseOne")}</span>
+            </div>
+            <div className="space-y-2">
+              {variations.map((variation) => {
+                const variationId = getDealChooserId(variation.id);
+                const checked = configuration?.selectedVariationId === variationId;
+
+                return (
+                  <label
+                    key={variationId}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2"
+                  >
+                    <span className="text-sm font-medium text-gray-700">
+                      {getVariationLabel(variation)}
+                    </span>
+                    <Checkbox
+                      className="size-5"
+                      checked={checked}
+                      onCheckedChange={(value) => {
+                        if (value === true) {
+                          selectVariation(item.id, variationId);
+                        }
+                      }}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {groups.map((group) => {
+          const groupId = getDealChooserId(group.id);
+          const groupModifiers = Array.isArray(group.modifiers) ? group.modifiers : [];
+          const selectedGroupModifiers = selectedModifiersByGroup[groupId] || [];
+          const selectionType = group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+          const maxSelect = selectionType === "SINGLE"
+            ? 1
+            : getDealChooserNumber(group.maxSelect, groupModifiers.length);
+
+          return (
+            <div key={groupId} className="mb-3 rounded-2xl border border-gray-100 bg-white p-3 last:mb-0">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {String(group.name || "Options")}
+                  </p>
+                  <p className="text-xs font-medium text-gray-500">
+                    {getDealChooserGroupHelperText(group)}
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-gray-500">
+                  {selectionType === "SINGLE" ? t("chooseOne") : t("chooseMultiple")}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {groupModifiers.map((modifier) => {
+                  const modifierId = getDealChooserId(modifier.id);
+                  const checked = selectedGroupModifiers.some(({ id }) => id === modifierId);
+                  const maxReached =
+                    maxSelect > 0 &&
+                    selectedGroupModifiers.length >= maxSelect &&
+                    !checked;
+
+                  return (
+                    <label
+                      key={modifierId}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2"
+                    >
+                      <span className="text-sm font-medium text-gray-700">
+                        {getDealChooserModifierName(modifier)}
+                      </span>
+                      <Checkbox
+                        className="size-5"
+                        checked={checked}
+                        disabled={maxReached}
+                        onCheckedChange={(value) =>
+                          toggleModifier(item.id, group, modifier, value === true)
+                        }
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+
+              {groupErrors[groupId] ? (
+                <p className="mt-2 text-xs font-medium text-red-500">
+                  {groupErrors[groupId]}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
     );
-  }, [
-    addDealMutation,
-    canAddSelectedItems,
-    deal,
-    onOpenChange,
-    requiredQuantity,
-    router,
-    selectedItems,
-    selectedMenuItemIds,
-  ]);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -413,7 +620,7 @@ export function DealChooserDrawer({
               {getRequirementText(deal, requiredQuantity, t)}
             </span>
             <span className="ml-auto rounded-full bg-orange-50 px-2.5 py-1 text-orange-700">
-              {selectedCount}/{requiredQuantity} {t("selected")}
+              {Math.min(selectedCount, requiredQuantity)}/{requiredQuantity} {t("selected")}
             </span>
           </div>
         ) : null}
@@ -436,160 +643,80 @@ export function DealChooserDrawer({
           </div>
         ) : null}
 
-        {!isLoading && !error && items.length > 0 && !customizingItem ? (
+        {!isLoading && !error && detailedItems.length > 0 ? (
           <div className="space-y-3">
-            {items.map((item) => {
+            {detailedItems.map((item) => {
               const checked = selectedMenuItemIds.includes(item.id);
               const itemPrice = getMenuItemPrice(item);
               const categoryName = item.category?.name?.trim();
               const description = item.description?.trim();
-              const requiresCustomization = requiresCustomizationForDealItem(item);
-              const canSelectInline = canAutoAddDealItem(item);
-              const unsupportedDealCustomization = hasUnsupportedDealMenuItemCustomization(item);
-              const canCustomizeInline = isDealMenuItemCustomizable(item);
+              const configurable = isDealChooserItemConfigurable(item);
+              const status = getItemStatus(item, checked);
+              const disableUnchecked =
+                !checked && selectedCount >= requiredQuantity && requiredQuantity !== 1;
 
               return (
                 <div
                   key={item.id}
-                  className="flex items-center gap-3 rounded-2xl border border-gray-100 p-3 transition-colors hover:border-primary/30 hover:bg-primary/5"
+                  className="overflow-hidden rounded-2xl border border-gray-100 transition-colors hover:border-primary/30 hover:bg-primary/5"
                 >
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-primary/10 text-primary">
-                    {item.imageUrl ? (
-                      <Image
-                        src={item.imageUrl}
-                        alt={item.name}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <span className="flex h-full items-center justify-center text-lg font-bold">
-                        {getMenuItemInitial(item.name)}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-gray-900">
-                      {item.name}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500">
-                      {hasMenuItemPrice(itemPrice) ? (
-                        <span className="text-primary">
-                          {formatDealPrice(itemPrice)}
+                  <div className="flex items-center gap-3 p-3">
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-primary/10 text-primary">
+                      {item.imageUrl ? (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <span className="flex h-full items-center justify-center text-lg font-bold">
+                          {getMenuItemInitial(item.name)}
                         </span>
-                      ) : null}
-                      {categoryName ? <span>{categoryName}</span> : null}
+                      )}
                     </div>
-                    {description ? (
-                      <p className="mt-1 line-clamp-1 text-xs leading-5 text-gray-500">
-                        {description}
-                      </p>
-                    ) : null}
-                  </div>
 
-                  {unsupportedDealCustomization ? (
-                    <div className="max-w-[170px] text-right text-xs font-medium text-red-500">
-                      {t("unsupportedDealCustomization")}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-900">
+                        {item.name}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500">
+                        {hasMenuItemPrice(itemPrice) ? (
+                          <span className="text-primary">
+                            {formatDealPrice(itemPrice)}
+                          </span>
+                        ) : null}
+                        {categoryName ? <span>{categoryName}</span> : null}
+                        {status ? (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+                            {status}
+                          </span>
+                        ) : null}
+                      </div>
+                      {description ? (
+                        <p className="mt-1 line-clamp-1 text-xs leading-5 text-gray-500">
+                          {description}
+                        </p>
+                      ) : null}
                     </div>
-                  ) : requiresCustomization ? (
-                    <Button
-                      className="h-9 shrink-0 rounded-full border border-primary/20 bg-white px-3 text-xs text-primary hover:bg-primary/5"
-                      onClick={() =>
-                        canCustomizeInline
-                          ? startInlineCustomization(item)
-                          : customizeItem(item)
-                      }
-                    >
-                      {t("customize")}
-                    </Button>
-                  ) : (
+
+                    {configurable || checked ? (
+                      <Button
+                        className="h-9 shrink-0 rounded-full border border-primary/20 bg-white px-3 text-xs text-primary hover:bg-primary/5"
+                        onClick={() => toggleExpandedItem(item.id)}
+                      >
+                        {expandedItemIds.includes(item.id) ? t("hideOptions") : t("options")}
+                      </Button>
+                    ) : null}
                     <Checkbox
                       className="size-5"
                       checked={checked}
-                      disabled={!canSelectInline}
+                      disabled={disableUnchecked}
                       onCheckedChange={(value) => toggleSelectedItem(item.id, value === true)}
                     />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-
-        {!isLoading && !error && customizingItem ? (
-          <div className="space-y-4">
-            <button
-              type="button"
-              className="text-sm font-medium text-primary"
-              onClick={() => {
-                setCustomizingItem(null);
-                setSelectedModifiersByGroup({});
-                setModifierErrors({});
-              }}
-            >
-              {t("backToItems")}
-            </button>
-
-            <div className="rounded-2xl border border-gray-100 p-3">
-              <p className="text-sm font-semibold text-gray-900">
-                {customizingItem.name}
-              </p>
-              {modifierErrors.root ? (
-                <p className="mt-2 text-xs font-medium text-red-500">
-                  {modifierErrors.root}
-                </p>
-              ) : null}
-            </div>
-
-            {customizationGroups.map((group) => {
-              const groupId = getId(group.id);
-              const groupModifiers = Array.isArray(group.modifiers) ? group.modifiers : [];
-              const selectedGroupModifiers = selectedModifiersByGroup[groupId] || [];
-              const selectionType = group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
-
-              return (
-                <div
-                  key={groupId}
-                  className="rounded-2xl border border-gray-100 p-3"
-                >
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {String(group.name || "Options")}
-                    </p>
-                    <span className="text-xs font-medium text-gray-500">
-                      {selectionType === "SINGLE" ? t("chooseOne") : t("chooseMultiple")}
-                    </span>
                   </div>
-
-                  <div className="space-y-2">
-                    {groupModifiers.map((modifier) => {
-                      const modifierId = getId(modifier.id);
-                      const checked = selectedGroupModifiers.some(({ id }) => id === modifierId);
-
-                      return (
-                        <label
-                          key={modifierId}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2"
-                        >
-                          <span className="text-sm font-medium text-gray-700">
-                            {getModifierName(modifier)}
-                          </span>
-                          <Checkbox
-                            className="size-5"
-                            checked={checked}
-                            onCheckedChange={(value) => toggleModifier(group, modifier, value === true)}
-                          />
-                        </label>
-                      );
-                    })}
-                  </div>
-
-                  {modifierErrors[groupId] ? (
-                    <p className="mt-2 text-xs font-medium text-red-500">
-                      {modifierErrors[groupId]}
-                    </p>
-                  ) : null}
+                  {renderItemConfiguration(item)}
                 </div>
               );
             })}
@@ -600,12 +727,8 @@ export function DealChooserDrawer({
           <Button
             variant="primary"
             className="h-11 w-full px-6 py-2 sm:w-auto"
-            disabled={
-              customizingItem
-                ? addDealMutation.isPending
-                : !canAddSelectedItems || addDealMutation.isPending
-            }
-            onClick={customizingItem ? addCustomizedDealItem : addSelectedItems}
+            disabled={!canSubmitSelection || addDealMutation.isPending}
+            onClick={addSelectedItems}
           >
             {addDealMutation.isPending ? t("adding") : t("addSelectedItems")}
           </Button>

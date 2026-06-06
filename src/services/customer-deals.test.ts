@@ -147,6 +147,10 @@ describe("getCustomerDeals", () => {
     expect(response.deals[0].dealRequiredQuantity).toBe(2);
     expect(response.deals[0].scopeMenuItems).toHaveLength(3);
     expect(response.deals[0].scopeMenuItems[0].slug).toBe("burger");
+    expect(response.deals[0].scopeMenuItems[0].variations).toEqual([]);
+    expect(response.deals[0].scopeMenuItems[0].modifierGroups).toEqual([]);
+    expect(response.deals[0].scopeMenuItems[0].modifiers).toEqual([]);
+    expect(response.deals[0].scopeMenuItems[0].modifierLinks).toEqual([]);
     expect(response.deals[0].scopeMenuItems[2].description).toBe("Crispy fries");
     expect(response.deals[0].scopeMenuItems[2].category?.name).toBe("Sides");
   });
