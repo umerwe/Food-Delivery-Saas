@@ -37,6 +37,9 @@ type GoogleAutocompleteService = {
     request: {
       input: string;
       types?: string[];
+      componentRestrictions?: {
+        country: string | string[];
+      };
     },
     callback: (predictions: GooglePlacePrediction[] | null, status: string) => void
   ) => void;

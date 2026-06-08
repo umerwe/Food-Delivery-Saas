@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { safeGetLocalStorageItem, safeRemoveLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
+import { reverseGeocode } from "@/services/geocoding";
 
 export type UserCoordinates = {
   lat: number;
@@ -16,6 +17,7 @@ type StoredUserLocation = UserCoordinates & {
 export type LocationPermissionState = "idle" | "requesting" | "granted" | "denied" | "unsupported";
 
 const USER_LOCATION_STORAGE_KEY = "deliveryway:last-user-location";
+const MAX_RELIABLE_ACCURACY_METERS = 50000;
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -102,15 +104,35 @@ export const useUserLocation = () => {
 
     setPermissionState("requesting");
     setErrorMessage("");
+    safeRemoveLocalStorageItem(USER_LOCATION_STORAGE_KEY);
+    setCoordinates(null);
+    setLocationLabel("");
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (
+          typeof position.coords.accuracy === "number" &&
+          position.coords.accuracy > MAX_RELIABLE_ACCURACY_METERS
+        ) {
+          setPermissionState("idle");
+          setErrorMessage(
+            "Your browser returned an approximate location. Please search your address or pick it on the map."
+          );
+          return;
+        }
+
         const nextCoordinates = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
 
-        acceptCoordinates(nextCoordinates, "Current location");
+        reverseGeocode(nextCoordinates.lat, nextCoordinates.lng)
+          .then((data) => {
+            acceptCoordinates(nextCoordinates, data.displayName || "Current location");
+          })
+          .catch(() => {
+            acceptCoordinates(nextCoordinates, "Current location");
+          });
       },
       (error) => {
         setPermissionState(error.code === error.PERMISSION_DENIED ? "denied" : "idle");
@@ -118,7 +140,7 @@ export const useUserLocation = () => {
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 5 * 60 * 1000,
+        maximumAge: 0,
         timeout: 12000,
       }
     );

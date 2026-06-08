@@ -6,6 +6,12 @@ export type CartSelectedVariation = {
   pickupPrice?: number | string | null;
 };
 
+export type {
+  MenuItemGroupedModifier,
+  MenuItemVariationModifierPriceOverride,
+  MenuItemVariationPriceOverride,
+} from "@/components/pages/Items/types";
+
 export type CartSelectedModifier = {
   id?: string;
   modifierId?: string;

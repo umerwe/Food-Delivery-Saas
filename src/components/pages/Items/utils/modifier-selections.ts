@@ -34,9 +34,13 @@ export const getModifierGroupSelectionError = (
 ) => {
   const groupName = String(group?.name || "This group").trim();
   const modifiersCount = Array.isArray(group?.modifiers) ? group.modifiers.length : 0;
-  const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
   const minSelect = Math.max(0, toNumber(group?.minSelect, 0));
   const rawMaxSelect = toNumber(group?.maxSelect, modifiersCount);
+  const isSingleSelectionGroup = minSelect === 1 && rawMaxSelect === 1;
+  const selectionType =
+    group?.selectionType === "SINGLE" || isSingleSelectionGroup
+      ? "SINGLE"
+      : "MULTIPLE";
   const defaultMaxSelect = modifiersCount > 0 ? modifiersCount : 0;
   const maxSelect = selectionType === "SINGLE"
     ? 1

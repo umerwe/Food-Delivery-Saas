@@ -351,7 +351,7 @@ export function BranchSelectorModal({
               </p>
             ) : null}
 
-            {permissionState === "denied" || permissionState === "unsupported" ? (
+            {errorMessage ? (
               <p className="mb-4 rounded-2xl bg-[#F9FAFB] px-4 py-3 text-xs leading-5 text-[#6B7280]">
                 {errorMessage || "Location is unavailable right now. You can still search and choose a branch manually."}
               </p>

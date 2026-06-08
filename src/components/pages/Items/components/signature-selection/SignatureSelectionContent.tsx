@@ -29,6 +29,9 @@ import {
   buildModifierSelections,
   validateModifierSelections,
 } from "@/components/pages/Items/utils/modifier-selections";
+import {
+  getModifierPriceForVariation,
+} from "@/components/pages/Items/utils/modifier-pricing";
 
 type SignatureSelectionContentProps = {
   restaurantId?: string | null;
@@ -877,7 +880,11 @@ export function SignatureSelectionContent({
     const modifiers = getNormalizedModifiersFromGroup(group);
     const minSelect = Math.max(0, toNumber(group?.minSelect, 0));
     const rawMaxSelect = toNumber(group?.maxSelect, modifiers.length);
-    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isSingleSelectionGroup = minSelect === 1 && rawMaxSelect === 1;
+    const selectionType =
+      group?.selectionType === "SINGLE" || isSingleSelectionGroup
+        ? "SINGLE"
+        : "MULTIPLE";
     const maxSelect = selectionType === "SINGLE"
       ? 1
       : Math.max(minSelect, rawMaxSelect > 0 ? rawMaxSelect : modifiers.length);
@@ -1138,53 +1145,17 @@ export function SignatureSelectionContent({
 
   const getModifierEffectivePrice = (
     modifier: Modifier,
-    itemId?: string,
+    item?: MenuItem | null,
     variation?: MenuVariation | null
   ) => {
-    const modifierId = String(modifier?.id || "");
-    const variationId = String(variation?.id || "");
+    if (!item) return toNumber(modifier?.priceDelta, 0);
 
-    if (variationId) {
-      const modifierSideOverride = findBestModifierOverride({
-        overrides: modifier?.variationPriceOverrides,
-        modifierId,
-        menuItemId: itemId,
-        variationId,
-      });
-
-      const modifierSideAmount = getOverrideAmount(modifierSideOverride);
-
-      if (modifierSideAmount !== null) {
-        return modifierSideAmount;
-      }
-
-      const variationSideOverride = findBestModifierOverride({
-        overrides: variation?.modifierPriceOverrides,
-        modifierId,
-        menuItemId: itemId,
-        variationId,
-      });
-
-      const variationSideAmount = getOverrideAmount(variationSideOverride);
-
-      if (variationSideAmount !== null) {
-        return variationSideAmount;
-      }
-    }
-
-    const itemOverride = findBestModifierOverride({
-      overrides: modifier?.itemPriceOverrides,
-      modifierId,
-      menuItemId: itemId,
+    return getModifierPriceForVariation({
+      item,
+      selectedVariation: variation,
+      selectedVariationId: variation?.id ?? null,
+      modifierId: String(modifier?.id || ""),
     });
-
-    const itemAmount = getOverrideAmount(itemOverride);
-
-    if (itemAmount !== null) {
-      return itemAmount;
-    }
-
-    return toNumber(modifier?.priceDelta, 0);
   };
 
   const getGroupValidation = (group: ModifierGroup) => {
@@ -1195,7 +1166,11 @@ export function SignatureSelectionContent({
         ? toNumber(group.maxSelect, 0)
         : undefined;
 
-    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isSingleSelectionGroup = rawMin === 1 && rawMax === 1;
+    const selectionType =
+      group?.selectionType === "SINGLE" || isSingleSelectionGroup
+        ? "SINGLE"
+        : "MULTIPLE";
     const isRequired = Boolean(group?.isRequired) || rawMin > 0;
 
     return {
@@ -1338,7 +1313,7 @@ export function SignatureSelectionContent({
       .reduce((acc, modifier) => {
         const modifierPrice = getModifierEffectivePrice(
           modifier,
-          item?.id,
+          item,
           variation
         );
 
@@ -1743,6 +1718,20 @@ export function SignatureSelectionContent({
       const isSelected = current.some((addon) => addon.id === modifier.id);
       const { minSelect, maxSelect } = addonSelectionRules;
       const itemName = selectedItem?.name || tProduct("thisItem");
+      const isSingleAddonSelection = maxSelect === 1;
+
+      if (isSingleAddonSelection) {
+        if (isSelected && minSelect <= 0) {
+          const next = { ...prev };
+          delete next[ADDONS_GROUP_ID];
+          return next;
+        }
+
+        return {
+          ...prev,
+          [ADDONS_GROUP_ID]: [{ ...modifier, selectedQuantity: 1 }],
+        };
+      }
 
       if (isSelected) {
         if (minSelect > 0 && current.length <= minSelect) {
@@ -1821,6 +1810,7 @@ export function SignatureSelectionContent({
 
     const { maxSelect } = addonSelectionRules;
     const selectedCount = selectedAddons.length;
+    const inputType = maxSelect === 1 ? "radio" : "checkbox";
 
     return (
       <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -1850,11 +1840,11 @@ export function SignatureSelectionContent({
             );
 
             const disableBecauseMaxReached =
-              !checked && Boolean(maxSelect) && selectedCount >= Number(maxSelect);
+              inputType !== "radio" && !checked && Boolean(maxSelect) && selectedCount >= Number(maxSelect);
 
             const effectivePrice = getModifierEffectivePrice(
               modifier,
-              selectedItem.id,
+              selectedItem,
               selectedVariation
             );
 
@@ -1871,7 +1861,8 @@ export function SignatureSelectionContent({
               >
                 <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
                   <input
-                    type="checkbox"
+                    type={inputType}
+                    name={`item-addons-${selectedItem?.id || "item"}`}
                     checked={checked}
                     disabled={disableBecauseMaxReached}
                     onChange={() => handleAddonToggle(modifier)}
@@ -1989,7 +1980,7 @@ export function SignatureSelectionContent({
 
               const effectivePrice = getModifierEffectivePrice(
                 modifier,
-                item.id,
+                item,
                 variation
               );
 

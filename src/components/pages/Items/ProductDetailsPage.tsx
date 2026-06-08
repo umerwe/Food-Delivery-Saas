@@ -25,6 +25,9 @@ import {
   validateModifierSelections,
 } from "@/components/pages/Items/utils/modifier-selections";
 import {
+  getModifierPriceForVariation,
+} from "@/components/pages/Items/utils/modifier-pricing";
+import {
   getDepositAmount,
   getProductDetailsQuantityLimits,
   normalizeApiList,
@@ -1074,7 +1077,11 @@ function ProductDetailsPageContent() {
     const modifiers = getNormalizedModifiersFromGroup(group);
     const minSelect = Math.max(0, toNumber(group?.minSelect, 0));
     const rawMaxSelect = toNumber(group?.maxSelect, modifiers.length);
-    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isSingleSelectionGroup = minSelect === 1 && rawMaxSelect === 1;
+    const selectionType =
+      group?.selectionType === "SINGLE" || isSingleSelectionGroup
+        ? "SINGLE"
+        : "MULTIPLE";
     const maxSelect = selectionType === "SINGLE"
       ? 1
       : Math.max(minSelect, rawMaxSelect > 0 ? rawMaxSelect : modifiers.length);
@@ -1221,68 +1228,16 @@ function ProductDetailsPageContent() {
     menuItem: MenuItem | null,
     variation?: MenuVariation | null
   ) => {
-    const menuItemId = String(menuItem?.id || "");
-    const variationId = String(variation?.id || "");
-    const modifierId = String(modifier?.id || "");
+    if (!menuItem) return toNumber(modifier?.priceDelta, 0);
 
-    if (variationId) {
-      const variationScopedOverrides = getVariationScopedModifierOverrides(
-        menuItem,
-        variation
-      );
-
-      const variationScopedOverride = findBestModifierOverride({
-        overrides: variationScopedOverrides,
-        modifierId,
-        menuItemId,
-        variationId,
-      });
-
-      const variationScopedAmount = getOverrideAmount(variationScopedOverride);
-
-      if (variationScopedAmount !== null) {
-        return variationScopedAmount;
-      }
-
-      const modifierSideOverride = findBestModifierOverride({
-        overrides: getModifierSideVariationOverrides(menuItem, modifier),
-        modifierId,
-        menuItemId,
-        variationId,
-      });
-
-      const modifierSideAmount = getOverrideAmount(modifierSideOverride);
-
-      if (modifierSideAmount !== null) {
-        return modifierSideAmount;
-      }
-    }
-
-    const topLevelItemOverride = findBestModifierOverride({
-      overrides: menuItem?.modifierPriceOverrides,
-      modifierId,
-      menuItemId,
+    const helperPrice = getModifierPriceForVariation({
+      item: menuItem,
+      selectedVariation: variation,
+      selectedVariationId: variation?.id ?? null,
+      modifierId: String(modifier?.id || ""),
     });
 
-    const topLevelItemAmount = getOverrideAmount(topLevelItemOverride);
-
-    if (topLevelItemAmount !== null) {
-      return topLevelItemAmount;
-    }
-
-    const modifierItemOverride = findBestModifierOverride({
-      overrides: modifier?.itemPriceOverrides,
-      modifierId,
-      menuItemId,
-    });
-
-    const modifierItemAmount = getOverrideAmount(modifierItemOverride);
-
-    if (modifierItemAmount !== null) {
-      return modifierItemAmount;
-    }
-
-    return toNumber(modifier?.priceDelta, 0);
+    return helperPrice;
   };
 
   const getGroupValidation = (group: ModifierGroup) => {
@@ -1292,7 +1247,11 @@ function ProductDetailsPageContent() {
         ? toNumber(group.maxSelect, 0)
         : undefined;
 
-    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isSingleSelectionGroup = rawMin === 1 && rawMax === 1;
+    const selectionType =
+      group?.selectionType === "SINGLE" || isSingleSelectionGroup
+        ? "SINGLE"
+        : "MULTIPLE";
     const isRequired = Boolean(group?.isRequired) || rawMin > 0;
 
     return {

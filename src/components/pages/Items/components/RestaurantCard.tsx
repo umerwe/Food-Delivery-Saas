@@ -15,6 +15,7 @@ import { getStoredGroupOrderCode } from "@/lib/group-order";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuVariation, Modifier, ModifierGroup, ModifierLink, SelectedModifiersMap, PromotionInfo, PromotionPricing, RawModifierLink, SelectedModifier, VariationPriceOverride } from "@/components/pages/Items/types";
 import { hasText, formatPrice, getSplitPizzaPricingVariation, toNumber } from "@/components/pages/Items/utils/restaurant-card-utils";
+import { getModifierPriceForVariation } from "@/components/pages/Items/utils/modifier-pricing";
 import {
   buildModifierSelections,
   validateModifierSelections,
@@ -637,7 +638,11 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
     const modifiers = getNormalizedModifiersFromGroup(group);
     const minSelect = Math.max(0, toNumber(group?.minSelect, 0));
     const rawMaxSelect = toNumber(group?.maxSelect, modifiers.length);
-    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isSingleSelectionGroup = minSelect === 1 && rawMaxSelect === 1;
+    const selectionType =
+      group?.selectionType === "SINGLE" || isSingleSelectionGroup
+        ? "SINGLE"
+        : "MULTIPLE";
     const maxSelect = selectionType === "SINGLE"
       ? 1
       : Math.max(minSelect, rawMaxSelect > 0 ? rawMaxSelect : modifiers.length);
@@ -899,7 +904,11 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
         ? toNumber(group.maxSelect, 0)
         : undefined;
 
-    const selectionType = group?.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+    const isSingleSelectionGroup = rawMin === 1 && rawMax === 1;
+    const selectionType =
+      group?.selectionType === "SINGLE" || isSingleSelectionGroup
+        ? "SINGLE"
+        : "MULTIPLE";
     const isRequired = Boolean(group?.isRequired) || rawMin > 0;
     const minSelect = Math.max(isRequired ? 1 : 0, rawMin);
 
@@ -935,79 +944,19 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
     });
   };
 
-  const getOverridePrice = (override?: VariationPriceOverride | ItemPriceOverride | ApiRecord | null) => {
-    if (!override) return null;
-
-    if (override?.priceDelta !== undefined && override.priceDelta !== null) {
-      return toNumber(override.priceDelta, 0);
-    }
-
-    if (override?.price !== undefined && override.price !== null) {
-      return toNumber(override.price, 0);
-    }
-
-    return null;
-  };
-
   const getModifierEffectivePrice = (
     modifier: Modifier,
-    menuItemId?: string,
+    menuItem: MenuItem | null,
     variation?: MenuVariation | null,
   ) => {
-    const modifierId = String(modifier?.id || "");
-    const normalizedMenuItemId = String(menuItemId || "");
-    const variationId = variation?.id ? String(variation.id) : "";
+    if (!menuItem) return toNumber(modifier?.priceDelta, 0);
 
-    if (variationId) {
-      const variationOverrides = [
-        ...(Array.isArray(variation?.modifierPriceOverrides)
-          ? variation.modifierPriceOverrides
-          : []),
-        ...(Array.isArray(modifier?.variationPriceOverrides)
-          ? modifier.variationPriceOverrides
-          : []),
-      ].filter((override: VariationPriceOverride | ItemPriceOverride | ApiRecord) => {
-        const overrideModifierId = String(override?.modifierId || "");
-        const overrideVariationId = String(override?.variationId || "");
-
-        return (
-          overrideModifierId === modifierId &&
-          overrideVariationId === variationId
-        );
-      });
-
-      const itemSpecificOverride = variationOverrides.find((override: VariationPriceOverride | ItemPriceOverride | ApiRecord) => {
-        return String(override?.menuItemId || "") === normalizedMenuItemId;
-      });
-
-      const itemSpecificPrice = getOverridePrice(itemSpecificOverride);
-      if (itemSpecificPrice !== null) return itemSpecificPrice;
-
-      const genericOverride = variationOverrides.find((override: VariationPriceOverride | ItemPriceOverride | ApiRecord) => {
-        return (
-          override?.menuItemId === null ||
-          override?.menuItemId === undefined ||
-          override?.menuItemId === ""
-        );
-      });
-
-      const genericPrice = getOverridePrice(genericOverride);
-      if (genericPrice !== null) return genericPrice;
-
-      const firstVariationPrice = getOverridePrice(variationOverrides[0]);
-      if (firstVariationPrice !== null) return firstVariationPrice;
-    }
-
-    const itemOverride = Array.isArray(modifier?.itemPriceOverrides)
-      ? modifier.itemPriceOverrides.find((override) => {
-          return String(override?.menuItemId || "") === normalizedMenuItemId;
-        })
-      : null;
-
-    const itemOverridePrice = getOverridePrice(itemOverride);
-    if (itemOverridePrice !== null) return itemOverridePrice;
-
-    return toNumber(modifier?.priceDelta, 0);
+    return getModifierPriceForVariation({
+      item: menuItem,
+      selectedVariation: variation,
+      selectedVariationId: variation?.id ?? null,
+      modifierId: String(modifier?.id || ""),
+    });
   };
 
   const itemVariations = useMemo(() => getItemVariations(item), [item]);
@@ -1184,6 +1133,20 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       const isSelected = current.some((addon) => addon.id === modifier.id);
       const { minSelect, maxSelect } = addonSelectionRules;
       const itemName = item?.name || t("thisItem");
+      const isSingleAddonSelection = maxSelect === 1;
+
+      if (isSingleAddonSelection) {
+        if (isSelected && minSelect <= 0) {
+          const next = { ...prev };
+          delete next[ADDONS_GROUP_ID];
+          return next;
+        }
+
+        return {
+          ...prev,
+          [ADDONS_GROUP_ID]: [{ ...modifier, selectedQuantity: 1 }],
+        };
+      }
 
       if (isSelected) {
         if (minSelect > 0 && current.length <= minSelect) {
@@ -1310,7 +1273,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
   const getModifiersTotal = (
     selectionMap: SelectedModifiersMap,
-    menuItemId?: string,
+    menuItem: MenuItem | null,
     variation?: MenuVariation | null,
   ) => {
     return Object.values(selectionMap)
@@ -1318,7 +1281,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       .reduce((acc: number, modifier: SelectedModifier) => {
         const modifierPrice = getModifierEffectivePrice(
           modifier as Modifier,
-          menuItemId,
+          menuItem,
           variation,
         );
 
@@ -1368,7 +1331,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
   const modifiersTotal = Number(getModifiersTotal(
     selectedModifiers,
-    item?.id ? String(item.id) : undefined,
+    item,
     selectedVariation,
   ));
 
@@ -1475,7 +1438,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
                 inputType !== "radio" && !checked && !!maxSelect && selectedCount >= maxSelect;
               const effectivePrice = getModifierEffectivePrice(
                 modifier,
-                item?.id ? String(item.id) : undefined,
+                item,
                 selectedVariation,
               );
 
@@ -1532,6 +1495,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
     const { maxSelect } = addonSelectionRules;
     const selectedCount = selectedAddons.length;
+    const inputType = maxSelect === 1 ? "radio" : "checkbox";
 
     return (
       <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -1561,11 +1525,11 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
             );
 
             const disableBecauseMaxReached =
-              !checked && !!maxSelect && selectedCount >= maxSelect;
+              inputType !== "radio" && !checked && !!maxSelect && selectedCount >= maxSelect;
 
             const effectivePrice = getModifierEffectivePrice(
               modifier,
-              item?.id ? String(item.id) : undefined,
+              item,
               selectedVariation,
             );
 
@@ -1582,7 +1546,8 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
               >
                 <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
                   <input
-                    type="checkbox"
+                    type={inputType}
+                    name={`item-addons-${item?.id || "item"}`}
                     checked={checked}
                     disabled={disableBecauseMaxReached}
                     onChange={() => handleAddonToggle(modifier)}

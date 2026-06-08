@@ -3,6 +3,9 @@ export type {
   CustomerGroupedModifier,
   CustomerModifierCategory,
   CustomerModifierGroup,
+  MenuItemGroupedModifier,
+  MenuItemVariationModifierPriceOverride,
+  MenuItemVariationPriceOverride,
   MenuItem,
   ModifierGroup,
 } from "@/components/pages/Items/types";

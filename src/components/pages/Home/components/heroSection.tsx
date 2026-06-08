@@ -214,7 +214,7 @@ const HeroSection = ({
 
             {showResults ? (
               <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.14)]">
-                {permissionState === "denied" || permissionState === "unsupported" ? (
+                {errorMessage ? (
                   <div className="px-5 py-6 text-sm text-gray-600">
                     {errorMessage || "Location is unavailable. Please choose a branch from the branch selector."}
                   </div>

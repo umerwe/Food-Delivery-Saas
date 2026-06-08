@@ -39,7 +39,9 @@ export function AddressLocationPicker({
   const [query, setQuery] = useState(locationLabel ?? "");
   const [predictions, setPredictions] = useState<GooglePlacePrediction[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isPredictionPanelOpen, setIsPredictionPanelOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement | null>(null);
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
   const markerRef = useRef<GoogleMarkerInstance | null>(null);
@@ -51,6 +53,33 @@ export function AddressLocationPicker({
   useEffect(() => {
     setQuery(locationLabel ?? "");
   }, [locationLabel]);
+
+  useEffect(() => {
+    if (!isPredictionPanelOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+
+      if (!(target instanceof Node)) return;
+      if (pickerRef.current?.contains(target)) return;
+
+      setIsPredictionPanelOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsPredictionPanelOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isPredictionPanelOpen]);
 
   useEffect(() => {
     if (!isReady || !googleMaps || trimmedQuery.length < MIN_QUERY_LENGTH) {
@@ -68,6 +97,9 @@ export function AddressLocationPicker({
         {
           input: trimmedQuery,
           types: ["geocode"],
+          componentRestrictions: {
+            country: "pk",
+          },
         },
         (results, serviceStatus) => {
           if (!active) return;
@@ -78,6 +110,7 @@ export function AddressLocationPicker({
               ? results.slice(0, 5)
               : []
           );
+          setIsPredictionPanelOpen(true);
         }
       );
     }, 250);
@@ -178,6 +211,7 @@ export function AddressLocationPicker({
     if (!googleMaps) return;
 
     setPredictions([]);
+    setIsPredictionPanelOpen(false);
     setQuery(prediction.description);
 
     const placesService = new googleMaps.maps.places.PlacesService(document.createElement("div"));
@@ -210,21 +244,29 @@ export function AddressLocationPicker({
       : errorMessage;
 
   return (
-    <div className="space-y-3">
+    <div ref={pickerRef} className="space-y-3">
       <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
           <input
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setIsPredictionPanelOpen(true);
+            }}
+            onFocus={() => {
+              if (predictions.length > 0 || isSearching) {
+                setIsPredictionPanelOpen(true);
+              }
+            }}
             placeholder="Search your address"
             className="h-[49px] w-full rounded-xl border border-transparent bg-[#F5F5F5] pl-11 pr-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
             disabled={status === "missing-key" || status === "error"}
           />
 
-          {(isSearching || predictions.length > 0) && (
-            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.14)]">
+          {isPredictionPanelOpen && (isSearching || predictions.length > 0) && (
+            <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-[min(260px,42vh)] overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.14)]">
               {isSearching ? (
                 <div className="flex items-center gap-2 px-4 py-4 text-sm text-gray-500">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -276,9 +318,9 @@ export function AddressLocationPicker({
       </div>
 
       {selectedLabel ? (
-        <p className="flex items-center gap-2 text-xs text-[#6B7280]">
-          <MapPin className="h-3.5 w-3.5 text-primary" />
-          {selectedLabel}
+        <p className="flex min-w-0 items-start gap-2 text-xs leading-5 text-[#6B7280]">
+          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="min-w-0 break-words">{selectedLabel}</span>
         </p>
       ) : null}
 

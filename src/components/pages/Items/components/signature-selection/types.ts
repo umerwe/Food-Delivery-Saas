@@ -12,6 +12,14 @@ export type ItemPriceOverride = {
   menuItem?: { id?: string | number | null } | null;
 };
 
+export type MenuItemVariationModifierPriceOverride = {
+  modifierId?: string;
+  modifier?: {
+    id: string;
+  };
+  priceDelta: number | string;
+};
+
 export type VariationPriceOverride = {
   id?: string;
   menuItemId?: string | number | null;
@@ -24,8 +32,10 @@ export type VariationPriceOverride = {
   variation?: MenuVariation | null;
   modifier?: Modifier | null;
   menuItem?: { id?: string | number | null } | null;
-  modifierPriceOverrides?: VariationPriceOverride[];
+  modifierPriceOverrides?: MenuItemVariationModifierPriceOverride[];
 };
+
+export type MenuItemVariationPriceOverride = VariationPriceOverride;
 
 export type MenuVariation = {
   id: string;
@@ -44,12 +54,16 @@ export type MenuVariation = {
 
 export type Modifier = {
   id: string;
+  modifierId?: string | null;
+  modifier?: {
+    id: string;
+  } | null;
   modifierGroupId?: string;
   restaurantId?: string;
   name: string;
   displayText?: string | null;
   description?: string | null;
-  priceDelta?: string | number;
+  priceDelta?: string | number | null;
   sortOrder?: number;
   isActive?: boolean;
   itemPriceOverrides?: ItemPriceOverride[];
@@ -69,6 +83,8 @@ export type CustomerGroupedModifier = {
   sortOrder?: number;
   category?: CustomerModifierCategory | null;
 };
+
+export type MenuItemGroupedModifier = CustomerGroupedModifier;
 
 export type CustomerModifierGroup = {
   id: string;
