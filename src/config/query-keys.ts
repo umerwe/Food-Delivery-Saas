@@ -22,7 +22,10 @@ export const queryKeys = {
   items: {
     all: ["items"] as const,
     request: (endpoint: string) => ["items", "request", endpoint] as const,
-    dealScopedDetails: (itemIds: string[]) => ["items", "deal-scoped-details", itemIds] as const,
+    dealScopedDetails: (
+      itemIds: string[],
+      itemSearchTermsById?: Record<string, string[]>
+    ) => ["items", "deal-scoped-details", itemIds, itemSearchTermsById ?? {}] as const,
   },
   cart: {
     current: ["cart", "current"] as const,

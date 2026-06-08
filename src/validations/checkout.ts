@@ -3,6 +3,7 @@ import { z } from "zod";
 export type CheckoutValidationMessages = {
   emailInvalid: string;
   streetRequired: string;
+  postalCodeRequired: string;
   cityRequired: string;
   countryRequired: string;
 };
@@ -10,6 +11,7 @@ export type CheckoutValidationMessages = {
 export const defaultEnglishCheckoutValidationMessages: CheckoutValidationMessages = {
   emailInvalid: "Please enter a valid email",
   streetRequired: "Street address is required",
+  postalCodeRequired: "Postal code is required",
   cityRequired: "City is required",
   countryRequired: "Country is required",
 };
@@ -36,16 +38,18 @@ export const checkoutTipSchema = z.object({
 export const createCheckoutAddressSchema = (
   messages: Pick<
     CheckoutValidationMessages,
-    "streetRequired" | "cityRequired" | "countryRequired"
+    "streetRequired" | "postalCodeRequired" | "cityRequired" | "countryRequired"
   >
 ) => z.object({
   street: z.string().trim().min(1, messages.streetRequired),
+  postalCode: z.string().trim().min(1, messages.postalCodeRequired),
   city: z.string().trim().min(1, messages.cityRequired),
   state: z.string().trim(),
   country: z.string().trim().min(1, messages.countryRequired),
   area: z.string().trim(),
   lat: z.string().trim(),
   lng: z.string().trim(),
+  isDefault: z.boolean(),
 });
 
 export const checkoutCustomerSchema = createCheckoutCustomerSchema(

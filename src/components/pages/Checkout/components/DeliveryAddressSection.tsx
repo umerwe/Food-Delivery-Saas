@@ -37,6 +37,13 @@ export function DeliveryAddressSection({
       const addressList = await fetchProfileAddresses({ get });
 
       setAddresses(addressList);
+      if (!selectedAddress) {
+        const defaultAddress = addressList.find((item) => item.isDefault);
+
+        if (defaultAddress) {
+          setSelectedAddress(defaultAddress.id);
+        }
+      }
 
       return addressList;
     } catch (err) {
@@ -44,7 +51,7 @@ export function DeliveryAddressSection({
     } finally {
       setLoading(false);
     }
-  }, [get]);
+  }, [get, selectedAddress, setSelectedAddress]);
 
   useEffect(() => {
     void fetchAddresses();
@@ -99,14 +106,21 @@ export function DeliveryAddressSection({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[20px] md:gap-[30px]">
 
           {addresses.map((addr) => {
-            const fullAddress = `${addr.street}, ${addr.area}, ${addr.city}, ${addr.state}, ${addr.country}`;
+            const fullAddress = [
+              addr.street,
+              addr.area,
+              addr.postalCode,
+              addr.city,
+              addr.state,
+              addr.country,
+            ].filter(Boolean).join(", ");
 
-const isSelected = selectedAddress === addr.id;
+            const isSelected = selectedAddress === addr.id;
 
             return (
               <Card
                 key={addr.id}
-             onClick={() => setSelectedAddress(addr.id)}
+                onClick={() => setSelectedAddress(addr.id)}
                 className={`rounded-[10px] p-5 md:p-6 cursor-pointer transition-all
                   ${
                     isSelected
@@ -116,10 +130,23 @@ const isSelected = selectedAddress === addr.id;
                 `}
               >
                 <div className="flex flex-col gap-4">
-                  <MapPin
-                    size={28}
-                    className={isSelected ? "" : "text-gray-400"}
-                  />
+                  <div className="flex items-start justify-between gap-3">
+                    <MapPin
+                      size={28}
+                      className={isSelected ? "" : "text-gray-400"}
+                    />
+                    {addr.isDefault ? (
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          isSelected
+                            ? "bg-white/15 text-white"
+                            : "bg-primary/10 text-primary"
+                        }`}
+                      >
+                        {addressT("defaultAddress")}
+                      </span>
+                    ) : null}
+                  </div>
 
                   <p
                     className={`text-sm md:text-base font-medium leading-relaxed ${

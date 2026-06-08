@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, MapPin, Navigation, X } from "lucide-react";
+import { Check, Loader2, MapPin, Navigation, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,12 +30,14 @@ type AddressModalProps = {
 
 const initialForm: CheckoutAddressValues = {
   street: "",
+  postalCode: "",
   city: "",
   state: "",
   country: "",
   area: "",
   lat: "",
   lng: "",
+  isDefault: false,
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -76,6 +78,7 @@ export function AddressModal({
     () =>
       createCheckoutAddressSchema({
         streetRequired: validationT("streetRequired"),
+        postalCodeRequired: validationT("postalCodeRequired"),
         cityRequired: validationT("cityRequired"),
         countryRequired: validationT("countryRequired"),
       }),
@@ -84,10 +87,11 @@ export function AddressModal({
 
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
-  const { register, reset, setValue, getValues, handleSubmit } = useForm<CheckoutAddressValues>({
+  const { register, reset, setValue, getValues, handleSubmit, watch } = useForm<CheckoutAddressValues>({
     resolver: zodResolver(checkoutAddressSchema),
     defaultValues: initialForm,
   });
+  const isDefaultSelected = watch("isDefault");
 
   useEffect(() => {
     if (!open) return;
@@ -95,12 +99,14 @@ export function AddressModal({
     if (editData) {
       reset({
         street: editData.street || "",
+        postalCode: editData.postalCode || "",
         city: editData.city || "",
         state: editData.state || "",
         country: editData.country || "",
         area: editData.area || "",
         lat: editData.lat ? String(editData.lat) : "",
         lng: editData.lng ? String(editData.lng) : "",
+        isDefault: Boolean(editData.isDefault),
       });
     } else {
       reset(initialForm);
@@ -163,6 +169,7 @@ export function AddressModal({
           ""
       );
       setValue("state", getAddressValue(address.state) || currentValues.state || "");
+      setValue("postalCode", getAddressValue(address.postcode) || currentValues.postalCode || "");
       setValue("country", getAddressValue(address.country) || currentValues.country || "");
       setValue("lat", lat);
       setValue("lng", lng);
@@ -197,8 +204,10 @@ export function AddressModal({
         state: form.state.trim(),
         country: form.country.trim(),
         area: form.area.trim(),
+        postalCode: form.postalCode.trim(),
         lat: form.lat.trim(),
         lng: form.lng.trim(),
+        isDefault: form.isDefault,
       };
 
       const res = editData
@@ -278,6 +287,47 @@ export function AddressModal({
 
             <div className="h-px bg-[#ECECEC]" />
 
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isDefaultSelected}
+              onClick={() => {
+                setValue("isDefault", !isDefaultSelected, {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                });
+              }}
+              className={`flex w-full items-center justify-between gap-4 rounded-[18px] border p-4 text-left transition ${
+                isDefaultSelected
+                  ? "border-[#D91F26]/25 bg-[#D91F26]/5"
+                  : "border-[#ECECEC] bg-[#FAFAFA] hover:border-[#D7D7D7]"
+              }`}
+            >
+              <span>
+                <span className="block text-[14px] font-semibold text-[#202020]">
+                  {t("setAsDefault")}
+                </span>
+                <span className="mt-1 block text-[12px] leading-5 text-[#7A7A7A]">
+                  {t("setAsDefaultDescription")}
+                </span>
+              </span>
+              <span
+                className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
+                  isDefaultSelected ? "bg-[#D91F26]" : "bg-[#D8D8D8]"
+                }`}
+              >
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm transition ${
+                    isDefaultSelected ? "translate-x-5" : "translate-x-0"
+                  }`}
+                >
+                  {isDefaultSelected ? (
+                    <Check className="h-3.5 w-3.5 text-[#D91F26]" />
+                  ) : null}
+                </span>
+              </span>
+            </button>
+
             {/* STREET */}
             <div className="space-y-2">
               <label className={LABEL_TEXT_CLASS}>
@@ -330,16 +380,29 @@ export function AddressModal({
               </div>
             </div>
 
-            {/* COUNTRY */}
-            <div className="space-y-2">
-              <label className={LABEL_TEXT_CLASS}>
-                {t("country")}
-              </label>
-              <Input
-                placeholder={t("countryPlaceholder")}
-                {...register("country")}
-                className={INPUT_BASE_CLASS}
-              />
+            {/* POSTAL CODE / COUNTRY */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.4fr]">
+              <div className="space-y-2">
+                <label className={LABEL_TEXT_CLASS}>
+                  {t("postalCode")}
+                </label>
+                <Input
+                  placeholder={t("postalCodePlaceholder")}
+                  {...register("postalCode")}
+                  className={INPUT_BASE_CLASS}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={LABEL_TEXT_CLASS}>
+                  {t("country")}
+                </label>
+                <Input
+                  placeholder={t("countryPlaceholder")}
+                  {...register("country")}
+                  className={INPUT_BASE_CLASS}
+                />
+              </div>
             </div>
 
             {/* LAT / LNG */}

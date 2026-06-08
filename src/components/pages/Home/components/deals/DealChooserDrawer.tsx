@@ -103,6 +103,7 @@ export function DealChooserDrawer({
   );
   const itemDetailsQuery = useDealScopedItemsDetails({
     itemIds,
+    items,
     enabled: open && itemIds.length > 0,
   });
 
@@ -332,9 +333,6 @@ export function DealChooserDrawer({
 
     const nextItemErrors: Record<string, string> = {};
     const nextGroupErrors: Record<string, Record<string, string>> = {};
-    const dealForSelection = isFixedItemDeal(deal)
-      ? { ...deal, dealSelectionMode: "FLEXIBLE_ITEMS" as const, dealRequiredQuantity: requiredQuantity }
-      : deal;
     const cartItemPayloads = selectedMenuItemIds
       .map((menuItemId) => {
         const item = detailedItemsById.get(menuItemId);
@@ -345,7 +343,7 @@ export function DealChooserDrawer({
         }
 
         const validation = validateDealChooserItemConfiguration({
-          deal: dealForSelection,
+          deal,
           item,
           configuration: configurationsByItemId[menuItemId],
         });
@@ -363,7 +361,7 @@ export function DealChooserDrawer({
         }
 
         return buildDealCartItemPayload({
-          deal: dealForSelection,
+          deal,
           item,
           branchId,
           configuration: configurationsByItemId[menuItemId],
@@ -387,7 +385,7 @@ export function DealChooserDrawer({
 
     addDealMutation.mutate(
       {
-        deal: dealForSelection,
+        deal,
         selectedMenuItemIds,
         eligibleMenuItems: selectedItems,
         cartItemPayloads,
@@ -420,26 +418,17 @@ export function DealChooserDrawer({
     selectedMenuItemIds.every((itemId) => {
       const item = detailedItemsById.get(itemId);
 
-      if (!item || item.supportsSplitPizza === true) {
+      if (!item || !deal) {
         return false;
       }
 
-      const variations = getDealChooserVariations(item);
-      const groups = getDealChooserModifierGroups(item);
-      const selectedModifiers = getSelectedModifiersByGroup(
-        groups,
-        configurationsByItemId[itemId]
-      );
-      const variationComplete =
-        variations.length === 0 || Boolean(configurationsByItemId[itemId]?.selectedVariationId);
-      const modifiersComplete = groups.every((group) => {
-        const groupId = getDealChooserId(group.id);
-        const minSelect = Math.max(0, getDealChooserNumber(group.minSelect, 0));
-
-        return (selectedModifiers[groupId]?.length ?? 0) >= minSelect;
+      const validation = validateDealChooserItemConfiguration({
+        deal,
+        item,
+        configuration: configurationsByItemId[itemId],
       });
 
-      return variationComplete && modifiersComplete;
+      return !validation.itemError && Object.keys(validation.groupErrors).length === 0;
     });
 
   const getItemStatus = useCallback(

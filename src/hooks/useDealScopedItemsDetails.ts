@@ -52,9 +52,11 @@ const toDealScopedMenuItem = (item: MenuItem): CustomerDealMenuItem | null => {
 
 export const useDealScopedItemsDetails = ({
   itemIds,
+  items = [],
   enabled,
 }: {
   itemIds: string[];
+  items?: CustomerDealMenuItem[];
   enabled: boolean;
 }) => {
   const { token } = useAuth();
@@ -63,13 +65,30 @@ export const useDealScopedItemsDetails = ({
     [itemIds]
   );
   const itemIdsKey = uniqueItemIds.join(":");
+  const itemSearchTermsById = useMemo(
+    () =>
+      Object.fromEntries(
+        items
+          .map((item) => {
+            const id = item.id.trim();
+
+            return [
+              id,
+              [item.slug ?? "", item.name].map((term) => term.trim()).filter(Boolean),
+            ] as const;
+          })
+          .filter(([id]) => id)
+      ),
+    [items]
+  );
 
   const query = useQuery({
-    queryKey: queryKeys.items.dealScopedDetails(uniqueItemIds),
+    queryKey: queryKeys.items.dealScopedDetails(uniqueItemIds, itemSearchTermsById),
     enabled: enabled && uniqueItemIds.length > 0 && Boolean(token),
     queryFn: async () => {
       const details = await fetchMenuItemDetailsByIds({
         itemIds: uniqueItemIds,
+        itemSearchTermsById,
         token,
       });
       const entries = Object.entries(details)

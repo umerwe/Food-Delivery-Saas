@@ -464,12 +464,22 @@ export function ProfileForm() {
                 <p className="font-medium text-[#222]">
                   {t("savedAddress")}
                 </p>
+                {addr.isDefault ? (
+                  <span className="ml-auto rounded-full bg-[#D91F26]/10 px-2.5 py-1 text-[11px] font-semibold text-[#D91F26]">
+                    {t("defaultAddress")}
+                  </span>
+                ) : null}
               </div>
 
               <p className="text-sm text-[#7A7A7A]">{addr.street}</p>
               <p className="text-sm text-[#7A7A7A]">
                 {addr.area}, {addr.city}
               </p>
+              {addr.postalCode ? (
+                <p className="text-sm text-[#7A7A7A]">
+                  {addr.postalCode}
+                </p>
+              ) : null}
               <p className="text-sm text-[#7A7A7A]">
                 {addr.state}, {addr.country}
               </p>

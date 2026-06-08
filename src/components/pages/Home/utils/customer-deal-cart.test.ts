@@ -14,6 +14,7 @@ import {
   getDealActionKind,
   getDealImage,
   getDealRequirementText,
+  getDealScopedItemIdsForDetails,
   getDealScopedItemCustomizationState,
   getUnknownDealScopedItemIds,
   getDealTypeLabel,
@@ -80,8 +81,36 @@ const flexibleAllItemsDeal: CustomerDeal = {
 describe("customer deal cart helpers", () => {
   it("fixed deal builds payload for all scoped items", () => {
     expect(buildFixedDealCartItemsInput(fixedDeal, "branch-1")).toEqual([
-      { branchId: "branch-1", menuItemId: "burger-id", quantity: 1 },
-      { branchId: "branch-1", menuItemId: "drink-id", quantity: 1 },
+      { branchId: "branch-1", menuItemId: "burger-id", dealId: "deal-1", quantity: 1 },
+      { branchId: "branch-1", menuItemId: "drink-id", dealId: "deal-1", quantity: 1 },
+    ]);
+  });
+
+  it("fixed combo payload ignores underlying required modifiers", () => {
+    const requiredModifierDeal = {
+      ...fixedDeal,
+      id: "fixed-combo",
+      scopeMenuItems: [
+        {
+          id: "pizza-id",
+          name: "Pizza",
+          modifierGroups: [
+            {
+              id: "group-1",
+              minSelect: 1,
+              modifiers: [{ id: "modifier-1", name: "Cheese" }],
+            },
+          ],
+          modifiers: [],
+          modifierLinks: [],
+          variations: [],
+        },
+      ],
+    };
+
+    expect(getDealActionKind(requiredModifierDeal)).toBe("AUTO_ADD");
+    expect(buildFixedDealCartItemsInput(requiredModifierDeal, "branch-1")).toEqual([
+      { branchId: "branch-1", menuItemId: "pizza-id", dealId: "fixed-combo", quantity: 1 },
     ]);
   });
 
@@ -152,7 +181,7 @@ describe("customer deal cart helpers", () => {
     expect(getDealRequirementText(flexibleAllItemsDeal)).toBe("Choose any 1 item");
   });
 
-  it("fixed simple deal can auto-add only if no customization", () => {
+  it("fixed deal can auto-add even when scoped items have customization metadata", () => {
     expect(getDealActionKind(fixedDeal)).toBe("AUTO_ADD");
     expect(
       getDealActionKind({
@@ -168,7 +197,7 @@ describe("customer deal cart helpers", () => {
           },
         ],
       })
-    ).toBe("OPEN_CHOOSER");
+    ).toBe("AUTO_ADD");
   });
 
   it("scope item with required modifierGroups returns requires modifiers", () => {
@@ -217,17 +246,17 @@ describe("customer deal cart helpers", () => {
     ).toBe("SIMPLE");
   });
 
-  it("does not include dealId, coupon, discountType, or applyMode in cart payload", () => {
+  it("includes only fixed dealId, not coupon, discountType, or applyMode in cart payload", () => {
     const [payload] = buildFixedDealCartItemsInput(fixedDeal, "branch-1");
 
-    expect(Object.keys(payload)).toEqual(["branchId", "menuItemId", "quantity"]);
-    expect(payload).not.toHaveProperty("dealId");
+    expect(Object.keys(payload)).toEqual(["branchId", "menuItemId", "dealId", "quantity"]);
+    expect(payload.dealId).toBe("deal-1");
     expect(payload).not.toHaveProperty("coupon");
     expect(payload).not.toHaveProperty("discountType");
     expect(payload).not.toHaveProperty("applyMode");
   });
 
-  it("fixed scoped item helper does not include dealId unless explicitly safe", () => {
+  it("fixed scoped item helper includes dealId for simple fixed deal items", () => {
     const [payload] = buildFixedDealCartItemsInput(
       {
         ...fixedDeal,
@@ -245,7 +274,7 @@ describe("customer deal cart helpers", () => {
       "branch-1"
     );
 
-    expect(payload).not.toHaveProperty("dealId");
+    expect(payload.dealId).toBe("deal-1");
     expect(
       shouldSendDealIdForCartItem(fixedDeal, fixedDeal.scopeMenuItems[0])
     ).toBe(false);
@@ -415,6 +444,28 @@ describe("customer deal cart helpers", () => {
     expect(payload).not.toHaveProperty("modifiers");
   });
 
+  it("fixed scoped item with modifier selections can send dealId without support flag", () => {
+    const customizableItem = {
+      id: "deal-item-2",
+      name: "Custom combo",
+      variations: [],
+      modifierGroups: [
+        {
+          id: "group-1",
+          name: "Sauce",
+          minSelect: 1,
+          maxSelect: 1,
+          modifiers: [{ id: "modifier-1", name: "Garlic" }],
+        },
+      ],
+      modifiers: [],
+      modifierLinks: [],
+    };
+
+    expect(canSendDealIdWithModifierSelections(fixedDeal, customizableItem)).toBe(true);
+    expect(canSendDealIdWithModifierSelections(flexibleItemDeal, customizableItem)).toBe(false);
+  });
+
   it("flexible deal item with variations can be selected using its default variation", () => {
     const variationDealItem = {
       id: "deal-item-3",
@@ -470,7 +521,7 @@ describe("customer deal cart helpers", () => {
     )).toEqual([]);
   });
 
-  it("unknown item detail triggers detail fetch path and does not auto-add", () => {
+  it("unknown fixed deal item still uses ready-made deal payload", () => {
     const unknownItem = { id: "drink-id", name: "Drink" };
 
     expect(getDealScopedItemCustomizationState(unknownItem)).toBe("UNKNOWN");
@@ -478,8 +529,15 @@ describe("customer deal cart helpers", () => {
     expect(buildFixedDealCartItemsInput(
       { ...fixedDeal, scopeMenuItems: [unknownItem] },
       "branch-1"
-    )).toEqual([]);
-    expect(getDealActionKind({ ...fixedDeal, scopeMenuItems: [unknownItem] })).toBe("OPEN_CHOOSER");
+    )).toEqual([
+      { branchId: "branch-1", menuItemId: "drink-id", dealId: "deal-1", quantity: 1 },
+    ]);
+    expect(getDealActionKind({ ...fixedDeal, scopeMenuItems: [unknownItem] })).toBe("AUTO_ADD");
+  });
+
+  it("fixed deals do not fetch item details before direct add", () => {
+    expect(getDealScopedItemIdsForDetails(fixedDeal)).toEqual([]);
+    expect(getDealScopedItemIdsForDetails(flexibleItemDeal)).toEqual([]);
   });
 
   it("deal type label works", () => {

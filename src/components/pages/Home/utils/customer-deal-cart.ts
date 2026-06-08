@@ -157,6 +157,18 @@ export const getUnknownDealScopedItemIds = (deal: CustomerDeal) =>
     .map(({ id }) => id.trim())
     .filter(Boolean);
 
+export const getDealScopedItemIdsForDetails = (deal: CustomerDeal) => {
+  if (isFixedItemDeal(deal)) {
+    return [];
+  }
+
+  const scopedItemIds = deal.scopeMenuItems
+    .map(({ id }) => id.trim())
+    .filter(Boolean);
+
+  return getUnknownDealScopedItemIds(deal);
+};
+
 export const mergeDealScopedItemDetails = (
   deal: CustomerDeal,
   detailsById: Record<string, CustomerDealMenuItem>
@@ -182,12 +194,26 @@ export const isDealMenuItemCustomizable = (item: CustomerDealMenuItem): boolean 
 export const canSendDealIdForReadyMadeItem = (
   deal: CustomerDeal,
   item: CustomerDealMenuItem
-): boolean => Boolean(deal.id && item.id && isDealMenuItemReadyMade(item));
+): boolean =>
+  Boolean(
+    deal.id &&
+      item.id &&
+      (isFixedItemDeal(deal) || supportsDealIdCartPayload(item)) &&
+      !hasDealMenuItemModifierOptions(item) &&
+      !hasUnsupportedDealMenuItemCustomization(item)
+  );
 
 export const canSendDealIdWithModifierSelections = (
   deal: CustomerDeal,
   item: CustomerDealMenuItem
-): boolean => Boolean(deal.id && item.id && isDealMenuItemCustomizable(item));
+): boolean =>
+  Boolean(
+    deal.id &&
+      item.id &&
+      (isFixedItemDeal(deal) || supportsDealIdCartPayload(item)) &&
+      hasDealMenuItemModifierOptions(item) &&
+      !hasUnsupportedDealMenuItemCustomization(item)
+  );
 
 export const shouldSendDealIdForCartItem = (
   deal: CustomerDeal,
@@ -234,8 +260,7 @@ export const canAutoAddDealItem = (item: CustomerDealMenuItem) =>
 
 export const canAutoAddFixedDeal = (deal: CustomerDeal) =>
   isFixedItemDeal(deal) &&
-  deal.scopeMenuItems.length > 0 &&
-  deal.scopeMenuItems.every(canAutoAddDealItem);
+  deal.scopeMenuItems.some(({ id }) => id.trim());
 
 export const canUseInlineFlexibleDealSelection = (deal: CustomerDeal) =>
   isFlexibleItemDeal(deal) &&
@@ -381,15 +406,9 @@ export const buildFixedDealCartItemsInput = (
   }
 
   return deal.scopeMenuItems
-    .filter(canAutoAddDealItem)
+    .filter((item) => item.id.trim())
     .map((item) =>
-      canSendDealIdForReadyMadeItem(deal, item)
-        ? buildReadyMadeDealCartItemPayload({ deal, item, branchId: resolvedBranchId })
-        : {
-            branchId: resolvedBranchId,
-            menuItemId: item.id.trim(),
-            quantity: 1,
-          }
+      buildReadyMadeDealCartItemPayload({ deal, item, branchId: resolvedBranchId })
     )
     .filter((payload) => payload.menuItemId);
 };

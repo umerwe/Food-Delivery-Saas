@@ -11,8 +11,10 @@ import {
 
 describe("checkout validation", () => {
   it("validates checkout address requirements", () => {
-    expect(checkoutAddressSchema.safeParse({ street: "", city: "", state: "", country: "", area: "", lat: "", lng: "" }).success).toBe(false);
-    expect(checkoutAddressSchema.safeParse({ street: "A", city: "B", state: "", country: "C", area: "", lat: "", lng: "" }).success).toBe(true);
+    expect(checkoutAddressSchema.safeParse({ street: "", postalCode: "", city: "", state: "", country: "", area: "", lat: "", lng: "", isDefault: false }).success).toBe(false);
+    expect(checkoutAddressSchema.safeParse({ street: "A", postalCode: "12345", city: "B", state: "", country: "C", area: "", lat: "", lng: "", isDefault: true }).success).toBe(true);
+    expect(checkoutAddressSchema.safeParse({ street: "A", postalCode: "", city: "B", state: "", country: "C", area: "", lat: "", lng: "", isDefault: false }).success).toBe(false);
+    expect(checkoutAddressSchema.safeParse({ street: "A", postalCode: "12345", city: "B", state: "", country: "C", area: "", lat: "", lng: "" }).success).toBe(false);
   });
 
   it("validates customer and notes shapes", () => {
@@ -39,16 +41,18 @@ describe("checkout validation", () => {
   it("uses translated checkout address messages from schema factories", () => {
     const schema = createCheckoutAddressSchema({
       streetRequired: "Street translated",
+      postalCodeRequired: "Postal translated",
       cityRequired: "City translated",
       countryRequired: "Country translated",
     });
 
-    const result = schema.safeParse({ street: "", city: "", state: "", country: "", area: "", lat: "", lng: "" });
+    const result = schema.safeParse({ street: "", postalCode: "", city: "", state: "", country: "", area: "", lat: "", lng: "", isDefault: false });
 
     expect(result.success).toBe(false);
 
     if (!result.success) {
       expect(result.error.flatten().fieldErrors.street).toContain("Street translated");
+      expect(result.error.flatten().fieldErrors.postalCode).toContain("Postal translated");
       expect(result.error.flatten().fieldErrors.city).toContain("City translated");
       expect(result.error.flatten().fieldErrors.country).toContain("Country translated");
     }
