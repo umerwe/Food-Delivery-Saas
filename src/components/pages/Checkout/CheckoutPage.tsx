@@ -197,7 +197,7 @@ function CheckoutPageContent() {
   }, [activeTab, fetchReservationBranch, user?.branch, user?.branchId]);
 
   const updateQuantity = async (id: string, type: "inc" | "dec") => {
-    const currentItem = cartItems.find((item) => item.id === id);
+    const currentItem = cartItems.find((item) => String(item.id) === id);
     if (!currentItem) return;
 
     const currentQty = Math.max(1, toNumber(currentItem.quantity, 1));
@@ -211,14 +211,19 @@ function CheckoutPageContent() {
 
     setCartItems((prev) =>
       prev.map((item) => {
-        if (item.id !== id) return item;
+        if (String(item.id) !== id) return item;
 
         return recalculateCartItemQuantity(item, newQty);
       })
     );
 
     try {
-      const res = await patch(`/v1/cart/items/${id}?customerId=${customerId}`, {
+      const isDealRow = String(currentItem.type || "").toUpperCase() === "DEAL";
+      const dealId = typeof currentItem.dealId === "string" ? currentItem.dealId : "";
+      const endpoint = isDealRow && dealId
+        ? `/v1/cart/deals/${dealId}?customerId=${customerId}`
+        : `/v1/cart/items/${id}?customerId=${customerId}`;
+      const res = await patch(endpoint, {
         quantity: newQty,
       });
 
@@ -245,11 +250,17 @@ function CheckoutPageContent() {
 
   const deleteItem = async (id: string) => {
     const previousCartItems = cartItems;
+    const currentItem = cartItems.find((item) => String(item.id) === id);
+    const isDealRow = String(currentItem?.type || "").toUpperCase() === "DEAL";
+    const dealId = typeof currentItem?.dealId === "string" ? currentItem.dealId : "";
 
     try {
-      setCartItems((prev) => prev.filter((item) => item.id !== id));
+      setCartItems((prev) => prev.filter((item) => String(item.id) !== id));
 
-      const res = await del(`/v1/cart/items/${id}?customerId=${customerId}`);
+      const endpoint = isDealRow && dealId
+        ? `/v1/cart/deals/${dealId}?customerId=${customerId}`
+        : `/v1/cart/items/${id}?customerId=${customerId}`;
+      const res = await del(endpoint);
 
       if (hasBackendError(res)) {
         setCartItems(previousCartItems);

@@ -182,6 +182,67 @@ describe("checkout normalizers", () => {
     expect(normalized.dealId).toBe("deal-1");
   });
 
+  it("normalizes grouped fixed combo deal rows", () => {
+    const normalized = normalizeCartItem({
+      id: "deal:deal-1",
+      type: "DEAL",
+      dealId: "deal-1",
+      cartItemIds: ["row-1", "row-2"],
+      menuItemIds: ["burger-1", "drink-1"],
+      quantity: 2,
+      unitPrice: 100,
+      unitPriceWithModifiers: 100,
+      lineTotal: 200,
+      deal: {
+        id: "deal-1",
+        code: "DEAL4",
+        title: "Deal 4",
+        description: "Fixed combo",
+        imageUrl: "deal.png",
+        fixedPrice: 100,
+      },
+      includedItems: [
+        {
+          type: "ITEM",
+          menuItemId: "burger-1",
+          quantity: 1,
+          menuItem: { name: "Burger" },
+        },
+        {
+          type: "ITEM",
+          menuItemId: "drink-1",
+          menuItem: { name: "Drink" },
+        },
+      ],
+    });
+
+    expect(normalized.type).toBe("DEAL");
+    expect(normalized.name).toBe("Deal 4");
+    expect(normalized.img).toBe("deal.png");
+    expect(normalized.dealId).toBe("deal-1");
+    expect(normalized.quantity).toBe(2);
+    expect(normalized.lineTotal).toBe(200);
+    expect(normalized.cartItemIds).toEqual(["row-1", "row-2"]);
+    expect(normalized.includedItems).toEqual([
+      {
+        type: "ITEM",
+        id: undefined,
+        menuItemId: "burger-1",
+        name: "Burger",
+        quantity: 1,
+        menuItem: { name: "Burger" },
+      },
+      {
+        type: "ITEM",
+        id: undefined,
+        menuItemId: "drink-1",
+        name: "Drink",
+        quantity: 1,
+        menuItem: { name: "Drink" },
+      },
+    ]);
+  });
+
   it("preserves applied promotion on cart quote", () => {
     const { quote } = normalizeCartResponse({
       data: {

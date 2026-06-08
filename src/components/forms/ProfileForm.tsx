@@ -38,6 +38,7 @@ import { GiftCardRedeemCard } from "@/components/pages/Profile/components/GiftCa
 
 export function ProfileForm() {
   const t = useTranslations("profile");
+  const addressT = useTranslations("addresses");
   const commonT = useTranslations("common");
   const validationT = useTranslations("validation");
   const { token, user } = useAuth();
@@ -466,7 +467,7 @@ export function ProfileForm() {
                 </p>
                 {addr.isDefault ? (
                   <span className="ml-auto rounded-full bg-[#D91F26]/10 px-2.5 py-1 text-[11px] font-semibold text-[#D91F26]">
-                    {t("defaultAddress")}
+                    {addressT("defaultAddress")}
                   </span>
                 ) : null}
               </div>

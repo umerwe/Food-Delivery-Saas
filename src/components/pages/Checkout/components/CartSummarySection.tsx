@@ -69,7 +69,10 @@ type CartSectionRecord = ApiRecord & {
 
 interface CartItem {
   id?: string | number;
+  type?: string;
   menuItemId?: string | number;
+  cartItemIds?: string[];
+  menuItemIds?: string[];
   name: string;
   slug?: string;
   price: number;
@@ -98,6 +101,22 @@ interface CartItem {
   takeawayPriceAdjustment?: unknown;
   deliveryPriceAdjustment?: unknown;
   dealId?: string | null;
+  deal?: ApiRecord & {
+    id?: string;
+    code?: string;
+    title?: string;
+    description?: string;
+    imageUrl?: string;
+    fixedPrice?: number | string;
+  };
+  includedItems?: Array<{
+    type?: string;
+    id?: string | number;
+    menuItemId?: string | number;
+    name?: string;
+    quantity?: number | string;
+    menuItem?: ApiRecord & { name?: string };
+  }>;
 }
 
 interface CartQuote {
@@ -223,8 +242,11 @@ const getItemSlug = (item: CartItem) => {
 };
 
 const getItemImage = (item: CartItem) => {
-  return item.img || item?.menuItem?.imageUrl || "/placeholder.png";
+  return item.img || item?.deal?.imageUrl || item?.menuItem?.imageUrl || "/placeholder.png";
 };
+
+const isDealCartItem = (item: CartItem) =>
+  String(item.type || "").toUpperCase() === "DEAL";
 
 const getSelectedVariationName = (item: CartItem) => {
   return (
@@ -889,7 +911,8 @@ export function CartSummarySection({
                 selectedSections,
               } = pricing;
 
-              const selectedVariationName = item.dealId
+              const isDealItem = isDealCartItem(item);
+              const selectedVariationName = isDealItem
                 ? ""
                 : getSelectedVariationName(item);
               const isSplitPizza = selectedSections.length > 0;
@@ -898,6 +921,9 @@ export function CartSummarySection({
                 selectedSections,
                 splitLabels
               );
+              const includedItems = Array.isArray(item.includedItems)
+                ? item.includedItems
+                : [];
 
               return (
                 <div
@@ -905,14 +931,16 @@ export function CartSummarySection({
                   className="group relative rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition hover:shadow-md"
                 >
                   <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition group-hover:opacity-100">
-                    <button
-                      type="button"
-                      onClick={() => handleEditItem(item)}
-                      className="rounded-md bg-gray-100 p-1 transition hover:bg-primary/10"
-                      aria-label={t("editItem", { name: item.name })}
-                    >
-                      <Pencil size={14} className="text-gray-700" />
-                    </button>
+                    {!isDealItem ? (
+                      <button
+                        type="button"
+                        onClick={() => handleEditItem(item)}
+                        className="rounded-md bg-gray-100 p-1 transition hover:bg-primary/10"
+                        aria-label={t("editItem", { name: item.name })}
+                      >
+                        <Pencil size={14} className="text-gray-700" />
+                      </button>
+                    ) : null}
 
                     <button
                       type="button"
@@ -941,6 +969,12 @@ export function CartSummarySection({
                           {item.name}
                         </h4>
 
+                        {isDealItem && item.deal?.code ? (
+                          <p className="mt-1 text-xs font-medium text-primary">
+                            {String(item.deal.code)}
+                          </p>
+                        ) : null}
+
                         {selectedVariationName ? (
                           <p className="mt-1 text-xs text-gray-500">
                             {t("size")}: {String(selectedVariationName)}
@@ -953,6 +987,47 @@ export function CartSummarySection({
                           </p>
                         ) : null}
                       </div>
+
+                      {isDealItem && includedItems.length > 0 ? (
+                        <div className="rounded-[10px] border border-primary/10 bg-primary/5 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                            {t("dealIncludes")}
+                          </p>
+
+                          <div className="mt-1.5 space-y-1">
+                            {includedItems.map((includedItem, index) => {
+                              const includedName =
+                                String(
+                                  includedItem.menuItem?.name ||
+                                    includedItem.name ||
+                                    ""
+                                ).trim() || t("includedItemFallback");
+                              const includedQuantity = Math.max(
+                                1,
+                                toNumber(includedItem.quantity, 1)
+                              );
+                              const includedKey =
+                                includedItem.id ||
+                                includedItem.menuItemId ||
+                                `${item.id}-included-${index}`;
+
+                              return (
+                                <div
+                                  key={String(includedKey)}
+                                  className="flex items-center justify-between gap-3 text-xs"
+                                >
+                                  <span className="min-w-0 truncate text-gray-700">
+                                    {includedName}
+                                  </span>
+                                  <span className="shrink-0 font-medium text-primary">
+                                    × {includedQuantity}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
 
                       {isSplitPizza ? (
                         <div className="rounded-[12px] border border-primary/10 bg-primary/5 px-3 py-2">

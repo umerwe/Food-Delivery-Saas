@@ -19,6 +19,7 @@ import {
   addGroupOrderItem,
   clearCustomerCart,
   deleteCustomerCartItem,
+  deleteCustomerCartDeal,
   deleteCart,
   fetchCustomerCart,
   fetchCustomerCartItem,
@@ -30,6 +31,7 @@ import {
   updateCustomerCart,
   updateCustomerCartItem,
   updateCustomerCartItemQuantity,
+  updateCustomerCartDealQuantity,
   type CartUpdatePayload,
 } from "@/services/cart";
 import type { ApiResult } from "@/services/http";
@@ -63,7 +65,9 @@ export type CartApi = DomainApiHook & {
   updateCustomerCartItem: (args: { cartItemId: string; payload: CartMutationPayload }) => Promise<ApiResult>;
   clearCustomerCart: (args: { customerId: string }) => Promise<ApiResult>;
   updateCustomerCartItemQuantity: (args: { customerId: string; cartItemId: string; quantity: number }) => Promise<ApiResult>;
+  updateCustomerCartDealQuantity: (args: { customerId: string; dealId: string; quantity: number }) => Promise<ApiResult>;
   deleteCustomerCartItem: (args: { customerId: string; cartItemId: string }) => Promise<ApiResult>;
+  deleteCustomerCartDeal: (args: { customerId: string; dealId: string }) => Promise<ApiResult>;
   fetchGroupOrders: () => Promise<{ response: ApiResult; groupOrders: ApiRecord[] }>;
   addGroupOrderItem: (args: { groupOrderId: string; payload: CartMutationPayload }) => Promise<ApiResult>;
 };
@@ -116,9 +120,21 @@ export const useCart = (token: string | null): CartApi => {
     [token]
   );
 
+  const updateCartDealQuantity = useCallback(
+    ({ customerId, dealId, quantity }: { customerId: string; dealId: string; quantity: number }) =>
+      updateCustomerCartDealQuantity({ customerId, dealId, quantity, token }),
+    [token]
+  );
+
   const deleteCartItem = useCallback(
     ({ customerId, cartItemId }: { customerId: string; cartItemId: string }) =>
       deleteCustomerCartItem({ customerId, cartItemId, token }),
+    [token]
+  );
+
+  const deleteCartDeal = useCallback(
+    ({ customerId, dealId }: { customerId: string; dealId: string }) =>
+      deleteCustomerCartDeal({ customerId, dealId, token }),
     [token]
   );
 
@@ -141,11 +157,13 @@ export const useCart = (token: string | null): CartApi => {
       updateCustomerCartItem: updateCartItem,
       clearCustomerCart: clearCart,
       updateCustomerCartItemQuantity: updateCartItemQuantity,
+      updateCustomerCartDealQuantity: updateCartDealQuantity,
       deleteCustomerCartItem: deleteCartItem,
+      deleteCustomerCartDeal: deleteCartDeal,
       fetchGroupOrders: fetchGroups,
       addGroupOrderItem: addGroupItem,
     }),
-    [addCartItem, addGroupItem, api, clearCart, deleteCartItem, fetchCart, fetchCartItem, fetchGroups, refreshCartQuote, updateCart, updateCartItem, updateCartItemQuantity]
+    [addCartItem, addGroupItem, api, clearCart, deleteCartDeal, deleteCartItem, fetchCart, fetchCartItem, fetchGroups, refreshCartQuote, updateCart, updateCartDealQuantity, updateCartItem, updateCartItemQuantity]
   );
 };
 

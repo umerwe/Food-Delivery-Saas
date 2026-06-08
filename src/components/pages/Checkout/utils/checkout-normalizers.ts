@@ -28,9 +28,21 @@ export type CartSection = {
   unitPrice: number;
 };
 
-export type CartItem = {
+export type CartIncludedItem = {
+  type?: string;
   id?: string | number;
   menuItemId?: string | number;
+  name: string;
+  quantity: number;
+  menuItem?: ApiRecord;
+};
+
+export type CartItem = {
+  id?: string | number;
+  type?: string;
+  menuItemId?: string | number;
+  cartItemIds?: string[];
+  menuItemIds?: string[];
   categoryId?: string | number;
   slug?: string;
   quantity: number;
@@ -58,6 +70,8 @@ export type CartItem = {
   takeawayPriceAdjustment?: unknown;
   deliveryPriceAdjustment?: unknown;
   dealId?: string | null;
+  deal?: ApiRecord;
+  includedItems?: CartIncludedItem[];
 };
 
 export type CartResponse = {
@@ -312,9 +326,25 @@ export const getSelectedSections = (cartItemInput: unknown): CartSection[] => {
     .filter(({ slot, menuItemId }) => slot || menuItemId);
 };
 
+const normalizeIncludedDealItem = (itemInput: unknown): CartIncludedItem => {
+  const item = asRecord(itemInput);
+  const menuItem = asRecord(item.menuItem);
+
+  return {
+    type: getStringValue(item.type) || undefined,
+    id: item.id as string | number | undefined,
+    menuItemId: item.menuItemId as string | number | undefined,
+    name: getStringValue(menuItem.name || item.name, "Included item"),
+    quantity: Math.max(1, toNumber(item.quantity, 1)),
+    menuItem,
+  };
+};
+
 export const normalizeCartItem = (itemInput: unknown): CartItem => {
   const item = asRecord(itemInput);
+  const type = getStringValue(item.type, "ITEM").toUpperCase();
   const dealId = typeof item.dealId === "string" ? item.dealId : null;
+  const deal = asRecord(item.deal);
   const menuItem = asRecord(item.menuItem);
   const category = asRecord(menuItem.category);
   const itemSelectedVariation = asRecord(item.selectedVariation);
@@ -333,7 +363,7 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
   );
 
   const itemUnitPrice = toNumber(
-    item.unitPrice ?? (highestSplitPizzaHalfPrice > 0 ? highestSplitPizzaHalfPrice : undefined) ?? menuItem.unitPrice ?? selectedVariation.price ?? item.price,
+    item.unitPrice ?? (highestSplitPizzaHalfPrice > 0 ? highestSplitPizzaHalfPrice : undefined) ?? deal.fixedPrice ?? menuItem.unitPrice ?? selectedVariation.price ?? item.price,
     0
   );
   const modifiersTotal = toNumber(item.modifiersTotal, fallbackModifiersTotal);
@@ -342,19 +372,28 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
 
   return {
     id: item.id as string | number | undefined,
+    type,
     menuItemId: item.menuItemId as string | number | undefined,
+    cartItemIds: normalizeArray<string>(item.cartItemIds),
+    menuItemIds: normalizeArray<string>(item.menuItemIds),
     categoryId: category.id as string | number | undefined,
-    slug: getStringValue(menuItem.slug),
+    slug: type === "DEAL" ? "" : getStringValue(menuItem.slug),
     quantity,
-    name: getStringValue(menuItem.name, "Untitled Item"),
+    name: type === "DEAL"
+      ? getStringValue(deal.title || item.name, "Deal")
+      : getStringValue(menuItem.name, "Untitled Item"),
     price: unitPriceWithModifiers,
     unitPrice: itemUnitPrice,
     itemUnitPrice,
     modifiersTotal,
     unitPriceWithModifiers,
     lineTotal,
-    desc: getStringValue(menuItem.description),
-    img: getStringValue(menuItem.imageUrl),
+    desc: type === "DEAL"
+      ? getStringValue(deal.description)
+      : getStringValue(menuItem.description),
+    img: type === "DEAL"
+      ? getStringValue(deal.imageUrl)
+      : getStringValue(menuItem.imageUrl),
     selectedVariationName: dealId
       ? ""
       : getStringValue(selectedVariation.displayText || selectedVariation.name),
@@ -374,6 +413,8 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
     takeawayPriceAdjustment: menuItem.takeawayPriceAdjustment,
     deliveryPriceAdjustment: menuItem.deliveryPriceAdjustment,
     dealId,
+    deal,
+    includedItems: normalizeArray<ApiRecord>(item.includedItems).map(normalizeIncludedDealItem),
   };
 };
 

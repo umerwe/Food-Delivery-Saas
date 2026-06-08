@@ -26,7 +26,7 @@ describe("pickup schedule helpers", () => {
     expect(
       buildPickupTimeSlots({
         branch,
-        dateValue: "2026-06-08",
+        dateValue: "2026-06-15",
       })
     ).toEqual([
       { value: "10:00", label: "10:00 AM" },
@@ -54,7 +54,7 @@ describe("pickup schedule helpers", () => {
     expect(
       buildPickupTimeSlots({
         branch,
-        dateValue: "2026-06-08",
+        dateValue: "2026-06-15",
       })
     ).toEqual([]);
   });

@@ -234,6 +234,18 @@ export const updateCustomerCartItemQuantity = ({
   token?: string | null;
 }) => patchCart(`/v1/cart/items/${cartItemId}?customerId=${customerId}`, { quantity }, token);
 
+export const updateCustomerCartDealQuantity = ({
+  customerId,
+  dealId,
+  quantity,
+  token,
+}: {
+  customerId: string;
+  dealId: string;
+  quantity: number;
+  token?: string | null;
+}) => patchCart(`/v1/cart/deals/${dealId}?customerId=${customerId}`, { quantity }, token);
+
 export const deleteCustomerCartItem = ({
   customerId,
   cartItemId,
@@ -243,6 +255,16 @@ export const deleteCustomerCartItem = ({
   cartItemId: string;
   token?: string | null;
 }) => deleteCart(`/v1/cart/items/${cartItemId}?customerId=${customerId}`, token);
+
+export const deleteCustomerCartDeal = ({
+  customerId,
+  dealId,
+  token,
+}: {
+  customerId: string;
+  dealId: string;
+  token?: string | null;
+}) => deleteCart(`/v1/cart/deals/${dealId}?customerId=${customerId}`, token);
 
 export const fetchGroupOrders = async (token?: string | null) => {
   const response = await getCart("/v1/group-orders", token);

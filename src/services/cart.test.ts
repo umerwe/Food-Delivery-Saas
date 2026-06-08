@@ -1,17 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { addCustomerCartItem, fetchCustomerCart, normalizeCartQuote, quoteCustomerCart, updateCustomerCart, updateCustomerCartItem } from "./cart";
+import {
+  addCustomerCartItem,
+  deleteCustomerCartDeal,
+  fetchCustomerCart,
+  normalizeCartQuote,
+  quoteCustomerCart,
+  updateCustomerCart,
+  updateCustomerCartDealQuantity,
+  updateCustomerCartItem,
+} from "./cart";
 
 const getCartMock = vi.hoisted(() => vi.fn());
 const postCartMock = vi.hoisted(() => vi.fn());
 const patchCartMock = vi.hoisted(() => vi.fn());
+const deleteCartMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/domain-api", () => ({
   createDomainApiService: () => ({
     get: getCartMock,
     post: postCartMock,
     patch: patchCartMock,
-    del: vi.fn(),
+    del: deleteCartMock,
   }),
 }));
 
@@ -20,6 +30,7 @@ describe("cart service", () => {
     getCartMock.mockReset();
     postCartMock.mockReset();
     patchCartMock.mockReset();
+    deleteCartMock.mockReset();
   });
 
   it("adds customer cart item with the normal cart item endpoint", async () => {
@@ -171,6 +182,36 @@ describe("cart service", () => {
       undefined
     );
     expect(patchCartMock.mock.calls[0][1]).not.toHaveProperty("modifiers");
+  });
+
+  it("updates grouped deal quantity with the deal endpoint", async () => {
+    patchCartMock.mockResolvedValue({ success: true });
+
+    await updateCustomerCartDealQuantity({
+      customerId: "customer-1",
+      dealId: "deal-1",
+      quantity: 2,
+    });
+
+    expect(patchCartMock).toHaveBeenCalledWith(
+      "/v1/cart/deals/deal-1?customerId=customer-1",
+      { quantity: 2 },
+      undefined
+    );
+  });
+
+  it("deletes grouped deals with the deal endpoint", async () => {
+    deleteCartMock.mockResolvedValue({ success: true });
+
+    await deleteCustomerCartDeal({
+      customerId: "customer-1",
+      dealId: "deal-1",
+    });
+
+    expect(deleteCartMock).toHaveBeenCalledWith(
+      "/v1/cart/deals/deal-1?customerId=customer-1",
+      undefined
+    );
   });
 
   it("updates customer cart schedule with scheduledDeliveryAt", async () => {

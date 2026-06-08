@@ -13,7 +13,9 @@ import { useTranslations } from "next-intl";
 
 type CartItem = {
   id: string;
+  type?: string;
   menuItemId?: string;
+  dealId?: string | null;
   quantity: number;
   name: string;
   unitPrice: number;
@@ -21,6 +23,7 @@ type CartItem = {
   desc?: string;
   img?: string;
   selectedVariationName?: string;
+  includedItems?: Array<{ id?: string; menuItemId?: string; name: string; quantity: number }>;
 };
 
 type OrderCartSidebarProps = {
@@ -37,7 +40,13 @@ export function OrderCartSidebar({
   const t = useTranslations("cart");
   const router = useRouter();
   const { token } = useAuth();
-  const { fetchCustomerCart, updateCustomerCartItemQuantity, deleteCustomerCartItem } = useCart(token);
+  const {
+    fetchCustomerCart,
+    updateCustomerCartItemQuantity,
+    updateCustomerCartDealQuantity,
+    deleteCustomerCartItem,
+    deleteCustomerCartDeal,
+  } = useCart(token);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loadingCart, setLoadingCart] = useState(false);
@@ -57,19 +66,43 @@ export function OrderCartSidebar({
       }
 
       const formatted: CartItem[] = items.map((item) => {
+        const record = item as CartItemRecord & {
+          type?: string;
+          deal?: { title?: string; imageUrl?: string };
+          includedItems?: Array<{
+            id?: string;
+            menuItemId?: string;
+            quantity?: number | string;
+            menuItem?: { name?: string };
+            name?: string;
+          }>;
+        };
         const quantity = toNumber(item.quantity, 1);
         const unitPrice = getCartItemUnitPrice(item);
+        const isDealItem = String(record.type || "").toUpperCase() === "DEAL";
 
         return {
           id: String(item.id ?? ""),
+          type: record.type,
           menuItemId: item.menuItemId ? String(item.menuItemId) : undefined,
+          dealId: typeof item.dealId === "string" ? item.dealId : null,
           quantity,
-          name: item.menuItem?.name || t("untitledItem"),
+          name: isDealItem
+            ? record.deal?.title || t("untitledItem")
+            : item.menuItem?.name || t("untitledItem"),
           unitPrice,
-          lineTotal: unitPrice * quantity,
-          desc: item.menuItem?.description || "",
-          img: item.menuItem?.imageUrl || "",
-          selectedVariationName: item.menuItem?.selectedVariation?.name || "",
+          lineTotal: toNumber(item.lineTotal, unitPrice * quantity),
+          desc: isDealItem ? "" : item.menuItem?.description || "",
+          img: isDealItem ? record.deal?.imageUrl || "" : item.menuItem?.imageUrl || "",
+          selectedVariationName: isDealItem ? "" : item.menuItem?.selectedVariation?.name || "",
+          includedItems: Array.isArray(record.includedItems)
+            ? record.includedItems.map((includedItem) => ({
+                id: includedItem.id,
+                menuItemId: includedItem.menuItemId,
+                name: includedItem.menuItem?.name || includedItem.name || t("untitledItem"),
+                quantity: toNumber(includedItem.quantity, 1),
+              }))
+            : [],
         };
       });
 
@@ -105,7 +138,10 @@ export function OrderCartSidebar({
     try {
       setActionId(id);
 
-      const res = await updateCustomerCartItemQuantity({ customerId, cartItemId: id, quantity: newQty });
+      const isDealItem = String(item.type || "").toUpperCase() === "DEAL";
+      const res = isDealItem && item.dealId
+        ? await updateCustomerCartDealQuantity({ customerId, dealId: item.dealId, quantity: newQty })
+        : await updateCustomerCartItemQuantity({ customerId, cartItemId: id, quantity: newQty });
 
       if (!res || res.error) {
         toast.error(res?.error || t("failedUpdateQuantity"));
@@ -134,11 +170,15 @@ export function OrderCartSidebar({
 
   const deleteItem = async (id: string) => {
     if (!customerId) return;
+    const item = cartItems.find((i) => i.id === id);
 
     try {
       setActionId(id);
 
-      const res = await deleteCustomerCartItem({ customerId, cartItemId: id });
+      const isDealItem = String(item?.type || "").toUpperCase() === "DEAL";
+      const res = isDealItem && item?.dealId
+        ? await deleteCustomerCartDeal({ customerId, dealId: item.dealId })
+        : await deleteCustomerCartItem({ customerId, cartItemId: id });
 
       if (!res || res.error) {
         toast.error(res?.error || t("failedRemoveItem"));
@@ -206,6 +246,24 @@ export function OrderCartSidebar({
                             <p className="mt-0.5 text-[11px] text-[#888]">
                               {item.selectedVariationName}
                             </p>
+                          ) : null}
+
+                          {String(item.type || "").toUpperCase() === "DEAL" && item.includedItems?.length ? (
+                            <div className="mt-2 rounded-[12px] bg-primary/5 px-2.5 py-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                {t("dealIncludes")}
+                              </p>
+                              <div className="mt-1 space-y-0.5">
+                                {item.includedItems.map((includedItem, index) => (
+                                  <p
+                                    key={includedItem.id || includedItem.menuItemId || `${item.id}-${index}`}
+                                    className="truncate text-[11px] text-[#666]"
+                                  >
+                                    {includedItem.name} × {includedItem.quantity}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
                           ) : null}
                         </div>
 
