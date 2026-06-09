@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, UsersRound, Utensils, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import GroupOrderModal from "@/components/pages/GroupOrder/components/GroupOrderModal";
+import { GroupOrderModal } from "@/components/pages/GroupOrder/components/GroupOrderModal";
 import { getStoredGroupOrderCode } from "@/lib/group-order";
 
-export default function GroupOrderSection() {
+export function GroupOrderSection() {
   const t = useTranslations("groupOrder.landing");
   const router = useRouter();
 

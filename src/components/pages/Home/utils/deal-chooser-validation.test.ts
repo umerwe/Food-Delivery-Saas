@@ -184,6 +184,40 @@ describe("deal chooser validation", () => {
     });
   });
 
+  it("blocks MULTIPLE group quantity beyond maxSelect", () => {
+    const item: CustomerDealMenuItem = {
+      ...requiredModifierItem,
+      modifierGroups: [
+        {
+          id: "toppings",
+          name: "Toppings",
+          selectionType: "MULTIPLE",
+          minSelect: 0,
+          maxSelect: 2,
+          modifiers: [{ id: "onion", name: "Onion" }],
+        },
+      ],
+    };
+
+    expect(
+      validateDealChooserItemConfiguration({
+        deal: flexibleDeal,
+        item,
+        configuration: {
+          menuItemId: "pizza",
+          modifierSelections: [
+            {
+              modifierGroupId: "toppings",
+              modifiers: [{ modifierId: "onion", quantity: 3 }],
+            },
+          ],
+        },
+      }).groupErrors
+    ).toEqual({
+      toppings: "Toppings allows at most 2 selections.",
+    });
+  });
+
   it("selected count cannot exceed required quantity", () => {
     expect(validateDealChooserSelectedCount({ selectedCount: 3, requiredQuantity: 1 }))
       .toBe("You can select only 1 item for this deal.");

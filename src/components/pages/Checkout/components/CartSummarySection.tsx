@@ -67,7 +67,7 @@ type CartSectionRecord = ApiRecord & {
   name?: string;
 };
 
-interface CartItem {
+export interface CartItem {
   id?: string | number;
   type?: string;
   menuItemId?: string | number;
@@ -167,7 +167,7 @@ interface Props {
   applyingTip?: boolean;
 }
 
-type CheckoutType = "delivery" | "pickup";
+export type CheckoutType = "delivery" | "pickup";
 
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
@@ -189,7 +189,7 @@ const normalizeArray = <T = unknown,>(value: unknown): T[] => {
   return Array.isArray(value) ? (value as T[]) : [];
 };
 
-const formatCurrency = (value: unknown) => {
+export const formatCurrency = (value: unknown) => {
   return `$${toNumber(value, 0).toFixed(2)}`;
 };
 
@@ -209,7 +209,7 @@ const getSelectedAddons = (item: CartItem) => {
     : [];
 };
 
-const getAddonQuantity = (addon: CartAddon) => {
+export const getAddonQuantity = (addon: CartAddon) => {
   return Math.max(1, toNumber(addon.quantity, 1));
 };
 
@@ -217,7 +217,7 @@ const getAddonUnitPrice = (addon: CartAddon) => {
   return toNumber(addon.unitPrice ?? addon.price ?? addon.priceDelta, 0);
 };
 
-const getAddonTotal = (addon: CartAddon) => {
+export const getAddonTotal = (addon: CartAddon) => {
   const quantity = getAddonQuantity(addon);
   const unitPrice = getAddonUnitPrice(addon);
 
@@ -241,14 +241,14 @@ const getItemSlug = (item: CartItem) => {
   return item?.slug || item?.menuItem?.slug || slugify(item?.name || "");
 };
 
-const getItemImage = (item: CartItem) => {
+export const getItemImage = (item: CartItem) => {
   return item.img || item?.deal?.imageUrl || item?.menuItem?.imageUrl || "/placeholder.png";
 };
 
-const isDealCartItem = (item: CartItem) =>
+export const isDealCartItem = (item: CartItem) =>
   String(item.type || "").toUpperCase() === "DEAL";
 
-const getSelectedVariationName = (item: CartItem) => {
+export const getSelectedVariationName = (item: CartItem) => {
   return (
     item.selectedVariationName ||
     item?.selectedVariation?.displayText ||
@@ -515,7 +515,7 @@ const getSplitSectionName = (section: CartSection | undefined, fallback: string)
   );
 };
 
-const getSplitPizzaDisplay = (
+export const getSplitPizzaDisplay = (
   item: CartItem,
   selectedSections: CartSection[],
   labels: SplitLabels
@@ -566,7 +566,7 @@ const getSplitPizzaDisplay = (
   };
 };
 
-const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
+export const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
   const quantity = Math.max(1, toNumber(item.quantity, 1));
   const selectedAddons = getSelectedAddons(item);
   const selectedSections = getSelectedSections(item);
@@ -721,7 +721,7 @@ export function CartSummarySection({
   );
 
   const computedTotalBeforeDiscount =
-    itemTotal + depositTotal + pickupPriceTotal + deliveryFee + taxes + serviceCharge + tipAmount;
+    itemTotal + pickupPriceTotal + deliveryFee + taxes + serviceCharge + tipAmount;
 
   const totalBeforeDiscount =
     quoteSubtotal !== null

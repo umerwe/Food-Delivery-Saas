@@ -1,5 +1,6 @@
 type ModifierSelectionInputModifier = {
   id?: string | number | null;
+  selectedQuantity?: string | number | null;
 };
 
 type ModifierSelectionInputGroup = {
@@ -26,6 +27,18 @@ const getId = (value: unknown) => String(value ?? "").trim();
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getModifierQuantity = (modifier: ModifierSelectionInputModifier) =>
+  Math.max(1, Math.floor(toNumber(modifier?.selectedQuantity, 1)));
+
+export const getModifierGroupSelectedQuantity = (
+  selectedModifiers: ModifierSelectionInputModifier[] | undefined
+) => {
+  return (selectedModifiers || []).reduce(
+    (total, modifier) => total + getModifierQuantity(modifier),
+    0
+  );
 };
 
 export const getModifierGroupSelectionError = (
@@ -71,12 +84,10 @@ export const validateModifierSelections = (
     const groupId = getId(group?.id);
     if (!groupId) continue;
 
-    const uniqueModifierIds = new Set(
-      (selectedModifiersByGroup[groupId] || [])
-        .map((modifier) => getId(modifier?.id))
-        .filter(Boolean)
+    const selectedQuantity = getModifierGroupSelectedQuantity(
+      selectedModifiersByGroup[groupId]
     );
-    const error = getModifierGroupSelectionError(group, uniqueModifierIds.size);
+    const error = getModifierGroupSelectionError(group, selectedQuantity);
 
     if (error) {
       errors[groupId] = error;
@@ -100,18 +111,22 @@ export const buildModifierSelections = (
     const groupId = getId(group?.id);
     if (!groupId || seenGroups.has(groupId)) continue;
 
-    const seenModifiers = new Set<string>();
-    const modifiers = (selectedModifiersByGroup[groupId] || [])
-      .map((modifier) => getId(modifier?.id))
-      .filter((modifierId) => {
-        if (!modifierId || seenModifiers.has(modifierId)) return false;
-        seenModifiers.add(modifierId);
-        return true;
-      })
-      .map((modifierId) => ({
+    const modifiersById = new Map<string, number>();
+
+    for (const modifier of selectedModifiersByGroup[groupId] || []) {
+      const modifierId = getId(modifier?.id);
+
+      if (!modifierId) continue;
+
+      modifiersById.set(modifierId, getModifierQuantity(modifier));
+    }
+
+    const modifiers = Array.from(modifiersById.entries()).map(
+      ([modifierId, quantity]) => ({
         modifierId,
-        quantity: 1,
-      }));
+        quantity,
+      })
+    );
 
     if (!modifiers.length) continue;
 

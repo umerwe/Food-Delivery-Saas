@@ -7,9 +7,10 @@ import { OrderCartSidebar } from "@/components/pages/Items/components/signature-
 import { useAuth } from "@/hooks/useAuth";
 
 function MenuPageContent() {
-const t = useTranslations("menu");
-const { restaurantId, user, loading } = useAuth();
+  const t = useTranslations("menu");
+  const { restaurantId, user, loading } = useAuth();
   const [cartRefreshKey, setCartRefreshKey] = useState(0);
+  const checkoutType = user?.selectedOrderType === "TAKEAWAY" ? "pickup" : "delivery";
 
   const handleCartRefresh = useCallback(() => {
     setCartRefreshKey((prev) => prev + 1);
@@ -41,6 +42,7 @@ const { restaurantId, user, loading } = useAuth();
               customerId={user?.id}
               cartRefreshKey={cartRefreshKey}
               onCartRefresh={handleCartRefresh}
+              checkoutType={checkoutType}
             />
           </div>
         </div>

@@ -321,6 +321,45 @@ describe("cart service", () => {
     });
   });
 
+  it("sends guest delivery address in cart quote payload", async () => {
+    postCartMock.mockResolvedValue({ success: true });
+
+    await quoteCustomerCart({
+      customerId: "guest-1",
+      payload: {
+        orderType: "DELIVERY",
+        guestDeliveryAddress: {
+          street: "Street 12",
+          area: "DHA",
+          postalCode: "54000",
+          city: "Lahore",
+          state: "Punjab",
+          country: "Pakistan",
+          lat: "31.5204",
+          lng: "74.3587",
+        },
+      },
+    });
+
+    expect(postCartMock).toHaveBeenCalledWith(
+      "/v1/cart/quote?customerId=guest-1",
+      {
+        orderType: "DELIVERY",
+        guestDeliveryAddress: {
+          street: "Street 12",
+          area: "DHA",
+          postalCode: "54000",
+          city: "Lahore",
+          state: "Punjab",
+          country: "Pakistan",
+          lat: "31.5204",
+          lng: "74.3587",
+        },
+      },
+      undefined
+    );
+  });
+
   it("normalizes customer cart quote from GET cart response", async () => {
     getCartMock.mockResolvedValue({
       data: {

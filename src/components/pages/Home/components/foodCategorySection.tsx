@@ -247,7 +247,7 @@ function PromotionBannerCard({
   );
 }
 
-export default function FoodCategorySection() {
+export function FoodCategorySection() {
   const tCategories = useTranslations("home.categories");
   const tPromotions = useTranslations("home.promotions");
   const router = useRouter();
@@ -367,6 +367,15 @@ export default function FoodCategorySection() {
           onClick={() => router.push("/group-order")}
         >
           {tCategories("groupOrder")}
+        </Button>
+
+        <Button
+          variant="ghost"
+          className="w-full rounded-full border border-gray-200 bg-white text-gray-800 shadow-sm transition hover:border-primary/25 hover:bg-primary/5 hover:text-primary sm:w-auto"
+          onClick={() => router.push("/menu")}
+        >
+          <Store className="h-4 w-4" />
+          {tCategories("menu")}
         </Button>
 
         <Button

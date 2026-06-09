@@ -61,6 +61,21 @@ describe("modifier selections", () => {
     expect(getModifierGroupSelectionError(limited, 2)).toContain("allows at most 1");
   });
 
+  it("validates multi-select limits by summed modifier quantity", () => {
+    const limited = group({ selectionType: "MULTIPLE", minSelect: 0, maxSelect: 2 });
+
+    expect(
+      validateModifierSelections([limited], {
+        "group-1": [{ ...modifier("m1"), selectedQuantity: 2 }],
+      }).isValid
+    ).toBe(true);
+    expect(
+      validateModifierSelections([limited], {
+        "group-1": [{ ...modifier("m1"), selectedQuantity: 3 }],
+      }).errors["group-1"]
+    ).toContain("allows at most 2");
+  });
+
   it("removes duplicate modifiers from payload", () => {
     const selected: ModifierSelectionMap = {
       "group-1": [modifier("m1"), modifier("m1"), modifier("m2")],
@@ -78,10 +93,15 @@ describe("modifier selections", () => {
   });
 
   it("builds grouped payload shape", () => {
-    expect(buildModifierSelections([group({})], { "group-1": [modifier("m1")] })).toEqual([
+    expect(
+      buildModifierSelections(
+        [group({})],
+        { "group-1": [{ ...modifier("m1"), selectedQuantity: 2 }] }
+      )
+    ).toEqual([
       {
         modifierGroupId: "group-1",
-        modifiers: [{ modifierId: "m1", quantity: 1 }],
+        modifiers: [{ modifierId: "m1", quantity: 2 }],
       },
     ]);
   });

@@ -188,7 +188,7 @@ export const getSelectedModifiersByGroup = (
       return {
         id: modifierId,
         name: matchedModifier ? getDealChooserModifierName(matchedModifier) : "Option",
-        selectedQuantity: modifier.quantity,
+        selectedQuantity: Math.max(1, Math.floor(getDealChooserNumber(modifier.quantity, 1))),
       };
     });
   }

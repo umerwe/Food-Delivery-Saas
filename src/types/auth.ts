@@ -15,6 +15,7 @@ export type AuthUser = {
   email: string;
   role: string;
   tenantId: string;
+  isGuest?: boolean;
   restaurantId?: string | null;
   branchId?: string | null;
   branch?: AuthBranch | null;

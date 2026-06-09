@@ -5,6 +5,7 @@ import type { CartItemRecord } from "@/components/pages/Items/components/signatu
 import type { CartAppliedPromotion, CartQuote } from "@/types/cart";
 
 type CartMutationPayload = Record<string, unknown>;
+type CartQuotePayload = Record<string, unknown>;
 
 export type CartUpdatePayload = CartMutationPayload & {
   scheduledDeliveryAt?: string | null;
@@ -203,11 +204,13 @@ export const updateCustomerCart = ({
 
 export const quoteCustomerCart = ({
   customerId,
+  payload = {},
   token,
 }: {
   customerId: string;
+  payload?: CartQuotePayload;
   token?: string | null;
-}) => postCart(`/v1/cart/quote?customerId=${customerId}`, {}, token);
+}) => postCart(`/v1/cart/quote?customerId=${customerId}`, payload, token);
 
 export const updateCustomerCartItem = ({
   cartItemId,

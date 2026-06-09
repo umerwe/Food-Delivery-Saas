@@ -1,16 +1,14 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import HeroSection from "@/components/pages/Home/components/heroSection";
-import FoodCategorySection from "@/components/pages/Home/components/foodCategorySection";
+import { FoodCategorySection } from "@/components/pages/Home/components/foodCategorySection";
 import WhyChooseUs from "@/components/pages/Home/components/whyChooseUsSection";
 import AppPromo from "@/components/pages/Home/components/appPromoSection";
 import Stats from "@/components/pages/Home/components/statsSection";
 import { RequiredBranchSelectionModal } from "@/components/common/branch-selector/RequiredBranchSelectionModal";
-import { OrderNowFloatingButton } from "@/components/ui/OrderNowFloatingButton";
 import BranchOpeningHoursPopup from "@/components/pages/Home/components/BranchOpeningHours";
 import { CustomerDealsSection } from "@/components/pages/Home/components/CustomerDealsSection";
 
@@ -25,7 +23,6 @@ import type { CustomerDeal } from "@/types/customer-deals";
 
 const HomePage = () => {
   const t = useTranslations("home.hero");
-  const router = useRouter();
   const { user, token, restaurantId: authRestaurantId } = useAuth();
   const { branding: fallbackBranding } = useBranding();
 
@@ -36,16 +33,9 @@ const HomePage = () => {
   const addDealMutation = useAddDealToCart(branchId);
   const handleAddDeal = useCallback(
     (deal: CustomerDeal, selectedMenuItemIds?: string[]) => {
-      addDealMutation.mutate(
-        { deal, selectedMenuItemIds },
-        {
-          onSuccess: () => {
-            router.push("/checkout");
-          },
-        }
-      );
+      addDealMutation.mutate({ deal, selectedMenuItemIds });
     },
-    [addDealMutation, router]
+    [addDealMutation]
   );
   const homeResponse = homeQuery.data;
   const homeData = homeResponse ? homeResponse.data : undefined;
@@ -87,8 +77,6 @@ const HomePage = () => {
       <Stats />
 
       {user && token && !branchId ? <RequiredBranchSelectionModal /> : null}
-
-      <OrderNowFloatingButton />
     </div>
   );
 };

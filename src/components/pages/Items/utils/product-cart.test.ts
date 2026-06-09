@@ -22,7 +22,7 @@ describe("product cart helpers", () => {
         groupB: [{ id: "m2", name: "Olives", selectedQuantity: 1 }],
       })
     ).toEqual([
-      { modifierId: "m1", quantity: 1 },
+      { modifierId: "m1", quantity: 2 },
       { modifierId: "m2", quantity: 1 },
     ]);
   });
@@ -68,7 +68,7 @@ describe("product cart helpers", () => {
       selectedVariation: { id: "large-variation-id", name: "Large" },
       qty: 1,
       selectedModifiers: {
-        group_sauces: [{ id: "modifier_garlic_sauce", name: "Garlic", selectedQuantity: 1 }],
+        group_sauces: [{ id: "modifier_garlic_sauce", name: "Garlic", selectedQuantity: 2 }],
       },
       modifierGroups: [
         {
@@ -92,7 +92,7 @@ describe("product cart helpers", () => {
     expect(payload.modifierSelections).toEqual([
       {
         modifierGroupId: "group_sauces",
-        modifiers: [{ modifierId: "modifier_garlic_sauce", quantity: 1 }],
+        modifiers: [{ modifierId: "modifier_garlic_sauce", quantity: 2 }],
       },
     ]);
     expect(payload).not.toHaveProperty("modifiers");

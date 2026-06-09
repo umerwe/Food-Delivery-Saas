@@ -18,6 +18,7 @@ import { hasText, formatPrice, getSplitPizzaPricingVariation, toNumber } from "@
 import { getModifierPriceForVariation } from "@/components/pages/Items/utils/modifier-pricing";
 import {
   buildModifierSelections,
+  getModifierGroupSelectedQuantity,
   validateModifierSelections,
 } from "@/components/pages/Items/utils/modifier-selections";
 
@@ -74,6 +75,16 @@ const normalizeArray = <T = unknown,>(value: unknown): T[] => {
 
 const formatMoney = (value: unknown) => {
   return `$${formatPrice(value)}`;
+};
+
+const formatModifierSelectionPrice = (unitPrice: number, quantity: number) => {
+  const safeQuantity = Math.max(1, Math.floor(toNumber(quantity, 1)));
+
+  if (safeQuantity <= 1) {
+    return `+${formatMoney(unitPrice)}`;
+  }
+
+  return `+${formatMoney(unitPrice)} * ${safeQuantity} = +${formatMoney(unitPrice * safeQuantity)}`;
 };
 
 const isPromotionObject = (value: unknown): value is PromotionInfo => {
@@ -1192,6 +1203,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
     setSelectedModifiers((prev) => {
       const current = prev[groupId] || [];
       const isSelected = current.some((selected) => selected.id === modifier.id);
+      const selectedQuantity = getModifierGroupSelectedQuantity(current);
 
       if (selectionType === "SINGLE" || maxSelect === 1) {
         if (isSelected && !isRequired) {
@@ -1207,7 +1219,10 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       }
 
       if (isSelected) {
-        if (minSelect > 0 && current.length <= minSelect) {
+        const modifierQuantity =
+          current.find((selected) => selected.id === modifier.id)?.selectedQuantity || 1;
+
+        if (minSelect > 0 && selectedQuantity - modifierQuantity < minSelect) {
           toast.error(t("minimumAddons", { itemName, count: minSelect }));
           return prev;
         }
@@ -1224,7 +1239,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
         return next;
       }
 
-      if (maxSelect && current.length >= maxSelect) {
+      if (maxSelect && selectedQuantity >= maxSelect) {
         toast.error(t("maximumAddons", { itemName, count: maxSelect }));
         return prev;
       }
@@ -1238,6 +1253,62 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
             selectedQuantity: 1,
           },
         ],
+      };
+    });
+  };
+
+  const handleGroupedModifierQuantityChange = (
+    group: ModifierGroup,
+    modifier: Modifier,
+    nextQuantity: number,
+  ) => {
+    const groupId = String(group.id);
+    const { minSelect, maxSelect, selectionType } = getGroupValidation(group);
+
+    if (selectionType === "SINGLE" || maxSelect === 1) {
+      return;
+    }
+
+    setSelectedModifiers((prev) => {
+      const current = prev[groupId] || [];
+      const currentModifier = current.find((selected) => selected.id === modifier.id);
+
+      if (!currentModifier) {
+        return prev;
+      }
+
+      const normalizedNextQuantity = Math.max(
+        1,
+        Math.floor(Number.isFinite(nextQuantity) ? nextQuantity : 1),
+      );
+      const otherSelectedQuantity = current.reduce((total, selected) => {
+        if (selected.id === modifier.id) return total;
+
+        return total + Math.max(1, Math.floor(toNumber(selected.selectedQuantity, 1)));
+      }, 0);
+      const maxAllowedQuantity =
+        maxSelect && maxSelect > 0
+          ? Math.max(1, maxSelect - otherSelectedQuantity)
+          : normalizedNextQuantity;
+
+      if (maxSelect && otherSelectedQuantity + normalizedNextQuantity > maxSelect) {
+        toast.error(t("maximumAddons", { itemName: item?.name || t("thisItem"), count: maxSelect }));
+      }
+
+      const minAllowedQuantity =
+        minSelect > otherSelectedQuantity ? minSelect - otherSelectedQuantity : 1;
+      const clampedQuantity = Math.max(
+        minAllowedQuantity,
+        Math.min(normalizedNextQuantity, maxAllowedQuantity),
+      );
+
+      return {
+        ...prev,
+        [groupId]: current.map((selected) =>
+          selected.id === modifier.id
+            ? { ...selected, selectedQuantity: clampedQuantity }
+            : selected,
+        ),
       };
     });
   };
@@ -1267,7 +1338,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       .flat()
       .map((modifier: SelectedModifier) => ({
         modifierId: modifier.id,
-        quantity: 1,
+        quantity: Math.max(1, Math.floor(toNumber(modifier.selectedQuantity, 1))),
       }));
   };
 
@@ -1285,7 +1356,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
           variation,
         );
 
-        return acc + modifierPrice;
+        return acc + modifierPrice * Math.max(1, Math.floor(toNumber(modifier.selectedQuantity, 1)));
       }, 0);
   };
 
@@ -1387,6 +1458,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
       const group = link.modifierGroup;
       const groupId = String(group?.id || "");
       const selectedInGroup = selectedModifiers[groupId] || [];
+      const selectedQuantity = getModifierGroupSelectedQuantity(selectedInGroup);
       const { maxSelect, isRequired, selectionType } = getGroupValidation(group);
       const groupModifiers = normalizeArray<Modifier>(group?.modifiers).filter(
         (modifier) => modifier?.isActive !== false,
@@ -1394,7 +1466,6 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
       if (!groupModifiers.length) return null;
 
-      const selectedCount = selectedInGroup.length;
       const inputType = selectionType === "SINGLE" || maxSelect === 1 ? "radio" : "checkbox";
       const groupSelectionLabel =
         maxSelect && maxSelect > 0
@@ -1424,18 +1495,25 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
             </div>
 
             <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
-              {selectedCount}
+              {selectedQuantity}
               {maxSelect ? ` / ${maxSelect}` : ""} selected
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
             {groupModifiers.map((modifier) => {
-              const checked = selectedInGroup.some(
+              const selectedModifier = selectedInGroup.find(
                 (selected) => selected.id === modifier.id,
               );
+              const checked = Boolean(selectedModifier);
+              const selectedModifierQuantity = Math.max(
+                1,
+                Math.floor(toNumber(selectedModifier?.selectedQuantity, 1)),
+              );
               const disableBecauseMaxReached =
-                inputType !== "radio" && !checked && !!maxSelect && selectedCount >= maxSelect;
+                inputType !== "radio" && !checked && !!maxSelect && selectedQuantity >= maxSelect;
+              const showQuantitySelector = checked && inputType === "checkbox";
+              const disableIncrement = Boolean(maxSelect && selectedQuantity >= maxSelect);
               const effectivePrice = getModifierEffectivePrice(
                 modifier,
                 item,
@@ -1443,9 +1521,9 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
               );
 
               return (
-                <label
+                <div
                   key={modifier.id}
-                  className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl border px-3 py-3 text-sm transition ${
+                  className={`rounded-xl border px-3 py-3 text-sm transition ${
                     disableBecauseMaxReached
                       ? "cursor-not-allowed border-gray-100 bg-gray-100 opacity-70"
                       : checked
@@ -1453,35 +1531,86 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
                         : "border-gray-100 bg-gray-50 hover:border-primary/25 hover:bg-white"
                   }`}
                 >
-                  <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
-                    <input
-                      type={inputType}
-                      name={`modifier-group-${item?.id}-${groupId}`}
-                      checked={checked}
-                      disabled={disableBecauseMaxReached}
-                      onChange={() => handleGroupedModifierToggle(group, modifier)}
-                      className="mt-1 accent-[var(--primary)]"
-                    />
+                  <label className="flex cursor-pointer items-start justify-between gap-3">
+                    <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
+                      <input
+                        type={inputType}
+                        name={`modifier-group-${item?.id}-${groupId}`}
+                        checked={checked}
+                        disabled={disableBecauseMaxReached}
+                        onChange={() => handleGroupedModifierToggle(group, modifier)}
+                        className="mt-1 accent-[var(--primary)]"
+                      />
 
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium text-gray-900">
-                        {modifier.displayText || modifier.name}
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium text-gray-900">
+                          {modifier.displayText || modifier.name}
+                        </span>
+
+                        {modifier.description ? (
+                          <span className="mt-1 block text-xs leading-relaxed text-gray-500">
+                            {modifier.description}
+                          </span>
+                        ) : null}
+                      </span>
+                    </span>
+
+                    {effectivePrice > 0 ? (
+                      <span className="shrink-0 font-semibold text-primary">
+                        {formatModifierSelectionPrice(
+                          effectivePrice,
+                          selectedModifierQuantity,
+                        )}
+                      </span>
+                    ) : null}
+                  </label>
+
+                  {showQuantitySelector ? (
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-full border border-primary/10 bg-white/90 px-2 py-1.5 shadow-sm">
+                      <span className="pl-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Qty
                       </span>
 
-                      {modifier.description ? (
-                        <span className="mt-1 block text-xs leading-relaxed text-gray-500">
-                          {modifier.description}
-                        </span>
-                      ) : null}
-                    </span>
-                  </span>
+                      <div className="flex items-center rounded-full bg-gray-100 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleGroupedModifierQuantityChange(
+                              group,
+                              modifier,
+                              selectedModifierQuantity - 1,
+                            )
+                          }
+                          disabled={selectedModifierQuantity <= 1}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                          aria-label={`Decrease ${modifier.displayText || modifier.name} quantity`}
+                        >
+                          <Minus size={14} />
+                        </button>
 
-                  {effectivePrice > 0 ? (
-                    <span className="shrink-0 font-semibold text-primary">
-                      +${effectivePrice.toFixed(2)}
-                    </span>
+                        <span className="min-w-8 text-center text-sm font-bold text-gray-900">
+                          {selectedModifierQuantity}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleGroupedModifierQuantityChange(
+                              group,
+                              modifier,
+                              selectedModifierQuantity + 1,
+                            )
+                          }
+                          disabled={disableIncrement}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                          aria-label={`Increase ${modifier.displayText || modifier.name} quantity`}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
                   ) : null}
-                </label>
+                </div>
               );
             })}
           </div>
@@ -1722,8 +1851,6 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
       if (groupCode) {
         router.push("/group-order/lobby");
-      } else {
-        router.push("/checkout");
       }
     } catch (error) {
       toast.error(tErrors("somethingWentWrong"));

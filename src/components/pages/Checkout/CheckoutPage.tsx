@@ -20,10 +20,98 @@ import {
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/hooks/useAuth";
 import type { ApiRecord, BackendErrorState, CartItem } from "@/components/pages/Checkout/utils/checkout-normalizers";
-import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorMeta, hasBackendError, normalizeCartItem, normalizeCartResponse, recalculateCartItemQuantity, toNumber } from "@/components/pages/Checkout/utils/checkout-normalizers";
+import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorMeta, hasBackendError, normalizeCartItem, normalizeCartQuote, normalizeCartResponse, recalculateCartItemQuantity, toNumber } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import type { BranchRecord } from "@/types/branch-selector";
 import { useTranslations } from "next-intl";
-import { normalizeCheckoutTipAmount } from "@/validations/checkout";
+import { normalizeCheckoutTipAmount, type CheckoutAddressValues } from "@/validations/checkout";
+
+const emptyGuestDeliveryAddress: CheckoutAddressValues = {
+  street: "",
+  postalCode: "",
+  city: "",
+  state: "",
+  country: "",
+  area: "",
+  lat: "",
+  lng: "",
+  isDefault: false,
+};
+
+type GuestPrivacyPolicy = {
+  title: string;
+  content: string;
+  policyLink: string;
+};
+
+const isGuestUser = (user: ReturnType<typeof useAuthContext>["user"]) =>
+  user?.isGuest === true || String(user?.role || "").toUpperCase() === "GUEST";
+
+const getCheckoutRestaurantId = (user: ReturnType<typeof useAuthContext>["user"]) =>
+  user?.restaurantId || user?.branch?.restaurantId || user?.tenantId || "";
+
+const normalizeGuestPrivacyPolicy = (value: unknown, restaurantId: string): GuestPrivacyPolicy => {
+  const record = asRecord(value);
+  const title = typeof record.title === "string" && record.title.trim()
+    ? record.title.trim()
+    : "Privacy Policy";
+  const content = typeof record.content === "string" ? record.content.trim() : "";
+  const policyLink = typeof record.policyLink === "string" && record.policyLink.trim()
+    ? record.policyLink.trim()
+    : `/api/v1/public-content/privacy-policy?restaurantId=${encodeURIComponent(restaurantId)}`;
+
+  return {
+    title,
+    content,
+    policyLink,
+  };
+};
+
+const trimAddress = (address: CheckoutAddressValues) => ({
+  street: address.street.trim(),
+  area: address.area.trim(),
+  postalCode: address.postalCode.trim(),
+  city: address.city.trim(),
+  state: address.state.trim(),
+  country: address.country.trim(),
+  lat: address.lat.trim(),
+  lng: address.lng.trim(),
+});
+
+const getGuestDeliveryAddressPayload = (address: CheckoutAddressValues) => {
+  const trimmed = trimAddress(address);
+
+  return {
+    street: trimmed.street,
+    area: trimmed.area,
+    postalCode: trimmed.postalCode,
+    city: trimmed.city,
+    state: trimmed.state,
+    country: trimmed.country,
+    lat: trimmed.lat,
+    lng: trimmed.lng,
+  };
+};
+
+const hasGuestDeliveryAddress = (address: CheckoutAddressValues) => {
+  const trimmed = trimAddress(address);
+
+  return Boolean(trimmed.street && trimmed.postalCode && trimmed.city && trimmed.country);
+};
+
+const getGuestContactPayload = (
+  customer: { name: string; phone: string; email: string },
+  privacyPolicyAccepted: boolean
+) => {
+  return {
+    email: customer.email.trim(),
+    phone: customer.phone.trim(),
+    privacyPolicyAccepted,
+  };
+};
+
+const hasGuestContact = (customer: { name: string; phone: string; email: string }) => {
+  return Boolean(customer.email.trim() && customer.phone.trim());
+};
 
 function CheckoutPageContent() {
   const t = useTranslations("checkout");
@@ -32,6 +120,8 @@ function CheckoutPageContent() {
   const { user, token } = useAuthContext();
   const preferredCheckoutType = user?.selectedOrderType === "TAKEAWAY" ? "pickup" : "delivery";
   const activeTab = type === "pickup" || type === "delivery" ? type : preferredCheckoutType;
+  const isGuest = isGuestUser(user);
+  const restaurantId = getCheckoutRestaurantId(user);
 
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
@@ -39,7 +129,7 @@ function CheckoutPageContent() {
   const [applyingTip, setApplyingTip] = useState(false);
 
   const { get, patch, del, post, checkoutCustomerCart } = useCheckout(token);
-  const { updateCustomerCart } = useCart(token);
+  const { updateCustomerCart, quoteCustomerCart } = useCart(token);
   const { fetchReservationBranch } = useReservations(token);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -146,12 +236,18 @@ function CheckoutPageContent() {
   }, [customerId]);
 
   const [selectedAddress, setSelectedAddress] = useState<string | null>("");
+  const [guestDeliveryAddress, setGuestDeliveryAddress] =
+    useState<CheckoutAddressValues>(emptyGuestDeliveryAddress);
   const [note, setNote] = useState("");
   const [customer, setCustomer] = useState({
     name: "",
     phone: "",
     email: "",
   });
+  const [privacyPolicyAccepted, setPrivacyPolicyAccepted] = useState(false);
+  const [guestPrivacyPolicy, setGuestPrivacyPolicy] =
+    useState<GuestPrivacyPolicy | null>(null);
+  const [privacyPolicyLoading, setPrivacyPolicyLoading] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -172,6 +268,78 @@ function CheckoutPageContent() {
       email: user.email || "",
     }));
   }, [user]);
+
+  useEffect(() => {
+    if (!isGuest) {
+      setGuestPrivacyPolicy(null);
+      setPrivacyPolicyAccepted(false);
+      return;
+    }
+
+    if (!restaurantId) return;
+
+    let isMounted = true;
+
+    const loadGuestPrivacyPolicy = async () => {
+      try {
+        setPrivacyPolicyLoading(true);
+
+        const res = await get(
+          `/v1/public-content/privacy-policy?restaurantId=${encodeURIComponent(restaurantId)}`
+        );
+
+        if (!isMounted) return;
+
+        if (hasBackendError(res)) {
+          setGuestPrivacyPolicy(
+            normalizeGuestPrivacyPolicy(undefined, restaurantId)
+          );
+          return;
+        }
+
+        setGuestPrivacyPolicy(normalizeGuestPrivacyPolicy(res?.data, restaurantId));
+      } catch (error) {
+        if (!isMounted) return;
+        setGuestPrivacyPolicy(normalizeGuestPrivacyPolicy(undefined, restaurantId));
+      } finally {
+        if (isMounted) {
+          setPrivacyPolicyLoading(false);
+        }
+      }
+    };
+
+    void loadGuestPrivacyPolicy();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [get, isGuest, restaurantId]);
+
+  useEffect(() => {
+    if (!isGuest || activeTab !== "delivery" || !customerId) return;
+    if (!hasGuestDeliveryAddress(guestDeliveryAddress)) return;
+
+    const quoteTimer = window.setTimeout(async () => {
+      const res = await quoteCustomerCart({
+        customerId,
+        payload: {
+          orderType: "DELIVERY",
+          guestDeliveryAddress: getGuestDeliveryAddressPayload(guestDeliveryAddress),
+        },
+      });
+
+      if (!hasBackendError(res)) {
+        const { quote } = normalizeCartResponse(res);
+        const quoteData = quote ?? normalizeCartQuote(asRecord(res?.data));
+
+        if (quoteData) {
+          setCartQuote(quoteData);
+        }
+      }
+    }, 450);
+
+    return () => window.clearTimeout(quoteTimer);
+  }, [activeTab, customerId, guestDeliveryAddress, isGuest, quoteCustomerCart]);
 
   useEffect(() => {
     const loadPickupBranch = async () => {
@@ -352,6 +520,7 @@ function CheckoutPageContent() {
 
   const setCartAddress = async () => {
     if (activeTab !== "delivery") return true;
+    if (isGuest) return true;
 
     try {
       const res = await patch(`/v1/cart/address?customerId=${customerId}`, {
@@ -519,7 +688,22 @@ function CheckoutPageContent() {
         return;
       }
 
-      if (activeTab === "delivery" && !selectedAddress) {
+      if (isGuest && !hasGuestContact(customer)) {
+        toast.error(t("toast.enterGuestContact"));
+        return;
+      }
+
+      if (isGuest && !privacyPolicyAccepted) {
+        toast.error(t("toast.acceptGuestPrivacyPolicy"));
+        return;
+      }
+
+      if (activeTab === "delivery" && isGuest && !hasGuestDeliveryAddress(guestDeliveryAddress)) {
+        toast.error(t("toast.enterGuestDeliveryAddress"));
+        return;
+      }
+
+      if (activeTab === "delivery" && !isGuest && !selectedAddress) {
         toast.error(t("toast.selectAddress"));
         return;
       }
@@ -559,6 +743,12 @@ function CheckoutPageContent() {
         payload: {
           ...(scheduledDeliveryAt ? { scheduledDeliveryAt } : {}),
           ...(checkoutTipAmount > 0 ? { tipAmount: checkoutTipAmount } : {}),
+          ...(isGuest
+            ? { guestContact: getGuestContactPayload(customer, privacyPolicyAccepted) }
+            : {}),
+          ...(isGuest && activeTab === "delivery"
+            ? { guestDeliveryAddress: getGuestDeliveryAddressPayload(guestDeliveryAddress) }
+            : {}),
           paymentMethod:
             paymentMethod === "card"
               ? "STRIPE"
@@ -715,6 +905,13 @@ function CheckoutPageContent() {
               setNote={setNote}
               customer={customer}
               setCustomer={setCustomer}
+              isGuest={isGuest}
+              privacyPolicyAccepted={privacyPolicyAccepted}
+              setPrivacyPolicyAccepted={setPrivacyPolicyAccepted}
+              privacyPolicy={guestPrivacyPolicy}
+              privacyPolicyLoading={privacyPolicyLoading}
+              guestDeliveryAddress={guestDeliveryAddress}
+              setGuestDeliveryAddress={setGuestDeliveryAddress}
               paymentMethod={paymentMethod}
               setPaymentMethod={setPaymentMethod}
               scheduledDeliveryValue={scheduledDeliveryValue}
@@ -726,6 +923,13 @@ function CheckoutPageContent() {
               setSelectedAddress={setSelectedAddress}
               note={note}
               setNote={setNote}
+              customer={customer}
+              setCustomer={setCustomer}
+              isGuest={isGuest}
+              privacyPolicyAccepted={privacyPolicyAccepted}
+              setPrivacyPolicyAccepted={setPrivacyPolicyAccepted}
+              privacyPolicy={guestPrivacyPolicy}
+              privacyPolicyLoading={privacyPolicyLoading}
               paymentMethod={paymentMethod}
               setPaymentMethod={setPaymentMethod}
               pickupDate={pickupDate}

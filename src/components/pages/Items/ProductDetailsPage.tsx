@@ -22,6 +22,7 @@ import {
   isCartBranchConflict,
 } from "@/components/pages/Items/utils/product-cart";
 import {
+  getModifierGroupSelectedQuantity,
   validateModifierSelections,
 } from "@/components/pages/Items/utils/modifier-selections";
 import {
@@ -60,6 +61,16 @@ const getCheckoutType = (type?: string | null): CheckoutType => {
 
 const formatMoney = (value: unknown) => {
   return `$${toNumber(value, 0).toFixed(2)}`;
+};
+
+const formatModifierSelectionPrice = (unitPrice: number, quantity: number) => {
+  const safeQuantity = Math.max(1, Math.floor(toNumber(quantity, 1)));
+
+  if (safeQuantity <= 1) {
+    return `+${formatMoney(unitPrice)}`;
+  }
+
+  return `+${formatMoney(unitPrice)} * ${safeQuantity} = +${formatMoney(unitPrice * safeQuantity)}`;
 };
 
 const isPromotionObject = (value: unknown): value is PromotionInfo => {
@@ -1406,8 +1417,12 @@ function ProductDetailsPageContent() {
       .flat()
       .reduce((acc, modifier) => {
         const price = getModifierEffectivePrice(modifier, menuItem, variation);
+        const modifierQuantity = Math.max(
+          1,
+          Math.floor(toNumber(modifier.selectedQuantity, 1))
+        );
 
-        return acc + price;
+        return acc + price * modifierQuantity;
       }, 0);
   };
 
@@ -1653,7 +1668,10 @@ function ProductDetailsPageContent() {
             .filter(Boolean)
             .map((modifier) => ({
               ...modifier,
-              selectedQuantity: 1,
+              selectedQuantity: Math.max(
+                1,
+                Math.floor(toNumber(modifier.selectedQuantity, 1))
+              ),
             }));
 
           if (normalizedModifiers.length) {
@@ -1681,6 +1699,7 @@ function ProductDetailsPageContent() {
       const alreadySelected = current.some(
         (selected) => selected.id === modifier.id
       );
+      const selectedQuantity = getModifierGroupSelectedQuantity(current);
 
       if (selectionType === "SINGLE" || maxSelect === 1) {
         if (alreadySelected && !isRequired) {
@@ -1696,7 +1715,10 @@ function ProductDetailsPageContent() {
       }
 
       if (alreadySelected) {
-        if (minSelect > 0 && current.length <= minSelect) {
+        const modifierQuantity =
+          current.find((selected) => selected.id === modifier.id)?.selectedQuantity || 1;
+
+        if (minSelect > 0 && selectedQuantity - modifierQuantity < minSelect) {
           toast.error(
             t("minimumAddons", { itemName: item?.name || t("thisItem"), count: minSelect })
           );
@@ -1717,7 +1739,7 @@ function ProductDetailsPageContent() {
         return next;
       }
 
-      if (maxSelect && current.length >= maxSelect) {
+      if (maxSelect && selectedQuantity >= maxSelect) {
         toast.error(
           t("maximumAddons", { itemName: item?.name || t("thisItem"), count: maxSelect })
         );
@@ -1727,6 +1749,70 @@ function ProductDetailsPageContent() {
       return {
         ...prev,
         [groupId]: [...current, { ...modifier, selectedQuantity: 1 }],
+      };
+    });
+  };
+
+  const handleModifierQuantityChange = (
+    group: ModifierGroup,
+    modifier: Modifier,
+    nextQuantity: number
+  ) => {
+    const groupId = String(group.id);
+    const { minSelect, maxSelect, selectionType } = getGroupValidation(group);
+
+    if (selectionType === "SINGLE" || maxSelect === 1) {
+      return;
+    }
+
+    setModifierErrors((prev) => {
+      const next = { ...prev };
+      delete next[groupId];
+      return next;
+    });
+
+    setSelectedModifiers((prev) => {
+      const current = prev[groupId] || [];
+      const currentModifier = current.find((selected) => selected.id === modifier.id);
+
+      if (!currentModifier) {
+        return prev;
+      }
+
+      const normalizedNextQuantity = Math.max(
+        1,
+        Math.floor(Number.isFinite(nextQuantity) ? nextQuantity : 1)
+      );
+      const otherSelectedQuantity = current.reduce((total, selected) => {
+        if (selected.id === modifier.id) return total;
+
+        return total + Math.max(1, Math.floor(toNumber(selected.selectedQuantity, 1)));
+      }, 0);
+      const maxAllowedQuantity =
+        maxSelect && maxSelect > 0
+          ? Math.max(1, maxSelect - otherSelectedQuantity)
+          : normalizedNextQuantity;
+
+      if (maxSelect && otherSelectedQuantity + normalizedNextQuantity > maxSelect) {
+        toast.error(
+          t("maximumAddons", { itemName: item?.name || t("thisItem"), count: maxSelect })
+        );
+      }
+
+      const minAllowedQuantity =
+        minSelect > otherSelectedQuantity ? minSelect - otherSelectedQuantity : 1;
+      const clampedQuantity = Math.max(
+        minAllowedQuantity,
+        Math.min(normalizedNextQuantity, maxAllowedQuantity)
+      );
+
+      return {
+        ...prev,
+        [groupId]: current.map((selected) =>
+          selected.id === modifier.id
+            ? { ...selected, selectedQuantity: clampedQuantity }
+            : selected
+        ),
       };
     });
   };
@@ -1823,6 +1909,7 @@ function ProductDetailsPageContent() {
       const group = link.modifierGroup;
       const groupId = String(group?.id || "");
       const selectedInGroup = selectionMap[groupId] || [];
+      const selectedGroupQuantity = getModifierGroupSelectedQuantity(selectedInGroup);
       const { maxSelect, isRequired, selectionType } = getGroupValidation(group);
 
       const groupModifiers = Array.isArray(group?.modifiers)
@@ -1868,7 +1955,7 @@ function ProductDetailsPageContent() {
             </div>
 
             <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
-              {selectedInGroup.length}
+              {selectedGroupQuantity}
               {maxSelect ? ` / ${maxSelect}` : ""}
             </span>
           </div>
@@ -1880,6 +1967,10 @@ function ProductDetailsPageContent() {
               );
 
               const checked = Boolean(selectedModifier);
+              const selectedModifierQuantity = Math.max(
+                1,
+                Math.floor(toNumber(selectedModifier?.selectedQuantity, 1))
+              );
 
               const effectivePrice = getModifierEffectivePrice(
                 modifier,
@@ -1888,11 +1979,14 @@ function ProductDetailsPageContent() {
               );
 
               const inputType = selectionType === "SINGLE" || maxSelect === 1 ? "radio" : "checkbox";
+              const showQuantitySelector = checked && inputType === "checkbox";
               const disableBecauseMaxReached =
                 maxSelect !== 1 &&
                 !checked &&
                 !!maxSelect &&
-                selectedInGroup.length >= maxSelect;
+                selectedGroupQuantity >= maxSelect;
+              const disableIncrement =
+                Boolean(maxSelect && selectedGroupQuantity >= maxSelect);
 
               const modifierDisplayName = getModifierDisplayName(modifier);
 
@@ -1945,10 +2039,59 @@ function ProductDetailsPageContent() {
 
                     {effectivePrice > 0 ? (
                       <span className="shrink-0 text-right font-medium text-primary">
-                        +{formatMoney(effectivePrice)}
+                        {formatModifierSelectionPrice(
+                          effectivePrice,
+                          selectedModifierQuantity
+                        )}
                       </span>
                     ) : null}
                   </div>
+
+                  {showQuantitySelector ? (
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-full border border-primary/10 bg-white/85 px-2 py-1.5 shadow-sm">
+                      <span className="pl-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                        Qty
+                      </span>
+
+                      <div className="flex items-center rounded-full bg-gray-100 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleModifierQuantityChange(
+                              group,
+                              modifier,
+                              selectedModifierQuantity - 1
+                            )
+                          }
+                          disabled={selectedModifierQuantity <= 1}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                          aria-label={`Decrease ${modifierDisplayName} quantity`}
+                        >
+                          <Minus size={14} />
+                        </button>
+
+                        <span className="min-w-8 text-center text-sm font-bold text-gray-900">
+                          {selectedModifierQuantity}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleModifierQuantityChange(
+                              group,
+                              modifier,
+                              selectedModifierQuantity + 1
+                            )
+                          }
+                          disabled={disableIncrement}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                          aria-label={`Increase ${modifierDisplayName} quantity`}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
@@ -2127,7 +2270,7 @@ function ProductDetailsPageContent() {
 
       if (groupCode) {
         router.push("/group-order/lobby");
-      } else {
+      } else if (isEditingCartItem) {
         router.push(`/checkout?type=${checkoutType}`);
       }
     } catch (error) {

@@ -62,6 +62,55 @@ describe("checkout service", () => {
     expect(postCheckoutMock.mock.calls[0][0]).not.toContain("/api/v1");
   });
 
+  it("sends guest contact and inline guest delivery address in checkout payload", async () => {
+    postCheckoutMock.mockResolvedValue({ success: true });
+
+    await checkoutCustomerCart({
+      customerId: "guest-1",
+      payload: {
+        paymentMethod: "COD",
+        guestContact: {
+          email: "guest@example.com",
+          phone: "+923001234567",
+          privacyPolicyAccepted: true,
+        },
+        guestDeliveryAddress: {
+          street: "Street 12",
+          area: "DHA",
+          postalCode: "54000",
+          city: "Lahore",
+          state: "Punjab",
+          country: "Pakistan",
+          lat: "31.5204",
+          lng: "74.3587",
+        },
+      },
+    });
+
+    expect(postCheckoutMock).toHaveBeenCalledWith(
+      "/v1/cart/checkout?customerId=guest-1",
+      {
+        paymentMethod: "COD",
+        guestContact: {
+          email: "guest@example.com",
+          phone: "+923001234567",
+          privacyPolicyAccepted: true,
+        },
+        guestDeliveryAddress: {
+          street: "Street 12",
+          area: "DHA",
+          postalCode: "54000",
+          city: "Lahore",
+          state: "Punjab",
+          country: "Pakistan",
+          lat: "31.5204",
+          lng: "74.3587",
+        },
+      },
+      undefined
+    );
+  });
+
   it("does not require scheduledDeliveryAt for immediate checkout", () => {
     expect(
       normalizeCheckoutPayload({

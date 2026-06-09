@@ -1,43 +1,61 @@
 "use client";
 
 import Image from "next/image";
-import { Minus, Plus, Tag, X, ArrowRight, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeDollarSign,
+  Layers2,
+  Loader2,
+  Minus,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { useCart } from "@/hooks/useCart";
-import type { CartItemRecord } from "./types";
-import { getCartItemUnitPrice, toNumber } from "./signature-selection-utils";
-import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
-type CartItem = {
-  id: string;
-  type?: string;
-  menuItemId?: string;
-  dealId?: string | null;
-  quantity: number;
-  name: string;
-  unitPrice: number;
-  lineTotal: number;
-  desc?: string;
-  img?: string;
-  selectedVariationName?: string;
-  includedItems?: Array<{ id?: string; menuItemId?: string; name: string; quantity: number }>;
-};
+import {
+  formatCurrency,
+  getAddonQuantity,
+  getAddonTotal,
+  getItemImage,
+  getItemPricing,
+  getSelectedVariationName,
+  getSplitPizzaDisplay,
+  isDealCartItem,
+  type CheckoutType,
+} from "@/components/pages/Checkout/components/CartSummarySection";
+import {
+  getAppliedPromotionDiscountLine,
+  type ApiRecord,
+  type CartItem,
+  normalizeCartItem,
+  recalculateCartItemQuantity,
+  toNumber,
+} from "@/components/pages/Checkout/utils/checkout-normalizers";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { useCart } from "@/hooks/useCart";
+import { cn } from "@/lib/utils";
 
 type OrderCartSidebarProps = {
   customerId?: string;
   cartRefreshKey: number;
   onCartRefresh?: () => void;
+  presentation?: "embedded" | "floating";
+  checkoutType?: CheckoutType;
 };
 
 export function OrderCartSidebar({
   customerId,
   cartRefreshKey,
   onCartRefresh,
+  presentation = "embedded",
+  checkoutType = "delivery",
 }: OrderCartSidebarProps) {
-  const t = useTranslations("cart");
+  const t = useTranslations("checkout");
+  const cartT = useTranslations("cart");
   const router = useRouter();
   const { token } = useAuth();
   const {
@@ -49,6 +67,7 @@ export function OrderCartSidebar({
   } = useCart(token);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartQuote, setCartQuote] = useState<ApiRecord | null>(null);
   const [loadingCart, setLoadingCart] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
 
@@ -58,111 +77,129 @@ export function OrderCartSidebar({
     try {
       setLoadingCart(true);
 
-      const { response: res, items } = await fetchCustomerCart({ customerId });
+      const { response: res, items, quote } = await fetchCustomerCart({ customerId });
 
       if (!res || res.error) {
         setCartItems([]);
+        setCartQuote(null);
         return;
       }
 
-      const formatted: CartItem[] = items.map((item) => {
-        const record = item as CartItemRecord & {
-          type?: string;
-          deal?: { title?: string; imageUrl?: string };
-          includedItems?: Array<{
-            id?: string;
-            menuItemId?: string;
-            quantity?: number | string;
-            menuItem?: { name?: string };
-            name?: string;
-          }>;
-        };
-        const quantity = toNumber(item.quantity, 1);
-        const unitPrice = getCartItemUnitPrice(item);
-        const isDealItem = String(record.type || "").toUpperCase() === "DEAL";
-
-        return {
-          id: String(item.id ?? ""),
-          type: record.type,
-          menuItemId: item.menuItemId ? String(item.menuItemId) : undefined,
-          dealId: typeof item.dealId === "string" ? item.dealId : null,
-          quantity,
-          name: isDealItem
-            ? record.deal?.title || t("untitledItem")
-            : item.menuItem?.name || t("untitledItem"),
-          unitPrice,
-          lineTotal: toNumber(item.lineTotal, unitPrice * quantity),
-          desc: isDealItem ? "" : item.menuItem?.description || "",
-          img: isDealItem ? record.deal?.imageUrl || "" : item.menuItem?.imageUrl || "",
-          selectedVariationName: isDealItem ? "" : item.menuItem?.selectedVariation?.name || "",
-          includedItems: Array.isArray(record.includedItems)
-            ? record.includedItems.map((includedItem) => ({
-                id: includedItem.id,
-                menuItemId: includedItem.menuItemId,
-                name: includedItem.menuItem?.name || includedItem.name || t("untitledItem"),
-                quantity: toNumber(includedItem.quantity, 1),
-              }))
-            : [],
-        };
-      });
-
-      setCartItems(formatted);
+      setCartItems(items.map((item) => normalizeCartItem(item)));
+      setCartQuote(quote as ApiRecord | null);
     } catch (err) {
       setCartItems([]);
+      setCartQuote(null);
     } finally {
       setLoadingCart(false);
     }
   };
 
   useEffect(() => {
-    fetchCart();
+    void fetchCart();
   }, [customerId, cartRefreshKey]);
 
+  const splitLabels = useMemo(
+    () => ({
+      half: t("half"),
+      leftHalf: t("leftHalf"),
+      rightHalf: t("rightHalf"),
+      selectedItem: t("selectedItem"),
+    }),
+    [t]
+  );
+
+  const pricingItems = useMemo(
+    () =>
+      cartItems.map((item) => ({
+        item,
+        pricing: getItemPricing(item, checkoutType),
+      })),
+    [cartItems, checkoutType]
+  );
+
   const totalItems = useMemo(
-    () => cartItems.reduce((acc, item) => acc + item.quantity, 0),
+    () => cartItems.reduce((acc, item) => acc + Math.max(1, toNumber(item.quantity, 1)), 0),
     [cartItems]
   );
 
-  const subtotal = useMemo(
-    () => cartItems.reduce((acc, item) => acc + item.lineTotal, 0),
-    [cartItems]
+  const itemTotal = useMemo(
+    () => pricingItems.reduce((acc, entry) => acc + entry.pricing.itemSubtotal, 0),
+    [pricingItems]
+  );
+
+  const depositTotal = useMemo(
+    () => pricingItems.reduce((acc, entry) => acc + entry.pricing.depositTotal, 0),
+    [pricingItems]
+  );
+
+  const pickupPriceTotal = useMemo(
+    () =>
+      checkoutType === "pickup"
+        ? pricingItems.reduce((acc, entry) => acc + entry.pricing.pickupExtraTotal, 0)
+        : 0,
+    [checkoutType, pricingItems]
+  );
+
+  const taxes = toNumber(cartQuote?.taxAmount, 0);
+  const deliveryFee = checkoutType === "delivery" ? toNumber(cartQuote?.deliveryFee, 0) : 0;
+  const serviceCharge = Math.max(0, toNumber(cartQuote?.serviceChargeAmount, 0));
+  const tipAmount = Math.max(0, toNumber(cartQuote?.tipAmount, 0));
+  const quoteSubtotal = cartQuote ? toNumber(cartQuote.subtotal, itemTotal) : itemTotal;
+  const appliedPromotion =
+    typeof cartQuote?.appliedPromotion === "object" && cartQuote.appliedPromotion !== null
+      ? cartQuote.appliedPromotion
+      : null;
+  const hasAppliedPromotion = Boolean(
+    appliedPromotion && ("id" in appliedPromotion || "title" in appliedPromotion)
+  );
+  const promotionDiscountLine = getAppliedPromotionDiscountLine(cartQuote);
+  const discount = promotionDiscountLine?.amount ?? Math.max(0, toNumber(cartQuote?.discountAmount, 0));
+  const loyaltyDiscount = Math.max(0, toNumber(cartQuote?.loyaltyDiscountAmount, 0));
+  const walletAppliedAmount = Math.max(0, toNumber(cartQuote?.walletAppliedAmount, 0));
+  const totalBeforeDiscount =
+    quoteSubtotal + pickupPriceTotal + deliveryFee + taxes + serviceCharge + tipAmount;
+  const finalTotal = Math.max(
+    0,
+    toNumber(
+      cartQuote?.payableAmount ?? cartQuote?.totalAmount,
+      totalBeforeDiscount - discount - loyaltyDiscount - walletAppliedAmount
+    )
   );
 
   const updateQuantity = async (id: string, type: "inc" | "dec") => {
-    const item = cartItems.find((i) => i.id === id);
+    const item = cartItems.find((cartItem) => String(cartItem.id) === id);
     if (!item || !customerId) return;
 
-    const newQty =
-      type === "inc" ? item.quantity + 1 : Math.max(1, item.quantity - 1);
+    const currentQty = Math.max(1, toNumber(item.quantity, 1));
+    const newQty = type === "inc" ? currentQty + 1 : Math.max(1, currentQty - 1);
+
+    if (newQty === currentQty) return;
 
     try {
       setActionId(id);
+      setCartItems((prev) =>
+        prev.map((cartItem) =>
+          String(cartItem.id) === id ? recalculateCartItemQuantity(cartItem, newQty) : cartItem
+        )
+      );
 
-      const isDealItem = String(item.type || "").toUpperCase() === "DEAL";
+      const isDealItem = isDealCartItem(item);
       const res = isDealItem && item.dealId
         ? await updateCustomerCartDealQuantity({ customerId, dealId: item.dealId, quantity: newQty })
         : await updateCustomerCartItemQuantity({ customerId, cartItemId: id, quantity: newQty });
 
       if (!res || res.error) {
-        toast.error(res?.error || t("failedUpdateQuantity"));
+        toast.error(res?.error || cartT("failedUpdateQuantity"));
+        await fetchCart();
         return;
       }
 
-      setCartItems((prev) =>
-        prev.map((i) =>
-          i.id === id
-            ? {
-                ...i,
-                quantity: newQty,
-                lineTotal: i.unitPrice * newQty,
-              }
-            : i
-        )
-      );
-
       onCartRefresh?.();
+      await fetchCart();
     } catch (err) {
-      toast.error(t("failedUpdateQuantity"));
+      toast.error(cartT("failedUpdateQuantity"));
+      await fetchCart();
     } finally {
       setActionId(null);
     }
@@ -170,41 +207,54 @@ export function OrderCartSidebar({
 
   const deleteItem = async (id: string) => {
     if (!customerId) return;
-    const item = cartItems.find((i) => i.id === id);
+    const item = cartItems.find((cartItem) => String(cartItem.id) === id);
 
     try {
       setActionId(id);
 
-      const isDealItem = String(item?.type || "").toUpperCase() === "DEAL";
+      const isDealItem = item ? isDealCartItem(item) : false;
       const res = isDealItem && item?.dealId
         ? await deleteCustomerCartDeal({ customerId, dealId: item.dealId })
         : await deleteCustomerCartItem({ customerId, cartItemId: id });
 
       if (!res || res.error) {
-        toast.error(res?.error || t("failedRemoveItem"));
+        toast.error(res?.error || cartT("failedRemoveItem"));
         return;
       }
 
-      toast.success(t("itemRemoved"));
-      setCartItems((prev) => prev.filter((i) => i.id !== id));
+      toast.success(cartT("itemRemoved"));
+      setCartItems((prev) => prev.filter((cartItem) => String(cartItem.id) !== id));
       onCartRefresh?.();
+      await fetchCart();
     } catch (err) {
-      toast.error(t("failedRemoveItem"));
+      toast.error(cartT("failedRemoveItem"));
     } finally {
       setActionId(null);
     }
   };
 
   return (
-    <aside className="border-l border-black/5 bg-white/95 px-4 py-5 backdrop-blur-sm sm:px-6 xl:sticky xl:top-0 shadow-[-12px_0_32px_0_rgba(26,28,28,0.04)]">
+    <aside
+      className={cn(
+        "border-l border-black/5 bg-white/95 px-4 py-5 backdrop-blur-sm sm:px-6 shadow-[-12px_0_32px_0_rgba(26,28,28,0.04)]",
+        presentation === "embedded"
+          ? "xl:sticky xl:top-0"
+          : "h-full overflow-y-auto rounded-[22px] border border-black/10 shadow-[0_24px_80px_rgba(15,23,42,0.18)]"
+      )}
+    >
       <div className="mx-auto flex h-full max-w-[320px] flex-col">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <h2 className="text-[22px] font-bold tracking-[-0.02em] text-[#1f1f1f]">
-            {t("yourOrder")}
-          </h2>
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-gray-900">
+              {t("cartSummary")}
+            </h2>
+            <p className="mt-1 text-xs capitalize text-gray-400">
+              {checkoutType === "pickup" ? t("pickupPricingApplied") : t("deliveryPricingApplied")}
+            </p>
+          </div>
 
           <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
-            {t("itemCount", { count: totalItems })}
+            {cartT("itemCount", { count: totalItems })}
           </span>
         </div>
 
@@ -213,21 +263,40 @@ export function OrderCartSidebar({
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
           </div>
         ) : cartItems.length === 0 ? (
-          <div className="rounded-[18px] border border-dashed border-black/10 bg-[#fafafa] p-5 text-center">
-            <p className="text-sm text-[#777]">{t("empty")}</p>
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/70 p-5 text-center">
+            <p className="text-sm font-medium text-gray-700">{t("yourCartIsEmpty")}</p>
+            <p className="mt-1 text-xs text-gray-400">{t("emptyCartDescription")}</p>
           </div>
         ) : (
-          <>
-            <div className="space-y-4">
-              {cartItems.map((item) => (
+          <div className="space-y-4">
+            {pricingItems.map(({ item, pricing }) => {
+              const {
+                quantity,
+                checkoutUnitPrice,
+                modifiersTotal,
+                unitPriceWithModifiers,
+                lineTotal,
+                depositUnitAmount,
+                depositTotal: itemDepositTotal,
+                pickupExtraUnitPrice,
+                pickupExtraTotal,
+                selectedAddons,
+                selectedSections,
+              } = pricing;
+              const isDealItem = isDealCartItem(item);
+              const selectedVariationName = isDealItem ? "" : getSelectedVariationName(item);
+              const splitPizzaDisplay = getSplitPizzaDisplay(item, selectedSections, splitLabels);
+              const includedItems = Array.isArray(item.includedItems) ? item.includedItems : [];
+
+              return (
                 <div
-                  key={item.id}
-                  className="rounded-[18px] border border-black/5 bg-white p-3 shadow-[0_6px_20px_rgba(15,23,42,0.04)]"
+                  key={String(item.id)}
+                  className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="relative h-[64px] w-[64px] shrink-0 overflow-hidden rounded-[16px] bg-[#f4f4f4]">
+                    <div className="relative h-[66px] w-[66px] shrink-0 overflow-hidden rounded-[12px] bg-gray-100">
                       <Image
-                        src={item.img || "/placeholder.png"}
+                        src={String(getItemImage(item) || "/placeholder.png")}
                         alt={item.name}
                         fill
                         className="object-cover"
@@ -235,124 +304,317 @@ export function OrderCartSidebar({
                       />
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <h3 className="line-clamp-2 text-[13px] font-medium leading-5 text-[#222]">
+                          <h3 className="line-clamp-2 text-[13px] font-medium leading-5 text-gray-900">
                             {item.name}
                           </h3>
 
-                          {item.selectedVariationName ? (
-                            <p className="mt-0.5 text-[11px] text-[#888]">
-                              {item.selectedVariationName}
+                          {isDealItem && item.deal?.code ? (
+                            <p className="mt-1 text-xs font-medium text-primary">
+                              {String(item.deal.code)}
                             </p>
                           ) : null}
 
-                          {String(item.type || "").toUpperCase() === "DEAL" && item.includedItems?.length ? (
-                            <div className="mt-2 rounded-[12px] bg-primary/5 px-2.5 py-2">
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-                                {t("dealIncludes")}
-                              </p>
-                              <div className="mt-1 space-y-0.5">
-                                {item.includedItems.map((includedItem, index) => (
-                                  <p
-                                    key={includedItem.id || includedItem.menuItemId || `${item.id}-${index}`}
-                                    className="truncate text-[11px] text-[#666]"
-                                  >
-                                    {includedItem.name} × {includedItem.quantity}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
+                          {selectedVariationName ? (
+                            <p className="mt-1 text-xs text-gray-500">
+                              {t("size")}: {String(selectedVariationName)}
+                            </p>
+                          ) : null}
+
+                          {checkoutType === "pickup" && pickupExtraUnitPrice > 0 ? (
+                            <p className="mt-1 text-xs font-medium text-primary">
+                              {t("pickupPriceEach", { price: formatCurrency(pickupExtraUnitPrice) })}
+                            </p>
                           ) : null}
                         </div>
 
                         <button
-                          onClick={() => deleteItem(item.id)}
-                          disabled={actionId === item.id}
-                          className="mt-0.5 shrink-0 text-[#a3a3a3] transition hover:text-[#222] disabled:opacity-50"
+                          type="button"
+                          onClick={() => void deleteItem(String(item.id))}
+                          disabled={actionId === String(item.id)}
+                          className="mt-0.5 shrink-0 rounded-md bg-red-50 p-1 text-red-500 transition hover:bg-red-100 disabled:opacity-50"
+                          aria-label={t("removeItem", { name: item.name })}
                         >
-                          <X className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3">
+                      {isDealItem && includedItems.length > 0 ? (
+                        <div className="rounded-[10px] border border-primary/10 bg-primary/5 px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                            {t("dealIncludes")}
+                          </p>
+                          <div className="mt-1.5 space-y-1">
+                            {includedItems.map((includedItem, index) => {
+                              const includedName =
+                                String(includedItem.menuItem?.name || includedItem.name || "").trim() ||
+                                t("includedItemFallback");
+                              const includedQuantity = Math.max(1, toNumber(includedItem.quantity, 1));
+                              const includedKey =
+                                includedItem.id ||
+                                includedItem.menuItemId ||
+                                `${item.id}-included-${index}`;
+
+                              return (
+                                <div
+                                  key={String(includedKey)}
+                                  className="flex items-center justify-between gap-3 text-xs"
+                                >
+                                  <span className="min-w-0 truncate text-gray-700">{includedName}</span>
+                                  <span className="shrink-0 font-medium text-primary">× {includedQuantity}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {selectedSections.length > 0 ? (
+                        <div className="rounded-[12px] border border-primary/10 bg-primary/5 px-3 py-2">
+                          <div className="mb-2 flex items-center gap-2">
+                            <Layers2 size={14} className="text-primary" />
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                              {t("splitPizza")}
+                            </p>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            {splitPizzaDisplay.sections.map((section) => (
+                              <div
+                                key={`${item.id}-section-${section.slot || section.index}`}
+                                className="flex items-start justify-between gap-3 text-xs"
+                              >
+                                <p className="min-w-0 truncate text-gray-700">
+                                  <span className="font-semibold">{section.label}:</span>{" "}
+                                  {section.displayName}
+                                </p>
+
+                                {section.checkoutPrice > 0 ? (
+                                  <p className="shrink-0 font-medium text-gray-800">
+                                    {formatCurrency(section.checkoutPrice)}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+
+                          <p className="mt-2 text-[11px] text-gray-500">
+                            {t("highestHalfPrice")}
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {selectedAddons.length > 0 ? (
+                        <div className="rounded-[10px] border border-gray-100 bg-gray-50 px-3 py-2">
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                            {t("addons")}
+                          </p>
+                          <div className="space-y-1">
+                            {selectedAddons.map((addon, index) => {
+                              const addonName = String(addon.name || "").trim() || t("addonFallback");
+                              const addonQty = getAddonQuantity(addon);
+                              const addonTotal = getAddonTotal(addon);
+                              const addonKey = addon.modifierId || addon.id || `${item.id}-addon-${index}`;
+
+                              return (
+                                <div key={addonKey} className="flex items-center justify-between gap-3 text-xs">
+                                  <span className="min-w-0 truncate text-gray-600">
+                                    {addonName}
+                                    {addonQty > 1 ? ` × ${addonQty}` : ""}
+                                  </span>
+                                  <span className="shrink-0 font-medium text-gray-700">
+                                    {addonTotal > 0 ? `+${formatCurrency(addonTotal)}` : t("free")}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {depositUnitAmount > 0 ? (
+                        <div className="flex items-center justify-between rounded-[10px] border border-amber-100 bg-amber-50 px-3 py-2 text-xs">
+                          <span className="inline-flex items-center gap-1 font-medium text-amber-700">
+                            <BadgeDollarSign size={14} />
+                            {t("deposit")}
+                          </span>
+                          <span className="font-semibold text-amber-700">
+                            {formatCurrency(depositUnitAmount)}
+                            {quantity > 1 ? ` × ${quantity}` : ""}
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {item.note ? (
+                        <p className="rounded-md bg-yellow-50 px-2 py-1 text-[11px] text-yellow-700">
+                          {t("note")}: {item.note}
+                        </p>
+                      ) : null}
+
+                      <div className="flex items-end justify-between gap-3 pt-1">
+                        <div>
+                          <p className="text-sm font-semibold text-primary">
+                            {formatCurrency(lineTotal)}
+                          </p>
+                          <div className="space-y-0.5">
+                            <p className="text-[11px] text-gray-400">
+                              {t("each", { price: formatCurrency(unitPriceWithModifiers) })}
+                            </p>
+                            {checkoutType === "pickup" && pickupExtraTotal > 0 ? (
+                              <p className="text-[11px] text-gray-400">
+                                {t("pickupPriceQuantity", {
+                                  price: formatCurrency(pickupExtraUnitPrice),
+                                  quantity: quantity > 1 ? ` × ${quantity}` : "",
+                                })}
+                              </p>
+                            ) : null}
+                            {selectedAddons.length > 0 ? (
+                              <p className="text-[11px] text-gray-400">
+                                {t("priceWithAddons", {
+                                  price: formatCurrency(checkoutUnitPrice),
+                                  addons: formatCurrency(modifiersTotal),
+                                })}
+                              </p>
+                            ) : null}
+                            {itemDepositTotal > 0 ? (
+                              <p className="text-[11px] text-gray-400">
+                                {t("includesDeposit", { amount: formatCurrency(itemDepositTotal) })}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+
                         <div className="flex h-8 items-center overflow-hidden rounded-full border border-black/5 bg-[#f7f7f7] px-1.5">
                           <button
-                            onClick={() => updateQuantity(item.id, "dec")}
-                            disabled={actionId === item.id}
+                            type="button"
+                            onClick={() => void updateQuantity(String(item.id), "dec")}
+                            disabled={actionId === String(item.id)}
                             className="flex h-6 w-6 items-center justify-center rounded-full text-[#666] transition hover:bg-white hover:text-[#222] disabled:opacity-50"
+                            aria-label={`Decrease ${item.name} quantity`}
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </button>
-
                           <span className="w-7 text-center text-[13px] font-medium text-[#222]">
-                            {item.quantity}
+                            {quantity}
                           </span>
-
                           <button
-                            onClick={() => updateQuantity(item.id, "inc")}
-                            disabled={actionId === item.id}
+                            type="button"
+                            onClick={() => void updateQuantity(String(item.id), "inc")}
+                            disabled={actionId === String(item.id)}
                             className="flex h-6 w-6 items-center justify-center rounded-full text-[#666] transition hover:bg-white hover:text-[#222] disabled:opacity-50"
+                            aria-label={`Increase ${item.name} quantity`}
                           >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                         </div>
-
-                        <span className="shrink-0 text-[13px] font-medium text-[#222]">
-                          ${item.lineTotal.toFixed(2)}
-                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="mt-5 rounded-[18px] border border-sky-100 bg-sky-50/80 p-4">
-              <div className="flex items-start gap-2 text-[13px] leading-5 text-sky-700">
-                <Tag className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{t("sauceUpsell")}</span>
-              </div>
-            </div>
-          </>
+              );
+            })}
+          </div>
         )}
 
-        <div className="mt-auto pt-12">
-          <div className="space-y-3 border-t border-black/5 pt-6">
-            <div className="flex items-center justify-between text-[13px] text-[#8b8b8b]">
-              <span>{t("subtotal")}</span>
-              <span className="font-medium text-[#666]">
-                ${subtotal.toFixed(2)}
-              </span>
+        <div className="mt-auto pt-8">
+          <div className="space-y-3 border-t border-black/5 pt-5 text-sm text-gray-500">
+            <div className="flex items-center justify-between">
+              <span>{t("itemTotal")}</span>
+              <span>{formatCurrency(quoteSubtotal)}</span>
             </div>
 
-            <div className="flex items-center justify-between text-[13px] text-[#8b8b8b]">
-              <span>{t("deliveryFee")}</span>
-              <span className="font-medium text-sky-600">{t("free")}</span>
+            {depositTotal > 0 ? (
+              <div className="flex items-center justify-between text-amber-700">
+                <span>{t("deposit")}</span>
+                <span>{formatCurrency(depositTotal)}</span>
+              </div>
+            ) : null}
+
+            {checkoutType === "pickup" && pickupPriceTotal > 0 ? (
+              <div className="flex items-center justify-between text-primary">
+                <span>{t("pickupPrice")}</span>
+                <span>{formatCurrency(pickupPriceTotal)}</span>
+              </div>
+            ) : null}
+
+            {checkoutType === "delivery" ? (
+              <div className="flex items-center justify-between">
+                <span>{t("deliveryFee")}</span>
+                <span>{formatCurrency(deliveryFee)}</span>
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between">
+              <span>{t("taxesAndCharges")}</span>
+              <span>{formatCurrency(taxes)}</span>
             </div>
+
+            {serviceCharge > 0 ? (
+              <div className="flex items-center justify-between">
+                <span>{t("totals.serviceCharge")}</span>
+                <span>{formatCurrency(serviceCharge)}</span>
+              </div>
+            ) : null}
+
+            {tipAmount > 0 ? (
+              <div className="flex items-center justify-between">
+                <span>{t("totals.tip")}</span>
+                <span>{formatCurrency(tipAmount)}</span>
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-between pt-2">
-              <span className="text-[22px] font-semibold tracking-[-0.02em] text-[#222]">
-                {t("total")}
-              </span>
-              <span className="text-[22px] font-semibold tracking-[-0.02em] text-[#222]">
-                ${subtotal.toFixed(2)}
-              </span>
+              <span>{t("totalBeforeDiscount")}</span>
+              <span>{formatCurrency(totalBeforeDiscount)}</span>
+            </div>
+
+            {discount > 0 ? (
+              <div className="flex items-center justify-between text-green-600">
+                <span>{hasAppliedPromotion ? t("appliedDealDiscount") : t("discount")}</span>
+                <span>- {formatCurrency(discount)}</span>
+              </div>
+            ) : null}
+
+            {loyaltyDiscount > 0 ? (
+              <div className="flex items-center justify-between text-green-600">
+                <span>
+                  {toNumber(cartQuote?.loyaltyPointsRedeemed, 0) > 0
+                    ? t("loyaltyDiscountWithPoints", {
+                        points: toNumber(cartQuote?.loyaltyPointsRedeemed, 0),
+                      })
+                    : t("loyaltyDiscount")}
+                </span>
+                <span>- {formatCurrency(loyaltyDiscount)}</span>
+              </div>
+            ) : null}
+
+            {walletAppliedAmount > 0 ? (
+              <div className="flex items-center justify-between text-green-600">
+                <span>{t("walletApplied")}</span>
+                <span>- {formatCurrency(walletAppliedAmount)}</span>
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between pt-2 text-[22px] font-semibold tracking-[-0.02em] text-gray-900">
+              <span>{walletAppliedAmount > 0 ? t("payableTotal") : t("total")}</span>
+              <span>{formatCurrency(finalTotal)}</span>
             </div>
           </div>
 
-          <button
-            onClick={() => router.push("/checkout")}
+          <Button
+            type="button"
+            onClick={() => router.push(`/checkout?type=${checkoutType}`)}
             disabled={!cartItems.length}
-            className="mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-[14px] font-medium text-primary-foreground shadow-[0_10px_24px_rgba(0,0,0,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-5 flex h-[50px] w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-[14px] font-medium text-primary-foreground shadow-[0_10px_24px_rgba(0,0,0,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {t("proceedToCheckout")}
+            {cartT("proceedToCheckout")}
             <ArrowRight className="h-4 w-4" />
-          </button>
+          </Button>
 
           <p className="mt-4 text-center text-[11px] text-[#b0b0b0]">
-            {t("averageDeliveryTime")}
+            {cartT("averageDeliveryTime")}
           </p>
         </div>
       </div>

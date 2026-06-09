@@ -13,6 +13,21 @@ export type CheckoutCartPayload = Record<string, unknown> & {
   scheduledDeliveryAt?: string | null;
   orderTime?: string | null;
   tipAmount?: number;
+  guestContact?: {
+    email: string;
+    phone: string;
+    privacyPolicyAccepted: boolean;
+  };
+  guestDeliveryAddress?: {
+    street: string;
+    area?: string;
+    postalCode: string;
+    city: string;
+    state?: string;
+    country: string;
+    lat?: string;
+    lng?: string;
+  };
 };
 
 export const normalizeCheckoutPayload = (payload: CheckoutCartPayload): Record<string, unknown> => {

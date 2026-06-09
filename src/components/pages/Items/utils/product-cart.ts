@@ -10,9 +10,9 @@ const getId = (value: unknown) => {
 export const buildModifiersPayload = (selectionMap: ModifierSelectionMap) =>
   Object.values(selectionMap)
     .flat()
-    .map(({ id }) => ({
+    .map(({ id, selectedQuantity }) => ({
       modifierId: id,
-      quantity: 1,
+      quantity: Math.max(1, Math.floor(Number(selectedQuantity) || 1)),
     }));
 
 type CartPayloadBuilderInput = {

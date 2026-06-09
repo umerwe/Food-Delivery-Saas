@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { Minus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -34,6 +34,7 @@ import {
   type DealChooserModifierGroup,
 } from "@/components/pages/Home/utils/deal-chooser-validation";
 import { formatDealPrice } from "@/components/pages/Home/utils/customer-deals-formatters";
+import { getModifierGroupSelectedQuantity } from "@/components/pages/Items/utils/modifier-selections";
 import {
   canSubmitDealSelection,
   getDealRequiredSelectionCount,
@@ -88,7 +89,6 @@ export function DealChooserDrawer({
   branchId,
 }: DealChooserDrawerProps) {
   const t = useTranslations("home.deals");
-  const router = useRouter();
   const addDealMutation = useAddDealToCart(branchId);
   const { items, isLoading, error } = useDealEligibleItems({ deal, open });
   const [selectedMenuItemIds, setSelectedMenuItemIds] = useState<string[]>([]);
@@ -270,13 +270,14 @@ export function DealChooserDrawer({
           selectedQuantity: 1,
         };
         let nextSelected = selected;
+        const selectedQuantity = getModifierGroupSelectedQuantity(selected);
 
         if (!checked) {
           nextSelected = selected.filter(({ id }) => id !== modifierId);
         } else if (selectionType === "SINGLE") {
           nextSelected = [nextModifier];
         } else if (!selected.some(({ id }) => id === modifierId)) {
-          if (maxSelect > 0 && selected.length >= maxSelect) {
+          if (maxSelect > 0 && selectedQuantity >= maxSelect) {
             return configuration;
           }
           nextSelected = [...selected, nextModifier];
@@ -298,6 +299,82 @@ export function DealChooserDrawer({
         return {
           ...configuration,
           modifierSelections: [...otherSelections, ...nextSelection],
+        };
+      });
+      setGroupErrorsByItemId((current) => {
+        const nextItemErrors = { ...(current[menuItemId] || {}) };
+        delete nextItemErrors[groupId];
+
+        return {
+          ...current,
+          [menuItemId]: nextItemErrors,
+        };
+      });
+    },
+    [updateItemConfiguration]
+  );
+
+  const updateModifierQuantity = useCallback(
+    (
+      menuItemId: string,
+      group: DealChooserModifierGroup,
+      modifier: DealChooserModifier,
+      nextQuantity: number
+    ) => {
+      const groupId = getDealChooserId(group.id);
+      const modifierId = getDealChooserId(modifier.id);
+
+      if (!groupId || !modifierId || group.selectionType === "SINGLE") return;
+
+      updateItemConfiguration(menuItemId, (configuration) => {
+        const selectedModifiersByGroup = getSelectedModifiersByGroup([group], configuration);
+        const selected = selectedModifiersByGroup[groupId] || [];
+        const currentModifier = selected.find(({ id }) => id === modifierId);
+
+        if (!currentModifier) {
+          return configuration;
+        }
+
+        const modifiersCount = Array.isArray(group.modifiers) ? group.modifiers.length : 0;
+        const rawMaxSelect = getDealChooserNumber(group.maxSelect, modifiersCount);
+        const maxSelect = rawMaxSelect > 0 ? rawMaxSelect : modifiersCount;
+        const normalizedNextQuantity = Math.max(
+          1,
+          Math.floor(Number.isFinite(nextQuantity) ? nextQuantity : 1)
+        );
+        const otherSelectedQuantity = selected.reduce((total, entry) => {
+          if (entry.id === modifierId) return total;
+
+          return total + Math.max(1, Math.floor(getDealChooserNumber(entry.selectedQuantity, 1)));
+        }, 0);
+        const maxAllowedQuantity =
+          maxSelect > 0
+            ? Math.max(1, maxSelect - otherSelectedQuantity)
+            : normalizedNextQuantity;
+        const nextSelected = selected.map((entry) =>
+          entry.id === modifierId
+            ? {
+                ...entry,
+                selectedQuantity: Math.min(normalizedNextQuantity, maxAllowedQuantity),
+              }
+            : entry
+        );
+        const otherSelections = configuration.modifierSelections.filter(
+          (selection) => selection.modifierGroupId !== groupId
+        );
+
+        return {
+          ...configuration,
+          modifierSelections: [
+            ...otherSelections,
+            {
+              modifierGroupId: groupId,
+              modifiers: nextSelected.map((entry) => ({
+                modifierId: entry.id,
+                quantity: entry.selectedQuantity,
+              })),
+            },
+          ],
         };
       });
       setGroupErrorsByItemId((current) => {
@@ -395,7 +472,6 @@ export function DealChooserDrawer({
       {
         onSuccess: () => {
           onOpenChange(false);
-          router.push("/checkout");
         },
       }
     );
@@ -409,7 +485,6 @@ export function DealChooserDrawer({
     itemDetailsQuery.isLoading,
     onOpenChange,
     requiredQuantity,
-    router,
     selectedCount,
     selectedItems,
     selectedMenuItemIds,
@@ -528,6 +603,8 @@ export function DealChooserDrawer({
           const groupId = getDealChooserId(group.id);
           const groupModifiers = Array.isArray(group.modifiers) ? group.modifiers : [];
           const selectedGroupModifiers = selectedModifiersByGroup[groupId] || [];
+          const selectedGroupQuantity =
+            getModifierGroupSelectedQuantity(selectedGroupModifiers);
           const selectionType = group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
           const maxSelect = selectionType === "SINGLE"
             ? 1
@@ -552,29 +629,93 @@ export function DealChooserDrawer({
               <div className="space-y-2">
                 {groupModifiers.map((modifier) => {
                   const modifierId = getDealChooserId(modifier.id);
-                  const checked = selectedGroupModifiers.some(({ id }) => id === modifierId);
+                  const selectedModifier = selectedGroupModifiers.find(
+                    ({ id }) => id === modifierId
+                  );
+                  const checked = Boolean(selectedModifier);
+                  const selectedModifierQuantity = Math.max(
+                    1,
+                    Math.floor(getDealChooserNumber(selectedModifier?.selectedQuantity, 1))
+                  );
                   const maxReached =
                     maxSelect > 0 &&
-                    selectedGroupModifiers.length >= maxSelect &&
+                    selectedGroupQuantity >= maxSelect &&
                     !checked;
+                  const canShowQuantitySelector = checked && selectionType !== "SINGLE";
 
                   return (
-                    <label
+                    <div
                       key={modifierId}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2"
+                      className={`rounded-xl border px-3 py-2 transition ${
+                        checked
+                          ? "border-primary/20 bg-primary/5 ring-1 ring-primary/10"
+                          : maxReached
+                          ? "border-gray-100 bg-gray-100 opacity-70"
+                          : "border-gray-100 bg-white"
+                      }`}
                     >
-                      <span className="text-sm font-medium text-gray-700">
-                        {getDealChooserModifierName(modifier)}
-                      </span>
-                      <Checkbox
-                        className="size-5"
-                        checked={checked}
-                        disabled={maxReached}
-                        onCheckedChange={(value) =>
-                          toggleModifier(item.id, group, modifier, value === true)
-                        }
-                      />
-                    </label>
+                      <label className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-gray-700">
+                          {getDealChooserModifierName(modifier)}
+                        </span>
+                        <Checkbox
+                          className="size-5"
+                          checked={checked}
+                          disabled={maxReached}
+                          onCheckedChange={(value) =>
+                            toggleModifier(item.id, group, modifier, value === true)
+                          }
+                        />
+                      </label>
+
+                      {canShowQuantitySelector ? (
+                        <div className="mt-2 flex items-center justify-between gap-3 rounded-full border border-primary/10 bg-white/90 px-2 py-1 shadow-sm">
+                          <span className="pl-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                            Qty
+                          </span>
+
+                          <div className="flex items-center rounded-full bg-gray-100 p-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateModifierQuantity(
+                                  item.id,
+                                  group,
+                                  modifier,
+                                  selectedModifierQuantity - 1
+                                )
+                              }
+                              disabled={selectedModifierQuantity <= 1}
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                              aria-label={`Decrease ${getDealChooserModifierName(modifier)} quantity`}
+                            >
+                              <Minus size={13} />
+                            </button>
+
+                            <span className="min-w-7 text-center text-xs font-bold text-gray-900">
+                              {selectedModifierQuantity}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateModifierQuantity(
+                                  item.id,
+                                  group,
+                                  modifier,
+                                  selectedModifierQuantity + 1
+                                )
+                              }
+                              disabled={maxSelect > 0 && selectedGroupQuantity >= maxSelect}
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                              aria-label={`Increase ${getDealChooserModifierName(modifier)} quantity`}
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>
