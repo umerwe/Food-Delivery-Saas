@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { queryKeys } from "@/config/query-keys";
 import { useAuth } from "@/hooks/useAuth";
 import { useDomainApi } from "@/hooks/useDomainApi";
-import { clearStoredGroupOrderCode, getStoredGroupOrderCode, isClosedGroupOrder } from "@/lib/group-order";
+import { canMutateGroupOrder, clearStoredGroupOrderCode, getStoredGroupOrderCode, isClosedGroupOrder } from "@/lib/group-order";
 import {
+  cancelGroupOrder,
   checkoutGroupOrder,
   createGroupOrder,
   deleteGroupOrderItem,
@@ -56,6 +57,11 @@ export const useGroupOrderApi = (token: string | null) => {
     [token]
   );
 
+  const cancelOrder = useCallback(
+    ({ orderId }: { orderId: string | number }) => cancelGroupOrder({ orderId, token }),
+    [token]
+  );
+
   const joinOrder = useCallback(
     ({ inviteCode }: { inviteCode: string }) => joinGroupOrder({ inviteCode, token }),
     [token]
@@ -86,16 +92,17 @@ export const useGroupOrderApi = (token: string | null) => {
       searchGroupOrdersByInviteCode: findGroupOrderByInviteCode,
       createGroupOrder: addGroupOrder,
       leaveGroupOrder: leaveOrder,
+      cancelGroupOrder: cancelOrder,
       joinGroupOrder: joinOrder,
       checkoutGroupOrder: checkoutOrder,
       updateGroupOrderItemQuantity: updateItemQuantity,
       deleteGroupOrderItem: deleteItem,
     }),
-    [api, addGroupOrder, checkoutOrder, deleteItem, findGroupOrderByInviteCode, joinOrder, leaveOrder, listGroupOrders, updateItemQuantity]
+    [api, addGroupOrder, cancelOrder, checkoutOrder, deleteItem, findGroupOrderByInviteCode, joinOrder, leaveOrder, listGroupOrders, updateItemQuantity]
   );
 };
 
-export default function useGroupOrder(): UseGroupOrderResult {
+export function useGroupOrder(): UseGroupOrderResult {
   const router = useRouter();
 
   const { token, user } = useAuth();
@@ -154,16 +161,21 @@ export default function useGroupOrder(): UseGroupOrderResult {
     fetchOrder();
   }, [token, fetchOrder]);
 
-  const isHost = order?.hostUserId === user?.id;
-
   const participant = order?.participants?.find((item) => {
-    return item.userId === user?.id;
+    return String(item.userId || "") === String(user?.id || "");
   });
 
+  const isHost = Boolean(
+    (order?.hostUserId !== null &&
+      order?.hostUserId !== undefined &&
+      String(order.hostUserId) === String(user?.id || "")) ||
+      participant?.isHost
+  );
   const isParticipant = Boolean(participant);
+  const canMutate = canMutateGroupOrder(order);
 
-  const canEditItems = isParticipant;
-  const canCheckout = isHost;
+  const canEditItems = isParticipant && canMutate;
+  const canCheckout = isHost && canMutate;
 
   return {
     order,
@@ -175,6 +187,7 @@ export default function useGroupOrder(): UseGroupOrderResult {
     participant,
     canEditItems,
     canCheckout,
+    canMutateGroupOrder: canMutate,
   };
 }
 

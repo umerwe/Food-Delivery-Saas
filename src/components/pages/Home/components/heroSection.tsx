@@ -33,7 +33,7 @@ type BranchSearchMode = "delivery" | "pickup";
 const getOrderType = (mode: BranchSearchMode): BranchOrderType =>
   mode === "pickup" ? "TAKEAWAY" : "DELIVERY";
 
-const HeroSection = ({
+export const HeroSection = ({
   restaurantName,
   tagline,
   heroImage = "/hero.png",
@@ -204,13 +204,8 @@ const HeroSection = ({
               onSelectLocation={handleSelectSearchLocation}
               onUseCurrentLocation={handleUseCurrentLocation}
               isLocating={permissionState === "requesting"}
+              showSelectedLabel={false}
             />
-
-            {mode === "delivery" ? (
-              <p className="mt-3 text-xs text-[#8A8A8A]">
-                Delivery coverage is confirmed at checkout based on your address.
-              </p>
-            ) : null}
 
             {showResults ? (
               <div className="mt-4 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.14)]">
@@ -268,5 +263,3 @@ const HeroSection = ({
     </main>
   );
 };
-
-export default HeroSection;

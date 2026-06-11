@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 
 import RestaurantHeader from "@/components/pages/Items/components/RestaurantHeader";
 import { ItemsLayout } from "@/components/pages/Items/components/ItemsLayout";
-import useGroupOrder, { useGroupOrderApi } from "@/hooks/useGroupOrder";
+import { useGroupOrder, useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useAuth } from "@/hooks/useAuth";
 import { clearStoredGroupOrderCode, getStoredGroupOrderCode, setStoredGroupOrderCode } from "@/lib/group-order";
 import type { GroupOrder, GroupOrderParticipant } from "@/types/group-order";

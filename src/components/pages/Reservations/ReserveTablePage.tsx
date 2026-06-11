@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Clock, Info, LoaderCircle, Star } from "lucide-react";
+import { AlertTriangle, CalendarX, Clock, Info, LoaderCircle, Star } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +60,8 @@ type DateRangeRule = {
   closeTime?: string;
   note?: string;
 };
+
+type ReservationBlockReason = "temporaryClosure" | "holiday" | "unavailable";
 
 const normalizeArray = <T = unknown,>(value: unknown): T[] => {
   return Array.isArray(value) ? value as T[] : [];
@@ -188,6 +190,173 @@ const getDateRangeRules = (branch?: BranchRecord | null): DateRangeRule[] => {
   ];
 };
 
+const getTemporaryClosure = (branch?: BranchRecord | null) =>
+  branch?.availability?.temporaryClosure || branch?.settings?.temporaryClosure || null;
+
+const getDateTimeFromDateAndMinutes = (dateValue: string, minutes: number) => {
+  const date = getDateFromValue(dateValue);
+
+  if (!date) return null;
+
+  date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return date;
+};
+
+const getTimestamp = (value?: string | null) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  const timestamp = date.getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const isTemporaryClosureActiveForDate = (branch: BranchRecord | null, dateValue: string) => {
+  const closure = getTemporaryClosure(branch);
+
+  if (!branch || !dateValue || (!closure?.isClosed && !branch.availability?.isTemporarilyClosed)) {
+    return false;
+  }
+
+  const from = getTimestamp(closure?.closedAt);
+  const to = getTimestamp(closure?.closedUntil);
+
+  if (from === null && to === null) {
+    return true;
+  }
+
+  const dayStart = getDateFromValue(dateValue);
+
+  if (!dayStart) return true;
+
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const closureStart = from ?? Number.NEGATIVE_INFINITY;
+  const closureEnd = to ?? Number.POSITIVE_INFINITY;
+
+  return closureStart <= dayEnd.getTime() && closureEnd >= dayStart.getTime();
+};
+
+const isSlotInsideTemporaryClosure = ({
+  branch,
+  dateValue,
+  slotStart,
+  slotEnd,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+  slotStart: number;
+  slotEnd: number;
+}) => {
+  const closure = getTemporaryClosure(branch);
+
+  if (!branch || !dateValue || (!closure?.isClosed && !branch.availability?.isTemporarilyClosed)) {
+    return false;
+  }
+
+  const from = getTimestamp(closure?.closedAt);
+  const to = getTimestamp(closure?.closedUntil);
+
+  if (from === null && to === null) {
+    return true;
+  }
+
+  const slotStartDate = getDateTimeFromDateAndMinutes(dateValue, slotStart);
+  const slotEndDate = getDateTimeFromDateAndMinutes(dateValue, slotEnd);
+
+  if (!slotStartDate || !slotEndDate) return true;
+
+  const closureStart = from ?? Number.NEGATIVE_INFINITY;
+  const closureEnd = to ?? Number.POSITIVE_INFINITY;
+
+  return slotStartDate.getTime() < closureEnd && slotEndDate.getTime() > closureStart;
+};
+
+const getHolidayOpeningHoursForDate = ({
+  branch,
+  dateValue,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+}): OpeningHours | null => {
+  const holidayOpeningHour = getRecord(branch?.availability?.holidayOpeningHour);
+
+  if (!holidayOpeningHour || !dateValue) {
+    return null;
+  }
+
+  const holidayDate = typeof holidayOpeningHour.date === "string"
+    ? normalizeDateValue(holidayOpeningHour.date)
+    : "";
+
+  if (holidayDate && holidayDate !== dateValue) {
+    return null;
+  }
+
+  if (!holidayDate && dateValue !== getTodayDateValue()) {
+    return null;
+  }
+
+  return {
+    dayOfWeek: getDayOfWeek(dateValue),
+    isClosed: Boolean(holidayOpeningHour.isClosed),
+    openTime: typeof holidayOpeningHour.openTime === "string" ? holidayOpeningHour.openTime : undefined,
+    closeTime: typeof holidayOpeningHour.closeTime === "string" ? holidayOpeningHour.closeTime : undefined,
+    breakTimes: [],
+    note: typeof holidayOpeningHour.note === "string" ? holidayOpeningHour.note : "",
+  };
+};
+
+const getBranchAvailabilityBlock = ({
+  branch,
+  dateValue,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+}) => {
+  if (!branch || !dateValue) {
+    return null;
+  }
+
+  if (branch.isActive === false || branch.availability?.isActive === false) {
+    return {
+      reason: "unavailable" as ReservationBlockReason,
+      message: branch.availability?.reason || "",
+    };
+  }
+
+  if (branch.availability?.isHolidayClosed && dateValue === getTodayDateValue()) {
+    return {
+      reason: "holiday" as ReservationBlockReason,
+      message: branch.availability?.reason || "",
+    };
+  }
+
+  if (isTemporaryClosureActiveForDate(branch, dateValue)) {
+    const closure = getTemporaryClosure(branch);
+
+    return {
+      reason: "temporaryClosure" as ReservationBlockReason,
+      message: closure?.message || closure?.reason || branch.availability?.reason || "",
+    };
+  }
+
+  if (
+    branch.availability?.isAvailable === false &&
+    !branch.availability?.isTemporarilyClosed &&
+    !branch.availability?.isHolidayClosed
+  ) {
+    return {
+      reason: "unavailable" as ReservationBlockReason,
+      message: branch.availability?.reason || "",
+    };
+  }
+
+  return null;
+};
+
 const isSlotInsideBreak = ({
   slotStart,
   slotEnd,
@@ -242,6 +411,16 @@ const getOpeningHoursForDate = ({
     };
   }
 
+  const holidayOpeningHours = getHolidayOpeningHoursForDate({ branch, dateValue });
+
+  if (holidayOpeningHours) {
+    return {
+      schedule: holidayOpeningHours,
+      dateRule: null,
+      reason: holidayOpeningHours.note || "",
+    };
+  }
+
   const openingHours = normalizeArray<OpeningHours>(branch?.settings?.openingHours);
   const selectedDay = getDayOfWeek(dateValue);
 
@@ -265,6 +444,12 @@ const buildAvailableTimeSlots = ({
   dateValue: string;
 }) => {
   if (!branch || !dateValue || isPastDateValue(dateValue)) return [];
+
+  const availabilityBlock = getBranchAvailabilityBlock({ branch, dateValue });
+
+  if (availabilityBlock?.reason === "unavailable" || availabilityBlock?.reason === "holiday") {
+    return [];
+  }
 
   const { schedule } = getOpeningHoursForDate({
     branch,
@@ -302,7 +487,14 @@ const buildAvailableTimeSlots = ({
         })
     );
 
-    if (!isDuringBreak) {
+    const isDuringTemporaryClosure = isSlotInsideTemporaryClosure({
+      branch,
+      dateValue,
+      slotStart,
+      slotEnd,
+    });
+
+    if (!isDuringBreak && !isDuringTemporaryClosure) {
       slots.push(minutesToTime(slotStart));
     }
   }
@@ -390,6 +582,18 @@ export function ReserveTablePage() {
     setValue("branchId", branch?.id ? String(branch.id) : "", { shouldValidate: true });
     setValue("date", "", { shouldValidate: true });
     setValue("time", "", { shouldValidate: true });
+
+    if (!branch?.id) return;
+
+    fetchReservationBranch({ branchId: String(branch.id) })
+      .then(({ branch: branchDetails }) => {
+        if (branchDetails) {
+          setSelectedBranch(branchDetails);
+        }
+      })
+      .catch(() => {
+        setSelectedBranch(branch);
+      });
   };
 
   /* ---------------- DAY + OPENING HOURS ---------------- */
@@ -407,6 +611,12 @@ export function ReserveTablePage() {
   const todaysHours = selectedScheduleState.schedule;
   const selectedDateRule = selectedScheduleState.dateRule;
   const isClosed = Boolean(todaysHours?.isClosed);
+  const selectedAvailabilityBlock = useMemo(() => {
+    return getBranchAvailabilityBlock({
+      branch: selectedBranch,
+      dateValue: date,
+    });
+  }, [selectedBranch, date]);
 
   const availableTimeSlots = useMemo(() => {
     return buildAvailableTimeSlots({
@@ -430,6 +640,12 @@ export function ReserveTablePage() {
     if (!date) return "";
     if (isPastDateValue(date)) return t("errors.pastDate");
     if (!selectedBranch?.id) return t("errors.selectBranchFirst");
+    if (selectedAvailabilityBlock?.reason === "unavailable") {
+      return selectedAvailabilityBlock.message || t("errors.branchUnavailable");
+    }
+    if (selectedAvailabilityBlock?.reason === "holiday") {
+      return selectedAvailabilityBlock.message || t("errors.holidayClosed");
+    }
     if (!hasOpeningHours && !selectedDateRule) {
       return t("errors.openingHoursNotConfigured");
     }
@@ -446,6 +662,7 @@ export function ReserveTablePage() {
     selectedBranch?.id,
     hasOpeningHours,
     selectedDateRule,
+    selectedAvailabilityBlock,
     todaysHours,
     isClosed,
     t,
@@ -481,6 +698,96 @@ export function ReserveTablePage() {
       todaysHours?.closeTime || "--:--"
     }`;
   }, [date, todaysHours, t]);
+
+  const reservationNotice = useMemo(() => {
+    if (!selectedBranch?.id) {
+      return null;
+    }
+
+    const closure = getTemporaryClosure(selectedBranch);
+    const closureUntil = closure?.closedUntil ? new Date(closure.closedUntil) : null;
+    const formattedClosureUntil = closureUntil && !Number.isNaN(closureUntil.getTime())
+      ? closureUntil.toLocaleString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
+
+    if (date && selectedAvailabilityBlock?.reason === "temporaryClosure") {
+      return {
+        tone: "warning" as const,
+        icon: AlertTriangle,
+        title: t("temporaryClosureTitle"),
+        message: selectedAvailabilityBlock.message || t("temporaryClosureDescription"),
+        meta: formattedClosureUntil ? t("temporaryClosureUntil", { date: formattedClosureUntil }) : "",
+      };
+    }
+
+    if (date && selectedAvailabilityBlock?.reason === "holiday") {
+      return {
+        tone: "danger" as const,
+        icon: CalendarX,
+        title: t("holidayClosureTitle"),
+        message: selectedAvailabilityBlock.message || t("holidayClosureDescription"),
+        meta: "",
+      };
+    }
+
+    if (date && selectedAvailabilityBlock?.reason === "unavailable") {
+      return {
+        tone: "danger" as const,
+        icon: CalendarX,
+        title: t("branchUnavailableTitle"),
+        message: selectedAvailabilityBlock.message || t("branchUnavailableDescription"),
+        meta: "",
+      };
+    }
+
+    if (date && isClosed) {
+      return {
+        tone: "danger" as const,
+        icon: CalendarX,
+        title: t("closedDayTitle"),
+        message: dateError || t("errors.closedSelectedDay"),
+        meta: "",
+      };
+    }
+
+    if (date && availableTimeSlots.length === 0 && !dateError) {
+      return {
+        tone: "warning" as const,
+        icon: Clock,
+        title: t("noSlotsTitle"),
+        message: t("noSlotsDescription"),
+        meta: "",
+      };
+    }
+
+    if (date && openingHoursLabel) {
+      return {
+        tone: "success" as const,
+        icon: Clock,
+        title: t("availableTodayTitle"),
+        message: t("availableHours", { hours: openingHoursLabel }),
+        meta: selectedDateRule ? t("dateRangeRuleSuffix") : "",
+      };
+    }
+
+    return null;
+  }, [
+    availableTimeSlots.length,
+    date,
+    dateError,
+    isClosed,
+    openingHoursLabel,
+    selectedAvailabilityBlock,
+    selectedBranch,
+    selectedDateRule,
+    t,
+  ]);
 
   /* ---------------- SUBMIT ---------------- */
   async function handleSubmit(values: ReservationFormValues) {
@@ -552,6 +859,7 @@ export function ReserveTablePage() {
     !dateError &&
     !timeError &&
     availableTimeSlots.includes(time);
+  const ReservationNoticeIcon = reservationNotice?.icon;
 
   return (
     <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden">
@@ -691,6 +999,42 @@ export function ReserveTablePage() {
                 ) : null}
               </div>
             </div>
+
+            {reservationNotice ? (
+              <div
+                className={`rounded-2xl border p-4 shadow-sm ${
+                  reservationNotice.tone === "success"
+                    ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+                    : reservationNotice.tone === "warning"
+                      ? "border-amber-200 bg-amber-50/90 text-amber-950"
+                      : "border-red-200 bg-red-50/90 text-red-950"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                      reservationNotice.tone === "success"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : reservationNotice.tone === "warning"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {ReservationNoticeIcon ? <ReservationNoticeIcon className="h-5 w-5" /> : null}
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {reservationNotice.title}
+                    </p>
+                    <p className="mt-1 text-sm leading-5 opacity-80">
+                      {reservationNotice.message}
+                      {reservationNotice.meta ? ` ${reservationNotice.meta}` : ""}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {/* DATE + TIME */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

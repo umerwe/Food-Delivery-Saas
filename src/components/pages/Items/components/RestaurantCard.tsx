@@ -16,6 +16,7 @@ import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuVariation, Modifier, ModifierGroup, ModifierLink, SelectedModifiersMap, PromotionInfo, PromotionPricing, RawModifierLink, SelectedModifier, VariationPriceOverride } from "@/components/pages/Items/types";
 import { hasText, formatPrice, getSplitPizzaPricingVariation, toNumber } from "@/components/pages/Items/utils/restaurant-card-utils";
 import { getModifierPriceForVariation } from "@/components/pages/Items/utils/modifier-pricing";
+import { getRestaurantMenuId } from "@/components/pages/Items/utils/product-cart";
 import {
   buildModifierSelections,
   getModifierGroupSelectedQuantity,
@@ -1800,6 +1801,7 @@ export function RestaurantCard({ item }: { item: MenuItem }) {
 
       const basePayload: CartPayload = {
         menuItemId: item?.id,
+        ...(getRestaurantMenuId(item) ? { restaurantMenuId: getRestaurantMenuId(item) } : {}),
         quantity: qty,
         variationId: selectedVariation?.id || undefined,
         note: note.trim() || "",

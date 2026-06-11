@@ -232,6 +232,7 @@ export type CartModifierSelectionInput = {
 export type CartPayload = {
   customerId?: string;
   menuItemId?: string | number;
+  restaurantMenuId?: string | number;
   dealId?: string;
   quantity: number;
   checkoutType?: CheckoutType;
@@ -300,6 +301,7 @@ export type AuthRestaurantUser = {
   restaurant?: RestaurantInfo | null;
   restaurantId?: string | number | null;
   restaurantName?: string | null;
+  branchId?: string | number | null;
   branch?: RestaurantBranch | null;
   address?: string | AddressRecord | null;
   profile?: {

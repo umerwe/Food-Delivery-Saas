@@ -1,7 +1,7 @@
 import { createDomainApiService } from "@/services/domain-api";
 import { getRequest } from "@/services/http";
 import { normalizeBranchApiResponse, normalizeBranchList } from "@/lib/branch-selector";
-import type { NearbyBranch, NearbyBranchesParams, NearbyBranchesResponse } from "@/types/branches";
+import type { BranchTemporaryClosure, NearbyBranch, NearbyBranchesParams, NearbyBranchesResponse } from "@/types/branches";
 import type { BranchApiResponse, BranchRecord } from "@/types/branch-selector";
 
 const branchesService = createDomainApiService();
@@ -33,6 +33,20 @@ const getNumber = (value: unknown) => {
 
 const getCoordinate = (value: unknown) =>
   typeof value === "string" || typeof value === "number" ? value : null;
+
+const normalizeTemporaryClosure = (value: unknown): BranchTemporaryClosure | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    isClosed: getBoolean(value.isClosed),
+    closedAt: getString(value.closedAt) ?? null,
+    closedUntil: getString(value.closedUntil) ?? null,
+    reason: getString(value.reason) ?? null,
+    message: getString(value.message) ?? null,
+  };
+};
 
 const normalizeNearbyBranch = (value: unknown): NearbyBranch | null => {
   if (!isRecord(value)) {
@@ -69,6 +83,7 @@ const normalizeNearbyBranch = (value: unknown): NearbyBranch | null => {
               .filter((orderType): orderType is string => Boolean(orderType))
           : undefined,
         deliveryConfig: value.settings.deliveryConfig,
+        temporaryClosure: normalizeTemporaryClosure(value.settings.temporaryClosure),
       }
     : null;
 
@@ -76,8 +91,12 @@ const normalizeNearbyBranch = (value: unknown): NearbyBranch | null => {
     ? {
         isAvailable: getBoolean(value.availability.isAvailable),
         isActive: getBoolean(value.availability.isActive),
+        isTemporarilyClosed: getBoolean(value.availability.isTemporarilyClosed),
+        isHolidayClosed: getBoolean(value.availability.isHolidayClosed),
         status: getString(value.availability.status),
         reason: getString(value.availability.reason) ?? null,
+        temporaryClosure: normalizeTemporaryClosure(value.availability.temporaryClosure),
+        holidayOpeningHour: value.availability.holidayOpeningHour,
       }
     : null;
 

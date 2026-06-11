@@ -27,13 +27,6 @@ export type DealChooserModifierGroup = {
   modifiers?: DealChooserModifier[];
 };
 
-export type DealChooserVariation = {
-  id?: string | number | null;
-  name?: string | null;
-  displayText?: string | null;
-  isDefault?: boolean | null;
-};
-
 export type DealChooserSelectedModifier = {
   id: string;
   name: string;
@@ -42,7 +35,6 @@ export type DealChooserSelectedModifier = {
 
 export type DealChooserItemConfiguration = {
   menuItemId: string;
-  selectedVariationId?: string | null;
   modifierSelections: CartModifierSelectionInput[];
   note?: string;
 };
@@ -64,18 +56,6 @@ export const getDealChooserNumber = (value: unknown, fallback = 0) => {
 
 export const getDealChooserModifierName = (modifier: DealChooserModifier) =>
   String(modifier.name || "Option").trim();
-
-export const getDealChooserVariations = (
-  item: CustomerDealMenuItem | null
-): DealChooserVariation[] =>
-  Array.isArray(item?.variations)
-    ? item.variations.filter(isRecord).map((variation) => ({
-        id: variation.id as string | number | null | undefined,
-        name: typeof variation.name === "string" ? variation.name : null,
-        displayText: typeof variation.displayText === "string" ? variation.displayText : null,
-        isDefault: typeof variation.isDefault === "boolean" ? variation.isDefault : null,
-      }))
-    : [];
 
 export const getDealChooserModifierGroups = (
   item: CustomerDealMenuItem | null
@@ -221,16 +201,14 @@ export const getDealChooserGroupHelperText = (group: DealChooserModifierGroup) =
 };
 
 export const isDealChooserItemConfigurable = (item: CustomerDealMenuItem) =>
-  getDealChooserModifierGroups(item).length > 0 ||
-  getDealChooserVariations(item).length > 0 ||
-  item.supportsSplitPizza === true;
+  getDealChooserModifierGroups(item).length > 0;
 
 export const canUseBackendDealItemFlow = (
   deal: CustomerDeal,
   item: CustomerDealMenuItem
 ) => {
-  if (getDealChooserVariations(item).length > 0) {
-    return false;
+  if (deal.dealSelectionMode === "FLEXIBLE_ITEMS") {
+    return true;
   }
 
   return (
@@ -270,23 +248,6 @@ export const validateDealChooserItemConfiguration = ({
   configuration?: DealChooserItemConfiguration;
 }): DealChooserItemValidationResult => {
   const groups = getDealChooserModifierGroups(item);
-  const variations = getDealChooserVariations(item);
-  const hasBackendDealFlow = canUseBackendDealItemFlow(deal, item);
-
-  if (variations.length > 0 && hasBackendDealFlow) {
-    return {
-      itemError: "Variation selection is not supported for this deal item.",
-      groupErrors: {},
-    };
-  }
-
-  if (variations.length > 0 && !configuration?.selectedVariationId) {
-    return {
-      itemError: "Choose a variation for this deal item.",
-      groupErrors: {},
-    };
-  }
-
   const selectedModifiersByGroup = getSelectedModifiersByGroup(groups, configuration);
   const validation = validateModifierSelections(groups, selectedModifiersByGroup);
 
@@ -311,8 +272,8 @@ export const buildDealCartItemPayload = ({
 
   if (
     modifierSelections.length > 0 &&
-    !configuration?.selectedVariationId &&
-    canSendDealIdWithModifierSelections(deal, item)
+    (canSendDealIdWithModifierSelections(deal, item) ||
+      deal.dealSelectionMode === "FLEXIBLE_ITEMS")
   ) {
     return buildCustomizableDealCartItemPayload({
       deal,
@@ -322,7 +283,10 @@ export const buildDealCartItemPayload = ({
     });
   }
 
-  if (!configuration?.selectedVariationId && canSendDealIdForReadyMadeItem(deal, item)) {
+  if (
+    canSendDealIdForReadyMadeItem(deal, item) ||
+    deal.dealSelectionMode === "FLEXIBLE_ITEMS"
+  ) {
     return buildReadyMadeDealCartItemPayload({
       deal,
       item,
@@ -333,8 +297,8 @@ export const buildDealCartItemPayload = ({
   return {
     branchId: branchId.trim(),
     menuItemId: item.id.trim(),
+    dealId: deal.id.trim(),
     quantity: 1,
-    ...(configuration?.selectedVariationId ? { variationId: configuration.selectedVariationId } : {}),
     ...(modifierSelections.length > 0 ? { modifierSelections } : {}),
     ...(configuration?.note ? { note: configuration.note } : {}),
   };

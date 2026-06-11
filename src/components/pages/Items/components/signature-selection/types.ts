@@ -237,6 +237,7 @@ export type SplitPizzaSelection = {
 export type CartPayload = {
   customerId?: string;
   menuItemId?: string;
+  restaurantMenuId?: string;
   quantity: number;
   checkoutType?: string;
   modifierSelections?: CartModifierSelectionInput[];

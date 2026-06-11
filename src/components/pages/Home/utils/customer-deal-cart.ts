@@ -7,7 +7,6 @@ export type DealActionKind = "AUTO_ADD" | "OPEN_CHOOSER";
 export type DealScopedItemCustomizationState =
   | "SIMPLE"
   | "REQUIRES_MODIFIERS"
-  | "REQUIRES_UNSUPPORTED_VARIATION"
   | "UNKNOWN";
 
 const CUSTOMIZATION_FIELDS = [
@@ -44,6 +43,12 @@ const hasRequiredOptionRecords = (value: unknown) =>
   Array.isArray(value) && value.some(isRequiredOptionRecord);
 
 const getRequiredQuantity = (deal: CustomerDeal) => {
+  const categoryRuleQuantity = getDealCategoryRulesRequiredQuantity(deal);
+
+  if (categoryRuleQuantity > 0) {
+    return categoryRuleQuantity;
+  }
+
   const parsed = Number(deal.dealRequiredQuantity);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : null;
 };
@@ -62,6 +67,22 @@ export const isFlexibleCategoryDeal = (deal: CustomerDeal) =>
   deal.dealSelectionMode === "FLEXIBLE_ITEMS" &&
   deal.scopeCategories.length > 0;
 
+export const getDealCategoryRulesRequiredQuantity = (deal: CustomerDeal | null) =>
+  (deal?.scopeCategoryRules ?? []).reduce((total, rule) => total + rule.itemLimit, 0);
+
+export const getDealCategoryRuleForItem = (
+  deal: CustomerDeal | null,
+  item: CustomerDealMenuItem | null
+) => {
+  const categoryId = item?.category?.id?.trim();
+
+  if (!deal || !categoryId) {
+    return null;
+  }
+
+  return deal.scopeCategoryRules?.find((rule) => rule.menuCategoryId === categoryId) ?? null;
+};
+
 export const isFlexibleAllItemsDeal = (deal: CustomerDeal) =>
   deal.dealSelectionMode === "FLEXIBLE_ITEMS" &&
   deal.scopeMenuItems.length === 0 &&
@@ -71,7 +92,7 @@ export const isFlexibleAllItemsDeal = (deal: CustomerDeal) =>
 export const requiresCustomizationForDealItem = (item: CustomerDealMenuItem): boolean => {
   const state = getDealScopedItemCustomizationState(item);
 
-  return state === "REQUIRES_MODIFIERS" || state === "REQUIRES_UNSUPPORTED_VARIATION";
+  return state === "REQUIRES_MODIFIERS";
 };
 
 const supportsDealIdCartPayload = (item: CustomerDealMenuItem) =>
@@ -82,49 +103,12 @@ const supportsDealIdCartPayload = (item: CustomerDealMenuItem) =>
 export const hasDealMenuItemModifierOptions = (item: CustomerDealMenuItem) =>
   hasOptions(item.modifierGroups) || hasOptions(item.modifiers) || hasOptions(item.modifierLinks);
 
-export const hasUnsupportedDealMenuItemCustomization = (item: CustomerDealMenuItem) =>
-  hasOptions(item.variations) || item.supportsSplitPizza === true;
-
-export const getDealMenuItemDefaultVariationId = (item: CustomerDealMenuItem) => {
-  const variations = Array.isArray(item.variations)
-    ? item.variations.filter(isRecord)
-    : [];
-  const defaultVariation = variations.find((variation) => variation.isDefault === true);
-  const fallbackVariation = variations[0];
-  const variationId = defaultVariation?.id ?? fallbackVariation?.id;
-
-  return typeof variationId === "string" || typeof variationId === "number"
-    ? String(variationId).trim()
-    : "";
-};
-
-export const getDealMenuItemDefaultVariationLabel = (item: CustomerDealMenuItem) => {
-  const variations = Array.isArray(item.variations)
-    ? item.variations.filter(isRecord)
-    : [];
-  const defaultVariation = variations.find((variation) => variation.isDefault === true);
-  const fallbackVariation = variations[0];
-  const variation = defaultVariation ?? fallbackVariation;
-  const label = variation?.displayText ?? variation?.name ?? variation?.label;
-
-  return typeof label === "string" ? label.trim() : "";
-};
-
 export const canSelectFlexibleDealItem = (item: CustomerDealMenuItem) =>
-  canAutoAddDealItem(item) ||
-  Boolean(
-    getDealMenuItemDefaultVariationId(item) &&
-      item.supportsSplitPizza !== true &&
-      !hasDealMenuItemModifierOptions(item)
-  );
+  canAutoAddDealItem(item) || isDealMenuItemCustomizable(item);
 
 export const getDealScopedItemCustomizationState = (
   item: CustomerDealMenuItem
 ): DealScopedItemCustomizationState => {
-  if (hasUnsupportedDealMenuItemCustomization(item)) {
-    return "REQUIRES_UNSUPPORTED_VARIATION";
-  }
-
   if (
     item.requiresCustomization === true ||
     item.hasConfigurableOptions === true ||
@@ -183,13 +167,11 @@ export const mergeDealScopedItemDetails = (
 
 export const isDealMenuItemReadyMade = (item: CustomerDealMenuItem): boolean =>
   supportsDealIdCartPayload(item) &&
-  !hasDealMenuItemModifierOptions(item) &&
-  !hasUnsupportedDealMenuItemCustomization(item);
+  !hasDealMenuItemModifierOptions(item);
 
 export const isDealMenuItemCustomizable = (item: CustomerDealMenuItem): boolean =>
   supportsDealIdCartPayload(item) &&
-  hasDealMenuItemModifierOptions(item) &&
-  !hasUnsupportedDealMenuItemCustomization(item);
+  hasDealMenuItemModifierOptions(item);
 
 export const canSendDealIdForReadyMadeItem = (
   deal: CustomerDeal,
@@ -199,8 +181,7 @@ export const canSendDealIdForReadyMadeItem = (
     deal.id &&
       item.id &&
       (isFixedItemDeal(deal) || supportsDealIdCartPayload(item)) &&
-      !hasDealMenuItemModifierOptions(item) &&
-      !hasUnsupportedDealMenuItemCustomization(item)
+      !hasDealMenuItemModifierOptions(item)
   );
 
 export const canSendDealIdWithModifierSelections = (
@@ -211,8 +192,7 @@ export const canSendDealIdWithModifierSelections = (
     deal.id &&
       item.id &&
       (isFixedItemDeal(deal) || supportsDealIdCartPayload(item)) &&
-      hasDealMenuItemModifierOptions(item) &&
-      !hasUnsupportedDealMenuItemCustomization(item)
+      hasDealMenuItemModifierOptions(item)
   );
 
 export const shouldSendDealIdForCartItem = (
@@ -296,6 +276,16 @@ export const getDealTypeLabel = (deal: CustomerDeal) => {
 
 export const getDealRequirementText = (deal: CustomerDeal) => {
   const requiredQuantity = getRequiredQuantity(deal);
+
+  if (isFlexibleCategoryDeal(deal) && (deal.scopeCategoryRules?.length ?? 0) > 0) {
+    const categoryNamesById = new Map(deal.scopeCategories.map((category) => [category.id, category.name]));
+    return (deal.scopeCategoryRules ?? [])
+      .map((rule) => {
+        const categoryName = categoryNamesById.get(rule.menuCategoryId) || "category";
+        return `${rule.itemLimit} from ${categoryName}`;
+      })
+      .join(", ");
+  }
 
   if (isFlexibleItemDeal(deal)) {
     return requiredQuantity
@@ -441,12 +431,11 @@ export const buildSelectedFlexibleDealCartItemsInput = (
     return [];
   }
 
-  return uniqueSelectedIds
+    return uniqueSelectedIds
     .map((menuItemId) => menuItemId.trim())
     .filter((menuItemId) => eligibleIds.has(menuItemId))
     .map((menuItemId) => {
       const item = eligibleItemsById.get(menuItemId);
-      const variationId = item ? getDealMenuItemDefaultVariationId(item) : "";
 
       if (item && canSendDealIdForReadyMadeItem(deal, item)) {
         return buildReadyMadeDealCartItemPayload({
@@ -459,7 +448,7 @@ export const buildSelectedFlexibleDealCartItemsInput = (
       return {
         branchId: resolvedBranchId,
         menuItemId,
-        ...(variationId ? { variationId } : {}),
+        dealId: trimId(deal.id),
         quantity: 1,
       };
     });

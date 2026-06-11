@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 
-import HeroSection from "@/components/pages/Home/components/heroSection";
+import { HeroSection } from "@/components/pages/Home/components/heroSection";
 import { FoodCategorySection } from "@/components/pages/Home/components/foodCategorySection";
 import WhyChooseUs from "@/components/pages/Home/components/whyChooseUsSection";
 import AppPromo from "@/components/pages/Home/components/appPromoSection";
@@ -16,6 +16,7 @@ import { DEFAULT_BRANDING } from "@/config/default-branding";
 import { useAuth } from "@/hooks/useAuth";
 import { useBranding } from "@/hooks/useBranding";
 import { useAddDealToCart } from "@/hooks/useCart";
+import { useAppLocale } from "@/hooks/useAppLocale";
 import { useCustomerDeals } from "@/hooks/useCustomerDeals";
 import { useHome } from "@/hooks/useHome";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
@@ -24,12 +25,13 @@ import type { CustomerDeal } from "@/types/customer-deals";
 const HomePage = () => {
   const t = useTranslations("home.hero");
   const { user, token, restaurantId: authRestaurantId } = useAuth();
+  const { locale } = useAppLocale();
   const { branding: fallbackBranding } = useBranding();
 
   const restaurantId = useMemo(() => resolveHomeRestaurantId(user, authRestaurantId), [authRestaurantId, user]);
   const branchId = useMemo(() => resolveHomeBranchId(user), [user]);
   const homeQuery = useHome(restaurantId, branchId, Boolean(token && branchId));
-  const dealsQuery = useCustomerDeals({ restaurantId, branchId, limit: 20 });
+  const dealsQuery = useCustomerDeals({ restaurantId, branchId, locale, limit: 20 });
   const addDealMutation = useAddDealToCart(branchId);
   const handleAddDeal = useCallback(
     (deal: CustomerDeal, selectedMenuItemIds?: string[]) => {

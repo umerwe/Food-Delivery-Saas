@@ -89,6 +89,14 @@ export const leaveGroupOrder = ({
   token?: string | null;
 }) => postGroupOrders(`/v1/group-orders/${orderId}/leave`, {}, token);
 
+export const cancelGroupOrder = ({
+  orderId,
+  token,
+}: {
+  orderId: string | number;
+  token?: string | null;
+}) => patchGroupOrders(`/v1/group-orders/${orderId}/status`, { status: "CANCELLED" }, token);
+
 export const checkoutGroupOrder = ({
   orderId,
   payload,

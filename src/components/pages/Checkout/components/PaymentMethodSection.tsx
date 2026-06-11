@@ -1,21 +1,23 @@
-import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 interface Props {
   paymentMethod: string;
   setPaymentMethod: (value: string) => void;
+  allowCashOnDelivery?: boolean;
 }
 
 const PaymentMethodSection = ({
   paymentMethod,
   setPaymentMethod,
+  allowCashOnDelivery = true,
 }: Props) => {
   const t = useTranslations("checkout");
   const options = [
-    { key: "cod", label: t("cashOnDelivery") },
-    { key: "card", label: t("cardStripe") },
-    { key: "wallet", label: t("wallet") },
-  ];
+    { key: "COD", label: t("cashOnDelivery") },
+    { key: "PAYPAL", label: t("paypal") },
+    { key: "STRIPE", label: t("onlineCard") },
+    { key: "WALLET", label: t("wallet") },
+  ].filter((option) => allowCashOnDelivery || option.key !== "COD");
 
   return (
     <section className="space-y-[25px]">
@@ -56,4 +58,4 @@ const PaymentMethodSection = ({
   );
 };
 
-export default PaymentMethodSection;
+export { PaymentMethodSection };

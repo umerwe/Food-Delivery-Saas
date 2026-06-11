@@ -13,6 +13,7 @@ export type CheckoutCartPayload = Record<string, unknown> & {
   scheduledDeliveryAt?: string | null;
   orderTime?: string | null;
   tipAmount?: number;
+  loyaltyPoints?: number;
   guestContact?: {
     email: string;
     phone: string;
@@ -30,20 +31,40 @@ export type CheckoutCartPayload = Record<string, unknown> & {
   };
 };
 
+export const normalizeCheckoutPaymentMethod = (paymentMethod: unknown) => {
+  const normalized = typeof paymentMethod === "string" ? paymentMethod.trim().toUpperCase() : "";
+
+  if (normalized === "CARD" || normalized === "CARD_ON_DELIVERY") {
+    return "STRIPE";
+  }
+
+  if (normalized === "WALLET") {
+    return "WALLET";
+  }
+
+  if (normalized === "COD" || normalized === "PAYPAL" || normalized === "STRIPE") {
+    return normalized;
+  }
+
+  return typeof paymentMethod === "string" ? paymentMethod : "";
+};
+
 export const normalizeCheckoutPayload = (payload: CheckoutCartPayload): Record<string, unknown> => {
   const { orderTime, scheduledDeliveryAt, ...rest } = payload;
+  delete rest.orderType;
+  rest.paymentMethod = normalizeCheckoutPaymentMethod(rest.paymentMethod);
 
   if (scheduledDeliveryAt !== undefined) {
     return {
       ...rest,
-      scheduledDeliveryAt,
+      orderTime: scheduledDeliveryAt,
     };
   }
 
   if (orderTime !== undefined) {
     return {
       ...rest,
-      scheduledDeliveryAt: orderTime,
+      orderTime,
     };
   }
 

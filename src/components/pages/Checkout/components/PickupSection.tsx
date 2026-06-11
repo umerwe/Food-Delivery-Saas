@@ -2,7 +2,7 @@ import AddressSection from "@/components/pages/Checkout/components/AddressSectio
 import { CustomerDetailsForm } from "@/components/pages/Checkout/components/CustomerDetailsForm"
 import { SelectPickupTimeSection } from "@/components/pages/Checkout/components/TimeSection"
 import NotesSection from "@/components/pages/Checkout/components/NotesSection"
-import PaymentMethodSection from "@/components/pages/Checkout/components/PaymentMethodSection"
+import { PaymentMethodSection } from "@/components/pages/Checkout/components/PaymentMethodSection"
 import type { BranchRecord } from "@/types/branch-selector";
 
 type PickupSectionProps = {

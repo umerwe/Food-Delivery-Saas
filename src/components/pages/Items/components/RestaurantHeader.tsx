@@ -1,15 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { Star, MapPin, Clock, Utensils, Loader2 } from "lucide-react";
+import { Star, MapPin, Clock, Utensils, Loader2, Store, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import useItems from "@/hooks/useItems";
 import { useAuth } from "@/hooks/useAuth";
+import useBranches from "@/hooks/useBranches";
 import { getStoredAuthState } from "@/lib/auth";
 import type { AuthRestaurantUser, ItemsCategory, StoredAuthState } from "@/components/pages/Items/types";
-import { getImageUrl, getOperatingHours, getRatingInfo, getRestaurantAddress, getRestaurantName, hasText, resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
+import { getBranchHoursSummary, getImageUrl, getOperatingHours, getRatingInfo, getRestaurantAddress, getRestaurantName, hasText, resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
+import type { BranchRecord } from "@/types/branch-selector";
 
 const CATEGORY_PAGE_LIMIT = 50;
 
@@ -24,6 +26,11 @@ const getCategoryItemCount = (category: ItemsCategory) => {
   return Number.isFinite(count) && count >= 0 ? count : null;
 };
 
+const getSelectedBranchFromSession = (
+  authUser: AuthRestaurantUser | null | undefined,
+  storedAuth: StoredAuthState | null | undefined
+) => authUser?.branch || authUser?.profile?.branch || storedAuth?.user?.branch || storedAuth?.user?.profile?.branch || null;
+
 export default function RestaurantHeader() {
   const t = useTranslations("items.common");
   const searchParams = useSearchParams();
@@ -32,9 +39,18 @@ export default function RestaurantHeader() {
 
   const { token, restaurantId: authRestaurantId, user } = useAuth();
   const { fetchMenuCategoriesPage } = useItems(token);
+  const { fetchBranches } = useBranches(token);
 
   const [category, setCategory] = useState<ItemsCategory | null>(null);
-  const [restaurant, setRestaurant] = useState<{ name: string; address: string; operatingHours: string; ratingInfo: ReturnType<typeof getRatingInfo>; coverImage?: string | null } | null>(null);
+  const [restaurant, setRestaurant] = useState<{
+    name: string;
+    address: string;
+    operatingHours: string;
+    ratingInfo: ReturnType<typeof getRatingInfo>;
+    coverImage?: string | null;
+    branchName?: string;
+    branchHours: ReturnType<typeof getBranchHoursSummary>;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const storedAuth = useMemo<StoredAuthState | null>(() => getStoredAuthState() as StoredAuthState | null, []);
@@ -48,6 +64,10 @@ export default function RestaurantHeader() {
     );
   }, [authRestaurantId, user?.restaurantId, storedAuth]);
 
+  const selectedBranchId = useMemo(() => {
+    return String(user?.branchId || user?.branch?.id || storedAuth?.user?.branchId || storedAuth?.user?.branch?.id || "");
+  }, [user?.branchId, user?.branch?.id, storedAuth]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -60,16 +80,37 @@ export default function RestaurantHeader() {
       try {
         setLoading(true);
 
+        const sessionBranch = getSelectedBranchFromSession(user as AuthRestaurantUser | null, storedAuth);
+        let selectedBranch: BranchRecord | AuthRestaurantUser["branch"] | null = sessionBranch;
+
+        if (selectedBranchId && restaurantId) {
+          try {
+            const branches = await fetchBranches(
+              `/v1/branches?restaurantId=${encodeURIComponent(String(restaurantId))}&page=1&limit=100`
+            );
+
+            selectedBranch = branches.find((branch) => String(branch.id) === selectedBranchId) ?? sessionBranch;
+          } catch {
+            selectedBranch = sessionBranch;
+          }
+        }
+
+        const branchHours = getBranchHoursSummary(selectedBranch);
+
         const resolvedRestaurant = {
           name: getRestaurantName(user as AuthRestaurantUser | null, storedAuth),
           address: getRestaurantAddress(user as AuthRestaurantUser | null, storedAuth),
-          operatingHours: getOperatingHours(user as AuthRestaurantUser | null, storedAuth),
+          operatingHours: branchHours.opening.status !== "unknown"
+            ? `${branchHours.opening.label}: ${branchHours.opening.value}`
+            : getOperatingHours(user as AuthRestaurantUser | null, storedAuth),
           ratingInfo: getRatingInfo(user as AuthRestaurantUser | null, storedAuth),
           coverImage:
             storedAuth?.user?.restaurant?.coverImage ||
             storedAuth?.user?.restaurant?.coverImageUrl ||
             storedAuth?.user?.restaurant?.bannerUrl ||
             "",
+          branchName: selectedBranch?.name ? String(selectedBranch.name) : undefined,
+          branchHours,
         };
 
         let page = 1;
@@ -128,6 +169,8 @@ export default function RestaurantHeader() {
             address: getRestaurantAddress(user as AuthRestaurantUser | null, storedAuth),
             operatingHours: getOperatingHours(user as AuthRestaurantUser | null, storedAuth),
             ratingInfo: getRatingInfo(user as AuthRestaurantUser | null, storedAuth),
+            branchName: getSelectedBranchFromSession(user as AuthRestaurantUser | null, storedAuth)?.name || undefined,
+            branchHours: getBranchHoursSummary(getSelectedBranchFromSession(user as AuthRestaurantUser | null, storedAuth)),
           });
           setCategory(null);
         }
@@ -143,7 +186,7 @@ export default function RestaurantHeader() {
     return () => {
       cancelled = true;
     };
-  }, [categoryId, token, restaurantId]);
+  }, [categoryId, token, restaurantId, selectedBranchId, fetchBranches, user, storedAuth]);
 
   const categoryItemCount = category ? getCategoryItemCount(category) : null;
   const ratingInfo = restaurant?.ratingInfo;
@@ -212,6 +255,50 @@ export default function RestaurantHeader() {
             <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5">
               <Clock size={15} className="text-gray-500" />
               <span>{restaurant?.operatingHours}</span>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="group relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+              <div className="absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full bg-emerald-200/35" />
+              <div className="relative flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+                  <Store size={18} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    {t("openingHours")}
+                  </span>
+                  <span className="mt-1 block text-base font-semibold text-gray-950">
+                    {restaurant?.branchHours.opening.value}
+                  </span>
+                  <span className="mt-1 block text-xs text-gray-500">
+                    {restaurant?.branchHours.opening.label}
+                    {restaurant?.branchName ? ` · ${restaurant.branchName}` : ""}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <div className="group relative overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+              <div className="absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full bg-orange-200/40" />
+              <div className="relative flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+                  <Truck size={18} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-primary">
+                    {t("deliveryHours")}
+                  </span>
+                  <span className="mt-1 block text-base font-semibold text-gray-950">
+                    {restaurant?.branchHours.delivery.value}
+                  </span>
+                  <span className="mt-1 block text-xs text-gray-500">
+                    {restaurant?.branchHours.delivery.label}
+                    {restaurant?.branchHours.delivery.label === "Same as opening" ? "" : restaurant?.branchName ? ` · ${restaurant.branchName}` : ""}
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
 

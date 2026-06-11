@@ -6,6 +6,7 @@ import type { CartAppliedPromotion, CartQuote } from "@/types/cart";
 
 type CartMutationPayload = Record<string, unknown>;
 type CartQuotePayload = Record<string, unknown>;
+type CartOrderType = "DELIVERY" | "TAKEAWAY";
 
 export type CartUpdatePayload = CartMutationPayload & {
   scheduledDeliveryAt?: string | null;
@@ -32,6 +33,11 @@ const getString = (value: unknown) => (typeof value === "string" ? value : "");
 
 const getServiceChargeType = (value: unknown) =>
   typeof value === "string" && value.trim() ? value : null;
+
+const getCurrentPathname = () =>
+  typeof window === "undefined" ? "" : window.location.pathname;
+
+const shouldSendRestaurantMenuId = (pathname: string) => pathname === "/menu";
 
 export const normalizeCartAppliedPromotion = (value: unknown): CartAppliedPromotion | null => {
   const promotion = getRecord(value);
@@ -65,6 +71,8 @@ export const normalizeCartQuote = (value: unknown): CartQuote | null => {
     return null;
   }
 
+  const couponCode = getString(quote.couponCode);
+
   return {
     subtotal: toNumber(quote.subtotal, 0),
     taxAmount: toNumber(quote.taxAmount, 0),
@@ -76,6 +84,10 @@ export const normalizeCartQuote = (value: unknown): CartQuote | null => {
     serviceChargeAmount: toNumber(quote.serviceChargeAmount, 0),
     tipAmount: toNumber(quote.tipAmount, 0),
     discountAmount: toNumber(quote.discountAmount, 0),
+    ...(couponCode ? { couponCode } : {}),
+    loyaltyDiscountAmount: toNumber(quote.loyaltyDiscountAmount, 0),
+    loyaltyPointsRedeemed: toNumber(quote.loyaltyPointsRedeemed, 0),
+    walletAppliedAmount: toNumber(quote.walletAppliedAmount, 0),
     totalAmount: toNumber(quote.totalAmount, 0),
     payableAmount: toNumber(quote.payableAmount, toNumber(quote.totalAmount, 0)),
     appliedPromotion: normalizeCartAppliedPromotion(quote.appliedPromotion),
@@ -85,7 +97,14 @@ export const normalizeCartQuote = (value: unknown): CartQuote | null => {
 const resolveCartRecord = (responseData: unknown) => {
   const resData = getRecord(responseData);
   const nestedData = getRecord(resData?.data);
-  return resData?.items || resData?.quote ? resData : nestedData?.items || nestedData?.quote ? nestedData : resData;
+  const cartData = getRecord(resData?.cart);
+  return resData?.items || resData?.quote
+    ? resData
+    : nestedData?.items || nestedData?.quote
+      ? nestedData
+      : cartData?.items || cartData?.quote
+        ? cartData
+        : resData;
 };
 
 export const fetchCustomerCart = async ({
@@ -136,14 +155,20 @@ export const addCustomerCartItem = ({
   token?: string | null;
 }) => postCart(`/v1/cart/items?customerId=${customerId}`, cleanAddCartItemPayload(payload), token);
 
-export const cleanAddCartItemPayload = (payload: CartMutationPayload): CartMutationPayload => {
-  if (!payload.dealId) {
-    return payload;
-  }
-
+export const cleanAddCartItemPayload = (
+  payload: CartMutationPayload,
+  pathname = getCurrentPathname()
+): CartMutationPayload => {
   const cleanedPayload: CartMutationPayload = { ...payload };
 
-  delete cleanedPayload.variationId;
+  if (!shouldSendRestaurantMenuId(pathname)) {
+    delete cleanedPayload.restaurantMenuId;
+  }
+
+  if (!cleanedPayload.dealId) {
+    return cleanedPayload;
+  }
+
   delete cleanedPayload.modifiers;
   delete cleanedPayload.sections;
   delete cleanedPayload.splitPizza;
@@ -159,6 +184,30 @@ export const cleanAddCartItemPayload = (payload: CartMutationPayload): CartMutat
   delete cleanedPayload.modifierSelections;
 
   return cleanedPayload;
+};
+
+export const normalizeGroupOrderItemPayload = (payload: CartMutationPayload): CartMutationPayload => {
+  const normalizedPayload: CartMutationPayload = { ...payload };
+  const modifierSelections = normalizeArray<ApiRecord>(payload.modifierSelections);
+
+  if (modifierSelections.length > 0) {
+    const groupedModifiers = modifierSelections.flatMap((selection) =>
+      normalizeArray<ApiRecord>(selection.modifiers)
+        .map((modifier) => ({
+          modifierId: getString(modifier.modifierId),
+          quantity: toNumber(modifier.quantity, 1),
+        }))
+        .filter((modifier) => modifier.modifierId)
+    );
+
+    if (groupedModifiers.length > 0) {
+      normalizedPayload.modifiers = groupedModifiers;
+    }
+  }
+
+  delete normalizedPayload.modifierSelections;
+
+  return normalizedPayload;
 };
 
 export const normalizeCartUpdatePayload = (payload: CartUpdatePayload): CartMutationPayload => {
@@ -178,18 +227,26 @@ export const normalizeCartUpdatePayload = (payload: CartUpdatePayload): CartMuta
   if (scheduledDeliveryAt !== undefined) {
     return {
       ...normalizedPayload,
-      scheduledDeliveryAt,
+      orderTime: scheduledDeliveryAt,
     };
   }
 
   if (orderTime !== undefined) {
     return {
       ...normalizedPayload,
-      scheduledDeliveryAt: orderTime,
+      orderTime,
     };
   }
 
   return normalizedPayload;
+};
+
+export const normalizeCartQuotePayload = (payload: CartQuotePayload): CartMutationPayload => {
+  const allowedPayload: CartMutationPayload = { ...payload };
+  delete allowedPayload.orderType;
+  delete allowedPayload.deliveryAddressId;
+
+  return allowedPayload;
 };
 
 export const updateCustomerCart = ({
@@ -202,6 +259,16 @@ export const updateCustomerCart = ({
   token?: string | null;
 }) => patchCart(`/v1/cart?customerId=${customerId}`, normalizeCartUpdatePayload(payload), token);
 
+export const updateCustomerCartOrderType = ({
+  customerId,
+  orderType,
+  token,
+}: {
+  customerId: string;
+  orderType: CartOrderType;
+  token?: string | null;
+}) => patchCart(`/v1/cart?customerId=${customerId}`, { orderType }, token);
+
 export const quoteCustomerCart = ({
   customerId,
   payload = {},
@@ -210,7 +277,7 @@ export const quoteCustomerCart = ({
   customerId: string;
   payload?: CartQuotePayload;
   token?: string | null;
-}) => postCart(`/v1/cart/quote?customerId=${customerId}`, payload, token);
+}) => postCart(`/v1/cart/quote?customerId=${customerId}`, normalizeCartQuotePayload(payload), token);
 
 export const updateCustomerCartItem = ({
   cartItemId,
@@ -286,4 +353,4 @@ export const addGroupOrderItem = ({
   groupOrderId: string;
   payload: CartMutationPayload;
   token?: string | null;
-}) => postCart(`/v1/group-orders/${groupOrderId}/items`, payload, token);
+}) => postCart(`/v1/group-orders/${groupOrderId}/items`, normalizeGroupOrderItemPayload(payload), token);

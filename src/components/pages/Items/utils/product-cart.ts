@@ -53,7 +53,7 @@ const getSplitSections = ({
       ]
     : undefined;
 
-const getRestaurantMenuId = (item: MenuItem | null) =>
+export const getRestaurantMenuId = (item: MenuItem | null) =>
   getId(
     item?.restaurantMenuId ||
       item?.restaurantMenu?.id ||
@@ -136,6 +136,7 @@ export const buildReadyMadeDealCartItemPayload = ({
 }): AddCartItemPayload => ({
   branchId: getStringId(branchId),
   menuItemId: getStringId(item.id),
+  ...(getRestaurantMenuId(item) ? { restaurantMenuId: getRestaurantMenuId(item) } : {}),
   dealId: getStringId(deal.id),
   quantity: 1,
 });
@@ -153,6 +154,7 @@ export const buildCustomizableDealCartItemPayload = ({
 }): AddCartItemPayload => ({
   branchId: getStringId(branchId),
   menuItemId: getStringId(item.id),
+  ...(getRestaurantMenuId(item) ? { restaurantMenuId: getRestaurantMenuId(item) } : {}),
   dealId: getStringId(deal.id),
   quantity: 1,
   modifierSelections,

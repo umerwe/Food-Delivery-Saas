@@ -15,6 +15,7 @@ export const getCustomerDeals = async (
     params: cleanParams({
       restaurantId: params.restaurantId,
       branchId: params.branchId,
+      locale: params.locale,
       limit: params.limit ?? 20,
     }),
   });

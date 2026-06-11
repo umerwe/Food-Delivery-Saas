@@ -49,7 +49,19 @@ export type CustomerDealMenuItem = {
 export type CustomerDealCategory = {
   id: string;
   name: string;
+  slug?: string | null;
   imageUrl?: string | null;
+};
+
+export type CustomerDealCategoryRule = {
+  menuCategoryId: string;
+  itemLimit: number;
+  variationId?: string | null;
+  variation?: {
+    id?: string;
+    name?: string;
+    displayText?: string | null;
+  } | null;
 };
 
 export type CustomerDealRestaurant = {
@@ -80,12 +92,14 @@ export type CustomerDeal = {
   branch?: CustomerDealBranch | null;
   scopeMenuItems: CustomerDealMenuItem[];
   scopeCategories: CustomerDealCategory[];
+  scopeCategoryRules?: CustomerDealCategoryRule[];
   scopeCategoryIds?: string[];
 };
 
 export type CustomerDealsParams = {
   restaurantId?: string | null;
   branchId?: string | null;
+  locale?: string | null;
   limit?: number;
 };
 
@@ -210,9 +224,36 @@ const normalizeCategories = (value: unknown): CustomerDealCategory[] => {
     .map((category) => ({
       id: getString(category.id) ?? "",
       name: getString(category.name) ?? "",
+      slug: getNullableString(category.slug),
       imageUrl: getNullableString(category.imageUrl),
     }))
     .filter((category) => category.id);
+};
+
+const normalizeCategoryRules = (value: unknown): CustomerDealCategoryRule[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(isRecord)
+    .map((rule) => {
+      const variation = isRecord(rule.variation) ? rule.variation : null;
+
+      return {
+        menuCategoryId: getString(rule.menuCategoryId) ?? "",
+        itemLimit: Math.max(0, Math.floor(getNumber(rule.itemLimit, 0))),
+        variationId: getNullableString(rule.variationId),
+        variation: variation
+          ? {
+              id: getString(variation.id),
+              name: getString(variation.name),
+              displayText: getNullableString(variation.displayText),
+            }
+          : null,
+      };
+    })
+    .filter((rule) => rule.menuCategoryId && rule.itemLimit > 0);
 };
 
 const normalizeCategoryIds = (value: unknown): string[] => {
@@ -307,6 +348,7 @@ export const normalizeCustomerDeal = (input: unknown): CustomerDeal | null => {
     branch: normalizeBranch(input.branch),
     scopeMenuItems: normalizeMenuItems(input.scopeMenuItems),
     scopeCategories,
+    scopeCategoryRules: normalizeCategoryRules(input.scopeCategoryRules),
     scopeCategoryIds,
   };
 };

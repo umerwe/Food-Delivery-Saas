@@ -10,6 +10,7 @@ export const useCustomerDeals = (params: CustomerDealsParams) => {
   const resolvedParams = {
     restaurantId: params.restaurantId ?? null,
     branchId: params.branchId ?? null,
+    locale: params.locale ?? null,
     limit: params.limit ?? 20,
   };
 

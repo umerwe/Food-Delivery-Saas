@@ -24,6 +24,7 @@ describe("getCustomerDeals", () => {
     await getCustomerDeals({
       restaurantId: "rest-1",
       branchId: "branch-1",
+      locale: "de",
       limit: 10,
     });
 
@@ -31,6 +32,7 @@ describe("getCustomerDeals", () => {
       params: {
         restaurantId: "rest-1",
         branchId: "branch-1",
+        locale: "de",
         limit: 10,
       },
     });
@@ -76,6 +78,14 @@ describe("getCustomerDeals", () => {
             thumbnailUrl: "https://example.com/thumb.png",
             scopeMenuItems: [{ id: "item-1", name: "Burger" }],
             scopeCategories: [{ id: "cat-1", name: "Burgers" }],
+            scopeCategoryRules: [
+              {
+                menuCategoryId: "cat-1",
+                itemLimit: 2,
+                variationId: "large",
+                variation: { id: "large", name: "Large" },
+              },
+            ],
           },
         ],
       },
@@ -89,6 +99,12 @@ describe("getCustomerDeals", () => {
     expect(response.deals[0].thumbnailUrl).toBe("https://example.com/thumb.png");
     expect(response.deals[0].scopeMenuItems[0].name).toBe("Burger");
     expect(response.deals[0].scopeCategories[0].name).toBe("Burgers");
+    expect(response.deals[0].scopeCategoryRules?.[0]).toEqual({
+      menuCategoryId: "cat-1",
+      itemLimit: 2,
+      variationId: "large",
+      variation: { id: "large", name: "Large", displayText: null },
+    });
   });
 
   it("handles direct array response", () => {

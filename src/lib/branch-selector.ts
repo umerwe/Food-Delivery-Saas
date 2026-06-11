@@ -1,6 +1,6 @@
 import { readAuthSession, saveAuthSession } from "@/lib/auth";
 import type { AuthContextValue, AuthUser } from "@/types/auth";
-import type { BranchOrderType, NearbyBranch } from "@/types/branches";
+import type { BranchOrderType, BranchTemporaryClosure, NearbyBranch } from "@/types/branches";
 import type { BranchApiResponse, BranchRecord } from "@/types/branch-selector";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -51,7 +51,29 @@ const normalizeOpeningHours = (value: unknown): NonNullable<BranchRecord["settin
     isClosed: getBoolean(entry.isClosed),
     openTime: getString(entry.openTime),
     closeTime: getString(entry.closeTime),
+    breakTimes: Array.isArray(entry.breakTimes)
+      ? entry.breakTimes.filter(isRecord).map((breakTime) => ({
+          startTime: getString(breakTime.startTime),
+          endTime: getString(breakTime.endTime),
+          note: getString(breakTime.note),
+        }))
+      : undefined,
+    note: getString(entry.note),
   }));
+};
+
+const normalizeTemporaryClosure = (value: unknown): BranchTemporaryClosure | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    isClosed: getBoolean(value.isClosed),
+    closedAt: getNullableString(value.closedAt),
+    closedUntil: getNullableString(value.closedUntil),
+    reason: getNullableString(value.reason),
+    message: getNullableString(value.message),
+  };
 };
 
 const normalizeBranchSettings = (value: unknown): BranchRecord["settings"] | undefined => {
@@ -67,6 +89,7 @@ const normalizeBranchSettings = (value: unknown): BranchRecord["settings"] | und
           .filter((orderType): orderType is BranchOrderType => Boolean(orderType))
       : undefined,
     deliveryConfig: value.deliveryConfig,
+    temporaryClosure: normalizeTemporaryClosure(value.temporaryClosure),
     openingHours: normalizeOpeningHours(value.openingHours),
   };
 };
@@ -79,8 +102,12 @@ const normalizeAvailability = (value: unknown): BranchRecord["availability"] => 
   return {
     isAvailable: getBoolean(value.isAvailable),
     isActive: getBoolean(value.isActive),
+    isTemporarilyClosed: getBoolean(value.isTemporarilyClosed),
+    isHolidayClosed: getBoolean(value.isHolidayClosed),
     status: getString(value.status),
     reason: getNullableString(value.reason),
+    temporaryClosure: normalizeTemporaryClosure(value.temporaryClosure),
+    holidayOpeningHour: value.holidayOpeningHour,
   };
 };
 

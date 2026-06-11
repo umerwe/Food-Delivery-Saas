@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useCart } from "@/hooks/useCart";
 import useMenu from "@/hooks/useMenu";
+import { setStoredRestaurantMenuId } from "@/lib/timed-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { getSignatureMenuViewMode, setSignatureMenuViewMode } from "@/lib/view-preferences";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -626,6 +627,10 @@ export function SignatureSelectionContent({
 
     return activeMenuId || menus?.[0]?.id || "";
   }, [viewMode, activeOnePageMenuId, activeMenuId, menus]);
+
+  useEffect(() => {
+    setStoredRestaurantMenuId(activeChipMenuId);
+  }, [activeChipMenuId]);
 
   useEffect(() => {
     if (!menus.length) {
@@ -1700,6 +1705,7 @@ export function SignatureSelectionContent({
         menuItemId: item.id,
         quantity,
         variationId: variation?.id ?? null,
+        ...(activeChipMenuId ? { restaurantMenuId: activeChipMenuId } : {}),
         branchId,
         note: note.trim() || "",
       };

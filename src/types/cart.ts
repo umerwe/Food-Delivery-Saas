@@ -64,6 +64,10 @@ export type CartQuote = {
   serviceChargeAmount?: number;
   tipAmount?: number;
   discountAmount?: number;
+  couponCode?: string;
+  loyaltyDiscountAmount?: number;
+  loyaltyPointsRedeemed?: number;
+  walletAppliedAmount?: number;
   totalAmount: number;
   payableAmount?: number;
   appliedPromotion?: CartAppliedPromotion | null;
@@ -80,6 +84,7 @@ export type CartModifierSelectionInput = {
 export type AddCartItemPayload = {
   branchId: string;
   menuItemId: string;
+  restaurantMenuId?: string;
   dealId?: string;
   variationId?: string;
   quantity: number;

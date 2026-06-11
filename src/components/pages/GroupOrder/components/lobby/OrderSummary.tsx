@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, Loader2, LogOut } from "lucide-react";
+import { Info, Loader2, LogOut, XCircle } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -13,8 +13,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import useGroupOrder, { useGroupOrderApi } from "@/hooks/useGroupOrder";
+import { useGroupOrder, useGroupOrderApi } from "@/hooks/useGroupOrder";
+import { useAuth } from "@/hooks/useAuth";
 import { clearStoredGroupOrderCode } from "@/lib/group-order";
+import { getBackendErrorMessage, hasBackendError } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import type { CheckoutGroupOrderPayload, GroupOrder, GroupOrderPaymentMethod, GroupOrderSuccessData } from "@/types/group-order";
 
 type OrderSummaryProps = {
@@ -22,13 +24,14 @@ type OrderSummaryProps = {
   onSuccess: (data: GroupOrderSuccessData) => void;
 };
 
-export default function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
+export function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
   const t = useTranslations("groupOrder.lobby.summary");
   const cartT = useTranslations("cart");
   const errorT = useTranslations("errors");
   const summary = order?.summary;
-const { canCheckout, isHost } = useGroupOrder();
-  const { checkoutGroupOrder, leaveGroupOrder } = useGroupOrderApi(null);
+  const { token } = useAuth();
+  const { canCheckout, canMutateGroupOrder, isHost } = useGroupOrder();
+  const { cancelGroupOrder, checkoutGroupOrder, leaveGroupOrder } = useGroupOrderApi(token);
 
   const [noteOpen, setNoteOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -37,22 +40,60 @@ const { canCheckout, isHost } = useGroupOrder();
   const [paymentMethod, setPaymentMethod] = useState<GroupOrderPaymentMethod>("COD");
 
   const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [loadingCancel, setLoadingCancel] = useState(false);
   const [loadingLeave, setLoadingLeave] = useState(false);
+  const actionsDisabled = !canMutateGroupOrder || loadingCancel || loadingCheckout || loadingLeave;
 
   const handleLeave = async () => {
+    if (isHost || !canMutateGroupOrder) return;
+
     try {
       setLoadingLeave(true);
-      await leaveGroupOrder({ orderId: order.id });
+      const res = await leaveGroupOrder({ orderId: order.id });
+
+      if (hasBackendError(res)) {
+        toast.error(getBackendErrorMessage(res, t("failedLeaveGroup")));
+        return;
+      }
+
+      clearStoredGroupOrderCode();
       toast.success(t("leftGroup"));
       window.location.href = "/";
     } catch (err) {
-      toast.error(t("failedLeaveGroup"));
+      toast.error(err instanceof Error ? err.message : t("failedLeaveGroup"));
     } finally {
       setLoadingLeave(false);
     }
   };
 
+  const handleCancel = async () => {
+    if (!isHost || !canMutateGroupOrder) return;
+
+    try {
+      setLoadingCancel(true);
+      const res = await cancelGroupOrder({ orderId: order.id });
+
+      if (hasBackendError(res)) {
+        toast.error(getBackendErrorMessage(res, t("failedCancelGroup")));
+        return;
+      }
+
+      clearStoredGroupOrderCode();
+      toast.success(t("cancelledGroup"));
+      window.location.href = "/group-order";
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("failedCancelGroup"));
+    } finally {
+      setLoadingCancel(false);
+    }
+  };
+
  const handleCheckout = async () => {
+  if (!canMutateGroupOrder) {
+    toast.error(t("cannotModifyClosedGroup"));
+    return;
+  }
+
   try {
     setLoadingCheckout(true);
 
@@ -65,8 +106,8 @@ const { canCheckout, isHost } = useGroupOrder();
 
     const res = await checkoutGroupOrder({ orderId: order.id, payload });
 
-    if (!res || res.error) {
-      toast.error(res?.error || res?.message || t("checkoutFailed"));
+    if (hasBackendError(res)) {
+      toast.error(getBackendErrorMessage(res, t("checkoutFailed")));
 
       return;
     }
@@ -96,10 +137,26 @@ clearStoredGroupOrderCode();
           </h2>
 
           {/* LEAVE BUTTON */}
-       {!isHost && (
+       {isHost && canMutateGroupOrder ? (
+          <button
+            onClick={handleCancel}
+            disabled={actionsDisabled}
+            className="flex items-center gap-1 text-red-500 text-sm hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loadingCancel ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <XCircle className="w-4 h-4" />
+            )}
+            {t("cancel")}
+          </button>
+        ) : null}
+
+       {!isHost && canMutateGroupOrder ? (
           <button
             onClick={handleLeave}
-            className="flex items-center gap-1 text-red-500 text-sm hover:opacity-80"
+            disabled={actionsDisabled}
+            className="flex items-center gap-1 text-red-500 text-sm hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loadingLeave ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -107,7 +164,8 @@ clearStoredGroupOrderCode();
               <LogOut className="w-4 h-4" />
             )}
             {t("leave")}
-          </button> )}
+          </button>
+        ) : null}
         </div>
 
         {/* PRICES */}
@@ -138,13 +196,19 @@ clearStoredGroupOrderCode();
         {/* CHECKOUT BUTTON */}
        <button
   onClick={() => {
+    if (!canMutateGroupOrder) {
+      toast.error(t("cannotModifyClosedGroup"));
+      return;
+    }
+
     if (!canCheckout) {
       toast.error(t("onlyHostCanFinalize"));
       return;
     }
     setCheckoutOpen(true);
   }}
-  className="w-full mt-5 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-full font-medium shadow-md hover:shadow-lg transition"
+  disabled={!canCheckout || actionsDisabled}
+  className="w-full mt-5 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-full font-medium shadow-md hover:shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60"
 >
   {t("finalizeCheckout")}
 </button>
@@ -239,7 +303,7 @@ clearStoredGroupOrderCode();
       </p>
 
       <div className="grid grid-cols-2 gap-3">
-        {(["COD", "BANK_TRANSFER", "EASYPESA", "JAZZCASH"] as GroupOrderPaymentMethod[]).map((method) => (
+        {(["COD", "PAYPAL", "STRIPE"] as GroupOrderPaymentMethod[]).map((method) => (
           <button
             key={method}
             onClick={() => setPaymentMethod(method as GroupOrderPaymentMethod)}

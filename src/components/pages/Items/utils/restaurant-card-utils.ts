@@ -1,4 +1,5 @@
 import type { ApiMeta, ApiRecord, AuthRestaurantUser, ItemsCategory, MenuItem, RestaurantInfo, StoredAuthState } from "../types";
+import type { BranchSettings } from "@/types/branches";
 
 export const FALLBACK_BANNER = "/categories/background_banner.png";
 export const FALLBACK_ITEM_IMAGE = "/menu-item.jpg";
@@ -163,6 +164,186 @@ export const getOperatingHours = (authUser: AuthRestaurantUser | null | undefine
   const closingTime = restaurant.closingTime || restaurant.closesAt || branch.closingTime || branch.closesAt;
   if (hasText(openingTime) && hasText(closingTime)) return `${openingTime} - ${closingTime}`;
   return "Operating hours not specified";
+};
+
+const DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+
+const DAY_LABELS: Record<string, string> = {
+  SUNDAY: "Sun",
+  MONDAY: "Mon",
+  TUESDAY: "Tue",
+  WEDNESDAY: "Wed",
+  THURSDAY: "Thu",
+  FRIDAY: "Fri",
+  SATURDAY: "Sat",
+};
+
+type BranchHoursEntry = NonNullable<BranchSettings["openingHours"]>[number];
+
+export type BranchHoursSummary = {
+  label: string;
+  value: string;
+  status: "open" | "closed" | "unknown";
+};
+
+const getRecordValue = (record: ApiRecord, keys: string[]) =>
+  keys.map((key) => record[key]).find((value) => value !== undefined && value !== null);
+
+const getBranchSettings = (branch: unknown): BranchSettings | null => {
+  if (typeof branch !== "object" || branch === null || Array.isArray(branch)) {
+    return null;
+  }
+
+  const settings = (branch as ApiRecord).settings;
+  return typeof settings === "object" && settings !== null && !Array.isArray(settings)
+    ? settings as BranchSettings
+    : null;
+};
+
+const normalizeDayKey = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toUpperCase();
+
+const formatScheduleTime = (value: unknown) => {
+  const text = String(value ?? "").trim();
+
+  if (!text) return "";
+  if (/[ap]m/i.test(text)) return text.toUpperCase();
+
+  const match = text.match(/^(\d{1,2}):(\d{2})/);
+
+  if (!match) return text;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return text;
+  }
+
+  const period = hours >= 12 ? "PM" : "AM";
+  const normalizedHours = hours % 12 || 12;
+
+  return `${normalizedHours}:${String(minutes).padStart(2, "0")} ${period}`;
+};
+
+const formatHoursRange = (entry: BranchHoursEntry) => {
+  const openTime = formatScheduleTime(entry.openTime);
+  const closeTime = formatScheduleTime(entry.closeTime);
+
+  return openTime && closeTime ? `${openTime} - ${closeTime}` : "";
+};
+
+const normalizeSchedule = (value: unknown): BranchHoursEntry[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is BranchHoursEntry => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+    : [];
+
+const getScheduleFromSettings = (settings: BranchSettings | null, keys: string[]) => {
+  if (!settings) return [];
+
+  const settingsRecord = settings as ApiRecord;
+  const directSchedule = normalizeSchedule(getRecordValue(settingsRecord, keys));
+
+  if (directSchedule.length > 0) {
+    return directSchedule;
+  }
+
+  const deliveryConfig = settingsRecord.deliveryConfig;
+
+  if (typeof deliveryConfig === "object" && deliveryConfig !== null && !Array.isArray(deliveryConfig)) {
+    return normalizeSchedule(getRecordValue(deliveryConfig as ApiRecord, keys));
+  }
+
+  return [];
+};
+
+const getTodaySchedule = (schedule: BranchHoursEntry[]) => {
+  const today = DAYS[new Date().getDay()];
+  const todayEntry = schedule.find((entry) => normalizeDayKey(entry.dayOfWeek) === today);
+
+  return {
+    today,
+    entry: todayEntry ?? schedule.find((entry) => !entry.isClosed && hasText(entry.openTime) && hasText(entry.closeTime)) ?? null,
+  };
+};
+
+const summarizeSchedule = ({
+  fallback,
+  schedule,
+  useFallbackWhenMissing = false,
+}: {
+  fallback?: BranchHoursSummary | null;
+  schedule: BranchHoursEntry[];
+  useFallbackWhenMissing?: boolean;
+}): BranchHoursSummary => {
+  if (schedule.length === 0) {
+    if (useFallbackWhenMissing && fallback?.status !== "unknown") {
+      return {
+        label: "Same as opening",
+        value: fallback?.value || "Same as opening hours",
+        status: fallback?.status ?? "unknown",
+      };
+    }
+
+    return {
+      label: "Schedule",
+      value: "Not configured",
+      status: "unknown",
+    };
+  }
+
+  const { today, entry } = getTodaySchedule(schedule);
+
+  if (!entry) {
+    return {
+      label: "Schedule",
+      value: "Not configured",
+      status: "unknown",
+    };
+  }
+
+  const label = normalizeDayKey(entry.dayOfWeek) === today
+    ? "Today"
+    : DAY_LABELS[normalizeDayKey(entry.dayOfWeek)] || "Next open";
+
+  if (entry.isClosed) {
+    return {
+      label,
+      value: "Closed",
+      status: "closed",
+    };
+  }
+
+  const hours = formatHoursRange(entry);
+
+  return {
+    label,
+    value: hours || "Not configured",
+    status: hours ? "open" : "unknown",
+  };
+};
+
+export const getBranchHoursSummary = (branch: unknown) => {
+  const settings = getBranchSettings(branch);
+  const openingSchedule = getScheduleFromSettings(settings, ["openingHours", "operatingHours", "businessHours"]);
+  const deliverySchedule = getScheduleFromSettings(settings, [
+    "deliveryHours",
+    "deliveryOpeningHours",
+    "deliverySchedule",
+    "deliveryOperatingHours",
+  ]);
+  const opening = summarizeSchedule({ schedule: openingSchedule });
+
+  return {
+    opening,
+    delivery: summarizeSchedule({
+      fallback: opening,
+      schedule: deliverySchedule,
+      useFallbackWhenMissing: true,
+    }),
+  };
 };
 
 export const getRatingInfo = (authUser: AuthRestaurantUser | null | undefined, storedAuth: StoredAuthState | null | undefined) => {

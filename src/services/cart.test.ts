@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  addGroupOrderItem,
   addCustomerCartItem,
+  cleanAddCartItemPayload,
   deleteCustomerCartDeal,
   fetchCustomerCart,
   normalizeCartQuote,
   quoteCustomerCart,
   updateCustomerCart,
+  updateCustomerCartOrderType,
   updateCustomerCartDealQuantity,
   updateCustomerCartItem,
 } from "./cart";
@@ -56,6 +59,45 @@ describe("cart service", () => {
     );
   });
 
+  it("strips restaurantMenuId from add item payloads outside menu page", async () => {
+    postCartMock.mockResolvedValue({ success: true });
+
+    await addCustomerCartItem({
+      customerId: "customer-1",
+      payload: {
+        branchId: "branch-1",
+        menuItemId: "burger-id",
+        restaurantMenuId: "menu-1",
+        quantity: 1,
+      },
+    });
+
+    expect(postCartMock.mock.calls[0][1]).toEqual({
+      branchId: "branch-1",
+      menuItemId: "burger-id",
+      quantity: 1,
+    });
+  });
+
+  it("keeps restaurantMenuId when add item payload is created on menu page", () => {
+    expect(
+      cleanAddCartItemPayload(
+        {
+          branchId: "branch-1",
+          menuItemId: "burger-id",
+          restaurantMenuId: "menu-1",
+          quantity: 1,
+        },
+        "/menu"
+      )
+    ).toEqual({
+      branchId: "branch-1",
+      menuItemId: "burger-id",
+      restaurantMenuId: "menu-1",
+      quantity: 1,
+    });
+  });
+
   it("adds customer cart item with grouped modifier selections", async () => {
     postCartMock.mockResolvedValue({ success: true });
 
@@ -92,6 +134,42 @@ describe("cart service", () => {
     expect(postCartMock.mock.calls[0][1]).not.toHaveProperty("modifiers");
   });
 
+  it("flattens grouped modifier selections before adding group order items", async () => {
+    postCartMock.mockResolvedValue({ success: true });
+
+    await addGroupOrderItem({
+      groupOrderId: "group-order-1",
+      payload: {
+        menuItemId: "burger-id",
+        quantity: 1,
+        modifierSelections: [
+          {
+            modifierGroupId: "group-sauces",
+            modifiers: [
+              { modifierId: "modifier-garlic", quantity: 1 },
+              { modifierId: "modifier-chili", quantity: 2 },
+            ],
+          },
+        ],
+      },
+      token: "customer-token",
+    });
+
+    expect(postCartMock).toHaveBeenCalledWith(
+      "/v1/group-orders/group-order-1/items",
+      {
+        menuItemId: "burger-id",
+        quantity: 1,
+        modifiers: [
+          { modifierId: "modifier-garlic", quantity: 1 },
+          { modifierId: "modifier-chili", quantity: 2 },
+        ],
+      },
+      "customer-token"
+    );
+    expect(postCartMock.mock.calls[0][1]).not.toHaveProperty("modifierSelections");
+  });
+
   it("cleans ready-made deal cart payloads before posting", async () => {
     postCartMock.mockResolvedValue({ success: true });
 
@@ -113,6 +191,7 @@ describe("cart service", () => {
       branchId: "branch-1",
       menuItemId: "deal-item-1",
       dealId: "deal-1",
+      variationId: "large",
       quantity: 1,
     });
   });
@@ -142,6 +221,7 @@ describe("cart service", () => {
       branchId: "branch-1",
       menuItemId: "deal-item-2",
       dealId: "deal-1",
+      variationId: "large",
       quantity: 1,
       modifierSelections: [
         {
@@ -214,7 +294,7 @@ describe("cart service", () => {
     );
   });
 
-  it("updates customer cart schedule with scheduledDeliveryAt", async () => {
+  it("updates customer cart schedule with orderTime when scheduledDeliveryAt is provided", async () => {
     patchCartMock.mockResolvedValue({ success: true });
 
     await updateCustomerCart({
@@ -227,7 +307,7 @@ describe("cart service", () => {
     expect(patchCartMock).toHaveBeenCalledWith(
       "/v1/cart?customerId=customer-1",
       {
-        scheduledDeliveryAt: "2026-06-10T19:30:00.000Z",
+        orderTime: "2026-06-10T19:30:00.000Z",
       },
       undefined
     );
@@ -273,7 +353,7 @@ describe("cart service", () => {
     );
   });
 
-  it("maps legacy cart orderTime update to scheduledDeliveryAt", async () => {
+  it("keeps cart orderTime updates as orderTime", async () => {
     patchCartMock.mockResolvedValue({ success: true });
 
     await updateCustomerCart({
@@ -286,11 +366,11 @@ describe("cart service", () => {
     expect(patchCartMock).toHaveBeenCalledWith(
       "/v1/cart?customerId=customer-1",
       {
-        scheduledDeliveryAt: "2026-06-10T19:30:00.000Z",
+        orderTime: "2026-06-10T19:30:00.000Z",
       },
       undefined
     );
-    expect(patchCartMock.mock.calls[0][1]).not.toHaveProperty("orderTime");
+    expect(patchCartMock.mock.calls[0][1]).not.toHaveProperty("scheduledDeliveryAt");
   });
 
   it("refreshes customer cart quote", async () => {
@@ -327,7 +407,6 @@ describe("cart service", () => {
     await quoteCustomerCart({
       customerId: "guest-1",
       payload: {
-        orderType: "DELIVERY",
         guestDeliveryAddress: {
           street: "Street 12",
           area: "DHA",
@@ -344,7 +423,6 @@ describe("cart service", () => {
     expect(postCartMock).toHaveBeenCalledWith(
       "/v1/cart/quote?customerId=guest-1",
       {
-        orderType: "DELIVERY",
         guestDeliveryAddress: {
           street: "Street 12",
           area: "DHA",
@@ -356,6 +434,57 @@ describe("cart service", () => {
           lng: "74.3587",
         },
       },
+      undefined
+    );
+  });
+
+  it("does not send orderType in cart quote payload", async () => {
+    postCartMock.mockResolvedValue({ success: true });
+
+    await quoteCustomerCart({
+      customerId: "customer-1",
+      payload: {
+        orderType: "DELIVERY",
+        tipAmount: 2,
+      },
+    });
+
+    expect(postCartMock).toHaveBeenCalledWith(
+      "/v1/cart/quote?customerId=customer-1",
+      { tipAmount: 2 },
+      undefined
+    );
+  });
+
+  it("does not send deliveryAddressId in cart quote payload", async () => {
+    postCartMock.mockResolvedValue({ success: true });
+
+    await quoteCustomerCart({
+      customerId: "customer-1",
+      payload: {
+        deliveryAddressId: "address-1",
+        tipAmount: 2,
+      },
+    });
+
+    expect(postCartMock).toHaveBeenCalledWith(
+      "/v1/cart/quote?customerId=customer-1",
+      { tipAmount: 2 },
+      undefined
+    );
+  });
+
+  it("updates cart order type through the documented cart endpoint", async () => {
+    patchCartMock.mockResolvedValue({ success: true });
+
+    await updateCustomerCartOrderType({
+      customerId: "customer-1",
+      orderType: "TAKEAWAY",
+    });
+
+    expect(patchCartMock).toHaveBeenCalledWith(
+      "/v1/cart?customerId=customer-1",
+      { orderType: "TAKEAWAY" },
       undefined
     );
   });
@@ -403,6 +532,9 @@ describe("cart service", () => {
       serviceChargeAmount: 100,
       tipAmount: 150,
       discountAmount: 301,
+      loyaltyDiscountAmount: 0,
+      loyaltyPointsRedeemed: 0,
+      walletAppliedAmount: 0,
       totalAmount: 999,
       payableAmount: 999,
       appliedPromotion: {
@@ -428,6 +560,9 @@ describe("cart service", () => {
         serviceChargeAmount: 100,
         tipAmount: 150,
         discountAmount: 301,
+        loyaltyDiscountAmount: 100,
+        loyaltyPointsRedeemed: 100,
+        walletAppliedAmount: 25,
         totalAmount: 999,
         payableAmount: 1400,
         appliedPromotion: {
@@ -445,6 +580,9 @@ describe("cart service", () => {
       serviceChargeAmount: 100,
       tipAmount: 150,
       discountAmount: 301,
+      loyaltyDiscountAmount: 100,
+      loyaltyPointsRedeemed: 100,
+      walletAppliedAmount: 25,
       totalAmount: 999,
       payableAmount: 1400,
       appliedPromotion: {
@@ -452,6 +590,33 @@ describe("cart service", () => {
         title: "Any 2 Burgers",
         discountAmount: 301,
       },
+    });
+  });
+
+  it("normalizes coupon quote values from wrapped cart response", async () => {
+    getCartMock.mockResolvedValue({
+      data: {
+        cart: {
+          items: [{ id: "cart-item-1" }],
+          quote: {
+            subtotal: 1300,
+            discountAmount: 100,
+            couponCode: "SAVE10",
+            totalAmount: 1200,
+            payableAmount: 1200,
+          },
+        },
+      },
+    });
+
+    const cart = await fetchCustomerCart({ customerId: "customer-1" });
+
+    expect(cart.items).toEqual([{ id: "cart-item-1" }]);
+    expect(cart.quote).toMatchObject({
+      couponCode: "SAVE10",
+      discountAmount: 100,
+      totalAmount: 1200,
+      payableAmount: 1200,
     });
   });
 });

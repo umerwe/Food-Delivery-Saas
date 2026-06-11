@@ -35,6 +35,7 @@ import {
 import { useTranslations } from "next-intl";
 import { GiftCardPurchaseCard } from "@/components/pages/Profile/components/GiftCardPurchaseCard";
 import { GiftCardRedeemCard } from "@/components/pages/Profile/components/GiftCardRedeemCard";
+import { LoyaltyProgramCard } from "@/components/pages/Profile/components/LoyaltyProgramCard";
 
 export function ProfileForm() {
   const t = useTranslations("profile");
@@ -422,6 +423,10 @@ export function ProfileForm() {
         walletCurrency={walletCurrency}
       />
       <GiftCardRedeemCard />
+    </div>
+
+    <div className="mb-5">
+      <LoyaltyProgramCard onWalletRedeemed={() => void fetchWallet()} />
     </div>
 
     {/* ROW 2 */}

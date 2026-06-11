@@ -13,6 +13,7 @@ import {
   BadgeDollarSign,
   AlertTriangle,
   Loader2,
+  Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -29,6 +30,7 @@ import {
   type BackendErrorState,
 } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import { useTranslations } from "next-intl";
+import type { LoyaltySummary } from "@/services/loyalty";
 
 interface CartAddon {
   id?: string;
@@ -50,7 +52,7 @@ interface CartSection {
   pickupPrice?: number | string;
   pickupUnitPrice?: number | string;
   selectedVariation?: ApiRecord | null;
-  menuItem?: ApiRecord & { selectedVariation?: ApiRecord; pickupPrice?: number | string; unitPrice?: number | string; name?: string; slug?: string; imageUrl?: string; category?: ApiRecord; variationPriceOverrides?: unknown[]; variations?: unknown[]; depositAmount?: number | string; takeawayPriceAdjustment?: number | string; deliveryPriceAdjustment?: number | string };
+  menuItem?: ApiRecord & { selectedVariation?: ApiRecord; pickupPrice?: number | string; unitPrice?: number | string; name?: string; slug?: string; imageUrl?: string; category?: ApiRecord; variationPriceOverrides?: unknown[]; variations?: unknown[]; depositAmount?: number | string; takeawayPriceAdjustment?: number | string; deliveryPriceAdjustment?: number | string; pricing?: ApiRecord };
   name?: string;
 }
 
@@ -128,6 +130,7 @@ interface CartQuote {
   serviceChargeAmount?: number | string;
   tipAmount?: number | string;
   discountAmount?: number | string;
+  couponCode?: string;
   walletAppliedAmount?: number | string;
   loyaltyDiscountAmount?: number | string;
   loyaltyPointsRedeemed?: number | string;
@@ -159,12 +162,19 @@ interface Props {
   couponCode?: string;
   setCouponCode?: (val: string) => void;
   onApplyCoupon?: () => void;
+  onRemoveCoupon?: () => void;
   couponDiscount?: number;
   validatingCoupon?: boolean;
+  removingCoupon?: boolean;
   loadingCart?: boolean;
   appliedTipAmount?: number;
   onApplyTip?: (amount: number) => Promise<void> | void;
   applyingTip?: boolean;
+  loyalty?: LoyaltySummary | null;
+  loyaltyPoints?: string;
+  setLoyaltyPoints?: (value: string) => void;
+  loadingLoyalty?: boolean;
+  isGuest?: boolean;
 }
 
 export type CheckoutType = "delivery" | "pickup";
@@ -304,12 +314,14 @@ const findSelectedVariation = (item: CartItem): CartSectionRecord | null => {
   );
 };
 
-const getBaseUnitPrice = (item: CartItem) => {
+const getBaseUnitPrice = (item: CartItem, checkoutType: CheckoutType) => {
   const selectedSections = getSelectedSections(item);
 
   if (selectedSections.length > 0) {
     const highestSectionPrice = Math.max(
-      ...selectedSections.map((section) => toNumber(section?.unitPrice, 0)),
+      ...selectedSections.map((section) =>
+        getSplitSectionCheckoutPrice(section, checkoutType)
+      ),
       0
     );
 
@@ -325,54 +337,6 @@ const getBaseUnitPrice = (item: CartItem) => {
       item.price,
     0
   );
-};
-
-const getExplicitPickupUnitPrice = (item: CartItem) => {
-  const menuItem = getMenuItem(item);
-  const override = findSelectedVariationOverride(item);
-  const variation = findSelectedVariation(item);
-
-  const candidates = [
-    item.pickupUnitPrice,
-    item.pickupPrice,
-    item?.selectedVariation?.pickupPrice,
-    item?.menuItem?.selectedVariation?.pickupPrice,
-    override?.pickupPrice,
-    variation?.pickupPrice,
-    menuItem?.pickupPrice,
-  ];
-
-  for (const candidate of candidates) {
-    const numeric = toNumber(candidate, 0);
-
-    if (numeric > 0) return numeric;
-  }
-
-  return null;
-};
-
-const getPickupAdjustedUnitPrice = (item: CartItem, baseUnitPrice: number) => {
-  const explicitPickupPrice = getExplicitPickupUnitPrice(item);
-
-  if (explicitPickupPrice !== null) {
-    return explicitPickupPrice;
-  }
-
-  const adjustment = toNumber(
-    item.takeawayPriceAdjustment ?? item.menuItem?.takeawayPriceAdjustment,
-    0
-  );
-
-  return Math.max(0, baseUnitPrice + adjustment);
-};
-
-const getDeliveryAdjustedUnitPrice = (item: CartItem, baseUnitPrice: number) => {
-  const adjustment = toNumber(
-    item.deliveryPriceAdjustment ?? item.menuItem?.deliveryPriceAdjustment,
-    0
-  );
-
-  return Math.max(0, baseUnitPrice + adjustment);
 };
 
 const getDepositUnitAmount = (item: CartItem) => {
@@ -448,36 +412,43 @@ const getSplitSectionPickupPrice = (section?: CartSection) => {
   return null;
 };
 
-const getItemPickupExtraUnitPrice = (
-  item: CartItem,
-  selectedSections: CartSection[] = getSelectedSections(item)
+const isPickupPricingModeEnabled = (section?: CartSection) => {
+  const candidateMode = String(
+    section?.menuItem?.pricingMode ??
+      section?.menuItem?.pricing?.mode ??
+      ""
+  ).trim();
+
+  return candidateMode.toUpperCase() === "MULTIPLE";
+};
+
+const getSplitSectionCheckoutPrice = (
+  section: CartSection,
+  checkoutType: CheckoutType
 ) => {
-  const itemPickupCandidates = [
-    item.pickupUnitPrice,
-    item.pickupPrice,
-    item?.selectedVariation?.pickupPrice,
-    item?.menuItem?.selectedVariation?.pickupPrice,
-    findSelectedVariationOverride(item)?.pickupPrice,
-    findSelectedVariation(item)?.pickupPrice,
-    item?.menuItem?.pickupPrice,
-  ];
+  const deliveryPrice = getSplitSectionDeliveryPrice(section);
+  const explicitPickupPrice = getSplitSectionPickupPrice(section);
+  const hasMultiplePricing = isPickupPricingModeEnabled(section);
+  const deliveryAdjustment = toNumber(section.menuItem?.deliveryPriceAdjustment ?? 0);
+  const pickupAdjustment = toNumber(section.menuItem?.takeawayPriceAdjustment ?? 0);
 
-  const itemPickupPrices = itemPickupCandidates
-    .map((candidate) => toNumber(candidate, 0))
-    .filter((price) => price > 0);
+  if (checkoutType === "delivery") {
+    if (hasMultiplePricing && deliveryAdjustment > 0) {
+      return deliveryPrice + deliveryAdjustment;
+    }
 
-  const sectionPickupPrices = selectedSections
-    .map((section) => getSplitSectionPickupPrice(section))
-    .filter((price): price is number => price !== null && price > 0);
+    return deliveryPrice;
+  }
 
-  const allPickupPrices = [...itemPickupPrices, ...sectionPickupPrices];
+  if (explicitPickupPrice !== null) {
+    return explicitPickupPrice;
+  }
 
-  if (!allPickupPrices.length) return 0;
+  if (hasMultiplePricing && pickupAdjustment > 0) {
+    return deliveryPrice + pickupAdjustment;
+  }
 
-  // For split pizza, pickup price should be added once for the selected/larger
-  // variation, not for every half. For regular multiple cart items, this helper
-  // runs per item, so each item's pickup price is still added separately.
-  return Math.max(...allPickupPrices);
+  return deliveryPrice;
 };
 
 type SplitLabels = {
@@ -518,7 +489,8 @@ const getSplitSectionName = (section: CartSection | undefined, fallback: string)
 export const getSplitPizzaDisplay = (
   item: CartItem,
   selectedSections: CartSection[],
-  labels: SplitLabels
+  labels: SplitLabels,
+  checkoutType: CheckoutType
 ) => {
   const currentMenuItemId = String(getMenuItemId(item) || "");
   const currentItemName = String(item?.name || item?.menuItem?.name || "").trim();
@@ -528,7 +500,7 @@ export const getSplitPizzaDisplay = (
     const sectionMenuItemId = String(section?.menuItemId || "");
     const deliveryPrice = getSplitSectionDeliveryPrice(section);
     const pickupPrice = getSplitSectionPickupPrice(section);
-    const displayPrice = deliveryPrice;
+    const checkoutPrice = getSplitSectionCheckoutPrice(section, checkoutType);
     const isCurrentById =
       Boolean(currentMenuItemId) && sectionMenuItemId === currentMenuItemId;
     const isCurrentByName =
@@ -540,10 +512,10 @@ export const getSplitPizzaDisplay = (
       index,
       label: getSplitHalfLabel(section?.slot, `${labels.half} ${index + 1}`, labels),
       displayName: sectionName,
-      price: displayPrice,
+      price: checkoutPrice,
       deliveryPrice,
       pickupPrice,
-      checkoutPrice: displayPrice,
+      checkoutPrice,
       hasExplicitPickupPrice: pickupPrice !== null,
       isCurrentItem: isCurrentById || isCurrentByName,
     };
@@ -577,7 +549,7 @@ export const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
 
   const modifiersTotal = toNumber(item.modifiersTotal, fallbackModifiersTotal);
 
-  const baseUnitPrice = getBaseUnitPrice(item);
+  const baseUnitPrice = getBaseUnitPrice(item, checkoutType);
 
   // Keep backend/cart pricing as the source of truth. Pickup price is added
   // separately below instead of replacing the item/variation unit price.
@@ -599,12 +571,6 @@ export const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
 
   const itemSubtotal = getCartItemLineTotal(item);
 
-  const pickupExtraUnitPrice =
-    checkoutType === "pickup"
-      ? getItemPickupExtraUnitPrice(item, selectedSections)
-      : 0;
-  const pickupExtraTotal = pickupExtraUnitPrice * quantity;
-
   return {
     quantity,
     baseUnitPrice,
@@ -616,12 +582,26 @@ export const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
     depositTotal,
     backendLineTotal: itemSubtotal,
     lineTotal: itemSubtotal,
-    pickupExtraUnitPrice,
-    pickupExtraTotal,
     selectedAddons,
     selectedSections,
   };
 };
+
+export const getCheckoutPriceAdjustmentTotal = (
+  cartItems: CartItem[],
+  checkoutType: CheckoutType
+) => {
+  return cartItems.reduce((total, item) => {
+    const quantity = Math.max(1, toNumber(item.quantity, 1));
+    const adjustment =
+      checkoutType === "pickup"
+        ? item.takeawayPriceAdjustment ?? item.menuItem?.takeawayPriceAdjustment
+        : item.deliveryPriceAdjustment ?? item.menuItem?.deliveryPriceAdjustment;
+
+    return total + Math.max(0, toNumber(adjustment, 0)) * quantity;
+  }, 0);
+};
+
 export function CartSummarySection({
   title,
   cartItems,
@@ -637,12 +617,19 @@ export function CartSummarySection({
   couponCode,
   setCouponCode,
   onApplyCoupon,
+  onRemoveCoupon,
   couponDiscount = 0,
   validatingCoupon,
+  removingCoupon,
   loadingCart = false,
   appliedTipAmount = 0,
   onApplyTip,
   applyingTip = false,
+  loyalty,
+  loyaltyPoints = "",
+  setLoyaltyPoints,
+  loadingLoyalty = false,
+  isGuest = false,
 }: Props) {
   const t = useTranslations("checkout");
   const router = useRouter();
@@ -676,13 +663,6 @@ export function CartSummarySection({
     return acc + entry.pricing.depositTotal;
   }, 0);
 
-  const pickupPriceTotal =
-    checkoutType === "pickup"
-      ? pricingItems.reduce((acc, entry) => {
-          return acc + entry.pricing.pickupExtraTotal;
-        }, 0)
-      : 0;
-
   const resolvedQuote = quote ?? cartQuote ?? null;
   const quoteSubtotal = toNullableNumber(resolvedQuote?.subtotal);
   const quoteDeliveryFee = toNullableNumber(resolvedQuote?.deliveryFee);
@@ -693,20 +673,40 @@ export function CartSummarySection({
     Math.max(0, toNumber(appliedTipAmount, 0));
   const quotePayableAmount = resolvedQuote ? getDisplayTotalAmount(resolvedQuote) : null;
   const [tipInput, setTipInput] = useState("");
+  const loyaltyPointsValue = Math.max(0, Math.floor(toNumber(loyaltyPoints, 0)));
+  const loyaltyEstimatedDiscount = loyaltyPointsValue * toNumber(loyalty?.redemptionValuePerPoint, 0);
+  const loyaltyCanRedeem =
+    Boolean(loyalty) &&
+    loyaltyPointsValue >= toNumber(loyalty?.minimumRedeemPoints, 0) &&
+    loyaltyPointsValue <= toNumber(loyalty?.availablePoints, 0);
 
   useEffect(() => {
     setTipInput(quoteTipAmount > 0 ? String(quoteTipAmount) : "");
   }, [quoteTipAmount]);
 
-  const deliveryFee = quoteDeliveryFee ?? (checkoutType === "delivery" ? 0 : 0);
+  const checkoutPriceAdjustment = getCheckoutPriceAdjustmentTotal(cartItems, checkoutType);
+  const deliveryAdjustmentFee =
+    checkoutType === "delivery" ? checkoutPriceAdjustment : 0;
+  const deliveryFee =
+    checkoutType === "delivery"
+      ? deliveryAdjustmentFee > 0 ? deliveryAdjustmentFee : quoteDeliveryFee ?? 0
+      : 0;
+  const pickupFee = checkoutType === "pickup" ? checkoutPriceAdjustment : 0;
+  const selectedOrderFee = checkoutType === "pickup" ? pickupFee : deliveryFee;
   const taxes = quoteTaxAmount ?? 0;
   const serviceCharge = Math.max(0, quoteServiceChargeAmount);
   const tipAmount = Math.max(0, quoteTipAmount);
 
   const appliedPromotion = resolvedQuote?.appliedPromotion ?? null;
   const hasAppliedPromotion = Boolean(appliedPromotion?.id || appliedPromotion?.title);
-  const promotionDiscountLine = getAppliedPromotionDiscountLine(resolvedQuote);
-  const quoteDiscount = promotionDiscountLine?.amount ?? 0;
+  const promotionDiscountLine = hasAppliedPromotion
+    ? getAppliedPromotionDiscountLine(resolvedQuote)
+    : null;
+  const appliedCouponCode = hasText(resolvedQuote?.couponCode)
+    ? String(resolvedQuote?.couponCode).trim()
+    : "";
+  const hasAppliedCoupon = Boolean(appliedCouponCode);
+  const quoteDiscount = Math.max(0, toNumber(resolvedQuote?.discountAmount, 0));
   const manualCouponDiscount = Math.max(0, toNumber(couponDiscount, 0));
   const discount = quoteDiscount > 0 ? quoteDiscount : manualCouponDiscount;
 
@@ -721,12 +721,16 @@ export function CartSummarySection({
   );
 
   const computedTotalBeforeDiscount =
-    itemTotal + pickupPriceTotal + deliveryFee + taxes + serviceCharge + tipAmount;
+    itemTotal + selectedOrderFee + taxes + serviceCharge + tipAmount;
 
   const totalBeforeDiscount =
     quoteSubtotal !== null
-      ? quoteSubtotal + pickupPriceTotal + deliveryFee + taxes + serviceCharge + tipAmount
+      ? quoteSubtotal + selectedOrderFee + taxes + serviceCharge + tipAmount
       : computedTotalBeforeDiscount;
+  const loyaltyPreviewDiscount =
+    loyaltyDiscount > 0 || !loyaltyCanRedeem
+      ? 0
+      : Math.min(Math.max(0, loyaltyEstimatedDiscount), totalBeforeDiscount - discount);
 
   const totalWithoutTip = Math.max(
     0,
@@ -748,9 +752,10 @@ export function CartSummarySection({
           0,
           totalBeforeDiscount - discount - loyaltyDiscount - walletAppliedAmount
         );
+  const displayedFinalTotal = Math.max(0, finalTotal - loyaltyPreviewDiscount);
 
   const hasAnyDiscount =
-    discount > 0 || loyaltyDiscount > 0 || walletAppliedAmount > 0;
+    discount > 0 || loyaltyDiscount > 0 || loyaltyPreviewDiscount > 0 || walletAppliedAmount > 0;
 
   const handleEditItem = (item: CartItem) => {
     const menuItemId = getMenuItemId(item);
@@ -905,8 +910,6 @@ export function CartSummarySection({
                 lineTotal,
                 depositUnitAmount,
                 depositTotal,
-                pickupExtraUnitPrice,
-                pickupExtraTotal,
                 selectedAddons,
                 selectedSections,
               } = pricing;
@@ -919,7 +922,8 @@ export function CartSummarySection({
               const splitPizzaDisplay = getSplitPizzaDisplay(
                 item,
                 selectedSections,
-                splitLabels
+                splitLabels,
+                checkoutType
               );
               const includedItems = Array.isArray(item.includedItems)
                 ? item.includedItems
@@ -981,11 +985,6 @@ export function CartSummarySection({
                           </p>
                         ) : null}
 
-                        {checkoutType === "pickup" && pickupExtraUnitPrice > 0 ? (
-                          <p className="mt-1 text-xs font-medium text-primary">
-                            {t("pickupPriceEach", { price: formatCurrency(pickupExtraUnitPrice) })}
-                          </p>
-                        ) : null}
                       </div>
 
                       {isDealItem && includedItems.length > 0 ? (
@@ -1195,15 +1194,6 @@ export function CartSummarySection({
                               {t("each", { price: formatCurrency(unitPriceWithModifiers) })}
                             </p>
 
-                            {checkoutType === "pickup" && pickupExtraTotal > 0 ? (
-                              <p className="text-[11px] text-gray-400">
-                                {t("pickupPriceQuantity", {
-                                  price: formatCurrency(pickupExtraUnitPrice),
-                                  quantity: quantity > 1 ? ` × ${quantity}` : "",
-                                })}
-                              </p>
-                            ) : null}
-
                             {selectedAddons.length > 0 ? (
                               <p className="text-[11px] text-gray-400">
                                 {t("priceWithAddons", {
@@ -1273,23 +1263,15 @@ export function CartSummarySection({
             </div>
           ) : null}
 
-          {checkoutType === "pickup" && pickupPriceTotal > 0 ? (
-            <div className="flex items-center justify-between text-primary">
-              <div className="flex items-center gap-1">
-                <span>{t("pickupPrice")}</span>
-                <Info size={16} />
-              </div>
-              <span>{formatCurrency(pickupPriceTotal)}</span>
-            </div>
-          ) : null}
-
-          {checkoutType === "delivery" ? (
+          {selectedOrderFee > 0 ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
-                <span>{t("deliveryFee")}</span>
+                <span>
+                  {checkoutType === "pickup" ? t("pickupPrice") : t("deliveryFee")}
+                </span>
                 <Info size={16} />
               </div>
-              <span>{formatCurrency(deliveryFee)}</span>
+              <span>{formatCurrency(selectedOrderFee)}</span>
             </div>
           ) : null}
 
@@ -1386,28 +1368,42 @@ export function CartSummarySection({
             value={couponCode || ""}
             onChange={(e) => setCouponCode?.(e.target.value)}
             placeholder={t("couponPlaceholder")}
+            disabled={validatingCoupon || removingCoupon}
             className="flex-1 rounded-md border border-gray-200 px-3 py-2 text-sm outline-none transition-colors focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
           />
 
           <Button
             type="button"
             onClick={onApplyCoupon}
-            disabled={validatingCoupon}
+            disabled={validatingCoupon || removingCoupon}
             className="h-[42px] text-white"
           >
             {validatingCoupon ? t("applying") : t("apply")}
           </Button>
         </div>
 
-        {discount > 0 || hasAppliedPromotion ? (
+        {discount > 0 || hasAppliedPromotion || hasAppliedCoupon ? (
           <div className="rounded-md bg-green-100 p-3 text-sm font-medium text-green-700">
-            <div className="flex items-center gap-2">
-              <TicketPercent width={16} height={16} />
-              <span>
-                {hasAppliedPromotion
-                  ? t("appliedDeal")
-                  : t("couponApplied")}
-              </span>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <TicketPercent width={16} height={16} />
+                <span>
+                  {hasAppliedPromotion
+                    ? t("appliedDeal")
+                    : t("couponApplied")}
+                </span>
+              </div>
+
+              {hasAppliedCoupon && onRemoveCoupon ? (
+                <button
+                  type="button"
+                  onClick={onRemoveCoupon}
+                  disabled={removingCoupon}
+                  className="text-xs font-semibold text-green-800 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {removingCoupon ? t("removing") : t("removeCoupon")}
+                </button>
+              ) : null}
             </div>
 
             {hasAppliedPromotion ? (
@@ -1420,7 +1416,79 @@ export function CartSummarySection({
                   ? ` · ${t("off", { amount: formatCurrency(promotionDiscountLine.amount) })}`
                   : ""}
               </p>
+            ) : hasAppliedCoupon ? (
+              <p className="mt-1 pl-6 text-xs font-normal text-green-700/90">
+                {appliedCouponCode}
+                {discount > 0
+                  ? ` · ${t("off", { amount: formatCurrency(discount) })}`
+                  : ""}
+              </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {canEditCart && !isGuest ? (
+          <div className="rounded-[18px] border border-primary/10 bg-[linear-gradient(135deg,rgba(206,24,27,0.07),rgba(17,24,39,0.03))] p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <Coins size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-950">
+                      {t("loyalty.title")}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-gray-500">
+                      {loadingLoyalty
+                        ? t("loyalty.loading")
+                        : loyalty
+                          ? t("loyalty.available", {
+                              points: Math.max(0, Math.round(toNumber(loyalty.availablePoints, 0))),
+                              minimum: Math.max(0, Math.round(toNumber(loyalty.minimumRedeemPoints, 0))),
+                            })
+                          : t("loyalty.unavailable")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="number"
+                    min="0"
+                    value={loyaltyPoints}
+                    onChange={(event) => setLoyaltyPoints?.(event.target.value)}
+                    disabled={loadingLoyalty || !loyalty}
+                    placeholder={t("loyalty.placeholder")}
+                    className="h-[42px] flex-1 rounded-full border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                  {loyaltyPointsValue > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setLoyaltyPoints?.("")}
+                      className="h-[42px] rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:border-primary/30 hover:text-primary"
+                    >
+                      {t("loyalty.clear")}
+                    </button>
+                  ) : null}
+                </div>
+
+                {loyaltyPointsValue > 0 ? (
+                  <p className={`mt-2 text-xs font-medium ${loyaltyCanRedeem ? "text-green-700" : "text-amber-700"}`}>
+                    {loyaltyCanRedeem
+                      ? t("loyalty.estimatedDiscount", {
+                          amount: formatCurrency(loyaltyEstimatedDiscount),
+                        })
+                      : t("loyalty.requirements")}
+                  </p>
+                ) : null}
+                {loyaltyCanRedeem ? (
+                  <p className="mt-1 text-xs leading-5 text-gray-500">
+                    {t("loyalty.redeemNotice")}
+                  </p>
+                ) : null}
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -1432,7 +1500,13 @@ export function CartSummarySection({
 
           {discount > 0 ? (
             <div className="flex items-center justify-between text-sm text-green-600">
-              <span>{hasAppliedPromotion ? t("appliedDealDiscount") : t("discount")}</span>
+              <span>
+                {hasAppliedPromotion
+                  ? t("appliedDealDiscount")
+                  : hasAppliedCoupon && appliedCouponCode
+                    ? `${t("discount")} (${appliedCouponCode})`
+                    : t("discount")}
+              </span>
               <span>- {formatCurrency(discount)}</span>
             </div>
           ) : null}
@@ -1450,6 +1524,13 @@ export function CartSummarySection({
             </div>
           ) : null}
 
+          {loyaltyPreviewDiscount > 0 ? (
+            <div className="flex items-center justify-between text-sm text-green-600">
+              <span>{t("estimatedLoyaltyDiscount")}</span>
+              <span>- {formatCurrency(loyaltyPreviewDiscount)}</span>
+            </div>
+          ) : null}
+
           {walletAppliedAmount > 0 ? (
             <div className="flex items-center justify-between pb-[15px] text-sm text-green-600">
               <span>{t("walletApplied")}</span>
@@ -1461,13 +1542,22 @@ export function CartSummarySection({
 
           <div className="flex items-center justify-between text-[24px] font-medium text-gray-900">
             <span>
-              {quotedFinalTotal !== null
+              {loyaltyPreviewDiscount > 0
+                ? t("totals.estimatedPayableAmount")
+                : quotedFinalTotal !== null
                 ? t("totals.payableAmount")
                 : walletAppliedAmount > 0
                   ? t("payableTotal")
                   : t("total")}
             </span>
-            <span>{formatCurrency(finalTotal)}</span>
+            <span className="flex flex-col items-end leading-none">
+              {loyaltyPreviewDiscount > 0 ? (
+                <span className="mb-1 text-sm font-medium text-gray-400 line-through">
+                  {formatCurrency(finalTotal)}
+                </span>
+              ) : null}
+              <span>{formatCurrency(displayedFinalTotal)}</span>
+            </span>
           </div>
         </div>
 

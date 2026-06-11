@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { checkoutCustomerCart, normalizeCheckoutPayload } from "./checkout";
+import { checkoutCustomerCart, normalizeCheckoutPayload, normalizeCheckoutPaymentMethod } from "./checkout";
 
 const postCheckoutMock = vi.hoisted(() => vi.fn());
 
@@ -18,7 +18,7 @@ describe("checkout service", () => {
     postCheckoutMock.mockReset();
   });
 
-  it("sends scheduledDeliveryAt in checkout payload", async () => {
+  it("sends orderTime in checkout payload when scheduledDeliveryAt is provided", async () => {
     postCheckoutMock.mockResolvedValue({ success: true });
 
     await checkoutCustomerCart({
@@ -32,7 +32,7 @@ describe("checkout service", () => {
     expect(postCheckoutMock).toHaveBeenCalledWith(
       "/v1/cart/checkout?customerId=customer-1",
       {
-        scheduledDeliveryAt: "2026-06-10T19:30:00.000Z",
+        orderTime: "2026-06-10T19:30:00.000Z",
         paymentMethod: "COD",
       },
       undefined
@@ -60,6 +60,95 @@ describe("checkout service", () => {
       undefined
     );
     expect(postCheckoutMock.mock.calls[0][0]).not.toContain("/api/v1");
+  });
+
+  it("sends loyaltyPoints in cart checkout payload", async () => {
+    postCheckoutMock.mockResolvedValue({ success: true });
+
+    await checkoutCustomerCart({
+      customerId: "customer-1",
+      payload: {
+        paymentMethod: "COD",
+        loyaltyPoints: 100,
+      },
+    });
+
+    expect(postCheckoutMock).toHaveBeenCalledWith(
+      "/v1/cart/checkout?customerId=customer-1",
+      {
+        paymentMethod: "COD",
+        loyaltyPoints: 100,
+      },
+      undefined
+    );
+  });
+
+  it("normalizes supported checkout payment methods", () => {
+    expect(normalizeCheckoutPaymentMethod("cod")).toBe("COD");
+    expect(normalizeCheckoutPaymentMethod("paypal")).toBe("PAYPAL");
+    expect(normalizeCheckoutPaymentMethod("stripe")).toBe("STRIPE");
+    expect(normalizeCheckoutPaymentMethod("wallet")).toBe("WALLET");
+    expect(normalizeCheckoutPaymentMethod("card")).toBe("STRIPE");
+    expect(normalizeCheckoutPaymentMethod("CARD_ON_DELIVERY")).toBe("STRIPE");
+  });
+
+  it("sends wallet as a checkout payment method", async () => {
+    postCheckoutMock.mockResolvedValue({ success: true });
+
+    await checkoutCustomerCart({
+      customerId: "customer-1",
+      payload: {
+        paymentMethod: "wallet",
+      },
+    });
+
+    expect(postCheckoutMock).toHaveBeenCalledWith(
+      "/v1/cart/checkout?customerId=customer-1",
+      {
+        paymentMethod: "WALLET",
+      },
+      undefined
+    );
+  });
+
+  it("does not send legacy card on delivery in cart checkout payload", async () => {
+    postCheckoutMock.mockResolvedValue({ success: true });
+
+    await checkoutCustomerCart({
+      customerId: "customer-1",
+      payload: {
+        paymentMethod: "CARD_ON_DELIVERY",
+      },
+    });
+
+    expect(postCheckoutMock).toHaveBeenCalledWith(
+      "/v1/cart/checkout?customerId=customer-1",
+      {
+        paymentMethod: "STRIPE",
+      },
+      undefined
+    );
+  });
+
+  it("does not send orderType in cart checkout payload", async () => {
+    postCheckoutMock.mockResolvedValue({ success: true });
+
+    await checkoutCustomerCart({
+      customerId: "customer-1",
+      payload: {
+        paymentMethod: "COD",
+        orderType: "TAKEAWAY",
+      },
+    });
+
+    expect(postCheckoutMock).toHaveBeenCalledWith(
+      "/v1/cart/checkout?customerId=customer-1",
+      {
+        paymentMethod: "COD",
+      },
+      undefined
+    );
+    expect(postCheckoutMock.mock.calls[0][1]).not.toHaveProperty("orderType");
   });
 
   it("sends guest contact and inline guest delivery address in checkout payload", async () => {
@@ -123,14 +212,14 @@ describe("checkout service", () => {
     });
   });
 
-  it("maps legacy orderTime to scheduledDeliveryAt", () => {
+  it("keeps orderTime in checkout payload", () => {
     expect(
       normalizeCheckoutPayload({
         orderTime: "2026-06-10T19:30:00.000Z",
         paymentMethod: "COD",
       })
     ).toEqual({
-      scheduledDeliveryAt: "2026-06-10T19:30:00.000Z",
+      orderTime: "2026-06-10T19:30:00.000Z",
       paymentMethod: "COD",
     });
   });

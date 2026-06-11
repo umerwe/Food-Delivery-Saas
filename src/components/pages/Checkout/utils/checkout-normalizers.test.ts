@@ -39,6 +39,23 @@ describe("checkout normalizers", () => {
     ]);
   });
 
+  it("preserves restaurantMenuId on normalized cart items", () => {
+    expect(
+      normalizeCartItem({
+        id: "cart-item-1",
+        restaurantMenuId: "menu-breakfast",
+        menuItemId: "item-1",
+        quantity: 1,
+        menuItem: { name: "Omelette" },
+      })
+    ).toMatchObject({
+      id: "cart-item-1",
+      restaurantMenuId: "menu-breakfast",
+      menuItemId: "item-1",
+      name: "Omelette",
+    });
+  });
+
   it("ready-made deal item with empty modifiers has no displayable modifiers", () => {
     expect(
       getSelectedModifiers({
@@ -277,6 +294,9 @@ describe("checkout normalizers", () => {
       serviceChargeAmount: 100,
       tipAmount: 150,
       discountAmount: 301,
+      loyaltyDiscountAmount: 0,
+      loyaltyPointsRedeemed: 0,
+      walletAppliedAmount: 0,
       totalAmount: 999,
       payableAmount: 1400,
       appliedPromotion: {
@@ -392,6 +412,29 @@ describe("checkout normalizers", () => {
 
     expect(quote?.totalAmount).toBe(999);
     expect(quote?.payableAmount).toBe(899);
+  });
+
+  it("preserves saved cart coupon values from wrapped cart response", () => {
+    const { quote } = normalizeCartResponse({
+      data: {
+        cart: {
+          quote: {
+            subtotal: 1300,
+            discountAmount: 100,
+            couponCode: "SAVE10",
+            totalAmount: 1200,
+            payableAmount: 1200,
+          },
+        },
+      },
+    });
+
+    expect(quote).toMatchObject({
+      couponCode: "SAVE10",
+      discountAmount: 100,
+      totalAmount: 1200,
+      payableAmount: 1200,
+    });
   });
 
   it("quote normalizer preserves service charge tip and payable amount", () => {

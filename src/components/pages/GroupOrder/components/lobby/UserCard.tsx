@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { Trash2, Plus, Minus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import useGroupOrder, { useGroupOrderApi } from "@/hooks/useGroupOrder";
+import { useAuth } from "@/hooks/useAuth";
+import { useGroupOrder, useGroupOrderApi } from "@/hooks/useGroupOrder";
 import type { GroupOrderItem, GroupOrderParticipant } from "@/types/group-order";
 
 type UserCardProps = {
@@ -12,9 +13,10 @@ type UserCardProps = {
   isHost?: boolean;
 };
 
-export default function UserCard({ participant, orderId, isHost }: UserCardProps) {
+export function UserCard({ participant, orderId, isHost }: UserCardProps) {
   const t = useTranslations("groupOrder.lobby.userCard");
-  const { deleteGroupOrderItem, updateGroupOrderItemQuantity } = useGroupOrderApi(null);
+  const { token } = useAuth();
+  const { deleteGroupOrderItem, updateGroupOrderItemQuantity } = useGroupOrderApi(token);
 
   const user = participant?.user;
   const items = participant?.items || [];

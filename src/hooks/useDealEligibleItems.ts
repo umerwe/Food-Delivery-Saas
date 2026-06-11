@@ -70,6 +70,15 @@ export const getDealRequiredSelectionCount = (deal: CustomerDeal | null) => {
     return 1;
   }
 
+  const categoryRuleQuantity = (deal.scopeCategoryRules ?? []).reduce(
+    (total, rule) => total + rule.itemLimit,
+    0
+  );
+
+  if (categoryRuleQuantity > 0) {
+    return categoryRuleQuantity;
+  }
+
   const parsed = Number(deal.dealRequiredQuantity);
 
   if (Number.isFinite(parsed) && parsed > 0) {
@@ -106,7 +115,12 @@ export const useDealEligibleItems = ({
   const [error, setError] = useState<string | null>(null);
 
   const categoryIds = useMemo(
-    () => deal?.scopeCategories.map(({ id }) => id).filter(Boolean) ?? [],
+    () => {
+      const ruleCategoryIds = deal?.scopeCategoryRules?.map(({ menuCategoryId }) => menuCategoryId) ?? [];
+      const scopedCategoryIds = deal?.scopeCategories.map(({ id }) => id) ?? [];
+
+      return Array.from(new Set([...ruleCategoryIds, ...scopedCategoryIds].filter(Boolean)));
+    },
     [deal]
   );
   const categoryIdsKey = categoryIds.join(":");

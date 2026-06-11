@@ -8,8 +8,6 @@ import {
   canSelectFlexibleDealItem,
   canSendDealIdForReadyMadeItem,
   canSendDealIdWithModifierSelections,
-  getDealMenuItemDefaultVariationId,
-  getDealMenuItemDefaultVariationLabel,
   getDealActionLabel,
   getDealActionKind,
   getDealImage,
@@ -122,8 +120,8 @@ describe("customer deal cart helpers", () => {
         ["drink-id", "unknown-id", "burger-id", "drink-id"]
       )
     ).toEqual([
-      { branchId: "branch-1", menuItemId: "drink-id", quantity: 1 },
-      { branchId: "branch-1", menuItemId: "burger-id", quantity: 1 },
+      { branchId: "branch-1", menuItemId: "drink-id", dealId: "deal-2", quantity: 1 },
+      { branchId: "branch-1", menuItemId: "burger-id", dealId: "deal-2", quantity: 1 },
     ]);
   });
 
@@ -152,20 +150,24 @@ describe("customer deal cart helpers", () => {
         ]
       )
     ).toEqual([
-      { branchId: "branch-1", menuItemId: "pizza-id", quantity: 1 },
-      { branchId: "branch-1", menuItemId: "drink-id", quantity: 1 },
+      { branchId: "branch-1", menuItemId: "pizza-id", dealId: "deal-3", quantity: 1 },
+      { branchId: "branch-1", menuItemId: "drink-id", dealId: "deal-3", quantity: 1 },
     ]);
   });
 
-  it("flexible deal cart payload does not include dealId", () => {
+  it("flexible deal cart payload includes dealId", () => {
     const [payload] = buildSelectedFlexibleDealCartItemsInput(
       flexibleItemDeal,
       "branch-1",
       ["burger-id"]
     );
 
-    expect(payload).toEqual({ branchId: "branch-1", menuItemId: "burger-id", quantity: 1 });
-    expect(payload).not.toHaveProperty("dealId");
+    expect(payload).toEqual({
+      branchId: "branch-1",
+      menuItemId: "burger-id",
+      dealId: "deal-2",
+      quantity: 1,
+    });
   });
 
   it("flexible item deal opens chooser action", () => {
@@ -220,7 +222,7 @@ describe("customer deal cart helpers", () => {
     ).toBe("REQUIRES_MODIFIERS");
   });
 
-  it("scope item with variations returns unsupported variation", () => {
+  it("scope item with variations ignores variation options", () => {
     expect(
       getDealScopedItemCustomizationState({
         id: "pizza-id",
@@ -230,7 +232,7 @@ describe("customer deal cart helpers", () => {
         modifiers: [],
         modifierLinks: [],
       })
-    ).toBe("REQUIRES_UNSUPPORTED_VARIATION");
+    ).toBe("SIMPLE");
   });
 
   it("scope item with no customization returns simple", () => {
@@ -325,7 +327,7 @@ describe("customer deal cart helpers", () => {
     })).toBe(false);
   });
 
-  it("customizable items are not safe for dealId cart payloads", () => {
+  it("variation-only deal items are safe for dealId cart payloads", () => {
     const customizableItem = {
       id: "burger-id",
       name: "Burger",
@@ -336,13 +338,13 @@ describe("customer deal cart helpers", () => {
       supportsDealIdCartPayload: true,
     };
 
-    expect(requiresCustomizationForDealItem(customizableItem)).toBe(true);
+    expect(requiresCustomizationForDealItem(customizableItem)).toBe(false);
     expect(
       shouldSendDealIdForCartItem(
         { ...fixedDeal, scopeMenuItems: [customizableItem] },
         customizableItem
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("ready-made deal item payload includes dealId only", () => {
@@ -466,7 +468,7 @@ describe("customer deal cart helpers", () => {
     expect(canSendDealIdWithModifierSelections(flexibleItemDeal, customizableItem)).toBe(false);
   });
 
-  it("flexible deal item with variations can be selected using its default variation", () => {
+  it("flexible deal item with variations can be selected without variation payload", () => {
     const variationDealItem = {
       id: "deal-item-3",
       name: "Sized combo",
@@ -480,12 +482,10 @@ describe("customer deal cart helpers", () => {
       supportsDealIdCartPayload: true,
     };
 
-    expect(isDealMenuItemReadyMade(variationDealItem)).toBe(false);
+    expect(isDealMenuItemReadyMade(variationDealItem)).toBe(true);
     expect(isDealMenuItemCustomizable(variationDealItem)).toBe(false);
-    expect(canSendDealIdForReadyMadeItem(fixedDeal, variationDealItem)).toBe(false);
+    expect(canSendDealIdForReadyMadeItem(fixedDeal, variationDealItem)).toBe(true);
     expect(canSelectFlexibleDealItem(variationDealItem)).toBe(true);
-    expect(getDealMenuItemDefaultVariationId(variationDealItem)).toBe("large");
-    expect(getDealMenuItemDefaultVariationLabel(variationDealItem)).toBe("Large");
     expect(buildSelectedFlexibleDealCartItemsInput(
       flexibleItemDeal,
       "branch-1",
@@ -495,13 +495,13 @@ describe("customer deal cart helpers", () => {
       {
         branchId: "branch-1",
         menuItemId: "deal-item-3",
-        variationId: "large",
+        dealId: "deal-2",
         quantity: 1,
       },
     ]);
   });
 
-  it("flexible deal item with split pizza variation remains unsupported", () => {
+  it("flexible deal item with split pizza flag can be selected without variation payload", () => {
     const splitVariationDealItem = {
       id: "deal-item-4",
       name: "Split pizza",
@@ -512,13 +512,20 @@ describe("customer deal cart helpers", () => {
       supportsSplitPizza: true,
     };
 
-    expect(canSelectFlexibleDealItem(splitVariationDealItem)).toBe(false);
+    expect(canSelectFlexibleDealItem(splitVariationDealItem)).toBe(true);
     expect(buildSelectedFlexibleDealCartItemsInput(
       flexibleItemDeal,
       "branch-1",
       ["deal-item-4"],
       [splitVariationDealItem]
-    )).toEqual([]);
+    )).toEqual([
+      {
+        branchId: "branch-1",
+        menuItemId: "deal-item-4",
+        dealId: "deal-2",
+        quantity: 1,
+      },
+    ]);
   });
 
   it("unknown fixed deal item still uses ready-made deal payload", () => {

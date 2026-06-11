@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildGroupOrderInviteLink,
+  canMutateGroupOrder,
   clearStoredGroupOrderCode,
   getStoredGroupOrderCode,
   isClosedGroupOrder,
@@ -45,6 +46,13 @@ describe("group order helpers", () => {
   it("detects closed group order statuses", () => {
     expect(isClosedGroupOrder({ id: "1", status: "CHECKED_OUT" })).toBe(true);
     expect(isClosedGroupOrder({ id: "1", status: "open" })).toBe(false);
+  });
+
+  it("allows group order mutation only before checkout", () => {
+    expect(canMutateGroupOrder({ id: "1", status: "OPEN" })).toBe(true);
+    expect(canMutateGroupOrder({ id: "1", status: "LOCKED" })).toBe(true);
+    expect(canMutateGroupOrder({ id: "1", status: "CHECKED_OUT" })).toBe(false);
+    expect(canMutateGroupOrder({ id: "1", status: "CANCELLED" })).toBe(false);
   });
 
   it("builds invite links without changing the route", () => {

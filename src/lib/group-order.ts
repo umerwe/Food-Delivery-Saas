@@ -9,6 +9,11 @@ export const GROUP_ORDER_CLOSED_STATUSES: GroupOrderStatus[] = [
   "EXPIRED",
 ];
 
+export const GROUP_ORDER_MUTABLE_STATUSES: GroupOrderStatus[] = [
+  "OPEN",
+  "LOCKED",
+];
+
 export const getStoredGroupOrderCode = () => safeGetLocalStorageItem(GROUP_ORDER_CODE_KEY) || "";
 
 export const setStoredGroupOrderCode = (inviteCode: string) => {
@@ -23,6 +28,12 @@ export const isClosedGroupOrder = (order: GroupOrder | null | undefined) => {
   const status = String(order?.status || "").toUpperCase();
 
   return GROUP_ORDER_CLOSED_STATUSES.includes(status);
+};
+
+export const canMutateGroupOrder = (order: GroupOrder | null | undefined) => {
+  const status = String(order?.status || "").toUpperCase();
+
+  return GROUP_ORDER_MUTABLE_STATUSES.includes(status);
 };
 
 export const buildGroupOrderInviteLink = ({

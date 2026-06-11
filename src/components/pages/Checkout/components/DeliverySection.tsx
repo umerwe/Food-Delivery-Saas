@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { DeliveryAddressSection } from '@/components/pages/Checkout/components/DeliveryAddressSection';
 import NotesSection from '@/components/pages/Checkout/components/NotesSection';
 import { CustomerDetailsForm } from '@/components/pages/Checkout/components/CustomerDetailsForm';
-import PaymentMethodSection from '@/components/pages/Checkout/components/PaymentMethodSection';
+import { PaymentMethodSection } from '@/components/pages/Checkout/components/PaymentMethodSection';
 import type { CheckoutAddressValues } from '@/validations/checkout';
 
 type DeliverySectionProps = {
@@ -53,7 +53,7 @@ export function DeliverySection(props: DeliverySectionProps) {
       </section>
       <NotesSection note={props.note} setNote={props.setNote} />
       <CustomerDetailsForm {...props} editable={props.isGuest} />
-      <PaymentMethodSection {...props} />
+      <PaymentMethodSection {...props} allowCashOnDelivery={false} />
     </div>
   );
 }

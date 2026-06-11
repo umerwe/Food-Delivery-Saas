@@ -1,4 +1,4 @@
-import type { BranchAddress, BranchOrderType, BranchSettings } from "@/types/branches";
+import type { BranchAddress, BranchOrderType, BranchSettings, BranchTemporaryClosure } from "@/types/branches";
 
 export type BranchRecord = {
   id: string;
@@ -11,8 +11,12 @@ export type BranchRecord = {
   availability?: {
     isAvailable?: boolean;
     isActive?: boolean;
+    isTemporarilyClosed?: boolean;
+    isHolidayClosed?: boolean;
     status?: string;
     reason?: string | null;
+    temporaryClosure?: BranchTemporaryClosure | null;
+    holidayOpeningHour?: unknown;
   } | null;
   selectedOrderType?: BranchOrderType;
   coverImage?: string | null;

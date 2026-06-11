@@ -64,6 +64,10 @@ export const queryKeys = {
     summary: ["wallet", "summary"] as const,
     history: ["wallet", "history"] as const,
   },
+  loyalty: {
+    all: ["loyalty"] as const,
+    request: (endpoint: string) => ["loyalty", "request", endpoint] as const,
+  },
   reservations: {
     all: ["reservations"] as const,
     request: (endpoint: string) => ["reservations", "request", endpoint] as const,

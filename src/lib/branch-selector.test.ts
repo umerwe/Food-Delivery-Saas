@@ -6,6 +6,7 @@ import {
   formatBranchAddress,
   formatBranchDistance,
   nearbyBranchToBranchRecord,
+  normalizeBranch,
 } from "@/lib/branch-selector";
 import type { NearbyBranch } from "@/types/branches";
 
@@ -67,5 +68,47 @@ describe("branch selector helpers", () => {
       settings: nearbyBranch.settings,
       distanceKm: 1.25,
     });
+  });
+
+  it("preserves branch availability and temporary closure details", () => {
+    const branch = normalizeBranch({
+      id: "branch-closed",
+      name: "Closed Branch",
+      settings: {
+        temporaryClosure: {
+          isClosed: true,
+          closedAt: "2026-06-10T09:00:00.000Z",
+          closedUntil: "2026-06-10T13:00:00.000Z",
+          reason: "Maintenance",
+          message: "We are closed for maintenance",
+        },
+        openingHours: [
+          {
+            dayOfWeek: "WEDNESDAY",
+            isClosed: false,
+            openTime: "09:00",
+            closeTime: "18:00",
+            breakTimes: [{ startTime: "14:00", endTime: "15:00", note: "Lunch" }],
+          },
+        ],
+      },
+      availability: {
+        isAvailable: false,
+        isTemporarilyClosed: true,
+        isHolidayClosed: false,
+        temporaryClosure: {
+          isClosed: true,
+          closedAt: "2026-06-10T09:00:00.000Z",
+          closedUntil: "2026-06-10T13:00:00.000Z",
+          reason: "Maintenance",
+          message: "We are closed for maintenance",
+        },
+      },
+    });
+
+    expect(branch?.availability?.isTemporarilyClosed).toBe(true);
+    expect(branch?.availability?.temporaryClosure?.closedUntil).toBe("2026-06-10T13:00:00.000Z");
+    expect(branch?.settings?.temporaryClosure?.message).toBe("We are closed for maintenance");
+    expect(branch?.settings?.openingHours?.[0]?.breakTimes?.[0]?.note).toBe("Lunch");
   });
 });

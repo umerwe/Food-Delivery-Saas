@@ -1,9 +1,9 @@
 import type { BranchRecord } from "@/types/branch-selector";
 
-export type GroupOrderStatus = "OPEN" | "CHECKED_OUT" | "CANCELLED" | "EXPIRED" | string;
+export type GroupOrderStatus = "OPEN" | "LOCKED" | "CHECKED_OUT" | "CANCELLED" | "EXPIRED" | string;
 export type GroupOrderParticipantStatus = "ACTIVE" | "PENDING" | string;
 export type GroupOrderType = "DINE_IN" | "TAKEAWAY" | "DELIVERY" | string;
-export type GroupOrderPaymentMethod = "COD" | "BANK_TRANSFER" | "EASYPESA" | "JAZZCASH" | string;
+export type GroupOrderPaymentMethod = "COD" | "PAYPAL" | "STRIPE";
 
 export type GroupOrderUser = {
   id?: string | number | null;
@@ -54,6 +54,7 @@ export type GroupOrder = {
   participants?: GroupOrderParticipant[];
   restaurant?: GroupOrderRestaurant | null;
   summary?: GroupOrderSummary | null;
+  restaurantMenuId?: string | number | null;
   orderTime?: string | null;
   orderType?: GroupOrderType;
   branch?: BranchRecord | null;
@@ -62,6 +63,7 @@ export type GroupOrder = {
 export type CreateGroupOrderPayload = {
   branchId: string | number;
   orderType: GroupOrderType;
+  restaurantMenuId?: string | number;
   deliveryAddressId: string | number | null;
   orderTime: string;
   hostNote: string | null;
@@ -99,4 +101,5 @@ export type UseGroupOrderResult = {
   participant: GroupOrderParticipant | undefined;
   canEditItems: boolean;
   canCheckout: boolean;
+  canMutateGroupOrder: boolean;
 };

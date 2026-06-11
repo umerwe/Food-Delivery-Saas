@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatAddress, formatPrice, getImageUrl, getOperatingHours, getRestaurantName, getSplitPizzaPricingVariation, mergeUniqueById, resolveHasNext, resolvePromotionBadge } from "./restaurant-card-utils";
+import { formatAddress, formatPrice, getBranchHoursSummary, getImageUrl, getOperatingHours, getRestaurantName, getSplitPizzaPricingVariation, mergeUniqueById, resolveHasNext, resolvePromotionBadge } from "./restaurant-card-utils";
 
 describe("restaurant card utils", () => {
   it("formats price and fallback image", () => {
@@ -11,6 +11,32 @@ describe("restaurant card utils", () => {
   it("formats address and operating hours", () => {
     expect(formatAddress({ street: "A", city: "B", country: "C" })).toBe("A, B, C");
     expect(getOperatingHours({ restaurant: { openingTime: "9", closingTime: "5" } }, null)).toBe("9 - 5");
+  });
+
+  it("summarizes selected branch opening and delivery hours", () => {
+    const branch = {
+      settings: {
+        openingHours: [
+          { dayOfWeek: "MONDAY", openTime: "09:00", closeTime: "22:00" },
+        ],
+        deliveryConfig: {
+          deliveryHours: [
+            { dayOfWeek: "MONDAY", openTime: "11:30", closeTime: "21:45" },
+          ],
+        },
+      },
+    };
+
+    expect(getBranchHoursSummary(branch)).toMatchObject({
+      opening: {
+        status: "open",
+        value: "9:00 AM - 10:00 PM",
+      },
+      delivery: {
+        status: "open",
+        value: "11:30 AM - 9:45 PM",
+      },
+    });
   });
 
   it("resolves restaurant and promotion text", () => {

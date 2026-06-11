@@ -12,6 +12,8 @@ import { CalendarDays, Clock3, PencilLine, RotateCcw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { setStoredGroupOrderCode } from "@/lib/group-order";
+import { getStoredRestaurantMenuId } from "@/lib/timed-menu";
+import { getBackendErrorMessage, hasBackendError } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import type { CreateGroupOrderPayload, GroupOrderType } from "@/types/group-order";
 import type { BranchRecord } from "@/types/branch-selector";
 
@@ -92,19 +94,21 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
       }
 
       const orderTime = selectedScheduleDate.toISOString();
+      const restaurantMenuId = getStoredRestaurantMenuId();
 
       const payload: CreateGroupOrderPayload = {
         branchId,
         orderType,
         deliveryAddressId: null,
+        ...(restaurantMenuId ? { restaurantMenuId } : {}),
         orderTime,
         hostNote: note || null,
       };
 
       const res = await createGroupOrder({ payload });
 
-      if (!res || res.error) {
-        return toast.error(res?.error || t("failedCreate"));
+      if (hasBackendError(res)) {
+        return toast.error(getBackendErrorMessage(res, t("failedCreate")));
       }
 
       const dataRecord =

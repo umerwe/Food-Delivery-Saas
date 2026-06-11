@@ -16,7 +16,6 @@ import {
   getDealActionKind,
   getDealScopedItemIdsForDetails,
   getDealScopedItemCustomizationState,
-  canSelectFlexibleDealItem,
   isFixedItemDeal,
   isFlexibleAllItemsDeal,
   isFlexibleCategoryDeal,
@@ -50,6 +49,103 @@ const CustomerDealsSkeleton = () => (
     ))}
   </div>
 );
+
+const getDealCategoryRuleHighlights = (deal: CustomerDeal) => {
+  const categoryNamesById = new Map(
+    deal.scopeCategories.map((category) => [category.id, category.name])
+  );
+
+  return (deal.scopeCategoryRules ?? [])
+    .map((rule) => ({
+      id: rule.menuCategoryId,
+      count: rule.itemLimit,
+      name: categoryNamesById.get(rule.menuCategoryId) || "Category",
+    }))
+    .filter(({ id, count }) => id && count > 0);
+};
+
+const getDealNameChips = (names: string) =>
+  names
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+const DealInfoPanel = ({
+  deal,
+  requirementText,
+  itemNames,
+  categoryNames,
+}: {
+  deal: CustomerDeal;
+  requirementText: string;
+  itemNames: string;
+  categoryNames: string;
+}) => {
+  const categoryRules = getDealCategoryRuleHighlights(deal);
+  const chips = getDealNameChips(itemNames || categoryNames);
+
+  if (isFlexibleCategoryDeal(deal) && categoryRules.length > 0) {
+    return (
+      <div className="mt-4 rounded-2xl border border-primary/10 bg-gradient-to-br from-primary/10 via-white to-amber-50/80 p-3 shadow-sm shadow-primary/5">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-md shadow-primary/20">
+            <PackageCheck size={15} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
+              Build your combo
+            </p>
+            <p className="mt-1 text-sm font-semibold leading-5 text-gray-900">
+              Pick the perfect mix from each category.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {categoryRules.map((rule) => (
+            <span
+              key={rule.id}
+              className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm"
+            >
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                {rule.count}x
+              </span>
+              <span className="max-w-[130px] truncate">{rule.name}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!requirementText && chips.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50/80 p-3">
+      {requirementText ? (
+        <p className="text-sm font-semibold leading-5 text-gray-900">
+          {requirementText}
+        </p>
+      ) : null}
+
+      {chips.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {chips.map((chip) => (
+            <span
+              key={chip}
+              className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 shadow-sm"
+            >
+              {chip}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 const CustomerDealCard = ({
   deal,
@@ -127,36 +223,16 @@ const CustomerDealCard = ({
           </p>
         ) : null}
 
-        {isFixedItemDeal(deal) && requirementText ? (
-          <p className="mt-3 line-clamp-2 text-sm font-medium text-gray-700">
-            {requirementText}
-          </p>
-        ) : null}
-
-        {isFixedItemDeal(deal) && itemNames ? (
-          <p className="mt-3 line-clamp-2 text-sm font-medium text-gray-700">
-            {t("includes", { items: itemNames })}
-          </p>
-        ) : null}
-
-        {isFlexibleItemDeal(deal) ? (
-          <p className="mt-3 line-clamp-2 text-sm font-medium text-gray-700">
-            {requirementText}
-          </p>
-        ) : null}
-
-        {isFlexibleCategoryDeal(deal) ? (
-          <p className="mt-3 line-clamp-2 text-sm font-medium text-gray-700">
-            {requirementText}
-            {categoryNames ? `: ${categoryNames}` : ""}
-          </p>
-        ) : null}
-
-        {isFlexibleAllItemsDeal(deal) ? (
-          <p className="mt-3 line-clamp-2 text-sm font-medium text-gray-700">
-            {requirementText}
-          </p>
-        ) : null}
+        <DealInfoPanel
+          deal={deal}
+          requirementText={
+            isFixedItemDeal(deal) && itemNames
+              ? t("includes", { items: itemNames })
+              : requirementText
+          }
+          itemNames={itemNames}
+          categoryNames={categoryNames}
+        />
 
         {!hasDealItems ? (
           <p className="mt-3 text-sm font-medium text-red-500">
@@ -211,14 +287,6 @@ export const CustomerDealsSection = ({
 
       if (states.includes("UNKNOWN")) {
         toast.warning(t("reviewDealItems"));
-        return;
-      }
-
-      if (
-        states.includes("REQUIRES_UNSUPPORTED_VARIATION") &&
-        deal.scopeMenuItems.some((item) => !canSelectFlexibleDealItem(item))
-      ) {
-        toast.error(t("unsupportedDealCustomization"));
         return;
       }
 

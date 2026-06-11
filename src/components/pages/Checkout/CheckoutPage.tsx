@@ -8,6 +8,7 @@ import { CartSummarySection } from "@/components/pages/Checkout/components/CartS
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCheckout } from "@/hooks/useCheckout";
 import { useCart } from "@/hooks/useCart";
+import { useLoyalty } from "@/hooks/useLoyalty";
 import useReservations from "@/hooks/useReservations";
 import { toast } from "sonner";
 import { useAuthContext } from "@/hooks/useAuth";
@@ -24,6 +25,8 @@ import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorM
 import type { BranchRecord } from "@/types/branch-selector";
 import { useTranslations } from "next-intl";
 import { normalizeCheckoutTipAmount, type CheckoutAddressValues } from "@/validations/checkout";
+import { getStoredRestaurantMenuId } from "@/lib/timed-menu";
+import type { LoyaltySummary } from "@/services/loyalty";
 
 const emptyGuestDeliveryAddress: CheckoutAddressValues = {
   street: "",
@@ -41,6 +44,17 @@ type GuestPrivacyPolicy = {
   title: string;
   content: string;
   policyLink: string;
+};
+
+const getCheckoutOrderType = (checkoutType: string) =>
+  checkoutType === "pickup" ? "TAKEAWAY" : "DELIVERY";
+
+const getCartRestaurantMenuId = (items: CartItem[]) => {
+  const cartMenuId = items
+    .map((item) => item.restaurantMenuId)
+    .find((restaurantMenuId) => restaurantMenuId !== undefined && restaurantMenuId !== null && String(restaurantMenuId).trim());
+
+  return cartMenuId ? String(cartMenuId) : getStoredRestaurantMenuId();
 };
 
 const isGuestUser = (user: ReturnType<typeof useAuthContext>["user"]) =>
@@ -126,10 +140,12 @@ function CheckoutPageContent() {
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [removingCoupon, setRemovingCoupon] = useState(false);
   const [applyingTip, setApplyingTip] = useState(false);
 
   const { get, patch, del, post, checkoutCustomerCart } = useCheckout(token);
-  const { updateCustomerCart, quoteCustomerCart } = useCart(token);
+  const { updateCustomerCart, updateCustomerCartOrderType, quoteCustomerCart } = useCart(token);
+  const { fetchLoyalty } = useLoyalty(token);
   const { fetchReservationBranch } = useReservations(token);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -139,6 +155,9 @@ function CheckoutPageContent() {
   const [backendError, setBackendError] = useState<BackendErrorState | null>(
     null
   );
+  const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
+  const [loyaltyPoints, setLoyaltyPoints] = useState("");
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
 
   const router = useRouter();
   const customerId = user?.id;
@@ -159,6 +178,31 @@ function CheckoutPageContent() {
 
   const clearBackendError = () => {
     setBackendError(null);
+  };
+
+  const syncCartFromResponse = (res: unknown) => {
+    const { items, quote } = normalizeCartResponse(res);
+
+    if (items.length) {
+      setCartItems(items.map((item) => normalizeCartItem(item)));
+    }
+
+    if (!quote) {
+      return false;
+    }
+
+    setCartQuote(quote);
+    setAppliedTipAmount((previousTipAmount) =>
+      Math.max(0, toNumber(quote.tipAmount, previousTipAmount))
+    );
+    setCouponCode(
+      typeof quote.couponCode === "string" && quote.couponCode.trim()
+        ? quote.couponCode.trim()
+        : ""
+    );
+    setCouponDiscount(Math.max(0, toNumber(quote.discountAmount, 0)));
+
+    return true;
   };
 
   const applyTipToCurrentQuote = (tipAmount: number) => {
@@ -209,6 +253,12 @@ function CheckoutPageContent() {
 
       setCartItems(formatted);
       setCartQuote(quote);
+      setCouponCode(
+        typeof quote?.couponCode === "string" && quote.couponCode.trim()
+          ? quote.couponCode.trim()
+          : ""
+      );
+      setCouponDiscount(Math.max(0, toNumber(quote?.discountAmount, 0)));
       setAppliedTipAmount((previousTipAmount) =>
         quote ? Math.max(0, toNumber(quote.tipAmount, 0)) : previousTipAmount
       );
@@ -231,9 +281,46 @@ function CheckoutPageContent() {
       setCartItems([]);
       setCartQuote(null);
       setAppliedTipAmount(0);
+      setCouponCode("");
+      setCouponDiscount(0);
       setLoadingCart(false);
     }
   }, [customerId]);
+
+  useEffect(() => {
+    if (!customerId || isGuest || !token) {
+      setLoyalty(null);
+      setLoyaltyPoints("");
+      setLoadingLoyalty(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadLoyalty = async () => {
+      try {
+        setLoadingLoyalty(true);
+        const { loyalty: nextLoyalty } = await fetchLoyalty();
+
+        if (!isMounted) return;
+
+        setLoyalty(nextLoyalty);
+      } catch {
+        if (!isMounted) return;
+        setLoyalty(null);
+      } finally {
+        if (isMounted) {
+          setLoadingLoyalty(false);
+        }
+      }
+    };
+
+    void loadLoyalty();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [customerId, fetchLoyalty, isGuest, token]);
 
   const [selectedAddress, setSelectedAddress] = useState<string | null>("");
   const [guestDeliveryAddress, setGuestDeliveryAddress] =
@@ -249,12 +336,14 @@ function CheckoutPageContent() {
     useState<GuestPrivacyPolicy | null>(null);
   const [privacyPolicyLoading, setPrivacyPolicyLoading] = useState(false);
 
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState("STRIPE");
   const [placingOrder, setPlacingOrder] = useState(false);
   const [pickupDate, setPickupDate] = useState<Date | null>(null);
   const [pickupTime, setPickupTime] = useState<string | null>(null);
   const [pickupBranch, setPickupBranch] = useState<BranchRecord | null>(null);
   const [scheduledDeliveryValue, setScheduledDeliveryValue] = useState("");
+  const checkoutPaymentMethod =
+    activeTab === "delivery" && paymentMethod === "COD" ? "STRIPE" : paymentMethod;
 
   useEffect(() => {
     if (!user) return;
@@ -316,16 +405,39 @@ function CheckoutPageContent() {
   }, [get, isGuest, restaurantId]);
 
   useEffect(() => {
-    if (!isGuest || activeTab !== "delivery" || !customerId) return;
-    if (!hasGuestDeliveryAddress(guestDeliveryAddress)) return;
+    if (!customerId) return;
 
     const quoteTimer = window.setTimeout(async () => {
+      const orderType = getCheckoutOrderType(activeTab);
+      const orderTypeRes = await updateCustomerCartOrderType({
+        customerId,
+        orderType,
+      });
+
+      if (hasBackendError(orderTypeRes)) {
+        reportBackendError(
+          t("toast.quoteFailed"),
+          orderTypeRes,
+          t("toast.quoteFailed")
+        );
+        return;
+      }
+
+      await fetchCart();
+
+      const payload: Record<string, unknown> = {};
+
+      if (activeTab === "delivery" && isGuest && hasGuestDeliveryAddress(guestDeliveryAddress)) {
+        payload.guestDeliveryAddress = getGuestDeliveryAddressPayload(guestDeliveryAddress);
+      }
+
+      if (activeTab === "delivery" && !isGuest && selectedAddress) {
+        payload.deliveryAddressId = selectedAddress;
+      }
+
       const res = await quoteCustomerCart({
         customerId,
-        payload: {
-          orderType: "DELIVERY",
-          guestDeliveryAddress: getGuestDeliveryAddressPayload(guestDeliveryAddress),
-        },
+        payload,
       });
 
       if (!hasBackendError(res)) {
@@ -339,7 +451,7 @@ function CheckoutPageContent() {
     }, 450);
 
     return () => window.clearTimeout(quoteTimer);
-  }, [activeTab, customerId, guestDeliveryAddress, isGuest, quoteCustomerCart]);
+  }, [activeTab, customerId, guestDeliveryAddress, isGuest, quoteCustomerCart, selectedAddress, updateCustomerCartOrderType]);
 
   useEffect(() => {
     const loadPickupBranch = async () => {
@@ -456,11 +568,15 @@ function CheckoutPageContent() {
     const previousCartItems = cartItems;
     const previousCartQuote = cartQuote;
     const previousAppliedTipAmount = appliedTipAmount;
+    const previousCouponCode = couponCode;
+    const previousCouponDiscount = couponDiscount;
 
     try {
       setCartItems([]);
       setCartQuote(null);
       setAppliedTipAmount(0);
+      setCouponCode("");
+      setCouponDiscount(0);
 
       const res = await del(`/v1/cart?customerId=${customerId}`);
 
@@ -468,6 +584,8 @@ function CheckoutPageContent() {
         setCartItems(previousCartItems);
         setCartQuote(previousCartQuote);
         setAppliedTipAmount(previousAppliedTipAmount);
+        setCouponCode(previousCouponCode);
+        setCouponDiscount(previousCouponDiscount);
         reportBackendError(
           t("toast.failedClearCart"),
           res,
@@ -482,37 +600,12 @@ function CheckoutPageContent() {
       setCartItems(previousCartItems);
       setCartQuote(previousCartQuote);
       setAppliedTipAmount(previousAppliedTipAmount);
+      setCouponCode(previousCouponCode);
+      setCouponDiscount(previousCouponDiscount);
       reportBackendError(
         t("toast.failedClearCart"),
         err,
         err instanceof Error ? err.message : t("toast.failedClearCart")
-      );
-      return false;
-    }
-  };
-
-  const setOrderType = async () => {
-    try {
-      const res = await patch(`/v1/cart/order-type?customerId=${customerId}`, {
-        orderType: activeTab === "pickup" ? "TAKEAWAY" : "DELIVERY",
-      });
-
-      if (hasBackendError(res)) {
-        reportBackendError(
-          t("toast.failedSetOrderType"),
-          res,
-          t("toast.failedSetOrderType")
-        );
-        return false;
-      }
-
-      clearBackendError();
-      return true;
-    } catch (err) {
-      reportBackendError(
-        t("toast.failedSetOrderType"),
-        err,
-        err instanceof Error ? err.message : t("toast.failedSetOrderType")
       );
       return false;
     }
@@ -602,10 +695,12 @@ function CheckoutPageContent() {
     if (!customerId || scheduledDeliveryAt === undefined) return true;
 
     try {
+      const restaurantMenuId = getCartRestaurantMenuId(cartItems);
       const res = await updateCustomerCart({
         customerId,
         payload: {
-          scheduledDeliveryAt,
+          orderTime: scheduledDeliveryAt,
+          ...(restaurantMenuId ? { restaurantMenuId } : {}),
         },
       });
 
@@ -713,9 +808,6 @@ function CheckoutPageContent() {
         return;
       }
 
-      const orderTypeUpdated = await setOrderType();
-      if (!orderTypeUpdated) return;
-
       const addressUpdated = await setCartAddress();
       if (!addressUpdated) return;
 
@@ -737,24 +829,38 @@ function CheckoutPageContent() {
         0,
         toNumber(cartQuote?.tipAmount, appliedTipAmount)
       );
+      const checkoutLoyaltyPoints = Math.max(0, Math.floor(toNumber(loyaltyPoints, 0)));
+
+      if (checkoutLoyaltyPoints > 0) {
+        if (!loyalty) {
+          toast.error(t("toast.loyaltyUnavailable"));
+          return;
+        }
+
+        if (checkoutLoyaltyPoints < loyalty.minimumRedeemPoints) {
+          toast.error(t("toast.minimumLoyaltyPoints", { points: loyalty.minimumRedeemPoints }));
+          return;
+        }
+
+        if (checkoutLoyaltyPoints > loyalty.availablePoints) {
+          toast.error(t("toast.insufficientLoyaltyPoints"));
+          return;
+        }
+      }
 
       const res = await checkoutCustomerCart({
         customerId,
         payload: {
-          ...(scheduledDeliveryAt ? { scheduledDeliveryAt } : {}),
+          ...(scheduledDeliveryAt ? { orderTime: scheduledDeliveryAt } : {}),
           ...(checkoutTipAmount > 0 ? { tipAmount: checkoutTipAmount } : {}),
+          ...(checkoutLoyaltyPoints > 0 ? { loyaltyPoints: checkoutLoyaltyPoints } : {}),
           ...(isGuest
             ? { guestContact: getGuestContactPayload(customer, privacyPolicyAccepted) }
             : {}),
           ...(isGuest && activeTab === "delivery"
             ? { guestDeliveryAddress: getGuestDeliveryAddressPayload(guestDeliveryAddress) }
             : {}),
-          paymentMethod:
-            paymentMethod === "card"
-              ? "STRIPE"
-              : paymentMethod === "wallet"
-                ? "WALLET"
-                : "COD",
+          paymentMethod: checkoutPaymentMethod,
           customerNote: note,
         },
       });
@@ -782,7 +888,7 @@ function CheckoutPageContent() {
 
       clearBackendError();
 
-      if (paymentMethod === "card") {
+      if (checkoutPaymentMethod === "STRIPE") {
         const attemptRes = await post(`/v1/payments/orders/${orderId}/attempts`, {
           paymentMethod: "STRIPE",
           currency: "USD",
@@ -812,16 +918,9 @@ function CheckoutPageContent() {
         return;
       }
 
-      if (paymentMethod === "wallet") {
-        toast.success(t("toast.paidUsingWallet"));
-
-        await clearCart();
-        router.push(`/order?success=true&orderId=${orderId}`);
-        return;
-      }
-
       toast.success(t("toast.orderPlaced"));
 
+      window.dispatchEvent(new Event("loyalty-updated"));
       await clearCart();
       router.push(`/order?success=true&orderId=${orderId}`);
     } catch (err) {
@@ -835,17 +934,7 @@ function CheckoutPageContent() {
     }
   };
 
-  const subtotal = cartItems.reduce((acc, item) => {
-    return acc + toNumber(item.lineTotal, item.price * item.quantity);
-  }, 0);
-
-  const menuItemIds = cartItems.map((item) => item.menuItemId).filter(Boolean);
-
-  const categoryIds = cartItems
-    .map((item) => item.categoryId)
-    .filter(Boolean);
-
-  const validateCoupon = async () => {
+  const applyCoupon = async () => {
     if (!couponCode.trim()) {
       toast.error(t("toast.enterCouponCode"));
       return;
@@ -854,17 +943,11 @@ function CheckoutPageContent() {
     try {
       setValidatingCoupon(true);
 
-      const res = await post(`/v1/coupons/validate`, {
-        code: couponCode.trim(),
-        branchId: user?.branchId || user?.restaurantId,
-        subtotal,
-        menuItemIds,
-        categoryIds,
-        customerId,
+      const res = await patch(`/v1/cart/coupon`, {
+        couponCode: couponCode.trim(),
       });
 
       if (hasBackendError(res)) {
-        setCouponDiscount(0);
         reportBackendError(
           t("toast.invalidCoupon"),
           res,
@@ -873,14 +956,14 @@ function CheckoutPageContent() {
         return;
       }
 
-      const couponData = asRecord(res?.data);
-      const discount = toNumber(couponData.discountAmount, 0);
+      const synced = syncCartFromResponse(res);
+      if (!synced) {
+        await fetchCart();
+      }
 
-      setCouponDiscount(discount);
       clearBackendError();
       toast.success(t("toast.couponApplied"));
     } catch (err) {
-      setCouponDiscount(0);
       reportBackendError(
         t("toast.couponValidationFailed"),
         err,
@@ -888,6 +971,42 @@ function CheckoutPageContent() {
       );
     } finally {
       setValidatingCoupon(false);
+    }
+  };
+
+  const removeCoupon = async () => {
+    try {
+      setRemovingCoupon(true);
+
+      const res = await del(`/v1/cart/coupon`);
+
+      if (hasBackendError(res)) {
+        reportBackendError(
+          t("toast.couponRemoveFailed"),
+          res,
+          t("toast.couponRemoveFailed")
+        );
+        return;
+      }
+
+      setCouponCode("");
+      setCouponDiscount(0);
+
+      const synced = syncCartFromResponse(res);
+      if (!synced) {
+        await fetchCart();
+      }
+
+      clearBackendError();
+      toast.success(t("toast.couponRemoved"));
+    } catch (err) {
+      reportBackendError(
+        t("toast.couponRemoveFailed"),
+        err,
+        err instanceof Error ? err.message : t("toast.couponRemoveFailed")
+      );
+    } finally {
+      setRemovingCoupon(false);
     }
   };
 
@@ -912,7 +1031,7 @@ function CheckoutPageContent() {
               privacyPolicyLoading={privacyPolicyLoading}
               guestDeliveryAddress={guestDeliveryAddress}
               setGuestDeliveryAddress={setGuestDeliveryAddress}
-              paymentMethod={paymentMethod}
+              paymentMethod={checkoutPaymentMethod}
               setPaymentMethod={setPaymentMethod}
               scheduledDeliveryValue={scheduledDeliveryValue}
               setScheduledDeliveryValue={setScheduledDeliveryValue}
@@ -930,7 +1049,7 @@ function CheckoutPageContent() {
               setPrivacyPolicyAccepted={setPrivacyPolicyAccepted}
               privacyPolicy={guestPrivacyPolicy}
               privacyPolicyLoading={privacyPolicyLoading}
-              paymentMethod={paymentMethod}
+              paymentMethod={checkoutPaymentMethod}
               setPaymentMethod={setPaymentMethod}
               pickupDate={pickupDate}
               setPickupDate={setPickupDate}
@@ -955,12 +1074,19 @@ function CheckoutPageContent() {
             placingOrder={placingOrder || loadingCart}
             couponCode={couponCode}
             setCouponCode={setCouponCode}
-            onApplyCoupon={validateCoupon}
+            onApplyCoupon={applyCoupon}
+            onRemoveCoupon={removeCoupon}
             couponDiscount={couponDiscount}
             validatingCoupon={validatingCoupon}
+            removingCoupon={removingCoupon}
             loadingCart={loadingCart}
             onApplyTip={applyTip}
             applyingTip={applyingTip}
+            loyalty={loyalty}
+            loyaltyPoints={loyaltyPoints}
+            setLoyaltyPoints={setLoyaltyPoints}
+            loadingLoyalty={loadingLoyalty}
+            isGuest={isGuest}
           />
         </div>
       </div>
@@ -985,6 +1111,7 @@ function CheckoutPageContent() {
                     orderId: "",
                   });
 
+                  window.dispatchEvent(new Event("loyalty-updated"));
                   await clearCart();
                   router.push(`/order?success=true&orderId=${stripePayment.orderId}`);
                 }}

@@ -1,4 +1,5 @@
 import { createDomainApiService } from "@/services/domain-api";
+import { normalizeBranch } from "@/lib/branch-selector";
 import type { ApiResult } from "@/services/http";
 import type { BranchRecord } from "@/types/branch-selector";
 import type { Reservation, ReservationMeta, ReservationPayload } from "@/types/reservations";
@@ -97,10 +98,11 @@ export const fetchReservationBranch = async ({
   const response = await getReservations(`/v1/branches/${branchId}`, token);
   const dataRecord = getRecord(response.data);
   const nestedData = getRecord(dataRecord?.data);
+  const branch = normalizeBranch(nestedData || dataRecord);
 
   return {
     response,
-    branch: (nestedData || dataRecord) as BranchRecord | null,
+    branch,
   };
 };
 

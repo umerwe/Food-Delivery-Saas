@@ -1,5 +1,13 @@
 export type BranchOrderType = "DELIVERY" | "TAKEAWAY" | string;
 
+export type BranchTemporaryClosure = {
+  isClosed?: boolean;
+  closedAt?: string | null;
+  closedUntil?: string | null;
+  reason?: string | null;
+  message?: string | null;
+};
+
 export type BranchAddress = {
   id?: string;
   street?: string | null;
@@ -15,6 +23,7 @@ export type BranchAddress = {
 export type BranchSettings = {
   allowedOrderTypes?: BranchOrderType[];
   deliveryConfig?: unknown;
+  temporaryClosure?: BranchTemporaryClosure | null;
   openingHours?: Array<{
     dayOfWeek?: string;
     isClosed?: boolean;
@@ -43,8 +52,12 @@ export type NearbyBranch = {
   availability?: {
     isAvailable?: boolean;
     isActive?: boolean;
+    isTemporarilyClosed?: boolean;
+    isHolidayClosed?: boolean;
     status?: string;
     reason?: string | null;
+    temporaryClosure?: BranchTemporaryClosure | null;
+    holidayOpeningHour?: unknown;
   } | null;
   isActive?: boolean;
 };

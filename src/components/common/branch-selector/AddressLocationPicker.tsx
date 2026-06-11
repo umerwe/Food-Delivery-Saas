@@ -18,6 +18,7 @@ type AddressLocationPickerProps = {
   onUseCurrentLocation: () => void;
   isLocating?: boolean;
   compact?: boolean;
+  showSelectedLabel?: boolean;
 };
 
 const DEFAULT_MAP_CENTER: GoogleLatLngLiteral = {
@@ -34,6 +35,7 @@ export function AddressLocationPicker({
   onUseCurrentLocation,
   isLocating = false,
   compact = false,
+  showSelectedLabel = true,
 }: AddressLocationPickerProps) {
   const { googleMaps, status, errorMessage, isReady } = useGoogleMaps();
   const [query, setQuery] = useState(locationLabel ?? "");
@@ -317,7 +319,7 @@ export function AddressLocationPicker({
         </button>
       </div>
 
-      {selectedLabel ? (
+      {showSelectedLabel && selectedLabel ? (
         <p className="flex min-w-0 items-start gap-2 text-xs leading-5 text-[#6B7280]">
           <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
           <span className="min-w-0 break-words">{selectedLabel}</span>
