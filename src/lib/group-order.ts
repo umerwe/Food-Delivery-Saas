@@ -1,4 +1,5 @@
 import { safeGetLocalStorageItem, safeRemoveLocalStorageItem, safeSetLocalStorageItem } from "@/lib/browser-storage";
+import type { AddressRecord } from "@/services/profile";
 import type { GroupOrder, GroupOrderStatus } from "@/types/group-order";
 
 export const GROUP_ORDER_CODE_KEY = "***";
@@ -43,3 +44,26 @@ export const buildGroupOrderInviteLink = ({
   origin: string;
   inviteCode?: string | null;
 }) => `${origin}/items?code=${inviteCode || ""}`;
+
+export const resolveGroupOrderDeliveryAddressId = ({
+  addresses,
+  selectedAddressId,
+}: {
+  addresses: AddressRecord[];
+  selectedAddressId?: string | null;
+}) => {
+  const normalizedSelectedAddressId = String(selectedAddressId || "").trim();
+
+  if (
+    normalizedSelectedAddressId &&
+    addresses.some((address) => address.id === normalizedSelectedAddressId)
+  ) {
+    return normalizedSelectedAddressId;
+  }
+
+  return (
+    addresses.find((address) => address.isDefault)?.id ||
+    addresses[0]?.id ||
+    ""
+  );
+};

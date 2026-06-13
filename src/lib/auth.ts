@@ -92,6 +92,7 @@ export const mergeStoredUserState = (user: AuthUser, storedUser?: AuthUser | nul
   restaurantId: storedUser?.restaurantId ?? user.restaurantId ?? null,
   branchId: storedUser?.branchId ?? user.branchId ?? null,
   branch: storedUser?.branch ?? user.branch ?? null,
+  selectedOrderType: storedUser?.selectedOrderType ?? user.selectedOrderType ?? null,
 });
 
 export const getAuthErrorMessage = (error: unknown, fallback = "Something went wrong") => {

@@ -1,16 +1,28 @@
 "use client";
 
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { SignatureSelectionContent } from "@/components/pages/Items/components/signature-selection/SignatureSelectionContent";
 import { OrderCartSidebar } from "@/components/pages/Items/components/signature-selection/OrderCartSidebar";
 import { useAuth } from "@/hooks/useAuth";
+import { getSelectedOrderType } from "@/lib/branch-selector";
+import {
+  getStoredCheckoutTypePreference,
+  type CheckoutTypePreference,
+} from "@/lib/checkout-type-preference";
 
 function MenuPageContent() {
   const t = useTranslations("menu");
   const { restaurantId, user, loading } = useAuth();
   const [cartRefreshKey, setCartRefreshKey] = useState(0);
-  const checkoutType = user?.selectedOrderType === "TAKEAWAY" ? "pickup" : "delivery";
+  const [storedCheckoutType, setStoredCheckoutType] =
+    useState<CheckoutTypePreference | null>(null);
+  const userCheckoutType = getSelectedOrderType(user) === "TAKEAWAY" ? "pickup" : "delivery";
+  const checkoutType = storedCheckoutType ?? userCheckoutType;
+
+  useEffect(() => {
+    setStoredCheckoutType(getStoredCheckoutTypePreference());
+  }, []);
 
   const handleCartRefresh = useCallback(() => {
     setCartRefreshKey((prev) => prev + 1);

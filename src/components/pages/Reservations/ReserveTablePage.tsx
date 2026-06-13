@@ -1,18 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { AlertTriangle, CalendarX, Clock, Info, LoaderCircle, Star } from "lucide-react";
+import { AlertTriangle, CalendarX, Clock, LoaderCircle, Star, Store } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { OpeningHoursDialog } from "@/components/common/popups/OpeningHoursDialog";
 
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -136,6 +130,28 @@ const formatTimeLabel = (value: string) => {
     hour: "numeric",
     minute: "2-digit",
   });
+};
+
+const formatHoursRangeLabel = (openTime?: string, closeTime?: string) => {
+  const open = openTime ? formatTimeLabel(openTime) : "";
+  const close = closeTime ? formatTimeLabel(closeTime) : "";
+
+  return open && close ? `${open} - ${close}` : "--:-- - --:--";
+};
+
+const formatDayShortLabel = (value?: string) => {
+  const text = String(value || "").trim().toLowerCase();
+
+  if (!text) return "Day";
+
+  return `${text.slice(0, 1).toUpperCase()}${text.slice(1, 3)}`;
+};
+
+const formatBreakTimeLabel = (breakTime: NonNullable<OpeningHours["breakTimes"]>[number]) => {
+  const range = formatHoursRangeLabel(breakTime.startTime, breakTime.endTime);
+  const note = String(breakTime.note || "").trim();
+
+  return note ? `${range} (${note})` : range;
 };
 
 const roundUpToInterval = (minutes: number, interval: number) => {
@@ -611,6 +627,7 @@ export function ReserveTablePage() {
   const todaysHours = selectedScheduleState.schedule;
   const selectedDateRule = selectedScheduleState.dateRule;
   const isClosed = Boolean(todaysHours?.isClosed);
+  const reservationsEnabled = selectedBranch?.settings?.tableReservationsEnabled === true;
   const selectedAvailabilityBlock = useMemo(() => {
     return getBranchAvailabilityBlock({
       branch: selectedBranch,
@@ -635,11 +652,18 @@ export function ReserveTablePage() {
 
   const hasOpeningHours = normalizeArray(selectedBranch?.settings?.openingHours).length > 0;
   const dateRangeRules = getDateRangeRules(selectedBranch);
+  const openingHoursRows = normalizeArray<OpeningHours>(selectedBranch?.settings?.openingHours);
+  const entriesCount = openingHoursRows.length + dateRangeRules.length;
+  const openRowsCount = openingHoursRows.filter((hour) => !hour.isClosed).length;
+  const closedRowsCount =
+    openingHoursRows.filter((hour) => hour.isClosed).length +
+    dateRangeRules.filter((rule) => rule?.isClosed).length;
 
   const dateError = useMemo(() => {
     if (!date) return "";
     if (isPastDateValue(date)) return t("errors.pastDate");
     if (!selectedBranch?.id) return t("errors.selectBranchFirst");
+    if (!reservationsEnabled) return t("errors.branchUnavailable");
     if (selectedAvailabilityBlock?.reason === "unavailable") {
       return selectedAvailabilityBlock.message || t("errors.branchUnavailable");
     }
@@ -660,6 +684,7 @@ export function ReserveTablePage() {
   }, [
     date,
     selectedBranch?.id,
+    reservationsEnabled,
     hasOpeningHours,
     selectedDateRule,
     selectedAvailabilityBlock,
@@ -921,81 +946,67 @@ export function ReserveTablePage() {
 
                 {/* INFO POPUP */}
                 {selectedBranch?.settings ? (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <button
-                        type="button"
-                        aria-label={t("openingHours")}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-primary hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      >
-                        <Info className="h-4 w-4" />
-                      </button>
-                    </DialogTrigger>
-
-                    <DialogContent className="max-h-[85vh] w-[calc(100%-32px)] max-w-[420px] overflow-y-auto rounded-2xl p-5">
-                      <DialogHeader className="pr-8 text-left">
-                        <DialogTitle>{t("openingHours")}</DialogTitle>
-                      </DialogHeader>
-
-                      {hasOpeningHours ? (
-                        <div className="space-y-2 text-sm">
-                          {normalizeArray<OpeningHours>(selectedBranch.settings.openingHours).map((h) => (
-                            <div
-                              key={h.dayOfWeek}
-                              className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 px-3 py-2"
-                            >
-                              <span className="font-medium text-gray-700">
-                                {String(h.dayOfWeek || "").slice(0, 3)}
-                              </span>
-                              <span className="text-right text-gray-600">
-                                {h.isClosed
-                                  ? t("closed")
-                                  : `${h.openTime} - ${h.closeTime}`}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-500">
-                          {t("openingHoursNotConfigured")}
-                        </p>
-                      )}
-
-                      {dateRangeRules.length > 0 ? (
-                        <div className="border-t pt-4">
-                          <p className="mb-2 text-sm font-semibold text-gray-900">
-                            {t("dateRangeRules")}
-                          </p>
-                          <div className="space-y-2 text-sm">
-                            {dateRangeRules.slice(0, 5).map((rule, index) => {
+                  <OpeningHoursDialog
+                    triggerLabel={t("openingHours")}
+                    badgeLabel={t("hoursAvailable")}
+                    title={t("hoursPopupTitle")}
+                    description={t("openingHoursPopupNote")}
+                    branchPill={selectedBranch?.name || undefined}
+                    stats={[
+                      { label: t("entries"), value: entriesCount },
+                      { label: t("open"), value: openRowsCount },
+                      { label: t("closed"), value: closedRowsCount },
+                    ]}
+                    infoTitle={t("hoursAvailable")}
+                    infoDescription={t("openingHoursPopupNote")}
+                    sections={[
+                      {
+                        id: "opening-hours",
+                        title: t("openingHours"),
+                        description: t("openingHoursDescription"),
+                        icon: Store,
+                        rows: openingHoursRows.map((hour, index) => ({
+                          id: String(hour.dayOfWeek || `opening-hour-${index}`),
+                          title: formatDayShortLabel(hour.dayOfWeek),
+                          subtitle: t("openingHours"),
+                          statusLabel: hour.isClosed ? t("closed") : t("open"),
+                          isClosed: Boolean(hour.isClosed),
+                          hoursLabel: formatHoursRangeLabel(hour.openTime, hour.closeTime),
+                          breakLabels: normalizeArray<NonNullable<OpeningHours["breakTimes"]>[number]>(hour.breakTimes).map(formatBreakTimeLabel),
+                          closedTitle: t("closed"),
+                          closedDescription: t("openingHoursNotConfigured"),
+                          breakPrefix: t("breakTime", { time: "" }).trim(),
+                        })),
+                        emptyTitle: t("openingHoursNotConfigured"),
+                      },
+                      ...(dateRangeRules.length > 0
+                        ? [{
+                            id: "date-range-rules",
+                            title: t("dateRangeRules"),
+                            description: t("openingHoursPopupNote"),
+                            icon: CalendarX,
+                            rows: dateRangeRules.slice(0, 5).map((rule, index) => {
                               const { fromDate, toDate } = getDateRangeDates(rule);
 
-                              return (
-                                <div
-                                  key={`date-rule-${index}`}
-                                  className="flex justify-between gap-4 rounded-xl bg-gray-50 px-3 py-2"
-                                >
-                                  <span className="text-gray-700">
-                                    {fromDate}
-                                    {toDate && toDate !== fromDate
-                                      ? ` -> ${toDate}`
-                                      : ""}
-                                  </span>
-                                  <span className="text-right text-gray-600">
-                                    {rule?.isClosed
-                                      ? t("closed")
-                                      : `${rule?.openTime || "--:--"} - ${
-                                          rule?.closeTime || "--:--"
-                                        }`}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : null}
-                    </DialogContent>
-                  </Dialog>
+                              return {
+                                id: `date-rule-${index}`,
+                                title: `${fromDate}${toDate && toDate !== fromDate ? ` - ${toDate}` : ""}`,
+                                subtitle: t("dateRangeRules"),
+                                statusLabel: rule?.isClosed ? t("closed") : t("open"),
+                                isClosed: Boolean(rule?.isClosed),
+                                hoursLabel: formatHoursRangeLabel(rule?.openTime, rule?.closeTime),
+                                breakLabels: [],
+                                closedTitle: t("closed"),
+                                closedDescription: rule?.note || t("errors.closedDateRange"),
+                                breakPrefix: t("breakTime", { time: "" }).trim(),
+                              };
+                            }),
+                            emptyTitle: t("dateRangeRules"),
+                          }]
+                        : []),
+                    ]}
+                    closeLabel={t("closeModal")}
+                  />
                 ) : null}
               </div>
             </div>
@@ -1048,12 +1059,15 @@ export function ReserveTablePage() {
                   onChange={(e) => {
                     const nextDate = e.target.value;
 
-                    setValue("date", nextDate, { shouldValidate: true });
-                    setValue("time", "", { shouldValidate: true });
-
                     if (nextDate && isPastDateValue(nextDate)) {
                       toast.error(t("errors.pastDate"));
+                      setValue("date", todayDate, { shouldValidate: true });
+                      setValue("time", "", { shouldValidate: true });
+                      return;
                     }
+
+                    setValue("date", nextDate, { shouldValidate: true });
+                    setValue("time", "", { shouldValidate: true });
                   }}
                   className="mt-2 rounded-full bg-[#FAFAF9] pr-11"
                 />

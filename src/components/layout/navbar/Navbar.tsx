@@ -104,6 +104,7 @@ export const Navbar = () => {
 
   const isAuth = !!user
   const userName = `${user?.profile?.firstName || ""} ${user?.profile?.lastName || ""}`.trim()
+  const tableReservationsEnabled = user?.branch?.settings?.tableReservationsEnabled === true
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -280,7 +281,18 @@ export const Navbar = () => {
             </button>
 
             {/* Reserve */}
-            <Link href="/reservetable" className="flex items-center gap-2 hover:text-primary">
+            <Link
+              href={tableReservationsEnabled ? "/reservetable" : "#"}
+              aria-disabled={!tableReservationsEnabled}
+              onClick={(event) => {
+                if (!tableReservationsEnabled) {
+                  event.preventDefault()
+                }
+              }}
+              className={`flex items-center gap-2 hover:text-primary ${
+                tableReservationsEnabled ? "" : "pointer-events-auto cursor-not-allowed opacity-40"
+              }`}
+            >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M9.99984 7.91797C14.6022 7.91797 18.3332 6.79868 18.3332 5.41797C18.3332 4.03726 14.6022 2.91797 9.99984 2.91797C5.39746 2.91797 1.6665 4.03726 1.6665 5.41797C1.6665 6.79868 5.39746 7.91797 9.99984 7.91797Z" fill="#CE181B" stroke="#CE181B" strokeWidth="1.25" />
                 <path d="M9.99992 17.0859C10.649 17.0906 11.2847 16.9008 11.8249 16.5409C11.9448 16.4565 12.0301 16.3315 12.0652 16.1891C12.1003 16.0467 12.0827 15.8964 12.0158 15.7659C11.7274 15.2176 11.1083 14.5859 9.99992 14.5859C8.89159 14.5859 8.27242 15.2193 7.98409 15.7651C7.91713 15.8956 7.89957 16.0459 7.93464 16.1883C7.9697 16.3307 8.05503 16.4556 8.17492 16.5401C8.67492 16.8818 9.30992 17.0859 9.99992 17.0859Z" fill="#CE181B" stroke="#CE181B" strokeWidth="1.25" strokeLinejoin="round" />
@@ -606,8 +618,19 @@ export const Navbar = () => {
               <Search /> {tNav("searchFood")}
             </button>
 
-            <Link href="/reservetable" className="flex items-center gap-3 text-primary">
-              <span>🍽️</span> {tNav("reserveTable")}
+            <Link
+              href={tableReservationsEnabled ? "/reservetable" : "#"}
+              aria-disabled={!tableReservationsEnabled}
+              onClick={(event) => {
+                if (!tableReservationsEnabled) {
+                  event.preventDefault()
+                }
+              }}
+              className={`flex items-center gap-3 text-primary ${
+                tableReservationsEnabled ? "" : "cursor-not-allowed opacity-40"
+              }`}
+            >
+              <Coffee size={20} /> {tNav("reserveTable")}
             </Link>
 
             <Link href="/checkout" className="flex items-center gap-3">

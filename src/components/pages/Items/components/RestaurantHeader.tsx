@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Star, MapPin, Clock, Utensils, Loader2, Store, Truck } from "lucide-react";
+import { Star, MapPin, Clock, Utensils, Loader2, Store, Truck, Coffee } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -9,8 +9,9 @@ import useItems from "@/hooks/useItems";
 import { useAuth } from "@/hooks/useAuth";
 import useBranches from "@/hooks/useBranches";
 import { getStoredAuthState } from "@/lib/auth";
+import { OpeningHoursDialog } from "@/components/common/popups/OpeningHoursDialog";
 import type { AuthRestaurantUser, ItemsCategory, StoredAuthState } from "@/components/pages/Items/types";
-import { getBranchHoursSummary, getImageUrl, getOperatingHours, getRatingInfo, getRestaurantAddress, getRestaurantName, hasText, resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
+import { getBranchHoursDetails, getBranchHoursSummary, getCurrentBranchHoursDetail, getImageUrl, getOperatingHours, getRatingInfo, getRestaurantAddress, getRestaurantName, hasText, resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
 import type { BranchRecord } from "@/types/branch-selector";
 
 const CATEGORY_PAGE_LIMIT = 50;
@@ -31,6 +32,85 @@ const getSelectedBranchFromSession = (
   storedAuth: StoredAuthState | null | undefined
 ) => authUser?.branch || authUser?.profile?.branch || storedAuth?.user?.branch || storedAuth?.user?.profile?.branch || null;
 
+function BranchHoursDialog({
+  branchName,
+  branchHours,
+}: {
+  branchName?: string;
+  branchHours: ReturnType<typeof getBranchHoursSummary>;
+}) {
+  const t = useTranslations("items.common");
+  const openingDetails = getBranchHoursDetails(branchHours.openingSchedule);
+  const deliveryDetails = getBranchHoursDetails(branchHours.deliverySchedule);
+  const hasOpeningDetails = openingDetails.length > 0;
+  const visibleDetails = branchHours.showDeliveryHours
+    ? [...openingDetails, ...deliveryDetails]
+    : openingDetails;
+  const entriesCount = visibleDetails.length;
+  const openDaysCount = visibleDetails.filter((day) => !day.isClosed).length;
+  const closedDaysCount = visibleDetails.filter((day) => day.isClosed).length;
+
+  return (
+    <OpeningHoursDialog
+      triggerLabel={t("viewHours")}
+      badgeLabel={t("hoursAvailable")}
+      title={t("hoursPopupTitle")}
+      description={t("hoursPopupNote")}
+      branchPill={branchName}
+      stats={[
+        { label: t("entries"), value: entriesCount },
+        { label: t("open"), value: openDaysCount },
+        { label: t("closed"), value: closedDaysCount },
+      ]}
+      infoTitle={t("hoursAvailable")}
+      infoDescription={t("hoursPopupNote")}
+      sections={[
+        {
+          id: "opening",
+          title: t("openingHours"),
+          description: t("openingHoursDescription"),
+          icon: Store,
+          rows: openingDetails.map((day) => ({
+            id: `opening-${day.dayOfWeek}`,
+            title: day.dayLabel,
+            subtitle: t("openingHours"),
+            statusLabel: day.isClosed ? t("closed") : t("open"),
+            isClosed: Boolean(day.isClosed),
+            hoursLabel: day.hoursLabel,
+            breakLabels: day.breakLabels,
+            closedTitle: t("closed"),
+            closedDescription: t("hoursNotConfigured"),
+            breakPrefix: t("breakTime", { time: "" }).replace(/\s*$/, ""),
+          })),
+          emptyTitle: t("hoursNotConfigured"),
+        },
+        ...(branchHours.showDeliveryHours
+          ? [{
+              id: "delivery",
+              title: t("deliveryHours"),
+              description: t("deliveryHoursDescription"),
+              icon: Truck,
+              rows: deliveryDetails.map((day) => ({
+                id: `delivery-${day.dayOfWeek}`,
+                title: day.dayLabel,
+                subtitle: t("deliveryHours"),
+                statusLabel: day.isClosed ? t("closed") : t("open"),
+                isClosed: Boolean(day.isClosed),
+                hoursLabel: day.hoursLabel,
+                breakLabels: day.breakLabels,
+                closedTitle: t("closed"),
+                closedDescription: t("hoursNotConfigured"),
+                breakPrefix: t("breakTime", { time: "" }).replace(/\s*$/, ""),
+              })),
+              emptyTitle: t("hoursNotConfigured"),
+            }]
+          : []),
+      ]}
+      closeLabel={t("close")}
+    />
+  );
+}
+
 export default function RestaurantHeader() {
   const t = useTranslations("items.common");
   const searchParams = useSearchParams();
@@ -50,6 +130,7 @@ export default function RestaurantHeader() {
     coverImage?: string | null;
     branchName?: string;
     branchHours: ReturnType<typeof getBranchHoursSummary>;
+    reservationEnabled: boolean;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -96,12 +177,13 @@ export default function RestaurantHeader() {
         }
 
         const branchHours = getBranchHoursSummary(selectedBranch);
+        const reservationEnabled = selectedBranch?.settings?.tableReservationsEnabled === true;
 
         const resolvedRestaurant = {
           name: getRestaurantName(user as AuthRestaurantUser | null, storedAuth),
           address: getRestaurantAddress(user as AuthRestaurantUser | null, storedAuth),
           operatingHours: branchHours.opening.status !== "unknown"
-            ? `${branchHours.opening.label}: ${branchHours.opening.value}`
+            ? t("hoursAvailable")
             : getOperatingHours(user as AuthRestaurantUser | null, storedAuth),
           ratingInfo: getRatingInfo(user as AuthRestaurantUser | null, storedAuth),
           coverImage:
@@ -111,6 +193,7 @@ export default function RestaurantHeader() {
             "",
           branchName: selectedBranch?.name ? String(selectedBranch.name) : undefined,
           branchHours,
+          reservationEnabled,
         };
 
         let page = 1;
@@ -171,6 +254,7 @@ export default function RestaurantHeader() {
             ratingInfo: getRatingInfo(user as AuthRestaurantUser | null, storedAuth),
             branchName: getSelectedBranchFromSession(user as AuthRestaurantUser | null, storedAuth)?.name || undefined,
             branchHours: getBranchHoursSummary(getSelectedBranchFromSession(user as AuthRestaurantUser | null, storedAuth)),
+            reservationEnabled: getSelectedBranchFromSession(user as AuthRestaurantUser | null, storedAuth)?.settings?.tableReservationsEnabled === true,
           });
           setCategory(null);
         }
@@ -186,11 +270,23 @@ export default function RestaurantHeader() {
     return () => {
       cancelled = true;
     };
-  }, [categoryId, token, restaurantId, selectedBranchId, fetchBranches, user, storedAuth]);
+  }, [categoryId, token, restaurantId, selectedBranchId, fetchBranches, user, storedAuth, t]);
 
   const categoryItemCount = category ? getCategoryItemCount(category) : null;
   const ratingInfo = restaurant?.ratingInfo;
   const bannerImage = getImageUrl(category, restaurant);
+  const openingDetails = restaurant?.branchHours
+    ? getBranchHoursDetails(restaurant.branchHours.openingSchedule)
+    : [];
+  const deliveryDetails = restaurant?.branchHours
+    ? getBranchHoursDetails(restaurant.branchHours.deliverySchedule)
+    : [];
+  const currentOpeningBreakLabels = getCurrentBranchHoursDetail(openingDetails)?.breakLabels ?? [];
+  const currentDeliveryBreakLabels = getCurrentBranchHoursDetail(deliveryDetails)?.breakLabels ?? [];
+  const showDeliverySameAsOpeningNote = Boolean(
+    restaurant?.branchHours.deliverySchedule.length &&
+      !restaurant.branchHours.showDeliveryHoursCard
+  );
 
   const title = category?.name ? category.name : t("fullMenu");
 
@@ -255,18 +351,23 @@ export default function RestaurantHeader() {
             <div className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5">
               <Clock size={15} className="text-gray-500" />
               <span>{restaurant?.operatingHours}</span>
+              {restaurant?.branchHours ? (
+                <BranchHoursDialog
+                  branchName={restaurant.branchName}
+                  branchHours={restaurant.branchHours}
+                />
+              ) : null}
             </div>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="group relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
-              <div className="absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full bg-emerald-200/35" />
-              <div className="relative flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+            <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-primary text-white shadow-sm">
                   <Store size={18} />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-primary">
                     {t("openingHours")}
                   </span>
                   <span className="mt-1 block text-base font-semibold text-gray-950">
@@ -276,30 +377,84 @@ export default function RestaurantHeader() {
                     {restaurant?.branchHours.opening.label}
                     {restaurant?.branchName ? ` · ${restaurant.branchName}` : ""}
                   </span>
+                  {currentOpeningBreakLabels.length > 0 ? (
+                    <span className="mt-2 flex flex-col gap-1">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                        {t("breakWindows")}
+                      </span>
+                      {currentOpeningBreakLabels.map((breakLabel) => (
+                        <span
+                          key={breakLabel}
+                          className="inline-flex w-fit items-center gap-1.5 rounded-[12px] border border-gray-200 bg-[#FAFAFA] px-2.5 py-1 text-xs font-medium text-gray-700"
+                        >
+                          <Coffee size={12} className="shrink-0 text-gray-400" />
+                          {t("breakTime", { time: breakLabel })}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                 </span>
               </div>
             </div>
 
-            <div className="group relative overflow-hidden rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-white p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
-              <div className="absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full bg-orange-200/40" />
-              <div className="relative flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
-                  <Truck size={18} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-xs font-semibold uppercase tracking-wide text-primary">
-                    {t("deliveryHours")}
+            {restaurant?.branchHours.showDeliveryHoursCard ? (
+              <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-primary text-white shadow-sm">
+                    <Truck size={18} />
                   </span>
-                  <span className="mt-1 block text-base font-semibold text-gray-950">
-                    {restaurant?.branchHours.delivery.value}
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold uppercase tracking-wide text-primary">
+                      {t("deliveryHours")}
+                    </span>
+                    <span className="mt-1 block text-base font-semibold text-gray-950">
+                      {restaurant.branchHours.delivery.value}
+                    </span>
+                    <span className="mt-1 block text-xs text-gray-500">
+                      {restaurant.branchHours.delivery.label}
+                      {restaurant.branchName ? ` · ${restaurant.branchName}` : ""}
+                    </span>
+                    {currentDeliveryBreakLabels.length > 0 ? (
+                      <span className="mt-2 flex flex-col gap-1">
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                          {t("breakWindows")}
+                        </span>
+                        {currentDeliveryBreakLabels.map((breakLabel) => (
+                          <span
+                            key={breakLabel}
+                            className="inline-flex w-fit items-center gap-1.5 rounded-[12px] border border-gray-200 bg-[#FAFAFA] px-2.5 py-1 text-xs font-medium text-gray-700"
+                          >
+                            <Coffee size={12} className="shrink-0 text-gray-400" />
+                            {t("breakTime", { time: breakLabel })}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
                   </span>
-                  <span className="mt-1 block text-xs text-gray-500">
-                    {restaurant?.branchHours.delivery.label}
-                    {restaurant?.branchHours.delivery.label === "Same as opening" ? "" : restaurant?.branchName ? ` · ${restaurant.branchName}` : ""}
-                  </span>
-                </span>
+                </div>
               </div>
-            </div>
+            ) : null}
+
+            {showDeliverySameAsOpeningNote ? (
+              <div className="rounded-[22px] border border-primary/10 bg-primary/5 p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-white text-primary shadow-sm ring-1 ring-primary/10">
+                    <Truck size={18} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold uppercase tracking-wide text-primary">
+                      {t("deliveryHours")}
+                    </span>
+                    <span className="mt-1 block text-base font-semibold text-gray-950">
+                      {t("deliverySameAsOpeningTitle")}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-gray-600">
+                      {t("deliverySameAsOpeningDescription")}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-5 space-y-2 text-sm text-gray-600">
@@ -312,8 +467,13 @@ export default function RestaurantHeader() {
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => router.push("/reservetable")}
-              className="rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-white transition hover:bg-primary/90"
+              disabled={!restaurant?.reservationEnabled}
+              onClick={() => {
+                if (restaurant?.reservationEnabled) {
+                  router.push("/reservetable");
+                }
+              }}
+              className="rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {t("reserveTable")}
             </button>

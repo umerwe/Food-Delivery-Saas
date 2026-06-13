@@ -31,6 +31,7 @@ import {
 } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import { useTranslations } from "next-intl";
 import type { LoyaltySummary } from "@/services/loyalty";
+import type { CartChargeBreakdown } from "@/types/cart";
 
 interface CartAddon {
   id?: string;
@@ -136,6 +137,7 @@ interface CartQuote {
   loyaltyPointsRedeemed?: number | string;
   totalAmount?: number | string;
   payableAmount?: number | string;
+  chargeBreakdown?: CartChargeBreakdown;
   appliedPromotion?: {
     id?: string;
     title?: string;
@@ -201,6 +203,67 @@ const normalizeArray = <T = unknown,>(value: unknown): T[] => {
 
 export const formatCurrency = (value: unknown) => {
   return `$${toNumber(value, 0).toFixed(2)}`;
+};
+
+type BillChargeDetailLine = {
+  id: string;
+  label: string;
+  amount: number;
+};
+
+const formatChargeLabel = (label: unknown, percentage: unknown) => {
+  const text = String(label || "").trim();
+  const percent = toNullableNumber(percentage);
+
+  if (percent === null) {
+    return text;
+  }
+
+  return text ? `${text} (${percent}%)` : `${percent}%`;
+};
+
+export const getBillChargeDetailLines = ({
+  chargeBreakdown,
+  taxes,
+  serviceCharge,
+  selectedOrderFee,
+  orderFeeLabel,
+  serviceChargeLabel,
+  taxFallbackLabel,
+}: {
+  chargeBreakdown?: CartChargeBreakdown;
+  taxes: number;
+  serviceCharge: number;
+  selectedOrderFee: number;
+  orderFeeLabel: string;
+  serviceChargeLabel: string;
+  taxFallbackLabel: string;
+}): BillChargeDetailLine[] => {
+  const taxLines = chargeBreakdown?.taxes?.length
+    ? chargeBreakdown.taxes.map((tax, index) => ({
+        id: `tax-${tax.code || tax.label || index}`,
+        label: formatChargeLabel(tax.label || tax.code || taxFallbackLabel, tax.percentage),
+        amount: toNumber(tax.amount, 0),
+      }))
+    : taxes > 0
+      ? [{ id: "tax-total", label: taxFallbackLabel, amount: taxes }]
+      : [];
+
+  const serviceChargeLines = chargeBreakdown?.serviceCharges?.length
+    ? chargeBreakdown.serviceCharges.map((charge, index) => ({
+        id: `service-${charge.code || charge.label || index}`,
+        label: formatChargeLabel(charge.label || charge.code || serviceChargeLabel, charge.percentage),
+        amount: toNumber(charge.amount, 0),
+      }))
+    : serviceCharge > 0
+      ? [{ id: "service-total", label: serviceChargeLabel, amount: serviceCharge }]
+      : [];
+
+  const orderFeeLines = selectedOrderFee > 0
+    ? [{ id: "order-adjustment", label: orderFeeLabel, amount: selectedOrderFee }]
+    : [];
+
+  return [...taxLines, ...serviceChargeLines, ...orderFeeLines];
 };
 
 const slugify = (value: string) => {
@@ -685,17 +748,29 @@ export function CartSummarySection({
   }, [quoteTipAmount]);
 
   const checkoutPriceAdjustment = getCheckoutPriceAdjustmentTotal(cartItems, checkoutType);
+  const hasResolvedQuote = Boolean(resolvedQuote);
   const deliveryAdjustmentFee =
     checkoutType === "delivery" ? checkoutPriceAdjustment : 0;
   const deliveryFee =
     checkoutType === "delivery"
-      ? deliveryAdjustmentFee > 0 ? deliveryAdjustmentFee : quoteDeliveryFee ?? 0
+      ? hasResolvedQuote
+        ? quoteDeliveryFee ?? 0
+        : deliveryAdjustmentFee > 0 ? deliveryAdjustmentFee : quoteDeliveryFee ?? 0
       : 0;
-  const pickupFee = checkoutType === "pickup" ? checkoutPriceAdjustment : 0;
+  const pickupFee = checkoutType === "pickup" && !hasResolvedQuote ? checkoutPriceAdjustment : 0;
   const selectedOrderFee = checkoutType === "pickup" ? pickupFee : deliveryFee;
   const taxes = quoteTaxAmount ?? 0;
   const serviceCharge = Math.max(0, quoteServiceChargeAmount);
   const tipAmount = Math.max(0, quoteTipAmount);
+  const chargeDetailLines = getBillChargeDetailLines({
+    chargeBreakdown: resolvedQuote?.chargeBreakdown,
+    taxes,
+    serviceCharge,
+    selectedOrderFee,
+    orderFeeLabel: checkoutType === "pickup" ? t("pickupPrice") : t("deliveryFee"),
+    serviceChargeLabel: t("totals.serviceCharge"),
+    taxFallbackLabel: t("taxesAndCharges"),
+  });
 
   const appliedPromotion = resolvedQuote?.appliedPromotion ?? null;
   const hasAppliedPromotion = Boolean(appliedPromotion?.id || appliedPromotion?.title);
@@ -1281,6 +1356,22 @@ export function CartSummarySection({
               <Info size={16} />
             </div>
             <span>{formatCurrency(taxes)}</span>
+          </div>
+
+          <div className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+            <p className="mb-1.5 font-medium text-gray-700">{t("includedCharges")}</p>
+            {chargeDetailLines.length > 0 ? (
+              <div className="space-y-1">
+                {chargeDetailLines.map((line) => (
+                  <div key={line.id} className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate">{line.label}</span>
+                    <span className="shrink-0">{formatCurrency(line.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>{t("noExtraCharges")}</p>
+            )}
           </div>
 
           {shouldShowPositiveAmountLine(serviceCharge) ? (

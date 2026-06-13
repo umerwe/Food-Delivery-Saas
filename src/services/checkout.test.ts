@@ -89,7 +89,7 @@ describe("checkout service", () => {
     expect(normalizeCheckoutPaymentMethod("stripe")).toBe("STRIPE");
     expect(normalizeCheckoutPaymentMethod("wallet")).toBe("WALLET");
     expect(normalizeCheckoutPaymentMethod("card")).toBe("STRIPE");
-    expect(normalizeCheckoutPaymentMethod("CARD_ON_DELIVERY")).toBe("STRIPE");
+    expect(normalizeCheckoutPaymentMethod("CARD_ON_DELIVERY")).toBe("CARD_ON_DELIVERY");
   });
 
   it("sends wallet as a checkout payment method", async () => {
@@ -111,7 +111,7 @@ describe("checkout service", () => {
     );
   });
 
-  it("does not send legacy card on delivery in cart checkout payload", async () => {
+  it("sends card on delivery in cart checkout payload", async () => {
     postCheckoutMock.mockResolvedValue({ success: true });
 
     await checkoutCustomerCart({
@@ -124,7 +124,7 @@ describe("checkout service", () => {
     expect(postCheckoutMock).toHaveBeenCalledWith(
       "/v1/cart/checkout?customerId=customer-1",
       {
-        paymentMethod: "STRIPE",
+        paymentMethod: "CARD_ON_DELIVERY",
       },
       undefined
     );
@@ -220,6 +220,18 @@ describe("checkout service", () => {
       })
     ).toEqual({
       orderTime: "2026-06-10T19:30:00.000Z",
+      paymentMethod: "COD",
+    });
+  });
+
+  it("keeps null orderTime for instant pickup checkout", () => {
+    expect(
+      normalizeCheckoutPayload({
+        orderTime: null,
+        paymentMethod: "COD",
+      })
+    ).toEqual({
+      orderTime: null,
       paymentMethod: "COD",
     });
   });

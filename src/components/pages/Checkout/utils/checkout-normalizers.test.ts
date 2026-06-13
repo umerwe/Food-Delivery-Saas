@@ -56,6 +56,29 @@ describe("checkout normalizers", () => {
     });
   });
 
+  it("normalizes cart item preparation time from backend item or menu item", () => {
+    expect(
+      normalizeCartItem({
+        id: "cart-item-1",
+        quantity: 2,
+        prepTimeMinutes: 20,
+        menuItem: { name: "Pizza", prepTimeMinutes: 15 },
+      })
+    ).toMatchObject({
+      prepTimeMinutes: 20,
+    });
+
+    expect(
+      normalizeCartItem({
+        id: "cart-item-2",
+        quantity: 1,
+        menuItem: { name: "Pasta", prepTimeMinutes: 12 },
+      })
+    ).toMatchObject({
+      prepTimeMinutes: 12,
+    });
+  });
+
   it("ready-made deal item with empty modifiers has no displayable modifiers", () => {
     expect(
       getSelectedModifiers({
@@ -451,6 +474,12 @@ describe("checkout normalizers", () => {
           discountAmount: 0,
           totalAmount: 1400,
           payableAmount: 1400,
+          chargeBreakdown: {
+            taxes: [{ code: "STANDARD", label: "Standard tax", percentage: 19, amount: 190 }],
+            serviceCharges: [{ code: "SERVICE", label: "Service charge", percentage: 10, amount: 100 }],
+            totalTaxAmount: 190,
+            totalServiceChargeAmount: 100,
+          },
         },
       },
     });
@@ -465,6 +494,12 @@ describe("checkout normalizers", () => {
       deliveryFee: 150,
       discountAmount: 0,
       totalAmount: 1400,
+      chargeBreakdown: {
+        taxes: [{ code: "STANDARD", label: "Standard tax", percentage: 19, amount: 190 }],
+        serviceCharges: [{ code: "SERVICE", label: "Service charge", percentage: 10, amount: 100 }],
+        totalTaxAmount: 190,
+        totalServiceChargeAmount: 100,
+      },
     });
   });
 });

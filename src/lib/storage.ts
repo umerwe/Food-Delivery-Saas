@@ -11,6 +11,13 @@ export {
   clearStoredGroupOrderCode,
 } from "@/lib/group-order";
 export {
+  checkoutTypeToOrderType,
+  getStoredCheckoutTypePreference,
+  orderTypeToCheckoutType,
+  setStoredCheckoutTypePreference,
+} from "@/lib/checkout-type-preference";
+export type { CheckoutTypePreference } from "@/lib/checkout-type-preference";
+export {
   getItemsMenuViewMode,
   setItemsMenuViewMode,
   getSignatureMenuViewMode,

@@ -4,16 +4,21 @@ interface Props {
   paymentMethod: string;
   setPaymentMethod: (value: string) => void;
   allowCashOnDelivery?: boolean;
+  allowCardOnDelivery?: boolean;
+  cashLabel?: string;
 }
 
 const PaymentMethodSection = ({
   paymentMethod,
   setPaymentMethod,
   allowCashOnDelivery = true,
+  allowCardOnDelivery = false,
+  cashLabel,
 }: Props) => {
   const t = useTranslations("checkout");
   const options = [
-    { key: "COD", label: t("cashOnDelivery") },
+    { key: "COD", label: cashLabel || t("cashOnDelivery") },
+    ...(allowCardOnDelivery ? [{ key: "CARD_ON_DELIVERY", label: t("cardOnDelivery") }] : []),
     { key: "PAYPAL", label: t("paypal") },
     { key: "STRIPE", label: t("onlineCard") },
     { key: "WALLET", label: t("wallet") },

@@ -6,6 +6,7 @@ import {
   clearStoredGroupOrderCode,
   getStoredGroupOrderCode,
   isClosedGroupOrder,
+  resolveGroupOrderDeliveryAddressId,
   setStoredGroupOrderCode,
 } from "./group-order";
 
@@ -59,5 +60,29 @@ describe("group order helpers", () => {
     expect(buildGroupOrderInviteLink({ origin: "https://demo.test", inviteCode: "ABC123" })).toBe(
       "https://demo.test/items?code=ABC123"
     );
+  });
+
+  it("prefers the selected delivery address when it still exists", () => {
+    expect(
+      resolveGroupOrderDeliveryAddressId({
+        selectedAddressId: "address-2",
+        addresses: [
+          { id: "address-1", isDefault: true },
+          { id: "address-2" },
+        ],
+      })
+    ).toBe("address-2");
+  });
+
+  it("falls back to the default delivery address when selection is missing", () => {
+    expect(
+      resolveGroupOrderDeliveryAddressId({
+        selectedAddressId: "",
+        addresses: [
+          { id: "address-1" },
+          { id: "address-2", isDefault: true },
+        ],
+      })
+    ).toBe("address-2");
   });
 });

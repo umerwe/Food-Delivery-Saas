@@ -1,4 +1,8 @@
 import { readAuthSession, saveAuthSession } from "@/lib/auth";
+import {
+  orderTypeToCheckoutType,
+  setStoredCheckoutTypePreference,
+} from "@/lib/checkout-type-preference";
 import type { AuthContextValue, AuthUser } from "@/types/auth";
 import type { BranchOrderType, BranchTemporaryClosure, NearbyBranch } from "@/types/branches";
 import type { BranchApiResponse, BranchRecord } from "@/types/branch-selector";
@@ -90,7 +94,9 @@ const normalizeBranchSettings = (value: unknown): BranchRecord["settings"] | und
       : undefined,
     deliveryConfig: value.deliveryConfig,
     temporaryClosure: normalizeTemporaryClosure(value.temporaryClosure),
+    tableReservationsEnabled: getBoolean(value.tableReservationsEnabled),
     openingHours: normalizeOpeningHours(value.openingHours),
+    deliveryHours: normalizeOpeningHours(value.deliveryHours),
   };
 };
 
@@ -192,6 +198,10 @@ export const normalizeBranchApiResponse = (response: unknown): BranchApiResponse
 export const getActiveBranches = (response: unknown) =>
   normalizeBranchList(response).filter((branch) => branch.isActive !== false);
 
+export const getSelectedOrderType = (
+  user?: Pick<AuthUser, "branch" | "selectedOrderType"> | null
+) => user?.selectedOrderType ?? user?.branch?.selectedOrderType ?? null;
+
 export function persistSelectedBranch(
   branch: BranchRecord,
   setUser?: AuthContextValue["setUser"],
@@ -201,6 +211,11 @@ export function persistSelectedBranch(
   const selectedBranch = options.orderType
     ? { ...branch, selectedOrderType: options.orderType }
     : branch;
+  const checkoutType = orderTypeToCheckoutType(options.orderType);
+
+  if (checkoutType) {
+    setStoredCheckoutTypePreference(checkoutType);
+  }
 
   if (auth?.user) {
     saveAuthSession({

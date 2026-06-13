@@ -34,7 +34,7 @@ export type CheckoutCartPayload = Record<string, unknown> & {
 export const normalizeCheckoutPaymentMethod = (paymentMethod: unknown) => {
   const normalized = typeof paymentMethod === "string" ? paymentMethod.trim().toUpperCase() : "";
 
-  if (normalized === "CARD" || normalized === "CARD_ON_DELIVERY") {
+  if (normalized === "CARD") {
     return "STRIPE";
   }
 
@@ -42,7 +42,12 @@ export const normalizeCheckoutPaymentMethod = (paymentMethod: unknown) => {
     return "WALLET";
   }
 
-  if (normalized === "COD" || normalized === "PAYPAL" || normalized === "STRIPE") {
+  if (
+    normalized === "CARD_ON_DELIVERY" ||
+    normalized === "COD" ||
+    normalized === "PAYPAL" ||
+    normalized === "STRIPE"
+  ) {
     return normalized;
   }
 

@@ -115,7 +115,15 @@ export const formatAddress = (value: unknown) => {
   if (typeof value === "string") return value.trim();
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     const address = value as ApiRecord;
-    return [address.street, address.area, address.city, address.state, address.country]
+    return [
+      address.street,
+      address.houseNumber ?? address.shopNumber,
+      address.postalCode,
+      address.city,
+      address.area,
+      address.state,
+      address.country,
+    ]
       .filter(hasText)
       .join(", ");
   }
@@ -137,12 +145,14 @@ export const getRestaurantName = (authUser: AuthRestaurantUser | null | undefine
 
 export const getRestaurantAddress = (authUser: AuthRestaurantUser | null | undefined, storedAuth: StoredAuthState | null | undefined) => {
   const candidates = [
-    authUser?.restaurant?.address,
     authUser?.branch?.address,
+    authUser?.profile?.branch?.address,
+    storedAuth?.user?.branch?.address,
+    storedAuth?.user?.profile?.branch?.address,
+    authUser?.restaurant?.address,
     authUser?.address,
     authUser?.profile?.address,
     storedAuth?.user?.restaurant?.address,
-    storedAuth?.user?.branch?.address,
     storedAuth?.user?.address,
     storedAuth?.user?.profile?.address,
   ];
@@ -178,12 +188,18 @@ const DAY_LABELS: Record<string, string> = {
   SATURDAY: "Sat",
 };
 
-type BranchHoursEntry = NonNullable<BranchSettings["openingHours"]>[number];
+export type BranchHoursEntry = NonNullable<BranchSettings["openingHours"]>[number];
 
 export type BranchHoursSummary = {
   label: string;
   value: string;
   status: "open" | "closed" | "unknown";
+};
+
+export type BranchHoursDetail = BranchHoursEntry & {
+  dayLabel: string;
+  hoursLabel: string;
+  breakLabels: string[];
 };
 
 const getRecordValue = (record: ApiRecord, keys: string[]) =>
@@ -205,7 +221,7 @@ const normalizeDayKey = (value: unknown) =>
     .trim()
     .toUpperCase();
 
-const formatScheduleTime = (value: unknown) => {
+export const formatScheduleTime = (value: unknown) => {
   const text = String(value ?? "").trim();
 
   if (!text) return "";
@@ -228,7 +244,7 @@ const formatScheduleTime = (value: unknown) => {
   return `${normalizedHours}:${String(minutes).padStart(2, "0")} ${period}`;
 };
 
-const formatHoursRange = (entry: BranchHoursEntry) => {
+export const formatHoursRange = (entry: BranchHoursEntry) => {
   const openTime = formatScheduleTime(entry.openTime);
   const closeTime = formatScheduleTime(entry.closeTime);
 
@@ -239,6 +255,84 @@ const normalizeSchedule = (value: unknown): BranchHoursEntry[] =>
   Array.isArray(value)
     ? value.filter((entry): entry is BranchHoursEntry => typeof entry === "object" && entry !== null && !Array.isArray(entry))
     : [];
+
+const normalizeScheduleForCompare = (schedule: BranchHoursEntry[]) =>
+  [...schedule]
+    .map((entry) => ({
+      dayOfWeek: normalizeDayKey(entry.dayOfWeek),
+      isClosed: Boolean(entry.isClosed),
+      openTime: String(entry.openTime || "").trim(),
+      closeTime: String(entry.closeTime || "").trim(),
+      breakTimes: Array.isArray(entry.breakTimes)
+        ? entry.breakTimes.map((breakTime) => ({
+            startTime: String(breakTime?.startTime || "").trim(),
+            endTime: String(breakTime?.endTime || "").trim(),
+            note: String(breakTime?.note || "").trim(),
+          }))
+        : [],
+    }))
+    .sort((a, b) => DAYS.indexOf(a.dayOfWeek) - DAYS.indexOf(b.dayOfWeek));
+
+export const areBranchSchedulesIdentical = (
+  firstSchedule: BranchHoursEntry[],
+  secondSchedule: BranchHoursEntry[],
+) => {
+  if (!firstSchedule.length || !secondSchedule.length) return false;
+
+  return JSON.stringify(normalizeScheduleForCompare(firstSchedule)) ===
+    JSON.stringify(normalizeScheduleForCompare(secondSchedule));
+};
+
+const formatBreakRange = (breakTime: NonNullable<BranchHoursEntry["breakTimes"]>[number]) => {
+  const startTime = formatScheduleTime(breakTime?.startTime);
+  const endTime = formatScheduleTime(breakTime?.endTime);
+
+  if (!startTime || !endTime) return "";
+
+  const note = String(breakTime?.note || "").trim();
+  return note ? `${startTime} - ${endTime} (${note})` : `${startTime} - ${endTime}`;
+};
+
+export const getBranchHoursDetails = (schedule: BranchHoursEntry[]): BranchHoursDetail[] =>
+  [...schedule]
+    .sort((a, b) => DAYS.indexOf(normalizeDayKey(a.dayOfWeek)) - DAYS.indexOf(normalizeDayKey(b.dayOfWeek)))
+    .map((entry) => {
+      const dayKey = normalizeDayKey(entry.dayOfWeek);
+      const hoursLabel = entry.isClosed ? "Closed" : formatHoursRange(entry) || "Not configured";
+
+      return {
+        ...entry,
+        dayLabel: DAY_LABELS[dayKey] || dayKey || "Day",
+        hoursLabel,
+        breakLabels: Array.isArray(entry.breakTimes)
+          ? entry.breakTimes.map(formatBreakRange).filter(Boolean)
+          : [],
+      };
+    });
+
+export const getCurrentBranchHoursDetail = (details: BranchHoursDetail[]) => {
+  if (details.length === 0) return null;
+
+  const today = DAYS[new Date().getDay()];
+
+  return (
+    details.find((entry) => normalizeDayKey(entry.dayOfWeek) === today) ??
+    details.find((entry) => !entry.isClosed && hasText(entry.hoursLabel)) ??
+    details[0] ??
+    null
+  );
+};
+
+const areCurrentBranchHoursDetailsIdentical = (
+  firstDetail: BranchHoursDetail | null,
+  secondDetail: BranchHoursDetail | null,
+) => {
+  if (!firstDetail || !secondDetail) return false;
+
+  return firstDetail.isClosed === secondDetail.isClosed &&
+    firstDetail.hoursLabel === secondDetail.hoursLabel &&
+    JSON.stringify(firstDetail.breakLabels) === JSON.stringify(secondDetail.breakLabels);
+};
 
 const getScheduleFromSettings = (settings: BranchSettings | null, keys: string[]) => {
   if (!settings) return [];
@@ -335,14 +429,28 @@ export const getBranchHoursSummary = (branch: unknown) => {
     "deliveryOperatingHours",
   ]);
   const opening = summarizeSchedule({ schedule: openingSchedule });
+  const delivery = summarizeSchedule({
+    fallback: opening,
+    schedule: deliverySchedule,
+    useFallbackWhenMissing: true,
+  });
+  const deliveryMatchesOpening = areBranchSchedulesIdentical(openingSchedule, deliverySchedule);
+  const deliveryMatchesOpeningToday = areCurrentBranchHoursDetailsIdentical(
+    getCurrentBranchHoursDetail(getBranchHoursDetails(openingSchedule)),
+    getCurrentBranchHoursDetail(getBranchHoursDetails(deliverySchedule)),
+  );
+  const showDeliveryHours = deliverySchedule.length > 0 && !deliveryMatchesOpening;
+  const showDeliveryHoursCard = showDeliveryHours && !deliveryMatchesOpeningToday;
 
   return {
     opening,
-    delivery: summarizeSchedule({
-      fallback: opening,
-      schedule: deliverySchedule,
-      useFallbackWhenMissing: true,
-    }),
+    delivery,
+    openingSchedule,
+    deliverySchedule,
+    showDeliveryHours,
+    showDeliveryHoursCard,
+    deliveryMatchesOpening,
+    deliveryMatchesOpeningToday,
   };
 };
 

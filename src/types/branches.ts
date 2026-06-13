@@ -24,7 +24,19 @@ export type BranchSettings = {
   allowedOrderTypes?: BranchOrderType[];
   deliveryConfig?: unknown;
   temporaryClosure?: BranchTemporaryClosure | null;
+  tableReservationsEnabled?: boolean;
   openingHours?: Array<{
+    dayOfWeek?: string;
+    isClosed?: boolean;
+    openTime?: string;
+    closeTime?: string;
+    breakTimes?: Array<{
+      startTime?: string;
+      endTime?: string;
+      note?: string;
+    }>;
+  }>;
+  deliveryHours?: Array<{
     dayOfWeek?: string;
     isClosed?: boolean;
     openTime?: string;

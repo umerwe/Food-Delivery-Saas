@@ -55,6 +55,27 @@ export type CartAppliedPromotion = {
 
 export type ServiceChargeType = "PERCENTAGE" | "AMOUNT" | string;
 
+export type CartChargeLine = {
+  code?: string;
+  label?: string;
+  percentage?: number;
+  amount: number;
+};
+
+export type CartChargeBreakdown = {
+  taxes?: CartChargeLine[];
+  availableTaxTypes?: Array<{
+    code?: string;
+    label?: string;
+    percentage?: number;
+    isActive?: boolean;
+    isDefault?: boolean;
+  }>;
+  totalTaxAmount?: number;
+  serviceCharges?: CartChargeLine[];
+  totalServiceChargeAmount?: number;
+};
+
 export type CartQuote = {
   subtotal: number;
   taxAmount?: number;
@@ -71,6 +92,7 @@ export type CartQuote = {
   totalAmount: number;
   payableAmount?: number;
   appliedPromotion?: CartAppliedPromotion | null;
+  chargeBreakdown?: CartChargeBreakdown;
 };
 
 export type CartModifierSelectionInput = {

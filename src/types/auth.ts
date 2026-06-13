@@ -1,4 +1,4 @@
-import type { BranchAddress, BranchOrderType } from "@/types/branches";
+import type { BranchAddress, BranchOrderType, BranchSettings } from "@/types/branches";
 
 export type AuthBranch = {
   id: string;
@@ -6,6 +6,7 @@ export type AuthBranch = {
   isActive?: boolean;
   restaurantId?: string | null;
   address?: BranchAddress;
+  settings?: BranchSettings | null;
   distanceKm?: number | null;
   selectedOrderType?: BranchOrderType;
 };

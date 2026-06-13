@@ -65,6 +65,22 @@ describe("getNearbyBranches", () => {
             settings: {
               allowedOrderTypes: ["DELIVERY", "TAKEAWAY"],
               deliveryConfig: { type: "RADIUS" },
+              tableReservationsEnabled: true,
+              openingHours: [
+                {
+                  dayOfWeek: "FRIDAY",
+                  openTime: "09:00",
+                  closeTime: "18:00",
+                },
+              ],
+              deliveryHours: [
+                {
+                  dayOfWeek: "FRIDAY",
+                  openTime: "10:00",
+                  closeTime: "22:00",
+                  breakTimes: [{ startTime: "16:00", endTime: "17:00" }],
+                },
+              ],
             },
           },
         ],
@@ -95,6 +111,14 @@ describe("getNearbyBranches", () => {
       settings: {
         allowedOrderTypes: ["DELIVERY", "TAKEAWAY"],
         deliveryConfig: { type: "RADIUS" },
+        tableReservationsEnabled: true,
+        deliveryHours: [
+          expect.objectContaining({
+            dayOfWeek: "FRIDAY",
+            openTime: "10:00",
+            breakTimes: [expect.objectContaining({ startTime: "16:00" })],
+          }),
+        ],
       },
     });
     expect(response.meta).toMatchObject({ page: 1, limit: 20, total: 1 });

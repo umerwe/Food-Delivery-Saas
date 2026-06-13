@@ -80,6 +80,9 @@ export function SelectPickupTimeSection({
       <h2 className="text-[24px] font-semibold text-gray-900">
         {t("selectPickupTime")}
       </h2>
+      <p className="rounded-[16px] border border-primary/10 bg-primary/5 px-4 py-3 text-sm leading-6 text-gray-600">
+        {t("instantPickupHint")}
+      </p>
 
       {/* DATE */}
       <div className="space-y-[14px]">

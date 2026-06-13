@@ -10,17 +10,31 @@ type OpeningHours = {
   breakTimes?: {
     startTime?: string;
     endTime?: string;
+    note?: string;
   }[];
 };
 
 type PickupSchedule = {
   schedule: OpeningHours | null;
   hasOpeningHours: boolean;
+  source: "opening" | "delivery" | null;
 };
 
 export type PickupTimeSlot = {
   value: string;
   label: string;
+};
+
+export type ScheduleBreakLabel = {
+  label: string;
+  note?: string;
+};
+
+export type ScheduledDeliveryEstimate = {
+  selectedLabel: string;
+  readyLabel: string;
+  preparationMinutes: number;
+  scheduledAt: Date;
 };
 
 export const normalizeArray = <T = unknown,>(value: unknown): T[] =>
@@ -79,6 +93,25 @@ const minutesToTime = (value: number) => {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };
 
+const formatEstimateTimeLabel = (date: Date) =>
+  date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+const formatEstimateDateTimeLabel = (date: Date, baseDate: Date) => {
+  const timeLabel = formatEstimateTimeLabel(date);
+
+  if (getDateValue(date) === getDateValue(baseDate)) {
+    return timeLabel;
+  }
+
+  return `${timeLabel}, ${date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })}`;
+};
+
 export const formatPickupTimeLabel = (value: string) => {
   const minutes = timeToMinutes(value);
 
@@ -91,6 +124,86 @@ export const formatPickupTimeLabel = (value: string) => {
     hour: "numeric",
     minute: "2-digit",
   });
+};
+
+export const buildScheduleBreakLabels = (
+  schedule?: OpeningHours | null
+): ScheduleBreakLabel[] =>
+  normalizeArray(schedule?.breakTimes).reduce<ScheduleBreakLabel[]>((labels, breakTime) => {
+    const breakRecord = getRecord(breakTime);
+    const startTime = typeof breakRecord?.startTime === "string" ? breakRecord.startTime : "";
+    const endTime = typeof breakRecord?.endTime === "string" ? breakRecord.endTime : "";
+    const note = typeof breakRecord?.note === "string" ? breakRecord.note.trim() : "";
+
+    if (!startTime || !endTime) return labels;
+
+    labels.push({
+      label: `${formatPickupTimeLabel(startTime)} - ${formatPickupTimeLabel(endTime)}`,
+      ...(note ? { note } : {}),
+    });
+
+    return labels;
+  }, []);
+
+export const getScheduledDateTime = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return null;
+
+  const scheduledDate = new Date(trimmedValue);
+
+  if (Number.isNaN(scheduledDate.getTime())) return null;
+
+  return scheduledDate;
+};
+
+export const addPreparationMinutesToScheduledDelivery = ({
+  scheduledDeliveryValue,
+  preparationMinutes,
+}: {
+  scheduledDeliveryValue: string;
+  preparationMinutes: number;
+}) => {
+  const scheduledDate = getScheduledDateTime(scheduledDeliveryValue);
+
+  if (!scheduledDate) return null;
+
+  const safePreparationMinutes = Math.max(0, Math.floor(preparationMinutes));
+  const estimatedDate = new Date(scheduledDate);
+
+  estimatedDate.setMinutes(estimatedDate.getMinutes() + safePreparationMinutes);
+
+  return estimatedDate;
+};
+
+export const buildScheduledDeliveryEstimate = ({
+  scheduledDeliveryValue,
+  preparationMinutes,
+}: {
+  scheduledDeliveryValue: string;
+  preparationMinutes: number;
+}): ScheduledDeliveryEstimate | null => {
+  const selectedDate = getScheduledDateTime(scheduledDeliveryValue);
+
+  if (!selectedDate) return null;
+
+  const safePreparationMinutes = Math.max(0, Math.floor(preparationMinutes));
+
+  if (safePreparationMinutes <= 0) return null;
+
+  const scheduledAt = addPreparationMinutesToScheduledDelivery({
+    scheduledDeliveryValue,
+    preparationMinutes: safePreparationMinutes,
+  });
+
+  if (!scheduledAt) return null;
+
+  return {
+    selectedLabel: formatEstimateTimeLabel(selectedDate),
+    readyLabel: formatEstimateDateTimeLabel(scheduledAt, selectedDate),
+    preparationMinutes: safePreparationMinutes,
+    scheduledAt,
+  };
 };
 
 const roundUpToInterval = (minutes: number, interval: number) =>
@@ -132,37 +245,68 @@ export const getPickupScheduleForDate = ({
   branch?: BranchRecord | null;
   dateValue: string;
 }): PickupSchedule => {
-  const openingHours = normalizeArray<OpeningHours>(branch?.settings?.openingHours);
+  return getBranchScheduleForDate({ branch, dateValue, scheduleType: "pickup" });
+};
 
-  if (!openingHours.length) {
+export const getBranchScheduleForDate = ({
+  branch,
+  dateValue,
+  scheduleType,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+  scheduleType: "pickup" | "delivery";
+}): PickupSchedule => {
+  const openingHours = normalizeArray<OpeningHours>(branch?.settings?.openingHours);
+  const deliveryHours = normalizeArray<OpeningHours>(branch?.settings?.deliveryHours);
+  const scheduleHours =
+    scheduleType === "delivery" && deliveryHours.length > 0
+      ? deliveryHours
+      : openingHours;
+  const source =
+    scheduleType === "delivery" && deliveryHours.length > 0
+      ? "delivery"
+      : openingHours.length > 0
+        ? "opening"
+        : null;
+
+  if (!scheduleHours.length) {
     return {
       schedule: null,
       hasOpeningHours: false,
+      source,
     };
   }
 
   const selectedDay = getDayOfWeek(dateValue);
   const schedule =
-    openingHours.find((hour) => {
+    scheduleHours.find((hour) => {
       return String(hour?.dayOfWeek || "").trim().toUpperCase() === selectedDay;
     }) || null;
 
   return {
     schedule,
     hasOpeningHours: true,
+    source,
   };
 };
 
-export const buildPickupTimeSlots = ({
+const buildTimeSlots = ({
   branch,
   dateValue,
+  scheduleType,
 }: {
   branch?: BranchRecord | null;
   dateValue: string;
+  scheduleType: "pickup" | "delivery";
 }): PickupTimeSlot[] => {
   if (!dateValue || isPastDateValue(dateValue)) return [];
 
-  const { hasOpeningHours, schedule } = getPickupScheduleForDate({ branch, dateValue });
+  const { hasOpeningHours, schedule } = getBranchScheduleForDate({
+    branch,
+    dateValue,
+    scheduleType,
+  });
 
   if (!hasOpeningHours || !schedule || schedule?.isClosed) return [];
 
@@ -202,3 +346,19 @@ export const buildPickupTimeSlots = ({
 
   return slots;
 };
+
+export const buildPickupTimeSlots = ({
+  branch,
+  dateValue,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+}): PickupTimeSlot[] => buildTimeSlots({ branch, dateValue, scheduleType: "pickup" });
+
+export const buildDeliveryTimeSlots = ({
+  branch,
+  dateValue,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+}): PickupTimeSlot[] => buildTimeSlots({ branch, dateValue, scheduleType: "delivery" });

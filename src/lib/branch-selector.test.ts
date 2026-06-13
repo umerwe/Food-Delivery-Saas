@@ -5,6 +5,7 @@ import {
   branchSupportsPickup,
   formatBranchAddress,
   formatBranchDistance,
+  getSelectedOrderType,
   nearbyBranchToBranchRecord,
   normalizeBranch,
 } from "@/lib/branch-selector";
@@ -70,6 +71,15 @@ describe("branch selector helpers", () => {
     });
   });
 
+  it("falls back to the branch selected order type", () => {
+    expect(
+      getSelectedOrderType({
+        branch: { id: "branch-1", name: "Central", selectedOrderType: "TAKEAWAY" },
+        selectedOrderType: null,
+      })
+    ).toBe("TAKEAWAY");
+  });
+
   it("preserves branch availability and temporary closure details", () => {
     const branch = normalizeBranch({
       id: "branch-closed",
@@ -91,6 +101,16 @@ describe("branch selector helpers", () => {
             breakTimes: [{ startTime: "14:00", endTime: "15:00", note: "Lunch" }],
           },
         ],
+        deliveryHours: [
+          {
+            dayOfWeek: "WEDNESDAY",
+            isClosed: false,
+            openTime: "10:00",
+            closeTime: "20:00",
+            breakTimes: [{ startTime: "16:00", endTime: "17:00", note: "Delivery pause" }],
+          },
+        ],
+        tableReservationsEnabled: true,
       },
       availability: {
         isAvailable: false,
@@ -110,5 +130,7 @@ describe("branch selector helpers", () => {
     expect(branch?.availability?.temporaryClosure?.closedUntil).toBe("2026-06-10T13:00:00.000Z");
     expect(branch?.settings?.temporaryClosure?.message).toBe("We are closed for maintenance");
     expect(branch?.settings?.openingHours?.[0]?.breakTimes?.[0]?.note).toBe("Lunch");
+    expect(branch?.settings?.deliveryHours?.[0]?.breakTimes?.[0]?.note).toBe("Delivery pause");
+    expect(branch?.settings?.tableReservationsEnabled).toBe(true);
   });
 });

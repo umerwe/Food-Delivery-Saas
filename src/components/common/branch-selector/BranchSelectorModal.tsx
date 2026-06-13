@@ -22,6 +22,10 @@ import {
   nearbyBranchToBranchRecord,
   persistSelectedBranch,
 } from "@/lib/branch-selector";
+import {
+  getStoredCheckoutTypePreference,
+  setStoredCheckoutTypePreference,
+} from "@/lib/checkout-type-preference";
 import { usePathname } from "next/navigation";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { AddressLocationPicker } from "@/components/common/branch-selector/AddressLocationPicker";
@@ -99,6 +103,16 @@ export function BranchSelectorModal({
   const [hasPrevPage, setHasPrevPage] = useState(false);
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const storedMode = getStoredCheckoutTypePreference();
+
+    if (storedMode) {
+      setBranchMode(storedMode);
+    }
+  }, [open]);
 
   const resolvedRestaurantId = useMemo(() => {
     return restaurantId || user?.restaurantId || user?.tenantId || null;
@@ -234,6 +248,11 @@ export function BranchSelectorModal({
     }
   };
 
+  const handleBranchModeChange = (mode: BranchSearchMode) => {
+    setBranchMode(mode);
+    setStoredCheckoutTypePreference(mode);
+  };
+
   const handlePrevPage = () => {
     if (loading || page <= 1) return;
     setPage((prev) => Math.max(1, prev - 1));
@@ -324,7 +343,7 @@ export function BranchSelectorModal({
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => setBranchMode(mode)}
+                  onClick={() => handleBranchModeChange(mode)}
                   className={`min-w-[112px] rounded-xl px-4 py-2 text-sm font-semibold transition ${
                     branchMode === mode
                       ? "bg-[var(--primary)] text-white shadow-sm"

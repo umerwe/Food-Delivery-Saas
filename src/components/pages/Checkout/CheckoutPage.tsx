@@ -25,7 +25,20 @@ import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorM
 import type { BranchRecord } from "@/types/branch-selector";
 import { useTranslations } from "next-intl";
 import { normalizeCheckoutTipAmount, type CheckoutAddressValues } from "@/validations/checkout";
-import { getStoredRestaurantMenuId } from "@/lib/timed-menu";
+import { branchSupportsDelivery, branchSupportsPickup, getSelectedOrderType } from "@/lib/branch-selector";
+import {
+  getStoredCheckoutTypePreference,
+  setStoredCheckoutTypePreference,
+  type CheckoutTypePreference,
+} from "@/lib/checkout-type-preference";
+import {
+  addPreparationMinutesToScheduledDelivery,
+  buildDeliveryTimeSlots,
+  getBranchScheduleForDate,
+  getScheduledDateTime,
+  getDateValue,
+  isPastDateValue,
+} from "@/components/pages/Checkout/utils/pickup-schedule";
 import type { LoyaltySummary } from "@/services/loyalty";
 
 const emptyGuestDeliveryAddress: CheckoutAddressValues = {
@@ -48,14 +61,6 @@ type GuestPrivacyPolicy = {
 
 const getCheckoutOrderType = (checkoutType: string) =>
   checkoutType === "pickup" ? "TAKEAWAY" : "DELIVERY";
-
-const getCartRestaurantMenuId = (items: CartItem[]) => {
-  const cartMenuId = items
-    .map((item) => item.restaurantMenuId)
-    .find((restaurantMenuId) => restaurantMenuId !== undefined && restaurantMenuId !== null && String(restaurantMenuId).trim());
-
-  return cartMenuId ? String(cartMenuId) : getStoredRestaurantMenuId();
-};
 
 const isGuestUser = (user: ReturnType<typeof useAuthContext>["user"]) =>
   user?.isGuest === true || String(user?.role || "").toUpperCase() === "GUEST";
@@ -127,12 +132,20 @@ const hasGuestContact = (customer: { name: string; phone: string; email: string 
   return Boolean(customer.email.trim() && customer.phone.trim());
 };
 
+const getCartPreparationMinutes = (items: CartItem[]) =>
+  items.reduce((total, item) => total + Math.max(0, Math.floor(toNumber(item.prepTimeMinutes, 0))), 0);
+
 function CheckoutPageContent() {
   const t = useTranslations("checkout");
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
   const { user, token } = useAuthContext();
-  const preferredCheckoutType = user?.selectedOrderType === "TAKEAWAY" ? "pickup" : "delivery";
+  const [storedCheckoutType, setStoredCheckoutType] =
+    useState<CheckoutTypePreference | null>(null);
+  const [hasLoadedCheckoutTypePreference, setHasLoadedCheckoutTypePreference] =
+    useState(false);
+  const userCheckoutType = getSelectedOrderType(user) === "TAKEAWAY" ? "pickup" : "delivery";
+  const preferredCheckoutType = storedCheckoutType ?? userCheckoutType;
   const activeTab = type === "pickup" || type === "delivery" ? type : preferredCheckoutType;
   const isGuest = isGuestUser(user);
   const restaurantId = getCheckoutRestaurantId(user);
@@ -158,6 +171,10 @@ function CheckoutPageContent() {
   const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
   const [loyaltyPoints, setLoyaltyPoints] = useState("");
   const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const totalPreparationMinutes = useMemo(
+    () => getCartPreparationMinutes(cartItems),
+    [cartItems]
+  );
 
   const router = useRouter();
   const customerId = user?.id;
@@ -175,6 +192,18 @@ function CheckoutPageContent() {
 
     toast.error(message);
   };
+
+  useEffect(() => {
+    setStoredCheckoutType(getStoredCheckoutTypePreference());
+    setHasLoadedCheckoutTypePreference(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedCheckoutTypePreference) return;
+
+    setStoredCheckoutTypePreference(activeTab);
+    setStoredCheckoutType(activeTab);
+  }, [activeTab, hasLoadedCheckoutTypePreference]);
 
   const clearBackendError = () => {
     setBackendError(null);
@@ -340,10 +369,12 @@ function CheckoutPageContent() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [pickupDate, setPickupDate] = useState<Date | null>(null);
   const [pickupTime, setPickupTime] = useState<string | null>(null);
-  const [pickupBranch, setPickupBranch] = useState<BranchRecord | null>(null);
+  const [checkoutBranch, setCheckoutBranch] = useState<BranchRecord | null>(null);
   const [scheduledDeliveryValue, setScheduledDeliveryValue] = useState("");
   const checkoutPaymentMethod =
     activeTab === "delivery" && paymentMethod === "COD" ? "STRIPE" : paymentMethod;
+  const deliveryAllowed = !checkoutBranch?.settings?.allowedOrderTypes?.length || branchSupportsDelivery(checkoutBranch);
+  const pickupAllowed = !checkoutBranch?.settings?.allowedOrderTypes?.length || branchSupportsPickup(checkoutBranch);
 
   useEffect(() => {
     if (!user) return;
@@ -454,27 +485,37 @@ function CheckoutPageContent() {
   }, [activeTab, customerId, guestDeliveryAddress, isGuest, quoteCustomerCart, selectedAddress, updateCustomerCartOrderType]);
 
   useEffect(() => {
-    const loadPickupBranch = async () => {
-      if (activeTab !== "pickup") return;
-
+    const loadCheckoutBranch = async () => {
       const branchId = user?.branchId || user?.branch?.id;
 
       if (!branchId) {
-        setPickupBranch(null);
+        setCheckoutBranch(null);
         return;
       }
 
       try {
         const { branch } = await fetchReservationBranch({ branchId: String(branchId) });
 
-        setPickupBranch(branch);
+        setCheckoutBranch(branch);
       } catch (error) {
-        setPickupBranch((user?.branch || null) as BranchRecord | null);
+        setCheckoutBranch((user?.branch || null) as BranchRecord | null);
       }
     };
 
-    void loadPickupBranch();
-  }, [activeTab, fetchReservationBranch, user?.branch, user?.branchId]);
+    void loadCheckoutBranch();
+  }, [fetchReservationBranch, user?.branch, user?.branchId]);
+
+  useEffect(() => {
+    if (!checkoutBranch?.settings?.allowedOrderTypes?.length) return;
+
+    if (activeTab === "delivery" && !deliveryAllowed && pickupAllowed) {
+      router.replace("/checkout?type=pickup", { scroll: false });
+    }
+
+    if (activeTab === "pickup" && !pickupAllowed && deliveryAllowed) {
+      router.replace("/checkout?type=delivery", { scroll: false });
+    }
+  }, [activeTab, checkoutBranch, deliveryAllowed, pickupAllowed, router]);
 
   const updateQuantity = async (id: string, type: "inc" | "dec") => {
     const currentItem = cartItems.find((item) => String(item.id) === id);
@@ -642,10 +683,15 @@ function CheckoutPageContent() {
   };
 
   const getOrderTime = () => {
-    if (!pickupDate || !pickupTime) return null;
+    if (!pickupDate || !pickupTime) return undefined;
 
     try {
       const date = new Date(pickupDate);
+      const dateValue = getDateValue(date);
+
+      if (isPastDateValue(dateValue)) {
+        return null;
+      }
 
       if (pickupTime === "ASAP") {
         return new Date().toISOString();
@@ -684,23 +730,52 @@ function CheckoutPageContent() {
 
     if (!trimmedValue) return undefined;
 
-    const scheduledDate = new Date(trimmedValue);
+    const scheduledDate = getScheduledDateTime(trimmedValue);
 
-    if (Number.isNaN(scheduledDate.getTime())) return null;
+    if (!scheduledDate) return null;
 
-    return scheduledDate.toISOString();
+    const dateValue = getDateValue(scheduledDate);
+
+    if (isPastDateValue(dateValue)) {
+      return null;
+    }
+
+    if (checkoutBranch) {
+      const timeValue = trimmedValue.split("T")[1]?.slice(0, 5) || "";
+      const availableSlots = buildDeliveryTimeSlots({
+        branch: checkoutBranch,
+        dateValue,
+      });
+      const scheduleState = getBranchScheduleForDate({
+        branch: checkoutBranch,
+        dateValue,
+        scheduleType: "delivery",
+      });
+
+      if (
+        scheduleState.hasOpeningHours &&
+        !availableSlots.some((slot) => slot.value === timeValue)
+      ) {
+        return null;
+      }
+    }
+
+    const deliveryDate = addPreparationMinutesToScheduledDelivery({
+      scheduledDeliveryValue: trimmedValue,
+      preparationMinutes: totalPreparationMinutes,
+    });
+
+    return (deliveryDate || scheduledDate).toISOString();
   };
 
   const setCartSchedule = async (scheduledDeliveryAt?: string | null) => {
     if (!customerId || scheduledDeliveryAt === undefined) return true;
 
     try {
-      const restaurantMenuId = getCartRestaurantMenuId(cartItems);
       const res = await updateCustomerCart({
         customerId,
         payload: {
           orderTime: scheduledDeliveryAt,
-          ...(restaurantMenuId ? { restaurantMenuId } : {}),
         },
       });
 
@@ -793,6 +868,16 @@ function CheckoutPageContent() {
         return;
       }
 
+      if (activeTab === "delivery" && !deliveryAllowed) {
+        toast.error(t("toast.deliveryUnavailable"));
+        return;
+      }
+
+      if (activeTab === "pickup" && !pickupAllowed) {
+        toast.error(t("toast.pickupUnavailable"));
+        return;
+      }
+
       if (activeTab === "delivery" && isGuest && !hasGuestDeliveryAddress(guestDeliveryAddress)) {
         toast.error(t("toast.enterGuestDeliveryAddress"));
         return;
@@ -800,11 +885,6 @@ function CheckoutPageContent() {
 
       if (activeTab === "delivery" && !isGuest && !selectedAddress) {
         toast.error(t("toast.selectAddress"));
-        return;
-      }
-
-      if (activeTab === "pickup" && (!pickupDate || !pickupTime)) {
-        toast.error(t("toast.selectPickupDateTime"));
         return;
       }
 
@@ -822,7 +902,11 @@ function CheckoutPageContent() {
         return;
       }
 
-      const scheduleUpdated = await setCartSchedule(scheduledDeliveryAt);
+      const cartOrderTime =
+        activeTab === "pickup" && scheduledDeliveryAt === undefined
+          ? null
+          : scheduledDeliveryAt;
+      const scheduleUpdated = await setCartSchedule(cartOrderTime);
       if (!scheduleUpdated) return;
 
       const checkoutTipAmount = Math.max(
@@ -851,7 +935,7 @@ function CheckoutPageContent() {
       const res = await checkoutCustomerCart({
         customerId,
         payload: {
-          ...(scheduledDeliveryAt ? { orderTime: scheduledDeliveryAt } : {}),
+          ...(cartOrderTime !== undefined ? { orderTime: cartOrderTime } : {}),
           ...(checkoutTipAmount > 0 ? { tipAmount: checkoutTipAmount } : {}),
           ...(checkoutLoyaltyPoints > 0 ? { loyaltyPoints: checkoutLoyaltyPoints } : {}),
           ...(isGuest
@@ -1014,7 +1098,11 @@ function CheckoutPageContent() {
     <div className="mx-auto mb-[113px] mt-[63px] max-w-[1400px] px-4 md:px-30">
       <div className="grid grid-cols-1 gap-16 lg:grid-cols-12">
         <div className="space-y-[38px] lg:col-span-7">
-          <Tabs activeTab={activeTab} />
+          <Tabs
+            activeTab={activeTab}
+            canShowDelivery={deliveryAllowed}
+            canShowPickup={pickupAllowed}
+          />
 
           {activeTab === "delivery" ? (
             <DeliverySection
@@ -1035,6 +1123,8 @@ function CheckoutPageContent() {
               setPaymentMethod={setPaymentMethod}
               scheduledDeliveryValue={scheduledDeliveryValue}
               setScheduledDeliveryValue={setScheduledDeliveryValue}
+              selectedBranch={checkoutBranch}
+              totalPreparationMinutes={totalPreparationMinutes}
             />
           ) : (
             <PickupSection
@@ -1055,7 +1145,7 @@ function CheckoutPageContent() {
               setPickupDate={setPickupDate}
               pickupTime={pickupTime}
               setPickupTime={setPickupTime}
-              selectedBranch={pickupBranch}
+              selectedBranch={checkoutBranch}
             />
           )}
         </div>

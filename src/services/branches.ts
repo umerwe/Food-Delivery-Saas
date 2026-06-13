@@ -48,6 +48,26 @@ const normalizeTemporaryClosure = (value: unknown): BranchTemporaryClosure | nul
   };
 };
 
+const normalizeHours = (value: unknown) => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.filter(isRecord).map((entry) => ({
+    dayOfWeek: getString(entry.dayOfWeek),
+    isClosed: getBoolean(entry.isClosed),
+    openTime: getString(entry.openTime),
+    closeTime: getString(entry.closeTime),
+    breakTimes: Array.isArray(entry.breakTimes)
+      ? entry.breakTimes.filter(isRecord).map((breakTime) => ({
+          startTime: getString(breakTime.startTime),
+          endTime: getString(breakTime.endTime),
+          note: getString(breakTime.note),
+        }))
+      : undefined,
+  }));
+};
+
 const normalizeNearbyBranch = (value: unknown): NearbyBranch | null => {
   if (!isRecord(value)) {
     return null;
@@ -84,6 +104,9 @@ const normalizeNearbyBranch = (value: unknown): NearbyBranch | null => {
           : undefined,
         deliveryConfig: value.settings.deliveryConfig,
         temporaryClosure: normalizeTemporaryClosure(value.settings.temporaryClosure),
+        tableReservationsEnabled: getBoolean(value.settings.tableReservationsEnabled),
+        openingHours: normalizeHours(value.settings.openingHours),
+        deliveryHours: normalizeHours(value.settings.deliveryHours),
       }
     : null;
 

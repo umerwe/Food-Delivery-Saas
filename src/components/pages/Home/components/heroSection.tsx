@@ -15,10 +15,16 @@ import {
   branchSupportsPickup,
   formatBranchAddress,
   formatBranchDistance,
+  getSelectedOrderType,
   isBranchCurrentlyAvailable,
   nearbyBranchToBranchRecord,
   persistSelectedBranch,
 } from "@/lib/branch-selector";
+import {
+  checkoutTypeToOrderType,
+  getStoredCheckoutTypePreference,
+  setStoredCheckoutTypePreference,
+} from "@/lib/checkout-type-preference";
 import { resolveHttpsImageUrl } from "@/lib/image-fallback";
 import type { BranchOrderType, NearbyBranch } from "@/types/branches";
 
@@ -67,8 +73,18 @@ export const HeroSection = ({
   const displayRestaurantName = restaurantName || t("defaultTitle");
   const displayTagline = tagline || t("defaultTagline");
   const selectedBranch = user?.branch ?? null;
-  const selectedOrderType = user?.selectedOrderType ?? selectedBranch?.selectedOrderType ?? null;
+  const selectedOrderType = getSelectedOrderType(user);
   const selectedOrderLabel = selectedOrderType === "TAKEAWAY" ? "Pickup" : selectedOrderType === "DELIVERY" ? "Delivery" : "";
+  const hasOrderTypeRules = Boolean(selectedBranch?.settings?.allowedOrderTypes?.length);
+  const showDeliveryOption = !hasOrderTypeRules || (selectedBranch ? branchSupportsDelivery(selectedBranch) : false);
+  const showPickupOption = !hasOrderTypeRules || (selectedBranch ? branchSupportsPickup(selectedBranch) : false);
+  const availableModes = useMemo(
+    () => [
+      ...(showDeliveryOption ? ["delivery" as const] : []),
+      ...(showPickupOption ? ["pickup" as const] : []),
+    ],
+    [showDeliveryOption, showPickupOption]
+  );
 
   const filteredBranches = useMemo(
     () =>
@@ -104,6 +120,34 @@ export const HeroSection = ({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [showResults]);
+
+  useEffect(() => {
+    if (availableModes.length > 0 && !availableModes.includes(mode)) {
+      setMode(availableModes[0]);
+    }
+  }, [availableModes, mode]);
+
+  useEffect(() => {
+    const storedMode = getStoredCheckoutTypePreference();
+
+    if (!storedMode || !availableModes.includes(storedMode)) return;
+
+    setMode(storedMode);
+  }, [availableModes]);
+
+  const handleModeChange = (nextMode: BranchSearchMode) => {
+    setMode(nextMode);
+    setStoredCheckoutTypePreference(nextMode);
+
+    if (selectedBranch) {
+      persistSelectedBranch({
+        ...selectedBranch,
+        settings: selectedBranch.settings ?? undefined,
+      }, setUser, {
+        orderType: checkoutTypeToOrderType(nextMode),
+      });
+    }
+  };
 
   const handleFindNearbyBranches = () => {
     setShowResults(true);
@@ -155,12 +199,13 @@ export const HeroSection = ({
         </p>
 
         <div className="w-full rounded-2xl bg-white p-6 shadow-xl md:p-8">
-          <div className="mb-6 inline-flex rounded-xl bg-[#F5F5F5] p-1">
-            {(["delivery", "pickup"] as const).map((nextMode) => (
+          {availableModes.length > 0 ? (
+            <div className="mb-6 inline-flex rounded-xl bg-[#F5F5F5] p-1">
+              {availableModes.map((nextMode) => (
               <button
                 key={nextMode}
                 type="button"
-                onClick={() => setMode(nextMode)}
+                onClick={() => handleModeChange(nextMode)}
                 className={`min-w-[116px] rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                   mode === nextMode
                     ? "bg-primary text-white shadow-sm"
@@ -169,8 +214,9 @@ export const HeroSection = ({
               >
                 {nextMode === "delivery" ? "Delivery" : "Pickup"}
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
 
           {selectedBranch ? (
             <div className="mb-4 flex flex-col gap-3 rounded-xl border border-primary/15 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">

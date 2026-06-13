@@ -373,6 +373,45 @@ describe("cart service", () => {
     expect(patchCartMock.mock.calls[0][1]).not.toHaveProperty("scheduledDeliveryAt");
   });
 
+  it("strips restaurantMenuId from cart schedule updates", async () => {
+    patchCartMock.mockResolvedValue({ success: true });
+
+    await updateCustomerCart({
+      customerId: "customer-1",
+      payload: {
+        orderTime: null,
+        restaurantMenuId: "menu-1",
+      },
+    });
+
+    expect(patchCartMock).toHaveBeenCalledWith(
+      "/v1/cart?customerId=customer-1",
+      {
+        orderTime: null,
+      },
+      undefined
+    );
+  });
+
+  it("clears customer cart orderTime with null for instant pickup", async () => {
+    patchCartMock.mockResolvedValue({ success: true });
+
+    await updateCustomerCart({
+      customerId: "customer-1",
+      payload: {
+        orderTime: null,
+      },
+    });
+
+    expect(patchCartMock).toHaveBeenCalledWith(
+      "/v1/cart?customerId=customer-1",
+      {
+        orderTime: null,
+      },
+      undefined
+    );
+  });
+
   it("refreshes customer cart quote", async () => {
     postCartMock.mockResolvedValue({
       data: {
@@ -565,6 +604,12 @@ describe("cart service", () => {
         walletAppliedAmount: 25,
         totalAmount: 999,
         payableAmount: 1400,
+        chargeBreakdown: {
+          taxes: [{ code: "STANDARD", label: "Standard tax", percentage: 19, amount: 190 }],
+          serviceCharges: [{ code: "SERVICE", label: "Service charge", percentage: 10, amount: 100 }],
+          totalTaxAmount: 190,
+          totalServiceChargeAmount: 100,
+        },
         appliedPromotion: {
           id: "deal-1",
           title: "Any 2 Burgers",
@@ -585,6 +630,12 @@ describe("cart service", () => {
       walletAppliedAmount: 25,
       totalAmount: 999,
       payableAmount: 1400,
+      chargeBreakdown: {
+        taxes: [{ code: "STANDARD", label: "Standard tax", percentage: 19, amount: 190 }],
+        serviceCharges: [{ code: "SERVICE", label: "Service charge", percentage: 10, amount: 100 }],
+        totalTaxAmount: 190,
+        totalServiceChargeAmount: 100,
+      },
       appliedPromotion: {
         id: "deal-1",
         title: "Any 2 Burgers",

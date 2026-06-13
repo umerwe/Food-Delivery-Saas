@@ -2,7 +2,7 @@ import { createDomainApiService } from "@/services/domain-api";
 import { normalizeApiList, normalizeArray } from "@/components/pages/Items/utils/product-normalizers";
 import type { ApiRecord } from "@/components/pages/Items/types";
 import type { CartItemRecord } from "@/components/pages/Items/components/signature-selection/types";
-import type { CartAppliedPromotion, CartQuote } from "@/types/cart";
+import type { CartAppliedPromotion, CartChargeBreakdown, CartChargeLine, CartQuote } from "@/types/cart";
 
 type CartMutationPayload = Record<string, unknown>;
 type CartQuotePayload = Record<string, unknown>;
@@ -64,6 +64,70 @@ export const normalizeCartAppliedPromotion = (value: unknown): CartAppliedPromot
   };
 };
 
+const normalizeChargeLine = (value: unknown): CartChargeLine | null => {
+  const line = getRecord(value);
+
+  if (!line) {
+    return null;
+  }
+
+  const label = getString(line.label);
+  const code = getString(line.code);
+
+  return {
+    ...(code ? { code } : {}),
+    ...(label ? { label } : {}),
+    percentage: toNumber(line.percentage, 0),
+    amount: toNumber(line.amount, 0),
+  };
+};
+
+const normalizeChargeLines = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map(normalizeChargeLine).filter((line): line is CartChargeLine => Boolean(line))
+    : [];
+
+const normalizeCartChargeBreakdown = (value: unknown): CartChargeBreakdown | undefined => {
+  const breakdown = getRecord(value);
+
+  if (!breakdown) {
+    return undefined;
+  }
+
+  const taxes = normalizeChargeLines(breakdown.taxes);
+  const serviceCharges = normalizeChargeLines(breakdown.serviceCharges);
+  const availableTaxTypes = Array.isArray(breakdown.availableTaxTypes)
+    ? breakdown.availableTaxTypes
+        .map((taxType) => {
+          const record = getRecord(taxType);
+
+          if (!record) {
+            return null;
+          }
+
+          const code = getString(record.code);
+          const label = getString(record.label);
+
+          return {
+            ...(code ? { code } : {}),
+            ...(label ? { label } : {}),
+            percentage: toNumber(record.percentage, 0),
+            isActive: typeof record.isActive === "boolean" ? record.isActive : undefined,
+            isDefault: typeof record.isDefault === "boolean" ? record.isDefault : undefined,
+          };
+        })
+        .filter((taxType): taxType is NonNullable<typeof taxType> => Boolean(taxType))
+    : [];
+
+  return {
+    taxes,
+    availableTaxTypes,
+    totalTaxAmount: toNumber(breakdown.totalTaxAmount, 0),
+    serviceCharges,
+    totalServiceChargeAmount: toNumber(breakdown.totalServiceChargeAmount, 0),
+  };
+};
+
 export const normalizeCartQuote = (value: unknown): CartQuote | null => {
   const quote = getRecord(value);
 
@@ -91,6 +155,7 @@ export const normalizeCartQuote = (value: unknown): CartQuote | null => {
     totalAmount: toNumber(quote.totalAmount, 0),
     payableAmount: toNumber(quote.payableAmount, toNumber(quote.totalAmount, 0)),
     appliedPromotion: normalizeCartAppliedPromotion(quote.appliedPromotion),
+    chargeBreakdown: normalizeCartChargeBreakdown(quote.chargeBreakdown),
   };
 };
 
@@ -213,6 +278,7 @@ export const normalizeGroupOrderItemPayload = (payload: CartMutationPayload): Ca
 export const normalizeCartUpdatePayload = (payload: CartUpdatePayload): CartMutationPayload => {
   const { orderTime, scheduledDeliveryAt, tipAmount, ...rest } = payload;
   const normalizedPayload: CartMutationPayload = { ...rest };
+  delete normalizedPayload.restaurantMenuId;
 
   if (tipAmount !== undefined) {
     const parsedTip = Number(tipAmount);

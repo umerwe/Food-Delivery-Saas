@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addPreparationMinutesToScheduledDelivery,
+  buildDeliveryTimeSlots,
   buildPickupTimeSlots,
+  buildScheduledDeliveryEstimate,
+  buildScheduleBreakLabels,
   getPickupScheduleForDate,
 } from "@/components/pages/Checkout/utils/pickup-schedule";
 import type { BranchRecord } from "@/types/branch-selector";
@@ -75,5 +79,92 @@ describe("pickup schedule helpers", () => {
         dateValue: "2026-06-08",
       })
     ).toEqual([]);
+  });
+
+  it("builds delivery slots from delivery hours and skips delivery breaks", () => {
+    const branch: BranchRecord = {
+      id: "branch-1",
+      name: "Main",
+      settings: {
+        openingHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "09:00",
+            closeTime: "18:00",
+          },
+        ],
+        deliveryHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "10:00",
+            closeTime: "12:00",
+            breakTimes: [{ startTime: "10:30", endTime: "11:00" }],
+          },
+        ],
+      },
+    };
+
+    expect(
+      buildDeliveryTimeSlots({
+        branch,
+        dateValue: "2026-06-15",
+      })
+    ).toEqual([
+      { value: "10:00", label: "10:00 AM" },
+      { value: "11:00", label: "11:00 AM" },
+      { value: "11:30", label: "11:30 AM" },
+    ]);
+    expect(
+      buildScheduleBreakLabels(branch.settings?.deliveryHours?.[0])
+    ).toEqual([
+      { label: "10:30 AM - 11:00 AM" },
+    ]);
+  });
+
+  it("falls back to opening hours for delivery when delivery hours are not configured", () => {
+    const branch: BranchRecord = {
+      id: "branch-1",
+      name: "Main",
+      settings: {
+        openingHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "10:00",
+            closeTime: "11:00",
+          },
+        ],
+      },
+    };
+
+    expect(
+      buildDeliveryTimeSlots({
+        branch,
+        dateValue: "2026-06-15",
+      })
+    ).toEqual([
+      { value: "10:00", label: "10:00 AM" },
+      { value: "10:30", label: "10:30 AM" },
+    ]);
+  });
+
+  it("adds preparation minutes to a selected scheduled delivery time", () => {
+    const scheduledAt = addPreparationMinutesToScheduledDelivery({
+      scheduledDeliveryValue: "2026-06-15T09:30",
+      preparationMinutes: 20,
+    });
+
+    expect(scheduledAt?.getHours()).toBe(9);
+    expect(scheduledAt?.getMinutes()).toBe(50);
+
+    expect(
+      buildScheduledDeliveryEstimate({
+        scheduledDeliveryValue: "2026-06-15T09:30",
+        preparationMinutes: 20,
+      })
+    ).toMatchObject({
+      selectedLabel: "9:30 AM",
+      readyLabel: "9:50 AM",
+      preparationMinutes: 20,
+    });
   });
 });

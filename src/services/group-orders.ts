@@ -65,13 +65,22 @@ export const searchGroupOrdersByInviteCode = async ({
   };
 };
 
+export const normalizeCreateGroupOrderPayload = (
+  payload: CreateGroupOrderPayload & { restaurantMenuId?: unknown }
+): CreateGroupOrderPayload => {
+  const normalizedPayload = { ...payload };
+  delete normalizedPayload.restaurantMenuId;
+
+  return normalizedPayload;
+};
+
 export const createGroupOrder = ({
   payload,
   token,
 }: {
-  payload: CreateGroupOrderPayload;
+  payload: CreateGroupOrderPayload & { restaurantMenuId?: unknown };
   token?: string | null;
-}) => postGroupOrders("/v1/group-orders", payload, token);
+}) => postGroupOrders("/v1/group-orders", normalizeCreateGroupOrderPayload(payload), token);
 
 export const joinGroupOrder = ({
   inviteCode,
