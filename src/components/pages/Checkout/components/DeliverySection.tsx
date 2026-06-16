@@ -8,7 +8,6 @@ import NotesSection from '@/components/pages/Checkout/components/NotesSection';
 import { CustomerDetailsForm } from '@/components/pages/Checkout/components/CustomerDetailsForm';
 import { PaymentMethodSection } from '@/components/pages/Checkout/components/PaymentMethodSection';
 import {
-  buildScheduledDeliveryEstimate,
   buildScheduleBreakLabels,
   buildDeliveryTimeSlots,
   formatPickupTimeLabel,
@@ -84,13 +83,6 @@ export function DeliverySection(props: DeliverySectionProps) {
   );
   const schedule = scheduleState.schedule;
   const breakLabels = useMemo(() => buildScheduleBreakLabels(schedule), [schedule]);
-  const deliveryEstimate = useMemo(
-    () => buildScheduledDeliveryEstimate({
-      scheduledDeliveryValue: props.scheduledDeliveryValue,
-      preparationMinutes: props.totalPreparationMinutes ?? 0,
-    }),
-    [props.scheduledDeliveryValue, props.totalPreparationMinutes]
-  );
   const scheduleLabel = useMemo(() => {
     if (!selectedDateValue || !schedule) return "";
     if (schedule.isClosed) return t("closed");
@@ -201,30 +193,6 @@ export function DeliverySection(props: DeliverySectionProps) {
                       </span>
                     ))}
                   </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {deliveryEstimate ? (
-            <div className="mt-3 rounded-[18px] border border-primary/10 bg-primary/5 p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-primary shadow-sm ring-1 ring-primary/10">
-                  <Clock size={18} aria-hidden="true" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {t("scheduledDeliveryEstimateTitle", {
-                      time: deliveryEstimate.readyLabel,
-                    })}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-gray-600">
-                    {t("scheduledDeliveryEstimateDescription", {
-                      selectedTime: deliveryEstimate.selectedLabel,
-                      minutes: deliveryEstimate.preparationMinutes,
-                      deliveryTime: deliveryEstimate.readyLabel,
-                    })}
-                  </p>
                 </div>
               </div>
             </div>

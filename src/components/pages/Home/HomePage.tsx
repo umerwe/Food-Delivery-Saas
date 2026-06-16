@@ -11,6 +11,7 @@ import Stats from "@/components/pages/Home/components/statsSection";
 import { RequiredBranchSelectionModal } from "@/components/common/branch-selector/RequiredBranchSelectionModal";
 import BranchOpeningHoursPopup from "@/components/pages/Home/components/BranchOpeningHours";
 import { CustomerDealsSection } from "@/components/pages/Home/components/CustomerDealsSection";
+import { GiftCardsSection } from "@/components/pages/Home/components/GiftCardsSection";
 
 import { DEFAULT_BRANDING } from "@/config/default-branding";
 import { useAuth } from "@/hooks/useAuth";
@@ -72,6 +73,13 @@ const HomePage = () => {
         addingDealId={addDealMutation.isPending ? addDealMutation.variables?.deal.id ?? null : null}
         branchId={branchId}
         onAddDeal={handleAddDeal}
+      />
+
+      <GiftCardsSection
+        giftCards={homeData?.giftCards}
+        restaurantId={restaurantId}
+        branchId={branchId}
+        currency={homeData?.config?.currency}
       />
 
       <WhyChooseUs />

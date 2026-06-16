@@ -9,7 +9,9 @@ describe("legal content service", () => {
         restaurantId: "restaurant-1",
         title: "Privacy Policy",
         content: "Policy text",
+        restaurantCoverImage: "https://example.com/cover.jpg",
         legalProfile: {
+          ownerName: "Badar",
           legalBusinessName: "DeliveryWays Kitchen LLC",
           taxNumber: "VAT-123456789",
           businessAddress: {
@@ -26,7 +28,9 @@ describe("legal content service", () => {
       restaurantId: "restaurant-1",
       title: "Privacy Policy",
       content: "Policy text",
+      restaurantCoverImage: "https://example.com/cover.jpg",
       legalProfile: {
+        ownerName: "Badar",
         legalBusinessName: "DeliveryWays Kitchen LLC",
         taxNumber: "VAT-123456789",
         businessAddress: {
@@ -44,6 +48,7 @@ describe("legal content service", () => {
   it("falls back safely when legal profile is missing", () => {
     expect(normalizePrivacyPolicyContent({})).toEqual({
       restaurantId: undefined,
+      restaurantCoverImage: undefined,
       title: "Privacy Policy",
       content: "",
       legalProfile: null,

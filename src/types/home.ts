@@ -1,13 +1,18 @@
 import type { Branding } from "@/types/branding";
+import type { BranchScheduleTimings } from "@/types/branches";
+import type { HomeGiftCards } from "@/types/gift-cards";
 
 export type HomeRestaurant = {
   id?: string | null;
   name?: string | null;
   tagline?: string | null;
+  bio?: string | null;
   description?: string | null;
   logoUrl?: string | null;
+  coverImage?: string | null;
   coverImageUrl?: string | null;
   heroImageUrl?: string | null;
+  socialMediaLinks?: Record<string, string | null | undefined> | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
   accentColor?: string | null;
@@ -22,6 +27,8 @@ export type HomeBranch = {
   restaurantId?: string | null;
   address?: Record<string, unknown>;
   settings?: Record<string, unknown>;
+  scheduleTimings?: BranchScheduleTimings | null;
+  tableReservationsEnabled?: boolean;
 };
 
 export type HomeConfig = {
@@ -94,6 +101,7 @@ export type CustomerHomeData = {
   landingPopup?: LandingPopup | null;
   cuisines: HomeCategory[];
   promotionalItems: PromotionCampaign[];
+  giftCards?: HomeGiftCards | null;
   faqs: Record<string, unknown>[];
   branding: Branding;
 };

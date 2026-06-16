@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Tabs from "@/components/pages/Checkout/components/Tabs";
 import { DeliverySection } from "@/components/pages/Checkout/components/DeliverySection";
 import { PickupSection } from "@/components/pages/Checkout/components/PickupSection";
@@ -8,8 +8,8 @@ import { CartSummarySection } from "@/components/pages/Checkout/components/CartS
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCheckout } from "@/hooks/useCheckout";
 import { useCart } from "@/hooks/useCart";
+import { useHome } from "@/hooks/useHome";
 import { useLoyalty } from "@/hooks/useLoyalty";
-import useReservations from "@/hooks/useReservations";
 import { toast } from "sonner";
 import { useAuthContext } from "@/hooks/useAuth";
 import {
@@ -25,7 +25,7 @@ import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorM
 import type { BranchRecord } from "@/types/branch-selector";
 import { useTranslations } from "next-intl";
 import { normalizeCheckoutTipAmount, type CheckoutAddressValues } from "@/validations/checkout";
-import { branchSupportsDelivery, branchSupportsPickup, getSelectedOrderType } from "@/lib/branch-selector";
+import { branchSupportsDelivery, branchSupportsPickup, getSelectedOrderType, normalizeBranch } from "@/lib/branch-selector";
 import {
   getStoredCheckoutTypePreference,
   setStoredCheckoutTypePreference,
@@ -61,6 +61,118 @@ type GuestPrivacyPolicy = {
 
 const getCheckoutOrderType = (checkoutType: string) =>
   checkoutType === "pickup" ? "TAKEAWAY" : "DELIVERY";
+
+const isMeaningfulCartText = (value: unknown) =>
+  typeof value === "string" && value.trim() !== "" && value.trim() !== "Untitled Item";
+
+const hasVariationDetails = (value: unknown) => {
+  const variation = asRecord(value);
+
+  return Boolean(
+    isMeaningfulCartText(variation.displayText) ||
+      isMeaningfulCartText(variation.name) ||
+      variation.id
+  );
+};
+
+const hasModifierDetails = (value: unknown) => {
+  const modifier = asRecord(value);
+
+  return Boolean(
+    isMeaningfulCartText(modifier.name) &&
+      String(modifier.name).trim() !== "Add-on"
+  );
+};
+
+const hasDisplayableModifierDetails = (items: CartItem["selectedModifiers"]) =>
+  items.some(hasModifierDetails);
+
+const getMergedCartMenuItem = (
+  currentItem: CartItem,
+  incomingItem: CartItem
+) => {
+  const incomingMenuItem = asRecord(incomingItem.menuItem);
+  const currentMenuItem = asRecord(currentItem.menuItem);
+  const mergedMenuItem = {
+    ...currentMenuItem,
+    ...incomingMenuItem,
+  };
+
+  return {
+    ...mergedMenuItem,
+    name: isMeaningfulCartText(incomingMenuItem.name)
+      ? incomingMenuItem.name
+      : currentMenuItem.name,
+    slug: isMeaningfulCartText(incomingMenuItem.slug)
+      ? incomingMenuItem.slug
+      : currentMenuItem.slug,
+    description: isMeaningfulCartText(incomingMenuItem.description)
+      ? incomingMenuItem.description
+      : currentMenuItem.description,
+    imageUrl: isMeaningfulCartText(incomingMenuItem.imageUrl)
+      ? incomingMenuItem.imageUrl
+      : currentMenuItem.imageUrl,
+    selectedVariation: hasVariationDetails(incomingMenuItem.selectedVariation)
+      ? incomingMenuItem.selectedVariation
+      : currentMenuItem.selectedVariation,
+  };
+};
+
+const mergeCartItemsWithExistingDetails = (
+  currentItems: CartItem[],
+  incomingItems: CartItem[]
+) => {
+  if (!currentItems.length || !incomingItems.length) return incomingItems;
+
+  const currentById = new Map(
+    currentItems
+      .filter((item) => item.id !== undefined && item.id !== null)
+      .map((item) => [String(item.id), item])
+  );
+
+  return incomingItems.map((incomingItem) => {
+    const currentItem = incomingItem.id !== undefined && incomingItem.id !== null
+      ? currentById.get(String(incomingItem.id))
+      : undefined;
+
+    if (!currentItem) return incomingItem;
+
+    const hasIncomingModifiers =
+      incomingItem.selectedModifiers.length > 0 &&
+      (
+        !currentItem.selectedModifiers.length ||
+        hasDisplayableModifierDetails(incomingItem.selectedModifiers)
+      );
+    const hasIncomingSections = incomingItem.selectedSections.length > 0;
+    const hasIncomingIncludedItems = Boolean(incomingItem.includedItems?.length);
+    const mergedMenuItem = getMergedCartMenuItem(currentItem, incomingItem);
+
+    return {
+      ...currentItem,
+      ...incomingItem,
+      name: isMeaningfulCartText(incomingItem.name) ? incomingItem.name : currentItem.name,
+      desc: isMeaningfulCartText(incomingItem.desc) ? incomingItem.desc : currentItem.desc,
+      img: isMeaningfulCartText(incomingItem.img) ? incomingItem.img : currentItem.img,
+      slug: isMeaningfulCartText(incomingItem.slug) ? incomingItem.slug : currentItem.slug,
+      selectedVariationName: isMeaningfulCartText(incomingItem.selectedVariationName)
+        ? incomingItem.selectedVariationName
+        : currentItem.selectedVariationName,
+      selectedVariation: hasVariationDetails(incomingItem.selectedVariation)
+        ? incomingItem.selectedVariation
+        : currentItem.selectedVariation,
+      variationId: incomingItem.variationId ?? currentItem.variationId,
+      selectedModifiers: hasIncomingModifiers
+        ? incomingItem.selectedModifiers
+        : currentItem.selectedModifiers,
+      selectedSections: hasIncomingSections
+        ? incomingItem.selectedSections
+        : currentItem.selectedSections,
+      sections: hasIncomingSections ? incomingItem.sections : currentItem.sections,
+      includedItems: hasIncomingIncludedItems ? incomingItem.includedItems : currentItem.includedItems,
+      menuItem: Object.keys(mergedMenuItem).length ? mergedMenuItem : incomingItem.menuItem,
+    };
+  });
+};
 
 const isGuestUser = (user: ReturnType<typeof useAuthContext>["user"]) =>
   user?.isGuest === true || String(user?.role || "").toUpperCase() === "GUEST";
@@ -135,6 +247,31 @@ const hasGuestContact = (customer: { name: string; phone: string; email: string 
 const getCartPreparationMinutes = (items: CartItem[]) =>
   items.reduce((total, item) => total + Math.max(0, Math.floor(toNumber(item.prepTimeMinutes, 0))), 0);
 
+const getCheckoutQuoteSignature = ({
+  activeTab,
+  customerId,
+  guestDeliveryAddress,
+  isGuest,
+  selectedAddress,
+}: {
+  activeTab: string;
+  customerId: string;
+  guestDeliveryAddress: CheckoutAddressValues;
+  isGuest: boolean;
+  selectedAddress: string | null;
+}) => {
+  const address = isGuest
+    ? trimAddress(guestDeliveryAddress)
+    : { selectedAddress: selectedAddress ?? "" };
+
+  return JSON.stringify({
+    activeTab,
+    customerId,
+    isGuest,
+    address,
+  });
+};
+
 function CheckoutPageContent() {
   const t = useTranslations("checkout");
   const searchParams = useSearchParams();
@@ -159,7 +296,16 @@ function CheckoutPageContent() {
   const { get, patch, del, post, checkoutCustomerCart } = useCheckout(token);
   const { updateCustomerCart, updateCustomerCartOrderType, quoteCustomerCart } = useCart(token);
   const { fetchLoyalty } = useLoyalty(token);
-  const { fetchReservationBranch } = useReservations(token);
+  const checkoutBranchId = user?.branchId || user?.branch?.id || null;
+  const homeQuery = useHome(
+    restaurantId,
+    checkoutBranchId,
+    Boolean(restaurantId && checkoutBranchId)
+  );
+  const homeBranch = useMemo(
+    () => normalizeBranch(homeQuery.data?.data.branch),
+    [homeQuery.data?.data.branch]
+  );
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartQuote, setCartQuote] = useState<ApiRecord | null>(null);
@@ -171,6 +317,8 @@ function CheckoutPageContent() {
   const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
   const [loyaltyPoints, setLoyaltyPoints] = useState("");
   const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const loadedCartCustomerIdRef = useRef<string | null>(null);
+  const lastQuoteSignatureRef = useRef("");
   const totalPreparationMinutes = useMemo(
     () => getCartPreparationMinutes(cartItems),
     [cartItems]
@@ -213,7 +361,10 @@ function CheckoutPageContent() {
     const { items, quote } = normalizeCartResponse(res);
 
     if (items.length) {
-      setCartItems(items.map((item) => normalizeCartItem(item)));
+      const nextItems = items.map((item) => normalizeCartItem(item));
+      setCartItems((currentItems) =>
+        mergeCartItemsWithExistingDetails(currentItems, nextItems)
+      );
     }
 
     if (!quote) {
@@ -305,8 +456,12 @@ function CheckoutPageContent() {
 
   useEffect(() => {
     if (customerId) {
+      if (loadedCartCustomerIdRef.current === customerId) return;
+      loadedCartCustomerIdRef.current = customerId;
       fetchCart();
     } else {
+      loadedCartCustomerIdRef.current = null;
+      lastQuoteSignatureRef.current = "";
       setCartItems([]);
       setCartQuote(null);
       setAppliedTipAmount(0);
@@ -436,9 +591,21 @@ function CheckoutPageContent() {
   }, [get, isGuest, restaurantId]);
 
   useEffect(() => {
-    if (!customerId) return;
+    if (!customerId || loadingCart) return;
+
+    const quoteSignature = getCheckoutQuoteSignature({
+      activeTab,
+      customerId,
+      guestDeliveryAddress,
+      isGuest,
+      selectedAddress,
+    });
+
+    if (lastQuoteSignatureRef.current === quoteSignature) return;
 
     const quoteTimer = window.setTimeout(async () => {
+      lastQuoteSignatureRef.current = quoteSignature;
+
       const orderType = getCheckoutOrderType(activeTab);
       const orderTypeRes = await updateCustomerCartOrderType({
         customerId,
@@ -446,6 +613,7 @@ function CheckoutPageContent() {
       });
 
       if (hasBackendError(orderTypeRes)) {
+        lastQuoteSignatureRef.current = "";
         reportBackendError(
           t("toast.quoteFailed"),
           orderTypeRes,
@@ -454,7 +622,7 @@ function CheckoutPageContent() {
         return;
       }
 
-      await fetchCart();
+      syncCartFromResponse(orderTypeRes);
 
       const payload: Record<string, unknown> = {};
 
@@ -472,38 +640,31 @@ function CheckoutPageContent() {
       });
 
       if (!hasBackendError(res)) {
-        const { quote } = normalizeCartResponse(res);
-        const quoteData = quote ?? normalizeCartQuote(asRecord(res?.data));
+        if (!syncCartFromResponse(res)) {
+          const quoteData = normalizeCartQuote(asRecord(res?.data));
 
-        if (quoteData) {
-          setCartQuote(quoteData);
+          if (quoteData) {
+            setCartQuote(quoteData);
+          }
         }
+      } else {
+        lastQuoteSignatureRef.current = "";
       }
     }, 450);
 
     return () => window.clearTimeout(quoteTimer);
-  }, [activeTab, customerId, guestDeliveryAddress, isGuest, quoteCustomerCart, selectedAddress, updateCustomerCartOrderType]);
+  }, [activeTab, customerId, guestDeliveryAddress, isGuest, loadingCart, quoteCustomerCart, selectedAddress, updateCustomerCartOrderType]);
 
   useEffect(() => {
-    const loadCheckoutBranch = async () => {
-      const branchId = user?.branchId || user?.branch?.id;
+    if (!checkoutBranchId) {
+      setCheckoutBranch(null);
+      return;
+    }
 
-      if (!branchId) {
-        setCheckoutBranch(null);
-        return;
-      }
+    const fallbackBranch = normalizeBranch(user?.branch);
 
-      try {
-        const { branch } = await fetchReservationBranch({ branchId: String(branchId) });
-
-        setCheckoutBranch(branch);
-      } catch (error) {
-        setCheckoutBranch((user?.branch || null) as BranchRecord | null);
-      }
-    };
-
-    void loadCheckoutBranch();
-  }, [fetchReservationBranch, user?.branch, user?.branchId]);
+    setCheckoutBranch(homeBranch ?? fallbackBranch);
+  }, [checkoutBranchId, homeBranch, user?.branch]);
 
   useEffect(() => {
     if (!checkoutBranch?.settings?.allowedOrderTypes?.length) return;

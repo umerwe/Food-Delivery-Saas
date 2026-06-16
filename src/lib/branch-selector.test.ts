@@ -133,4 +133,36 @@ describe("branch selector helpers", () => {
     expect(branch?.settings?.deliveryHours?.[0]?.breakTimes?.[0]?.note).toBe("Delivery pause");
     expect(branch?.settings?.tableReservationsEnabled).toBe(true);
   });
+
+  it("normalizes root schedule timings from the customer home branch shape", () => {
+    const branch = normalizeBranch({
+      id: "branch-home",
+      name: "Home Branch",
+      scheduleTimings: {
+        deliveryIntervalMinutes: 15,
+        pickupIntervalMinutes: 20,
+        openingHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "09:00",
+            closeTime: "18:00",
+          },
+        ],
+        deliveryHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "10:00",
+            closeTime: "22:00",
+          },
+        ],
+      },
+      tableReservationsEnabled: true,
+    });
+
+    expect(branch?.scheduleTimings?.deliveryIntervalMinutes).toBe(15);
+    expect(branch?.scheduleTimings?.pickupIntervalMinutes).toBe(20);
+    expect(branch?.settings?.openingHours?.[0]?.openTime).toBe("09:00");
+    expect(branch?.settings?.deliveryHours?.[0]?.closeTime).toBe("22:00");
+    expect(branch?.settings?.tableReservationsEnabled).toBe(true);
+  });
 });

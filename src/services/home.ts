@@ -3,6 +3,7 @@ import { normalizeBrandingApiResponse } from "../lib/branding";
 import { isHomeBranch, isLandingPopup, normalizeHomeCategories, normalizePromotions } from "../lib/home";
 import { getMeta } from "../lib/response";
 import type { CustomerHomeData, CustomerHomeResponse, HomeCategory, HomeConfig, HomeRestaurant } from "../types/home";
+import { normalizeHomeGiftCards } from "../types/gift-cards";
 
 const HOME_CATEGORIES_PAGE_LIMIT = 50;
 const HOME_CATEGORIES_MAX_PAGES = 30;
@@ -92,6 +93,7 @@ const normalizeHomeData = (value: unknown): CustomerHomeData => {
     landingPopup: isLandingPopup(record.landingPopup) ? record.landingPopup : null,
     cuisines: normalizeHomeCategories(record.cuisines),
     promotionalItems: normalizePromotions(record.promotionalItems),
+    giftCards: normalizeHomeGiftCards(record.giftCards),
     faqs: Array.isArray(record.faqs) ? record.faqs.filter(isRecord) : [],
     branding: normalizeBrandingApiResponse(record),
   };

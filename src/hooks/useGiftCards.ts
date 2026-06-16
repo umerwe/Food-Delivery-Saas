@@ -5,8 +5,10 @@ import { toast } from "sonner";
 
 import { queryKeys } from "@/config/query-keys";
 import { getApiErrorMessage } from "@/lib/errors";
-import { purchaseGiftCard, redeemGiftCard } from "@/services/gift-cards";
+import { guestPurchaseGiftCard, purchaseGiftCard, redeemGiftCard } from "@/services/gift-cards";
 import type {
+  GiftCardGuestPurchaseParams,
+  GiftCardGuestPurchasePayload,
   GiftCardPurchasePayload,
   GiftCardRedeemParams,
   GiftCardRedeemPayload,
@@ -19,6 +21,11 @@ type PurchaseGiftCardVariables = {
 type RedeemGiftCardVariables = {
   payload: GiftCardRedeemPayload;
   params?: GiftCardRedeemParams;
+};
+
+type GuestPurchaseGiftCardVariables = {
+  payload: GiftCardGuestPurchasePayload;
+  params: GiftCardGuestPurchaseParams;
 };
 
 const invalidateWalletQueries = async (
@@ -67,3 +74,9 @@ export const useRedeemGiftCard = () => {
     },
   });
 };
+
+export const useGuestPurchaseGiftCard = () =>
+  useMutation({
+    mutationFn: ({ payload, params }: GuestPurchaseGiftCardVariables) =>
+      guestPurchaseGiftCard(payload, params),
+  });

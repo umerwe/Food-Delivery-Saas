@@ -8,6 +8,14 @@ export type BranchTemporaryClosure = {
   message?: string | null;
 };
 
+export type BranchScheduleTimings = {
+  deliveryIntervalMinutes?: number | string | null;
+  pickupIntervalMinutes?: number | string | null;
+  openingHours?: BranchHours[];
+  deliveryHours?: BranchHours[];
+  [key: string]: unknown;
+};
+
 export type BranchAddress = {
   id?: string;
   street?: string | null;
@@ -23,35 +31,28 @@ export type BranchAddress = {
 export type BranchSettings = {
   allowedOrderTypes?: BranchOrderType[];
   deliveryConfig?: unknown;
+  scheduleTimings?: BranchScheduleTimings | null;
   temporaryClosure?: BranchTemporaryClosure | null;
   tableReservationsEnabled?: boolean;
-  openingHours?: Array<{
-    dayOfWeek?: string;
-    isClosed?: boolean;
-    openTime?: string;
-    closeTime?: string;
-    breakTimes?: Array<{
-      startTime?: string;
-      endTime?: string;
-      note?: string;
-    }>;
-  }>;
-  deliveryHours?: Array<{
-    dayOfWeek?: string;
-    isClosed?: boolean;
-    openTime?: string;
-    closeTime?: string;
-    breakTimes?: Array<{
-      startTime?: string;
-      endTime?: string;
-      note?: string;
-    }>;
-  }>;
+  openingHours?: BranchHours[];
+  deliveryHours?: BranchHours[];
   holidayRanges?: unknown[];
   reservationDateRanges?: unknown[];
   tableReservationDateRanges?: unknown[];
   reservationBlackoutRanges?: unknown[];
   [key: string]: unknown;
+};
+
+export type BranchHours = {
+  dayOfWeek?: string;
+  isClosed?: boolean;
+  openTime?: string;
+  closeTime?: string;
+  breakTimes?: Array<{
+    startTime?: string;
+    endTime?: string;
+    note?: string;
+  }>;
 };
 
 export type NearbyBranch = {
@@ -60,6 +61,7 @@ export type NearbyBranch = {
   restaurantId?: string | null;
   address?: BranchAddress | null;
   settings?: BranchSettings | null;
+  scheduleTimings?: BranchScheduleTimings | null;
   distanceKm?: number | null;
   availability?: {
     isAvailable?: boolean;

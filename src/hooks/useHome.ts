@@ -10,4 +10,5 @@ export const useHome = (restaurantId?: string | null, branchId?: string | null, 
     queryKey: queryKeys.home.detail(restaurantId, branchId),
     queryFn: () => getHome(restaurantId, branchId),
     enabled,
+    staleTime: 5 * 60 * 1000,
   });

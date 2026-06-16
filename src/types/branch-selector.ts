@@ -1,4 +1,10 @@
-import type { BranchAddress, BranchOrderType, BranchSettings, BranchTemporaryClosure } from "@/types/branches";
+import type {
+  BranchAddress,
+  BranchOrderType,
+  BranchScheduleTimings,
+  BranchSettings,
+  BranchTemporaryClosure,
+} from "@/types/branches";
 
 export type BranchRecord = {
   id: string;
@@ -7,6 +13,7 @@ export type BranchRecord = {
   restaurantId?: string | null;
   address?: BranchAddress;
   settings?: BranchSettings;
+  scheduleTimings?: BranchScheduleTimings | null;
   distanceKm?: number | null;
   availability?: {
     isAvailable?: boolean;

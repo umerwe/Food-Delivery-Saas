@@ -108,33 +108,17 @@ export default function OrderSummary({
             <span>${order?.totalAmount}</span>
           </div>
         </div>
-
-<div className="fixed bottom-6 right-6 z-50">
-  <Link
-    href={`/contact/chat?orderId=${order?.id}`}
-    className="group flex items-center justify-end"
-  >
-    {/* TEXT (reveals on hover) */}
-    <span
-      className="mr-3 px-4 py-2 text-sm font-medium text-white bg-[#ef5a2a] rounded-full 
-                 opacity-0 translate-x-4 
-                 group-hover:opacity-100 group-hover:translate-x-0 
-                 transition-all duration-300 shadow-md whitespace-nowrap"
-    >
-      {t("chatAboutOrder")}
-    </span>
-
-    {/* ICON BUTTON */}
-    <div
-      className="w-12 h-12 flex items-center justify-center rounded-full 
-                 bg-[#ef5a2a] text-white shadow-lg 
-                 group-hover:scale-105 transition-all duration-200"
-    >
-      <MessageCircle size={20} />
-    </div>
-  </Link>
-</div>
       </section>
+
+      {order?.id ? (
+        <Link
+          href={`/contact/chat?orderId=${order.id}`}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(193,0,10,0.22)] transition hover:bg-primary/90"
+        >
+          <MessageCircle size={18} />
+          {t("chatAboutOrder")}
+        </Link>
+      ) : null}
     </div>
   );
 }

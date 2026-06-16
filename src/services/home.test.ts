@@ -18,6 +18,16 @@ describe("getHome", () => {
       data: {
         restaurant: { name: "Demo" },
         config: { currency: "USD", branding: { theme: { primaryColor: "#111111" } } },
+        giftCards: {
+          isEnabled: true,
+          items: [
+            {
+              id: "gift-card-1",
+              title: "Dinner for two",
+              amount: "2500",
+            },
+          ],
+        },
         cuisines: [{ id: "c1" }],
         promotionalItems: [{ id: "p1" }],
         faqs: [{ id: "f1" }],
@@ -30,6 +40,8 @@ describe("getHome", () => {
     expect(response.data.restaurant?.name).toBe("Demo");
     expect(response.data.config?.currency).toBe("USD");
     expect(response.data.branding.primaryColor).toBe("#111111");
+    expect(response.data.giftCards?.isEnabled).toBe(true);
+    expect(response.data.giftCards?.items[0].amount).toBe(2500);
     expect(response.data.cuisines).toHaveLength(1);
   });
 

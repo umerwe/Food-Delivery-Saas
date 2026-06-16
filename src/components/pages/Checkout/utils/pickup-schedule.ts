@@ -1,6 +1,6 @@
 import type { BranchRecord } from "@/types/branch-selector";
 
-const SLOT_INTERVAL_MINUTES = 30;
+const DEFAULT_SLOT_INTERVAL_MINUTES = 30;
 
 type OpeningHours = {
   dayOfWeek?: string;
@@ -220,6 +220,34 @@ const getRecord = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
+const getScheduleIntervalMinutes = (
+  branch: BranchRecord | null | undefined,
+  scheduleType: "pickup" | "delivery"
+) => {
+  const branchTimings = getRecord(branch?.scheduleTimings);
+  const settingsTimings = getRecord(branch?.settings?.scheduleTimings);
+  const scheduleTimings = branchTimings ?? settingsTimings;
+  const intervalValue =
+    scheduleType === "delivery"
+      ? scheduleTimings?.deliveryIntervalMinutes
+      : scheduleTimings?.pickupIntervalMinutes;
+
+  if (intervalValue === null || intervalValue === undefined) {
+    return DEFAULT_SLOT_INTERVAL_MINUTES;
+  }
+
+  const interval =
+    typeof intervalValue === "number" || typeof intervalValue === "string"
+      ? Number(intervalValue)
+      : Number.NaN;
+
+  if (!Number.isFinite(interval) || interval <= 0) {
+    return DEFAULT_SLOT_INTERVAL_MINUTES;
+  }
+
+  return Math.floor(interval);
+};
+
 const isSlotInsideBreak = ({
   slotStart,
   slotEnd,
@@ -257,8 +285,13 @@ export const getBranchScheduleForDate = ({
   dateValue: string;
   scheduleType: "pickup" | "delivery";
 }): PickupSchedule => {
-  const openingHours = normalizeArray<OpeningHours>(branch?.settings?.openingHours);
-  const deliveryHours = normalizeArray<OpeningHours>(branch?.settings?.deliveryHours);
+  const scheduleTimings = getRecord(branch?.scheduleTimings);
+  const openingHours = normalizeArray<OpeningHours>(
+    branch?.settings?.openingHours ?? scheduleTimings?.openingHours
+  );
+  const deliveryHours = normalizeArray<OpeningHours>(
+    branch?.settings?.deliveryHours ?? scheduleTimings?.deliveryHours
+  );
   const scheduleHours =
     scheduleType === "delivery" && deliveryHours.length > 0
       ? deliveryHours
@@ -312,12 +345,13 @@ const buildTimeSlots = ({
 
   const open = timeToMinutes(schedule?.openTime);
   const close = timeToMinutes(schedule?.closeTime);
+  const slotIntervalMinutes = getScheduleIntervalMinutes(branch, scheduleType);
 
   if (open === null || close === null || open >= close) return [];
 
   const isToday = dateValue === getTodayDateValue();
   const earliestTodayMinutes = isToday
-    ? roundUpToInterval(getCurrentMinutes(), SLOT_INTERVAL_MINUTES)
+    ? roundUpToInterval(getCurrentMinutes(), slotIntervalMinutes)
     : open;
 
   const startAt = Math.max(open, earliestTodayMinutes);
@@ -325,10 +359,10 @@ const buildTimeSlots = ({
 
   for (
     let slotStart = startAt;
-    slotStart + SLOT_INTERVAL_MINUTES <= close;
-    slotStart += SLOT_INTERVAL_MINUTES
+    slotStart + slotIntervalMinutes <= close;
+    slotStart += slotIntervalMinutes
   ) {
-    const slotEnd = slotStart + SLOT_INTERVAL_MINUTES;
+    const slotEnd = slotStart + slotIntervalMinutes;
 
     const isDuringBreak = normalizeArray(schedule?.breakTimes).some(
       (breakTime) => isSlotInsideBreak({ slotStart, slotEnd, breakTime })

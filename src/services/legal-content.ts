@@ -8,6 +8,7 @@ type LegalAddress = {
 };
 
 export type LegalProfile = {
+  ownerName?: string;
   legalBusinessName?: string;
   taxNumber?: string;
   businessAddress?: LegalAddress;
@@ -16,6 +17,7 @@ export type LegalProfile = {
 
 export type PrivacyPolicyContent = {
   restaurantId?: string;
+  restaurantCoverImage?: string;
   title: string;
   content: string;
   legalProfile?: LegalProfile | null;
@@ -48,6 +50,7 @@ const normalizeLegalProfile = (value: unknown): LegalProfile | null => {
   }
 
   const profile = {
+    ownerName: getString(value.ownerName),
     legalBusinessName: getString(value.legalBusinessName),
     taxNumber: getString(value.taxNumber),
     businessAddress: normalizeLegalAddress(value.businessAddress),
@@ -62,6 +65,7 @@ export const normalizePrivacyPolicyContent = (value: unknown): PrivacyPolicyCont
 
   return {
     restaurantId: getString(record.restaurantId),
+    restaurantCoverImage: getString(record.restaurantCoverImage),
     title: getString(record.title) ?? "Privacy Policy",
     content: getString(record.content) ?? "",
     legalProfile: normalizeLegalProfile(record.legalProfile),

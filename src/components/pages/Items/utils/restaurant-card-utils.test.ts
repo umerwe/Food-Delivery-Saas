@@ -94,15 +94,19 @@ describe("restaurant card utils", () => {
   });
 
   it("hides only the delivery card when today's delivery hours match opening hours", () => {
+    const dayKeys = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const today = dayKeys[new Date().getDay()];
+    const anotherDay = dayKeys[(new Date().getDay() + 1) % dayKeys.length];
+
     const summary = getBranchHoursSummary({
       settings: {
         openingHours: [
-          { dayOfWeek: "MONDAY", openTime: "09:00", closeTime: "18:00" },
-          { dayOfWeek: "TUESDAY", openTime: "09:00", closeTime: "17:00" },
+          { dayOfWeek: today, openTime: "09:00", closeTime: "18:00" },
+          { dayOfWeek: anotherDay, openTime: "09:00", closeTime: "17:00" },
         ],
         deliveryHours: [
-          { dayOfWeek: "MONDAY", openTime: "09:00", closeTime: "18:00" },
-          { dayOfWeek: "TUESDAY", openTime: "10:00", closeTime: "17:00" },
+          { dayOfWeek: today, openTime: "09:00", closeTime: "18:00" },
+          { dayOfWeek: anotherDay, openTime: "10:00", closeTime: "17:00" },
         ],
       },
     });

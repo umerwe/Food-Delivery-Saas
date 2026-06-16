@@ -174,6 +174,61 @@ describe("checkout normalizers", () => {
     expect(recalculateCartItemQuantity(normalized, 3).lineTotal).toBe(15);
   });
 
+  it("uses cart item fallback fields when mutation responses omit nested menu item details", () => {
+    const normalized = normalizeCartItem({
+      id: "cart-item-1",
+      quantity: 1,
+      unitPrice: 30,
+      unitPriceWithModifiers: 51,
+      lineTotal: 51,
+      name: "Lahori Chicken Pizza",
+      description: "test test test",
+      imageUrl: "/pizza.avif",
+      menuItemId: "menu-item-1",
+    });
+
+    expect(normalized.name).toBe("Lahori Chicken Pizza");
+    expect(normalized.desc).toBe("test test test");
+    expect(normalized.img).toBe("/pizza.avif");
+    expect(normalized.lineTotal).toBe(51);
+  });
+
+  it("resolves modifier names and prices from flat menu item modifiers", () => {
+    const normalized = normalizeCartItem({
+      id: "cart-item-1",
+      quantity: 1,
+      modifiers: [{ modifierId: "modifier-1", quantity: 1 }],
+      menuItem: {
+        name: "Lahori Chicken Pizza",
+        selectedVariation: {
+          id: "small",
+          name: "Small",
+          displayText: "Small",
+        },
+        modifiers: [
+          {
+            id: "modifier-1",
+            name: "Lahori pizza modifier",
+            priceDelta: 21,
+          },
+        ],
+      },
+    });
+
+    expect(normalized.selectedVariationName).toBe("Small");
+    expect(normalized.selectedModifiers).toEqual([
+      {
+        id: "",
+        modifierId: "modifier-1",
+        name: "Lahori pizza modifier",
+        quantity: 1,
+        unitPrice: 21,
+        priceDelta: undefined,
+        total: 21,
+      },
+    ]);
+  });
+
   it("preserves backend cart item pricing and selected deal fields", () => {
     const normalized = normalizeCartItem({
       id: "cart-item-1",
@@ -435,6 +490,44 @@ describe("checkout normalizers", () => {
 
     expect(quote?.totalAmount).toBe(999);
     expect(quote?.payableAmount).toBe(899);
+  });
+
+  it("does not treat quote snapshot rows as display cart items", () => {
+    const { items, quote } = normalizeCartResponse({
+      data: {
+        subtotal: 51,
+        deliveryFee: 2,
+        totalAmount: 53,
+        payableAmount: 53,
+        items: [
+          {
+            menuItemId: "pizza-1",
+            menuItemName: "Lahori Chicken Pizza",
+            variationId: "small",
+            variationName: "Small",
+            quantity: 1,
+            unitPrice: 51,
+            lineTotal: 51,
+            snapshotModifiers: [
+              {
+                modifierId: "modifier-1",
+                name: "Lahori pizza modifier",
+                quantity: 1,
+                unitPrice: 21,
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(items).toEqual([]);
+    expect(quote).toMatchObject({
+      subtotal: 51,
+      deliveryFee: 2,
+      totalAmount: 53,
+      payableAmount: 53,
+    });
   });
 
   it("preserves saved cart coupon values from wrapped cart response", () => {

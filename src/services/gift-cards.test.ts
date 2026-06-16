@@ -1,20 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { normalizeGiftCardPurchaseResponse, normalizeGiftCardRedeemResponse } from "@/types/gift-cards";
+import {
+  normalizeGiftCardAvailabilityResponse,
+  normalizeGiftCardGuestPurchaseResponse,
+  normalizeGiftCardPurchaseResponse,
+  normalizeGiftCardRedeemResponse,
+} from "@/types/gift-cards";
 
-import { purchaseGiftCard, redeemGiftCard } from "./gift-cards";
+import { getAvailableGiftCards, guestPurchaseGiftCard, purchaseGiftCard, redeemGiftCard } from "./gift-cards";
 
 const httpClientPostMock = vi.hoisted(() => vi.fn());
+const publicClientGetMock = vi.hoisted(() => vi.fn());
+const publicClientPostMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/axios", () => ({
+  API_BASE_URL: "https://api.example.com/api/v1",
   httpClient: {
     post: httpClientPostMock,
+  },
+}));
+
+vi.mock("axios", () => ({
+  default: {
+    create: () => ({
+      get: publicClientGetMock,
+      post: publicClientPostMock,
+    }),
   },
 }));
 
 describe("gift card service", () => {
   beforeEach(() => {
     httpClientPostMock.mockReset();
+    publicClientGetMock.mockReset();
+    publicClientPostMock.mockReset();
   });
 
   it("purchase calls customer gift card purchase endpoint without api v1 duplication", async () => {
@@ -148,6 +167,105 @@ describe("gift card service", () => {
         currency: "PKR",
       },
       message: "Gift card redeemed successfully",
+    });
+  });
+
+  it("available gift cards calls public endpoint with restaurant and branch", async () => {
+    publicClientGetMock.mockResolvedValue({
+      data: {
+        data: {
+          isEnabled: true,
+          items: [{ id: "gift-card-1", title: "Dinner", amount: 2500 }],
+        },
+      },
+    });
+
+    const response = await getAvailableGiftCards({
+      restaurantId: "restaurant-1",
+      branchId: "branch-1",
+    });
+
+    expect(publicClientGetMock).toHaveBeenCalledWith(
+      "/customer-app/gift-cards/available",
+      { params: { restaurantId: "restaurant-1", branchId: "branch-1" } }
+    );
+    expect(response.items[0].amount).toBe(2500);
+  });
+
+  it("guest purchase calls public Stripe endpoint without wallet endpoint", async () => {
+    publicClientPostMock.mockResolvedValue({
+      data: {
+        data: {
+          transaction: { id: "txn-1" },
+          paymentSession: {
+            provider: "stripe",
+            clientSecret: "secret",
+            publishableKey: "pk_test",
+            paymentIntentId: "pi_1",
+          },
+        },
+      },
+    });
+
+    await guestPurchaseGiftCard(
+      {
+        amount: 2500,
+        buyerEmail: "buyer@example.com",
+        buyerName: " Buyer ",
+        branchId: "branch-1",
+        title: " Dinner ",
+        message: " Enjoy ",
+        currency: "USD",
+      },
+      {
+        restaurantId: "restaurant-1",
+        branchId: "branch-1",
+      }
+    );
+
+    expect(publicClientPostMock).toHaveBeenCalledWith(
+      "/customer-app/gift-cards/guest-purchase",
+      {
+        amount: 2500,
+        buyerEmail: "buyer@example.com",
+        buyerName: "Buyer",
+        branchId: "branch-1",
+        title: "Dinner",
+        message: "Enjoy",
+        currency: "USD",
+      },
+      { params: { restaurantId: "restaurant-1", branchId: "branch-1" } }
+    );
+    expect(httpClientPostMock).not.toHaveBeenCalled();
+  });
+
+  it("normalizes disabled availability and guest payment session", () => {
+    expect(normalizeGiftCardAvailabilityResponse({
+      data: { isEnabled: false, items: [] },
+    })).toEqual({ isEnabled: false, items: [] });
+
+    expect(normalizeGiftCardGuestPurchaseResponse({
+      data: {
+        transaction: { id: "txn-1" },
+        paymentSession: {
+          provider: "stripe",
+          clientSecret: "secret",
+          publishableKey: "pk_test",
+          paymentIntentId: "pi_1",
+        },
+      },
+      message: "Created",
+    })).toEqual({
+      data: {
+        transaction: { id: "txn-1" },
+        paymentSession: {
+          provider: "stripe",
+          clientSecret: "secret",
+          publishableKey: "pk_test",
+          paymentIntentId: "pi_1",
+        },
+      },
+      message: "Created",
     });
   });
 });

@@ -4,7 +4,7 @@ import {
   setStoredCheckoutTypePreference,
 } from "@/lib/checkout-type-preference";
 import type { AuthContextValue, AuthUser } from "@/types/auth";
-import type { BranchOrderType, BranchTemporaryClosure, NearbyBranch } from "@/types/branches";
+import type { BranchOrderType, BranchScheduleTimings, BranchTemporaryClosure, NearbyBranch } from "@/types/branches";
 import type { BranchApiResponse, BranchRecord } from "@/types/branch-selector";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -66,6 +66,24 @@ const normalizeOpeningHours = (value: unknown): NonNullable<BranchRecord["settin
   }));
 };
 
+const normalizeScheduleTimings = (value: unknown): BranchScheduleTimings | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    ...value,
+    deliveryIntervalMinutes: typeof value.deliveryIntervalMinutes === "number" || typeof value.deliveryIntervalMinutes === "string" || value.deliveryIntervalMinutes === null
+      ? value.deliveryIntervalMinutes
+      : undefined,
+    pickupIntervalMinutes: typeof value.pickupIntervalMinutes === "number" || typeof value.pickupIntervalMinutes === "string" || value.pickupIntervalMinutes === null
+      ? value.pickupIntervalMinutes
+      : undefined,
+    openingHours: normalizeOpeningHours(value.openingHours),
+    deliveryHours: normalizeOpeningHours(value.deliveryHours),
+  };
+};
+
 const normalizeTemporaryClosure = (value: unknown): BranchTemporaryClosure | null => {
   if (!isRecord(value)) {
     return null;
@@ -93,6 +111,7 @@ const normalizeBranchSettings = (value: unknown): BranchRecord["settings"] | und
           .filter((orderType): orderType is BranchOrderType => Boolean(orderType))
       : undefined,
     deliveryConfig: value.deliveryConfig,
+    scheduleTimings: normalizeScheduleTimings(value.scheduleTimings),
     temporaryClosure: normalizeTemporaryClosure(value.temporaryClosure),
     tableReservationsEnabled: getBoolean(value.tableReservationsEnabled),
     openingHours: normalizeOpeningHours(value.openingHours),
@@ -129,13 +148,24 @@ export const normalizeBranch = (value: unknown): BranchRecord | null => {
     return null;
   }
 
+  const rootScheduleTimings = normalizeScheduleTimings(value.scheduleTimings);
+  const settings = normalizeBranchSettings(value.settings);
+
   return {
     id,
     name,
     isActive: getBoolean(value.isActive),
     restaurantId: getString(value.restaurantId) ?? null,
     address: normalizeBranchAddress(value.address),
-    settings: normalizeBranchSettings(value.settings),
+    settings: {
+      ...settings,
+      openingHours: settings?.openingHours ?? rootScheduleTimings?.openingHours,
+      deliveryHours: settings?.deliveryHours ?? rootScheduleTimings?.deliveryHours,
+      scheduleTimings: settings?.scheduleTimings ?? rootScheduleTimings,
+      tableReservationsEnabled:
+        settings?.tableReservationsEnabled ?? getBoolean(value.tableReservationsEnabled),
+    },
+    scheduleTimings: rootScheduleTimings ?? settings?.scheduleTimings ?? null,
     distanceKm: getNullableNumber(value.distanceKm),
     availability: normalizeAvailability(value.availability),
   };

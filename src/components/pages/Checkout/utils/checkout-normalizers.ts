@@ -160,6 +160,19 @@ export const hasBackendError = (res: unknown) => {
 const getModifierPriceFromGroups = (cartItem: ApiRecord, modifierId: string) => {
   const menuItem = asRecord(cartItem.menuItem);
   const category = asRecord(menuItem.category);
+  const flatModifiers = [
+    ...normalizeArray<ApiRecord>(menuItem.modifiers),
+    ...normalizeArray<ApiRecord>(category.modifiers),
+  ];
+  const flatModifier = flatModifiers.find(({ id }) => String(id || "") === modifierId);
+
+  if (flatModifier) {
+    return {
+      name: getStringValue(flatModifier.name, "Add-on"),
+      unitPrice: toNumber(flatModifier.priceDelta, 0),
+    };
+  }
+
   const modifierGroups = [
     ...normalizeArray<ApiRecord>(menuItem.modifierGroups),
     ...normalizeArray<ApiRecord>(category.modifierGroups),
@@ -413,7 +426,7 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
     quantity,
     name: type === "DEAL"
       ? getStringValue(deal.title || item.name, "Deal")
-      : getStringValue(menuItem.name, "Untitled Item"),
+      : getStringValue(menuItem.name || item.name || item.menuItemName, "Untitled Item"),
     price: unitPriceWithModifiers,
     unitPrice: itemUnitPrice,
     itemUnitPrice,
@@ -422,10 +435,10 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
     lineTotal,
     desc: type === "DEAL"
       ? getStringValue(deal.description)
-      : getStringValue(menuItem.description),
+      : getStringValue(menuItem.description || item.description),
     img: type === "DEAL"
       ? getStringValue(deal.imageUrl)
-      : getStringValue(menuItem.imageUrl),
+      : getStringValue(menuItem.imageUrl || item.imageUrl),
     selectedVariationName: dealId
       ? ""
       : getStringValue(selectedVariation.displayText || selectedVariation.name),
@@ -634,6 +647,25 @@ export const getAppliedPromotionDiscountLine = (
   };
 };
 
+const isQuoteRecord = (record: ApiRecord) =>
+  "subtotal" in record ||
+  "totalAmount" in record ||
+  "payableAmount" in record ||
+  "deliveryFee" in record ||
+  "taxAmount" in record ||
+  "chargeBreakdown" in record ||
+  "appliedPromotion" in record;
+
+const isDisplayCartItemRecord = (item: ApiRecord) =>
+  Boolean(
+    item.id ||
+      item.cartItemId ||
+      item.deal ||
+      item.menuItem ||
+      Array.isArray(item.selectedModifiers) ||
+      Array.isArray(item.selectedSections)
+  );
+
 export const normalizeCartResponse = (res: unknown): CartResponse => {
   const record = asRecord(res);
   const data = asRecord(record.data);
@@ -646,9 +678,11 @@ export const normalizeCartResponse = (res: unknown): CartResponse => {
       : cartData.items || cartData.quote
         ? cartData
         : data;
+  const items = normalizeArray<ApiRecord>(cart.items);
+  const hasDisplayCartItems = items.some(isDisplayCartItemRecord);
 
   return {
-    items: normalizeArray<ApiRecord>(cart.items),
-    quote: normalizeCartQuote(cart.quote),
+    items: hasDisplayCartItems ? items : [],
+    quote: normalizeCartQuote(cart.quote) ?? (isQuoteRecord(cart) ? normalizeCartQuote(cart) : null),
   };
 };
