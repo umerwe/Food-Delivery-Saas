@@ -129,7 +129,14 @@ const PrivacyPage = () => {
   const legalAddress = useMemo(() => {
     const address = policy?.legalProfile?.businessAddress;
 
-    return [address?.street, address?.city, address?.state, address?.country]
+    return [
+      address?.street,
+      address?.shopNumber,
+      address?.postalCode,
+      address?.city,
+      address?.state,
+      address?.country,
+    ]
       .filter(Boolean)
       .join(", ");
   }, [policy?.legalProfile?.businessAddress]);

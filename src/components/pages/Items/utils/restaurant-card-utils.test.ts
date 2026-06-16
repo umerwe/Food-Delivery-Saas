@@ -116,6 +116,65 @@ describe("restaurant card utils", () => {
     expect(summary.deliveryMatchesOpeningToday).toBe(true);
   });
 
+  it("uses opening hours when today's delivery hours are closed", () => {
+    const dayKeys = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const today = dayKeys[new Date().getDay()];
+
+    const summary = getBranchHoursSummary({
+      settings: {
+        openingHours: [
+          { dayOfWeek: today, openTime: "09:00", closeTime: "18:00" },
+        ],
+        deliveryHours: [
+          { dayOfWeek: today, isClosed: true, openTime: null, closeTime: null },
+        ],
+      },
+    });
+
+    expect(summary.opening).toMatchObject({
+      label: "Today",
+      value: "9:00 AM - 6:00 PM",
+    });
+    expect(summary.delivery).toMatchObject({
+      label: "Today",
+      value: "9:00 AM - 6:00 PM",
+    });
+    expect(summary.showDeliveryHoursCard).toBe(false);
+  });
+
+  it("uses today's holiday opening hours before regular branch hours", () => {
+    const todayDate = new Date();
+    const todayValue = [
+      todayDate.getFullYear(),
+      String(todayDate.getMonth() + 1).padStart(2, "0"),
+      String(todayDate.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    const summary = getBranchHoursSummary({
+      scheduleTimings: {
+        openingHours: [
+          { dayOfWeek: "MONDAY", openTime: "09:00", closeTime: "18:00" },
+        ],
+        deliveryHours: [
+          { dayOfWeek: "MONDAY", openTime: "10:00", closeTime: "22:00" },
+        ],
+        holidayOpeningHours: [
+          { date: todayValue, openTime: "10:00", closeTime: "14:00" },
+        ],
+      },
+    });
+
+    expect(summary.opening).toMatchObject({
+      label: "Today",
+      value: "10:00 AM - 2:00 PM",
+    });
+    expect(summary.delivery).toMatchObject({
+      label: "Today",
+      value: "10:00 AM - 2:00 PM",
+    });
+    expect(summary.showDeliveryHoursCard).toBe(false);
+  });
+
   it("formats branch break times for the enriched hours popup", () => {
     expect(
       getBranchHoursDetails([

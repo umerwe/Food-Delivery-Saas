@@ -56,6 +56,18 @@ describe("branch selector helpers", () => {
 
   it("formats branch address from known address parts", () => {
     expect(formatBranchAddress(nearbyBranch)).toBe("Main Road, Karachi, Pakistan");
+    expect(
+      formatBranchAddress({
+        address: {
+          street: "21",
+          shopNumber: "dha 5",
+          postalCode: "46330",
+          city: "Rawalpindi",
+          state: "Punjab",
+          country: "Pakistan",
+        },
+      })
+    ).toBe("21, dha 5, 46330, Rawalpindi, Punjab, Pakistan");
   });
 
   it("keeps selected branch persistence shape compatible", () => {

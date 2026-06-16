@@ -13,12 +13,15 @@ export type BranchScheduleTimings = {
   pickupIntervalMinutes?: number | string | null;
   openingHours?: BranchHours[];
   deliveryHours?: BranchHours[];
+  holidayOpeningHours?: BranchHolidayHours[];
   [key: string]: unknown;
 };
 
 export type BranchAddress = {
   id?: string;
   street?: string | null;
+  shopNumber?: string | null;
+  houseNumber?: string | null;
   area?: string | null;
   city?: string | null;
   state?: string | null;
@@ -36,6 +39,7 @@ export type BranchSettings = {
   tableReservationsEnabled?: boolean;
   openingHours?: BranchHours[];
   deliveryHours?: BranchHours[];
+  holidayOpeningHours?: BranchHolidayHours[];
   holidayRanges?: unknown[];
   reservationDateRanges?: unknown[];
   tableReservationDateRanges?: unknown[];
@@ -45,6 +49,7 @@ export type BranchSettings = {
 
 export type BranchHours = {
   dayOfWeek?: string;
+  date?: string;
   isClosed?: boolean;
   openTime?: string;
   closeTime?: string;
@@ -53,6 +58,10 @@ export type BranchHours = {
     endTime?: string;
     note?: string;
   }>;
+};
+
+export type BranchHolidayHours = Omit<BranchHours, "dayOfWeek"> & {
+  date?: string;
 };
 
 export type NearbyBranch = {

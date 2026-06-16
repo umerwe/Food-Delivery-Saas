@@ -2,6 +2,8 @@ import { getRequest } from "@/services/http";
 
 type LegalAddress = {
   street?: string;
+  shopNumber?: string;
+  postalCode?: string;
   city?: string;
   state?: string;
   country?: string;
@@ -36,6 +38,13 @@ const normalizeLegalAddress = (value: unknown): LegalAddress | undefined => {
 
   const address = {
     street: getString(value.street),
+    shopNumber:
+      getString(value.shopNumber) ??
+      getString(value.houseNumber) ??
+      getString(value.area) ??
+      getString(value.addressLine2) ??
+      getString(value.line2),
+    postalCode: getString(value.postalCode) ?? getString(value.zipCode) ?? getString(value.zip),
     city: getString(value.city),
     state: getString(value.state),
     country: getString(value.country),

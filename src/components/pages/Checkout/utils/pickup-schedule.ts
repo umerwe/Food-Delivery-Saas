@@ -4,6 +4,7 @@ const DEFAULT_SLOT_INTERVAL_MINUTES = 30;
 
 type OpeningHours = {
   dayOfWeek?: string;
+  date?: string;
   isClosed?: boolean;
   openTime?: string;
   closeTime?: string;
@@ -17,7 +18,7 @@ type OpeningHours = {
 type PickupSchedule = {
   schedule: OpeningHours | null;
   hasOpeningHours: boolean;
-  source: "opening" | "delivery" | null;
+  source: "opening" | "delivery" | "holiday" | null;
 };
 
 export type PickupTimeSlot = {
@@ -220,13 +221,49 @@ const getRecord = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
+const getScheduleTimingsRecord = (
+  branch: BranchRecord | null | undefined
+) => {
+  const branchTimings = getRecord(branch?.scheduleTimings);
+  const settingsTimings = getRecord(branch?.settings?.scheduleTimings);
+
+  return branchTimings ?? settingsTimings;
+};
+
+const getHolidayOpeningHours = (
+  branch: BranchRecord | null | undefined
+) => {
+  const scheduleTimings = getScheduleTimingsRecord(branch);
+
+  return normalizeArray<OpeningHours>(
+    branch?.settings?.holidayOpeningHours ?? scheduleTimings?.holidayOpeningHours
+  );
+};
+
+const getHolidayScheduleForDate = ({
+  branch,
+  dateValue,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+}) =>
+  getHolidayOpeningHours(branch).find((hour) => {
+    return String(hour?.date || "").trim() === dateValue;
+  }) ?? null;
+
+const isUsableSchedule = (schedule: OpeningHours | null | undefined) =>
+  Boolean(
+    schedule &&
+      !schedule.isClosed &&
+      timeToMinutes(schedule.openTime) !== null &&
+      timeToMinutes(schedule.closeTime) !== null
+  );
+
 const getScheduleIntervalMinutes = (
   branch: BranchRecord | null | undefined,
   scheduleType: "pickup" | "delivery"
 ) => {
-  const branchTimings = getRecord(branch?.scheduleTimings);
-  const settingsTimings = getRecord(branch?.settings?.scheduleTimings);
-  const scheduleTimings = branchTimings ?? settingsTimings;
+  const scheduleTimings = getScheduleTimingsRecord(branch);
   const intervalValue =
     scheduleType === "delivery"
       ? scheduleTimings?.deliveryIntervalMinutes
@@ -285,42 +322,57 @@ export const getBranchScheduleForDate = ({
   dateValue: string;
   scheduleType: "pickup" | "delivery";
 }): PickupSchedule => {
-  const scheduleTimings = getRecord(branch?.scheduleTimings);
+  const scheduleTimings = getScheduleTimingsRecord(branch);
   const openingHours = normalizeArray<OpeningHours>(
     branch?.settings?.openingHours ?? scheduleTimings?.openingHours
   );
   const deliveryHours = normalizeArray<OpeningHours>(
     branch?.settings?.deliveryHours ?? scheduleTimings?.deliveryHours
   );
-  const scheduleHours =
-    scheduleType === "delivery" && deliveryHours.length > 0
-      ? deliveryHours
-      : openingHours;
-  const source =
-    scheduleType === "delivery" && deliveryHours.length > 0
-      ? "delivery"
-      : openingHours.length > 0
-        ? "opening"
-        : null;
+  const holidaySchedule = getHolidayScheduleForDate({ branch, dateValue });
 
-  if (!scheduleHours.length) {
+  if (holidaySchedule) {
+    return {
+      schedule: holidaySchedule,
+      hasOpeningHours: true,
+      source: "holiday",
+    };
+  }
+
+  if (!openingHours.length && !deliveryHours.length) {
     return {
       schedule: null,
       hasOpeningHours: false,
-      source,
+      source: null,
     };
   }
 
   const selectedDay = getDayOfWeek(dateValue);
-  const schedule =
-    scheduleHours.find((hour) => {
+  const openingSchedule =
+    openingHours.find((hour) => {
+      return String(hour?.dayOfWeek || "").trim().toUpperCase() === selectedDay;
+    }) || null;
+  const deliverySchedule =
+    deliveryHours.find((hour) => {
       return String(hour?.dayOfWeek || "").trim().toUpperCase() === selectedDay;
     }) || null;
 
+  if (scheduleType === "delivery") {
+    const schedule = isUsableSchedule(deliverySchedule)
+      ? deliverySchedule
+      : openingSchedule;
+
+    return {
+      schedule,
+      hasOpeningHours: openingHours.length > 0 || deliveryHours.length > 0,
+      source: schedule === deliverySchedule ? "delivery" : openingSchedule ? "opening" : null,
+    };
+  }
+
   return {
-    schedule,
-    hasOpeningHours: true,
-    source,
+    schedule: openingSchedule,
+    hasOpeningHours: openingHours.length > 0,
+    source: openingSchedule ? "opening" : null,
   };
 };
 

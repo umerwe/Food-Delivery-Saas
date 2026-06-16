@@ -35,6 +35,8 @@ const normalizeBranchAddress = (value: unknown): BranchRecord["address"] | undef
   return {
     id: getString(value.id),
     street: getNullableString(value.street),
+    shopNumber: getNullableString(value.shopNumber),
+    houseNumber: getNullableString(value.houseNumber),
     area: getNullableString(value.area),
     city: getNullableString(value.city),
     state: getNullableString(value.state),
@@ -52,6 +54,7 @@ const normalizeOpeningHours = (value: unknown): NonNullable<BranchRecord["settin
 
   return value.filter(isRecord).map((entry) => ({
     dayOfWeek: getString(entry.dayOfWeek),
+    date: getString(entry.date),
     isClosed: getBoolean(entry.isClosed),
     openTime: getString(entry.openTime),
     closeTime: getString(entry.closeTime),
@@ -81,6 +84,7 @@ const normalizeScheduleTimings = (value: unknown): BranchScheduleTimings | null 
       : undefined,
     openingHours: normalizeOpeningHours(value.openingHours),
     deliveryHours: normalizeOpeningHours(value.deliveryHours),
+    holidayOpeningHours: normalizeOpeningHours(value.holidayOpeningHours),
   };
 };
 
@@ -116,6 +120,7 @@ const normalizeBranchSettings = (value: unknown): BranchRecord["settings"] | und
     tableReservationsEnabled: getBoolean(value.tableReservationsEnabled),
     openingHours: normalizeOpeningHours(value.openingHours),
     deliveryHours: normalizeOpeningHours(value.deliveryHours),
+    holidayOpeningHours: normalizeOpeningHours(value.holidayOpeningHours),
   };
 };
 
@@ -161,6 +166,8 @@ export const normalizeBranch = (value: unknown): BranchRecord | null => {
       ...settings,
       openingHours: settings?.openingHours ?? rootScheduleTimings?.openingHours,
       deliveryHours: settings?.deliveryHours ?? rootScheduleTimings?.deliveryHours,
+      holidayOpeningHours:
+        settings?.holidayOpeningHours ?? rootScheduleTimings?.holidayOpeningHours,
       scheduleTimings: settings?.scheduleTimings ?? rootScheduleTimings,
       tableReservationsEnabled:
         settings?.tableReservationsEnabled ?? getBoolean(value.tableReservationsEnabled),
@@ -286,14 +293,21 @@ export const branchSupportsDelivery = (branch: Pick<BranchRecord, "settings"> | 
   branch.settings?.allowedOrderTypes?.includes("DELIVERY") ?? false;
 
 export function formatBranchAddress(branch: Pick<BranchRecord, "address"> | NearbyBranch) {
+  const shopOrHouse = branch.address?.shopNumber ?? branch.address?.houseNumber;
+  const area =
+    branch.address?.area && branch.address.area !== shopOrHouse
+      ? branch.address.area
+      : null;
+
   return (
     [
       branch.address?.street,
-      branch.address?.area,
+      shopOrHouse,
+      branch.address?.postalCode,
       branch.address?.city,
+      area,
       branch.address?.state,
       branch.address?.country,
-      branch.address?.postalCode,
     ]
       .filter(Boolean)
       .join(", ") || "Branch location available"

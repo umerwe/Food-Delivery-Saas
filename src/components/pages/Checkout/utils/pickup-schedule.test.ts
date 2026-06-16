@@ -6,6 +6,7 @@ import {
   buildPickupTimeSlots,
   buildScheduledDeliveryEstimate,
   buildScheduleBreakLabels,
+  getBranchScheduleForDate,
   getPickupScheduleForDate,
 } from "@/components/pages/Checkout/utils/pickup-schedule";
 import type { BranchRecord } from "@/types/branch-selector";
@@ -144,6 +145,102 @@ describe("pickup schedule helpers", () => {
     ).toEqual([
       { value: "10:00", label: "10:00 AM" },
       { value: "10:30", label: "10:30 AM" },
+    ]);
+  });
+
+  it("falls back to opening hours for delivery when selected delivery day is closed", () => {
+    const branch: BranchRecord = {
+      id: "branch-1",
+      name: "Main",
+      settings: {
+        openingHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "09:00",
+            closeTime: "10:00",
+          },
+        ],
+        deliveryHours: [
+          {
+            dayOfWeek: "MONDAY",
+            isClosed: true,
+            openTime: undefined,
+            closeTime: undefined,
+          },
+        ],
+      },
+    };
+
+    expect(
+      getBranchScheduleForDate({
+        branch,
+        dateValue: "2030-06-17",
+        scheduleType: "delivery",
+      })
+    ).toMatchObject({
+      source: "opening",
+    });
+    expect(
+      buildDeliveryTimeSlots({
+        branch,
+        dateValue: "2030-06-17",
+      })
+    ).toEqual([
+      { value: "09:00", label: "9:00 AM" },
+      { value: "09:30", label: "9:30 AM" },
+    ]);
+  });
+
+  it("uses holiday opening hours before regular pickup and delivery hours", () => {
+    const branch: BranchRecord = {
+      id: "branch-1",
+      name: "Main",
+      scheduleTimings: {
+        deliveryIntervalMinutes: 15,
+        pickupIntervalMinutes: 20,
+        openingHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "09:00",
+            closeTime: "18:00",
+          },
+        ],
+        deliveryHours: [
+          {
+            dayOfWeek: "MONDAY",
+            isClosed: true,
+          },
+        ],
+        holidayOpeningHours: [
+          {
+            date: "2030-06-17",
+            openTime: "10:00",
+            closeTime: "11:00",
+          },
+        ],
+      },
+    };
+
+    expect(
+      buildPickupTimeSlots({
+        branch,
+        dateValue: "2030-06-17",
+      })
+    ).toEqual([
+      { value: "10:00", label: "10:00 AM" },
+      { value: "10:20", label: "10:20 AM" },
+      { value: "10:40", label: "10:40 AM" },
+    ]);
+    expect(
+      buildDeliveryTimeSlots({
+        branch,
+        dateValue: "2030-06-17",
+      })
+    ).toEqual([
+      { value: "10:00", label: "10:00 AM" },
+      { value: "10:15", label: "10:15 AM" },
+      { value: "10:30", label: "10:30 AM" },
+      { value: "10:45", label: "10:45 AM" },
     ]);
   });
 

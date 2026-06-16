@@ -7,6 +7,7 @@ export type AuthBranch = {
   restaurantId?: string | null;
   address?: BranchAddress;
   settings?: BranchSettings | null;
+  tableReservationsEnabled?: boolean;
   distanceKm?: number | null;
   selectedOrderType?: BranchOrderType;
 };

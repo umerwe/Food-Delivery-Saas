@@ -11,7 +11,7 @@ import useBranches from "@/hooks/useBranches";
 import { getStoredAuthState } from "@/lib/auth";
 import { OpeningHoursDialog } from "@/components/common/popups/OpeningHoursDialog";
 import type { AuthRestaurantUser, ItemsCategory, StoredAuthState } from "@/components/pages/Items/types";
-import { getBranchHoursDetails, getBranchHoursSummary, getCurrentBranchHoursDetail, getImageUrl, getOperatingHours, getRatingInfo, getRestaurantAddress, getRestaurantName, hasText, resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
+import { formatAddress, getBranchHoursDetails, getBranchHoursSummary, getCurrentBranchHoursDetail, getImageUrl, getOperatingHours, getRatingInfo, getRestaurantAddress, getRestaurantName, hasText, resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
 import type { BranchRecord } from "@/types/branch-selector";
 
 const CATEGORY_PAGE_LIMIT = 50;
@@ -178,10 +178,11 @@ export default function RestaurantHeader() {
 
         const branchHours = getBranchHoursSummary(selectedBranch);
         const reservationEnabled = selectedBranch?.settings?.tableReservationsEnabled === true;
+        const selectedBranchAddress = formatAddress(selectedBranch?.address);
 
         const resolvedRestaurant = {
           name: getRestaurantName(user as AuthRestaurantUser | null, storedAuth),
-          address: getRestaurantAddress(user as AuthRestaurantUser | null, storedAuth),
+          address: selectedBranchAddress || getRestaurantAddress(user as AuthRestaurantUser | null, storedAuth),
           operatingHours: branchHours.opening.status !== "unknown"
             ? t("hoursAvailable")
             : getOperatingHours(user as AuthRestaurantUser | null, storedAuth),

@@ -16,6 +16,8 @@ describe("legal content service", () => {
           taxNumber: "VAT-123456789",
           businessAddress: {
             street: "Street 12",
+            shopNumber: "Shop 4",
+            postalCode: "54000",
             city: "Lahore",
             state: "Punjab",
             country: "Pakistan",
@@ -35,6 +37,8 @@ describe("legal content service", () => {
         taxNumber: "VAT-123456789",
         businessAddress: {
           street: "Street 12",
+          shopNumber: "Shop 4",
+          postalCode: "54000",
           city: "Lahore",
           state: "Punjab",
           country: "Pakistan",

@@ -7,6 +7,11 @@ import useOrders from "@/hooks/useOrders";
 import { useAuthContext } from "@/hooks/useAuth";
 import OrderSummary from "@/components/pages/Order/components/OrderSummary";
 import { useTranslations } from "next-intl";
+import {
+  getOrderProgressStep,
+  getOrderProgressStepKeys,
+  type OrderProgressStepKey,
+} from "@/components/pages/Order/order-status-progress";
 
 function OrderStatusContent() {
   const t = useTranslations("orderStatus");
@@ -51,15 +56,7 @@ function OrderStatusContent() {
     fetchOrder();
   }, [fetchOrderById, orderId, token]);
 
-  const statusMap: Record<string, number> = {
-    PLACED: 1,
-    CONFIRMED: 2,
-    PREPARING: 3,
-    PICKED_UP: 4,
-    DELIVERED: 5,
-  };
-
-  const currentStep = statusMap[order?.status || ""] || 1;
+  const currentStep = getOrderProgressStep(order?.status, order?.orderType);
 
   const getOrderTypeLabel = (value?: string | null) => {
     switch (String(value || "").toUpperCase()) {
@@ -74,13 +71,11 @@ function OrderStatusContent() {
     }
   };
 
-  const orderSteps = [
-    { id: 1, title: t("steps.placedTitle"), desc: t("steps.placedDescription") },
-    { id: 2, title: t("steps.confirmedTitle"), desc: t("steps.confirmedDescription") },
-    { id: 3, title: t("steps.preparingTitle"), desc: t("steps.preparingDescription") },
-    { id: 4, title: t("steps.pickedUpTitle"), desc: t("steps.pickedUpDescription") },
-    { id: 5, title: t("steps.deliveredTitle"), desc: t("steps.deliveredDescription") },
-  ].map((step) => ({
+  const orderSteps = getOrderProgressStepKeys(order?.orderType).map((key, index) => ({
+    id: index + 1,
+    title: t(`steps.${key}Title` as `steps.${OrderProgressStepKey}Title`),
+    desc: t(`steps.${key}Description` as `steps.${OrderProgressStepKey}Description`),
+  })).map((step) => ({
     ...step,
     active: step.id <= currentStep,
   }));

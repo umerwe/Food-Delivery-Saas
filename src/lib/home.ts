@@ -8,6 +8,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const getString = (value: unknown) => (typeof value === "string" ? value : undefined);
 
+const getBoolean = (value: unknown) => (typeof value === "boolean" ? value : undefined);
+
 const getNumberOrString = (value: unknown) => {
   if (typeof value === "number" || typeof value === "string") {
     return value;
@@ -93,3 +95,22 @@ export const normalizePromotions = (response: unknown): PromotionCampaign[] =>
 export const isLandingPopup = (value: unknown): value is LandingPopup => isRecord(value);
 
 export const isHomeBranch = (value: unknown): value is HomeBranch => isRecord(value);
+
+export const resolveTableReservationsEnabled = (
+  homeBranch?: HomeBranch | null,
+  sessionBranch?: AuthUser["branch"] | null
+) => {
+  const homeFlag =
+    getBoolean(homeBranch?.tableReservationsEnabled) ??
+    getBoolean(homeBranch?.settings?.tableReservationsEnabled);
+
+  if (homeFlag !== undefined) {
+    return homeFlag;
+  }
+
+  return (
+    getBoolean(sessionBranch?.tableReservationsEnabled) ??
+    getBoolean(sessionBranch?.settings?.tableReservationsEnabled) ??
+    false
+  );
+};

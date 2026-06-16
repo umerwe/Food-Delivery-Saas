@@ -69,6 +69,15 @@ const getTextField = (record: unknown, keys: string[]) => {
   return null;
 };
 
+const getNestedTextField = (record: unknown, keys: string[]) => {
+  const directValue = getTextField(record, keys);
+
+  if (directValue) return directValue;
+  if (!isRecord(record)) return null;
+
+  return getTextField(record.contactInfo, keys);
+};
+
 const getAddressRecord = (value: unknown) => {
   if (!isRecord(value)) return null;
 
@@ -84,13 +93,23 @@ const formatRealAddress = (value: unknown) => {
 
   if (!address) return "";
 
+  const shopOrHouse = getTextField(address, [
+    "shopNumber",
+    "houseNumber",
+    "addressLine2",
+    "line2",
+  ]);
+  const area = getTextField(address, ["area", "district", "neighborhood"]);
+  const shouldShowArea = area && area !== shopOrHouse;
+
   return [
     getTextField(address, ["street", "addressLine1", "line1", "address"]),
-    getTextField(address, ["area", "district", "neighborhood"]),
+    shopOrHouse,
+    getTextField(address, ["postalCode", "zipCode", "zip"]),
     getTextField(address, ["city"]),
+    shouldShowArea ? area : null,
     getTextField(address, ["state", "province", "region"]),
     getTextField(address, ["country"]),
-    getTextField(address, ["postalCode", "zipCode", "zip"]),
   ]
     .filter(Boolean)
     .join(", ");
@@ -149,11 +168,8 @@ export const Footer = () => {
     formatRealAddress(homeData?.branch) ||
     (branch?.address ? formatRealAddress(branch.address) : "");
   const branchPhone =
-    getTextField(homeData?.branch, ["phone", "phoneNumber", "contactPhone", "contactNumber", "mobile"]) ||
-    getTextField(restaurant, ["phone", "phoneNumber", "contactPhone", "contactNumber", "mobile"]);
-  const branchEmail =
-    getTextField(homeData?.branch, ["email", "contactEmail", "supportEmail"]) ||
-    getTextField(restaurant, ["email", "contactEmail", "supportEmail"]);
+    getNestedTextField(homeData?.branch, ["phone", "phoneNumber", "contactPhone", "contactNumber", "mobile"]) ||
+    getNestedTextField(restaurant, ["phone", "phoneNumber", "contactPhone", "contactNumber", "mobile"]);
   const socialLinks = buildSocialLinks(restaurant?.socialMediaLinks);
   const privacyHref = restaurantId
     ? `/privacy?restaurantId=${encodeURIComponent(restaurantId)}`
@@ -300,38 +316,6 @@ export const Footer = () => {
                 </p>
               ) : null}
 
-              {branchEmail ? (
-                <p className="text-white font-medium">
-                  {t("email")} :{" "}
-                  <a
-                    href={`mailto:${branchEmail}`}
-                    className="text-gray-300 font-normal transition-colors hover:text-primary"
-                  >
-                    {branchEmail}
-                  </a>
-                </p>
-              ) : null}
-
-              {socialLinks.length > 0 ? (
-                <p className="text-white font-medium">
-                  {t("followUs")} :{" "}
-                  <span className="inline-flex flex-wrap gap-x-2 gap-y-1 text-gray-300 font-normal">
-                    {socialLinks.map((link, index) => (
-                      <span key={link.key}>
-                        <Link
-                          href={link.href}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="transition-colors hover:text-primary"
-                        >
-                          {link.label}
-                        </Link>
-                        {index < socialLinks.length - 1 ? "," : ""}
-                      </span>
-                    ))}
-                  </span>
-                </p>
-              ) : null}
             </div>
           </div>
         </div>
