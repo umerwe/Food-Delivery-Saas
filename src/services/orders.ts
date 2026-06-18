@@ -1,7 +1,15 @@
 import { createDomainApiService } from "@/services/domain-api";
 import type { ApiResult } from "@/services/http";
 
-export type OrderStatus = "PLACED" | "CONFIRMED" | "PREPARING" | "PICKED_UP" | "DELIVERED" | "CANCELLED" | string;
+export type OrderStatus =
+  | "PLACED"
+  | "CONFIRMED"
+  | "PREPARING"
+  | "PICKED_UP"
+  | "DELIVERED"
+  | "SERVED"
+  | "CANCELLED"
+  | string;
 
 export type OrderMenuItem = {
   id?: string | number | null;
@@ -21,18 +29,62 @@ export type OrderItem = {
 };
 
 export type OrderReview = {
+  id?: string;
+  orderId?: string;
   rating: number;
+  comment?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type OrderBranch = {
   id?: string | number | null;
   name?: string | null;
+  logoUrl?: string | null;
+  coverImage?: string | null;
+};
+
+export type OrderRestaurant = {
+  id?: string | number | null;
+  name?: string | null;
+  slug?: string | null;
+  logoUrl?: string | null;
+  coverImage?: string | null;
+};
+
+export type OrderDeliveryAddress = {
+  id?: string | number | null;
+  street?: string | null;
+  area?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  houseNumber?: string | null;
+};
+
+export type OrderTransaction = {
+  id: string;
+  orderId?: string | null;
+  paymentMethod?: string | null;
+  type?: string | null;
+  status?: string | null;
+  amount?: number | string | null;
+  currency?: string | null;
+  providerRef?: string | null;
+  note?: string | null;
+  processedAt?: string | null;
+  createdAt?: string | null;
 };
 
 export type Order = {
   id: string;
   orderType?: string | null;
   status: OrderStatus;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  orderTime?: string | null;
+  isScheduled?: boolean | null;
   subtotal?: number | string | null;
   deliveryFee?: number | string | null;
   taxAmount?: number | string | null;
@@ -45,7 +97,10 @@ export type Order = {
   totalAmount?: number | string | null;
   items?: OrderItem[];
   itemsPreview?: OrderItem[];
+  restaurant?: OrderRestaurant | null;
   branch?: OrderBranch | null;
+  deliveryAddress?: OrderDeliveryAddress | null;
+  transactions?: OrderTransaction[];
   createdAt: string;
   review?: OrderReview | null;
 };
@@ -67,6 +122,34 @@ export type ReorderPayload = {
 
 export type DirectOrderPayload = Record<string, unknown> & {
   tipAmount?: number;
+};
+
+export type SubmitOrderReviewPayload = {
+  rating: number;
+  comment?: string;
+};
+
+export const canReviewOrder = (order: Pick<Order, "orderType" | "status" | "review">) => {
+  if (order.review) {
+    return false;
+  }
+
+  const orderType = String(order.orderType || "").toUpperCase();
+  const status = String(order.status || "").toUpperCase();
+
+  if (orderType === "DELIVERY") {
+    return status === "DELIVERED";
+  }
+
+  if (orderType === "TAKEAWAY" || orderType === "PICKUP") {
+    return status === "PICKED_UP";
+  }
+
+  if (orderType === "DINE_IN" || orderType === "DINEIN" || orderType === "TABLE") {
+    return status === "SERVED";
+  }
+
+  return false;
 };
 
 const ordersService = createDomainApiService();
@@ -139,3 +222,13 @@ export const addCartItemForReorder = ({
   payload: ReorderPayload;
   token?: string | null;
 }) => postOrders(`/v1/cart/items?customerId=${customerId}`, payload, token);
+
+export const submitOrderReview = ({
+  orderId,
+  payload,
+  token,
+}: {
+  orderId: string;
+  payload: SubmitOrderReviewPayload;
+  token?: string | null;
+}) => postOrders(`/v1/orders/${orderId}/review`, payload, token);

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveTableReservationsEnabled } from "@/lib/home";
+import { resolveHomeRestaurantId, resolveTableReservationsEnabled } from "@/lib/home";
+import type { AuthUser } from "@/types/auth";
+
+const baseUser: AuthUser = {
+  id: "customer-1",
+  email: "customer@example.com",
+  role: "CUSTOMER",
+  tenantId: "tenant-1",
+};
 
 describe("home helpers", () => {
   it("uses the live home reservation flag before stale session data", () => {
@@ -28,5 +36,19 @@ describe("home helpers", () => {
         { id: "branch-1", name: "Branch", tableReservationsEnabled: true }
       )
     ).toBe(true);
+  });
+
+  it("resolves restaurant id from the selected branch when the user is branch scoped", () => {
+    expect(
+      resolveHomeRestaurantId({
+        ...baseUser,
+        restaurantId: null,
+        branch: {
+          id: "branch-1",
+          name: "Main",
+          restaurantId: "restaurant-from-branch",
+        },
+      })
+    ).toBe("restaurant-from-branch");
   });
 });

@@ -37,8 +37,10 @@ export const resolveHomeRestaurantId = (user?: AuthUser | null, authRestaurantId
 
   return (
     storedUser?.restaurantId ??
+    storedUser?.branch?.restaurantId ??
     authRestaurantId ??
     user?.restaurantId ??
+    user?.branch?.restaurantId ??
     user?.tenantId ??
     ""
   );

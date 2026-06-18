@@ -6,6 +6,7 @@ import { queryKeys } from "@/config/query-keys";
 import { useDomainApi } from "@/hooks/useDomainApi";
 import {
   deletePayments,
+  createOrderPaymentAttempt,
   fetchPaymentsPage,
   fetchWallet,
   getPayments,
@@ -31,13 +32,20 @@ export const usePayments = (token: string | null) => {
 
   const getWallet = useCallback(() => fetchWallet(token), [token]);
 
+  const startOrderPaymentAttempt = useCallback(
+    (args: Parameters<typeof createOrderPaymentAttempt>[0]) =>
+      createOrderPaymentAttempt({ ...args, token }),
+    [token]
+  );
+
   return useMemo(
     () => ({
       ...api,
       fetchPaymentsPage: getPaymentsPage,
       fetchWallet: getWallet,
+      createOrderPaymentAttempt: startOrderPaymentAttempt,
     }),
-    [api, getPaymentsPage, getWallet]
+    [api, getPaymentsPage, getWallet, startOrderPaymentAttempt]
   );
 };
 

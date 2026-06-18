@@ -1,12 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import useOrders from "@/hooks/useOrders";
+import usePayments from "@/hooks/usePayments";
 import { useAuthContext } from "@/hooks/useAuth";
 import OrderSummary from "@/components/pages/Order/components/OrderSummary";
+import type { Order } from "@/services/orders";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+import { X } from "lucide-react";
+import {
+  Elements,
+  PaymentElement,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 import {
   getOrderProgressStep,
   getOrderProgressStepKeys,
@@ -15,46 +26,122 @@ import {
 
 function OrderStatusContent() {
   const t = useTranslations("orderStatus");
+  const checkoutT = useTranslations("checkout");
+  const errorT = useTranslations("errors");
   const { token } = useAuthContext();
   const { fetchOrderById } = useOrders(token);
+  const { createOrderPaymentAttempt } = usePayments(token);
 
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
+  const isSuccessView = searchParams.get("success") === "true";
 
-  const [order, setOrder] = useState<import("@/services/orders").Order | null>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [continuingPayment, setContinuingPayment] = useState(false);
+  const [stripePayment, setStripePayment] = useState({
+    open: false,
+    clientSecret: "",
+    publishableKey: "",
+    orderId: "",
+  });
 
-  useEffect(() => {
-    const fetchOrder = async () => {
-      if (!orderId) {
+  const stripePromise = useMemo(() => {
+    if (!stripePayment.publishableKey) return null;
+    return loadStripe(stripePayment.publishableKey);
+  }, [stripePayment.publishableKey]);
+
+  const resetStripePayment = () => {
+    setStripePayment({
+      open: false,
+      clientSecret: "",
+      publishableKey: "",
+      orderId: "",
+    });
+  };
+
+  const fetchOrder = useCallback(async () => {
+    if (!orderId) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setNotFound(false);
+
+      const { response: res, order: nextOrder } = await fetchOrderById({ orderId });
+
+      if (!res || res.success === false || !nextOrder) {
         setNotFound(true);
-        setLoading(false);
+        setOrder(null);
         return;
       }
 
-      try {
-        setLoading(true);
-        setNotFound(false);
+      setOrder(nextOrder);
+    } catch {
+      setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchOrderById, orderId]);
 
-        const { response: res, order: nextOrder } = await fetchOrderById({ orderId });
-
-        if (!res || res.success === false || !nextOrder) {
-          setNotFound(true);
-          setOrder(null);
-          return;
-        }
-
-        setOrder(nextOrder);
-      } catch {
-        setNotFound(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchOrder();
-  }, [fetchOrderById, orderId, token]);
+  }, [fetchOrder]);
+
+  const handleContinuePayment = async () => {
+    if (!order?.id) return;
+
+    try {
+      setContinuingPayment(true);
+
+      const attempt = await createOrderPaymentAttempt({
+        orderId: order.id,
+        payload: {
+          paymentMethod: "STRIPE",
+          currency: order.transactions?.find((transaction) => transaction.currency)?.currency || "USD",
+          note: "Retry order payment",
+        },
+      });
+
+      if (!attempt.response || attempt.response.success === false || !attempt.clientSecret || !attempt.publishableKey) {
+        toast.error(attempt.response?.message || checkoutT("toast.failedInitiatePayment"));
+        return;
+      }
+
+      setStripePayment({
+        open: true,
+        clientSecret: attempt.clientSecret,
+        publishableKey: attempt.publishableKey,
+        orderId: order.id,
+      });
+    } catch {
+      toast.error(errorT("somethingWentWrong"));
+    } finally {
+      setContinuingPayment(false);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    toast.success(checkoutT("toast.paymentSuccessful"));
+    resetStripePayment();
+    await fetchOrder();
+  };
+
+  const paymentStatus = String(order?.paymentStatus || "").toUpperCase();
+  const paymentMethod = String(order?.paymentMethod || "").toUpperCase();
+  const showSuccessNotice = !loading && order?.id && isSuccessView;
+  const successNoticeTitle =
+    paymentStatus === "PENDING" && paymentMethod === "STRIPE"
+      ? t("successNotice.paymentPendingTitle")
+      : t("successNotice.title");
+  const successNoticeDescription =
+    paymentStatus === "PENDING" && paymentMethod === "STRIPE"
+      ? t("successNotice.paymentPendingDescription")
+      : t("successNotice.description");
 
   const currentStep = getOrderProgressStep(order?.status, order?.orderType);
 
@@ -104,6 +191,18 @@ function OrderStatusContent() {
 
       {/* ================= NORMAL FLOW ================= */}
       {!notFound && (
+        <>
+        {showSuccessNotice ? (
+          <div className="mb-6 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-semibold text-emerald-700">
+              {successNoticeTitle}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-gray-500">
+              {successNoticeDescription}
+            </p>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
 
           {/* LEFT */}
@@ -191,16 +290,96 @@ function OrderStatusContent() {
 
           {/* RIGHT */}
           <div className="lg:col-span-5">
-            <OrderSummary order={order} />
-
+            <OrderSummary
+              order={order}
+              onContinuePayment={handleContinuePayment}
+              continuingPayment={continuingPayment}
+            />
           </div>
 
         </div>
+        </>
       )}
 
+      {stripePayment.open && stripePromise && stripePayment.clientSecret ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="relative max-h-[90vh] w-[min(420px,100%)] overflow-auto rounded-2xl bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.22)]">
+            <button
+              type="button"
+              onClick={resetStripePayment}
+              className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              aria-label={t("closePaymentPopup")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h2 className="mb-2 pr-10 text-lg font-semibold">
+              {t("completePayment")}
+            </h2>
+            <p className="mb-5 text-sm leading-6 text-gray-500">
+              {t("completePaymentDescription")}
+            </p>
+
+            <Elements stripe={stripePromise} options={{ clientSecret: stripePayment.clientSecret }}>
+              <OrderPaymentElement onSuccess={handlePaymentSuccess} />
+            </Elements>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
+
+const OrderPaymentElement = ({ onSuccess }: { onSuccess: () => void }) => {
+  const checkoutT = useTranslations("checkout");
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paying, setPaying] = useState(false);
+
+  const handlePay = async () => {
+    if (!stripe || !elements) return;
+
+    try {
+      setPaying(true);
+
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        redirect: "if_required",
+      });
+
+      if (error) {
+        toast.error(error.message || checkoutT("toast.paymentFailed"));
+        return;
+      }
+
+      if (paymentIntent?.status === "succeeded") {
+        onSuccess();
+        return;
+      }
+
+      toast.error(checkoutT("toast.paymentNotCompleted"));
+    } catch {
+      toast.error(checkoutT("toast.paymentFailed"));
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+
+      <button
+        type="button"
+        onClick={handlePay}
+        disabled={paying || !stripe || !elements}
+        className="h-11 w-full rounded-xl bg-primary text-sm font-semibold text-white disabled:opacity-60"
+      >
+        {paying ? checkoutT("processing") : checkoutT("payNow")}
+      </button>
+    </div>
+  );
+};
 
 export function OrderStatusPage() {
   return (

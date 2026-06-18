@@ -1,16 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { Star, Loader2, Camera } from "lucide-react";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { Star, Loader2 } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useSearchParams, useRouter } from "next/navigation";
 import useOrders from "@/hooks/useOrders";
 import { useAuthContext } from "@/hooks/useAuth";
 import { createReviewSchema, type ReviewFormValues } from "@/validations/reviews";
-import type { Order } from "@/services/orders";
+import { canReviewOrder, type Order } from "@/services/orders";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/errors";
 
 export default function WriteReview() {
   const t = useTranslations("orders");
@@ -20,11 +22,12 @@ export default function WriteReview() {
   const orderId = params.get("orderId");
 
   const { token } = useAuthContext();
-  const { fetchOrderById } = useOrders(token);
+  const { fetchOrderById, submitOrderReview } = useOrders(token);
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const translatedReviewSchema = useMemo(
     () => createReviewSchema({ reviewMax: validationT("reviewMax") }),
@@ -39,13 +42,14 @@ export default function WriteReview() {
   const review = watch("review") || "";
   const [hover, setHover] = useState(0);
 
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
-
   // ================= FETCH ORDER =================
   useEffect(() => {
     const fetchOrder = async () => {
-      if (!orderId || !token) return;
+      if (!orderId || !token) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
@@ -72,19 +76,48 @@ export default function WriteReview() {
     return new Date(date).toLocaleDateString();
   };
 
-  // ================= IMAGE HANDLER =================
-  const handleImageClick = () => {
-    fileRef.current?.click();
-  };
+  const renderStars = (value: number) => (
+    <div className="flex justify-center gap-2">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          size={22}
+          className={
+            star <= value
+              ? "text-[#EC5834] fill-[#EC5834]"
+              : "text-gray-300"
+          }
+        />
+      ))}
+    </div>
+  );
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const onSubmit = async (values: ReviewFormValues) => {
+    if (!orderId || submitting || !order || !canReviewOrder(order)) return;
 
+    try {
+      setSubmitting(true);
 
-    const preview = URL.createObjectURL(file);
-    setImagePreview(preview);
-    setValue("image", file, { shouldValidate: true });
+      const response = await submitOrderReview({
+        orderId,
+        payload: {
+          rating: values.rating,
+          comment: values.review?.trim() || undefined,
+        },
+      });
+
+      if (!response || response.success === false) {
+        toast.error(getApiErrorMessage(response));
+        return;
+      }
+
+      toast.success(t("reviewSubmitted"));
+      router.push("/orders-history");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // ================= STATES =================
@@ -114,6 +147,54 @@ export default function WriteReview() {
         >
           {t("goBack")}
         </button>
+      </div>
+    );
+  }
+
+  if (order.review) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold mb-2">
+            {t("alreadyReviewedTitle")}
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            {t("reviewAlreadySubmitted")}
+          </p>
+          {renderStars(order.review.rating)}
+          {order.review.comment ? (
+            <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
+              {order.review.comment}
+            </p>
+          ) : null}
+          <button
+            onClick={() => router.push("/orders-history")}
+            className="mt-5 px-4 py-2 bg-primary text-white rounded-md text-sm"
+          >
+            {t("goBack")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canReviewOrder(order)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold mb-2">
+            {t("reviewUnavailableTitle")}
+          </h2>
+          <p className="text-sm text-gray-500 mb-5">
+            {t("reviewUnavailableDescription")}
+          </p>
+          <button
+            onClick={() => router.push("/orders-history")}
+            className="px-4 py-2 bg-primary text-white rounded-md text-sm"
+          >
+            {t("goBack")}
+          </button>
+        </div>
       </div>
     );
   }
@@ -191,45 +272,16 @@ export default function WriteReview() {
             placeholder={t("reviewPlaceholder")}
             className="w-full border border-[#ACACAC] rounded-lg p-3 text-sm outline-none min-h-[120px]"
           />
-          <p className="text-sm mt-4 mb-2">{t("addPhotos")}</p>
-
-          <div className="flex gap-3 items-center">
-            <div
-              onClick={handleImageClick}
-              className="w-[120px] h-[120px] border-2 border-[#ACACAC] border-dashed rounded-xl flex flex-col items-center justify-center text-gray-400 text-xs cursor-pointer hover:border-primary transition"
-            >
-              <Camera size={20} />
-              {t("upload")}
-            </div>
-
-            {imagePreview && (
-              <div className="w-[120px] h-[120px] relative rounded-xl overflow-hidden border">
-                <Image
-                  src={imagePreview}
-                  alt={t("previewAlt")}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            )}
-          </div>
-
-          <input
-            type="file"
-            ref={fileRef}
-            onChange={handleImageChange}
-            className="hidden"
-            accept="image/*"
-          />
         </div>
 
         {/* ACTION BUTTONS */}
         <div className="flex gap-3 mt-6">
           <button
-            onClick={handleSubmit(() => undefined)}
-            className="flex-1 bg-[#EC5834] text-white py-3 rounded-lg text-sm font-medium"
+            onClick={handleSubmit(onSubmit)}
+            disabled={submitting}
+            className="flex-1 bg-[#EC5834] text-white py-3 rounded-lg text-sm font-medium disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {t("submitReview")}
+            {submitting ? t("submittingReview") : t("submitReview")}
           </button>
 
           <button

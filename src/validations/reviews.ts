@@ -12,7 +12,6 @@ export const createReviewSchema = (messages: ReviewValidationMessages = defaultM
   z.object({
     rating: z.number().int().min(1).max(5),
     review: z.string().max(1000, messages.reviewMax).optional(),
-    image: z.instanceof(File).optional(),
   });
 
 export const reviewSchema = createReviewSchema();

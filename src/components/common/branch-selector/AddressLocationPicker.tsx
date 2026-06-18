@@ -2,6 +2,7 @@
 
 import { Loader2, MapPin, MousePointer2, Navigation, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import { useGoogleMaps } from "@/hooks/useGoogleMaps";
 import type {
@@ -19,6 +20,8 @@ type AddressLocationPickerProps = {
   isLocating?: boolean;
   compact?: boolean;
   showSelectedLabel?: boolean;
+  actionsBelow?: boolean;
+  trailingAction?: ReactNode;
 };
 
 const DEFAULT_MAP_CENTER: GoogleLatLngLiteral = {
@@ -36,6 +39,8 @@ export function AddressLocationPicker({
   isLocating = false,
   compact = false,
   showSelectedLabel = true,
+  actionsBelow = false,
+  trailingAction,
 }: AddressLocationPickerProps) {
   const { googleMaps, status, errorMessage, isReady } = useGoogleMaps();
   const [query, setQuery] = useState(locationLabel ?? "");
@@ -247,7 +252,7 @@ export function AddressLocationPicker({
 
   return (
     <div ref={pickerRef} className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+      <div className={actionsBelow ? "grid gap-3" : "grid gap-3 md:grid-cols-[1fr_auto_auto]"}>
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
           <input
@@ -298,25 +303,29 @@ export function AddressLocationPicker({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={onUseCurrentLocation}
-          disabled={isLocating}
-          className="inline-flex h-[49px] items-center justify-center gap-2 rounded-xl border border-primary/20 bg-white px-4 text-sm font-semibold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
-          Current location
-        </button>
+        <div className={actionsBelow ? `grid gap-2 sm:gap-3 ${trailingAction ? "grid-cols-3" : "grid-cols-2"}` : "contents"}>
+          <button
+            type="button"
+            onClick={onUseCurrentLocation}
+            disabled={isLocating}
+            className="inline-flex h-[49px] min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-primary/20 bg-white px-2.5 text-xs font-semibold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-70 sm:px-4 sm:text-sm"
+          >
+            {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
+            Current location
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setMapOpen((current) => !current)}
-          disabled={status === "missing-key" || status === "error"}
-          className="inline-flex h-[49px] items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-white transition hover:bg-[#d94e24] disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          <MousePointer2 className="h-4 w-4" />
-          {mapOpen ? "Hide map" : "Pick on map"}
-        </button>
+          <button
+            type="button"
+            onClick={() => setMapOpen((current) => !current)}
+            disabled={status === "missing-key" || status === "error"}
+            className="inline-flex h-[49px] min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-primary/20 bg-white px-2.5 text-xs font-semibold text-primary transition hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-70 sm:px-4 sm:text-sm"
+          >
+            <MousePointer2 className="h-4 w-4" />
+            {mapOpen ? "Hide map" : "Pick on map"}
+          </button>
+
+          {trailingAction}
+        </div>
       </div>
 
       {showSelectedLabel && selectedLabel ? (

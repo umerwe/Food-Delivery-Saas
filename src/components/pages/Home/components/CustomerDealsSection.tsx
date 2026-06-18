@@ -2,11 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { BadgePercent, CalendarDays, PackageCheck } from "lucide-react";
+import { BadgePercent } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel";
 import { DealChooserDrawer } from "@/components/pages/Home/components/deals/DealChooserDrawer";
 import {
   getDealImage,
@@ -23,7 +28,6 @@ import {
   mergeDealScopedItemDetails,
 } from "@/components/pages/Home/utils/customer-deal-cart";
 import {
-  formatDealDateRange,
   formatDealPrice,
   getDealItemNames,
   isDealActive,
@@ -40,15 +44,27 @@ type CustomerDealsSectionProps = {
 };
 
 const CustomerDealsSkeleton = () => (
-  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
-    {[1, 2, 3].map((item) => (
+  <div className="flex gap-5 overflow-hidden">
+    {[1, 2, 3, 4].map((item) => (
       <div
         key={item}
-        className="h-[430px] animate-pulse rounded-[24px] bg-gray-100"
+        className="h-[250px] min-w-[280px] animate-pulse rounded-[22px] bg-gray-100 sm:min-w-[320px]"
       />
     ))}
   </div>
 );
+
+const fallbackDealImages = [
+  "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=640&q=80",
+  "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=640&q=80",
+  "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=640&q=80",
+  "https://images.unsplash.com/photo-1633945274405-b6c8069047b0?auto=format&fit=crop&w=640&q=80",
+] as const;
+
+const toNumber = (value: number | string | null | undefined) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 const getDealCategoryRuleHighlights = (deal: CustomerDeal) => {
   const categoryNamesById = new Map(
@@ -71,98 +87,52 @@ const getDealNameChips = (names: string) =>
     .filter(Boolean)
     .slice(0, 3);
 
-const DealInfoPanel = ({
-  deal,
-  requirementText,
-  itemNames,
-  categoryNames,
-}: {
-  deal: CustomerDeal;
-  requirementText: string;
-  itemNames: string;
-  categoryNames: string;
-}) => {
+const getDealHighlights = (deal: CustomerDeal, itemNames: string, categoryNames: string) => {
   const categoryRules = getDealCategoryRuleHighlights(deal);
   const chips = getDealNameChips(itemNames || categoryNames);
 
   if (isFlexibleCategoryDeal(deal) && categoryRules.length > 0) {
-    return (
-      <div className="mt-4 rounded-2xl border border-primary/10 bg-gradient-to-br from-primary/10 via-white to-amber-50/80 p-3 shadow-sm shadow-primary/5">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-md shadow-primary/20">
-            <PackageCheck size={15} />
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-              Build your combo
-            </p>
-            <p className="mt-1 text-sm font-semibold leading-5 text-gray-900">
-              Pick the perfect mix from each category.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {categoryRules.map((rule) => (
-            <span
-              key={rule.id}
-              className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm"
-            >
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
-                {rule.count}x
-              </span>
-              <span className="max-w-[130px] truncate">{rule.name}</span>
-            </span>
-          ))}
-        </div>
-      </div>
-    );
+    return categoryRules
+      .map((rule) => `${rule.count} ${rule.name}`)
+      .slice(0, 3);
   }
 
-  if (!requirementText && chips.length === 0) {
-    return null;
-  }
+  return chips;
+};
 
-  return (
-    <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50/80 p-3">
-      {requirementText ? (
-        <p className="text-sm font-semibold leading-5 text-gray-900">
-          {requirementText}
-        </p>
-      ) : null}
+const getDealImageForCard = (deal: CustomerDeal, index: number) => {
+  const image = getDealImage(deal);
 
-      {chips.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {chips.map((chip) => (
-            <span
-              key={chip}
-              className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 shadow-sm"
-            >
-              {chip}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
+  return image || fallbackDealImages[index % fallbackDealImages.length];
+};
+
+const getComparableDealPrice = (deal: CustomerDeal) => {
+  const scopedTotal = deal.scopeMenuItems.reduce(
+    (total, item) => total + toNumber(item.basePrice),
+    0
   );
+
+  return scopedTotal > deal.discountValue ? formatDealPrice(scopedTotal) : "";
 };
 
 const CustomerDealCard = ({
   deal,
+  index,
   isAdding,
   onAddDeal,
 }: {
   deal: CustomerDeal;
+  index: number;
   isAdding: boolean;
   onAddDeal?: (deal: CustomerDeal, selectedMenuItemIds?: string[]) => void;
 }) => {
   const t = useTranslations("home.deals");
-  const image = getDealImage(deal);
+  const image = getDealImageForCard(deal, index);
   const itemNames = getDealItemNames(deal.scopeMenuItems);
   const categoryNames = getDealItemNames(deal.scopeCategories);
-  const requirementText = getDealRequirementText(deal);
-  const dateRange = formatDealDateRange(deal.startsAt, deal.expiresAt);
   const actionLabel = getDealActionLabel(deal);
+  const highlights = getDealHighlights(deal, itemNames, categoryNames);
+  const comparablePrice = getComparableDealPrice(deal);
   const hasDealItems = isFlexibleCategoryDeal(deal)
     ? deal.scopeCategories.length > 0
     : isFlexibleAllItemsDeal(deal) || deal.scopeMenuItems.length > 0;
@@ -177,80 +147,79 @@ const CustomerDealCard = ({
         : t("addDeal");
 
   return (
-    <article className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-gray-100 bg-white shadow-xl shadow-primary/5">
-      <div className="relative h-[150px] bg-primary/5">
-        {image ? (
-          <Image
-            src={image}
-            alt={deal.title}
-            fill
-            className="object-cover"
-            unoptimized
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-primary">
-            <BadgePercent size={42} />
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-1 flex-col p-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
-            <PackageCheck size={12} />
-            {formatDealPrice(deal.discountValue)}
-          </span>
-
-          {dateRange ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-600">
-              <CalendarDays size={12} />
-              {dateRange}
+    <article className="relative flex h-[250px] min-w-0 flex-col overflow-hidden rounded-[18px] border border-gray-100 bg-white p-4 shadow-[0_12px_34px_rgba(17,24,39,0.08)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(17,24,39,0.12)]">
+      <div className="flex min-h-0 flex-1 gap-3">
+        <div className="flex min-w-0 flex-1 flex-col">
+          {index === 0 ? (
+            <span className="mb-2 w-fit rounded-full bg-[#FFB23F] px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white">
+              {t("bestSeller")}
             </span>
           ) : null}
+
+          <h3 className="line-clamp-2 text-[15px] font-extrabold leading-tight text-gray-950">
+            {deal.title}
+          </h3>
+
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-[20px] font-black leading-none text-primary">
+              {formatDealPrice(deal.discountValue)}
+            </span>
+            {comparablePrice ? (
+              <span className="text-xs font-semibold text-gray-400 line-through">
+                {comparablePrice}
+              </span>
+            ) : null}
+          </div>
+
+          <p className="mt-2 text-[11px] font-bold text-gray-500">
+            {getDealRequirementText(deal) || getDealTypeLabel(deal)}
+          </p>
+
+          <ul className="mt-3 space-y-1.5 text-[12px] font-medium leading-4 text-gray-700">
+            {(highlights.length > 0 ? highlights : [getDealTypeLabel(deal)])
+              .slice(0, 3)
+              .map((highlight) => (
+                <li key={highlight} className="flex min-w-0 items-start gap-2">
+                  <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-gray-700" />
+                  <span className="line-clamp-1">{highlight}</span>
+                </li>
+              ))}
+          </ul>
         </div>
 
-        <h3 className="line-clamp-2 text-lg font-bold text-gray-900">
-          {deal.title}
-        </h3>
-
-        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-primary">
-          {getDealTypeLabel(deal)}
-        </p>
-
-        {deal.description ? (
-          <p className="mt-2 line-clamp-2 text-sm leading-5 text-gray-500">
-            {deal.description}
-          </p>
-        ) : null}
-
-        <DealInfoPanel
-          deal={deal}
-          requirementText={
-            isFixedItemDeal(deal) && itemNames
-              ? t("includes", { items: itemNames })
-              : requirementText
-          }
-          itemNames={itemNames}
-          categoryNames={categoryNames}
-        />
-
-        {!hasDealItems ? (
-          <p className="mt-3 text-sm font-medium text-red-500">
-            {t("noAvailableItems")}
-          </p>
-        ) : null}
-
-        <div className="mt-auto pt-5">
-          <Button
-            variant="primary"
-            className="h-10 w-full px-3 text-xs"
-            disabled={!hasDealItems || isAdding}
-            onClick={handleAddDeal}
-          >
-            {isAdding ? t("adding") : translatedActionLabel}
-          </Button>
+        <div className="relative mt-2 h-[118px] w-[128px] shrink-0 self-center">
+          <div className="absolute inset-x-3 bottom-1 h-8 rounded-full bg-black/20 blur-xl" />
+          {image ? (
+            <Image
+              src={image}
+              alt={deal.title}
+              fill
+              sizes="128px"
+              className="object-contain drop-shadow-[0_18px_18px_rgba(17,24,39,0.22)]"
+              unoptimized
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-full bg-primary/10 text-primary">
+              <BadgePercent size={42} />
+            </div>
+          )}
         </div>
       </div>
+
+      {!hasDealItems ? (
+        <p className="mt-2 text-xs font-semibold text-red-500">
+          {t("noAvailableItems")}
+        </p>
+      ) : null}
+
+      <Button
+        variant="default"
+        className="mt-4 h-10 w-full rounded-[10px] bg-primary px-3 text-sm font-bold text-white shadow-md shadow-primary/20 hover:bg-primary/90"
+        disabled={!hasDealItems || isAdding}
+        onClick={handleAddDeal}
+      >
+        {isAdding ? t("adding") : translatedActionLabel}
+      </Button>
     </article>
   );
 };
@@ -376,25 +345,32 @@ export const CustomerDealsSection = ({
     <section className="mx-auto max-w-[1400px] px-4 pb-[30px] pt-[30px] sm:px-6 sm:pb-[60px] sm:pt-[60px]">
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-primary">
-            {t("label")}
-          </p>
-          <h3 className="mt-1 text-2xl font-bold text-gray-900">
+          <h3 className="text-2xl font-extrabold text-gray-950">
             {t("available")}
           </h3>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
-        {activeDeals.map((deal) => (
-          <CustomerDealCard
-            key={deal.id}
-            deal={deal}
-            isAdding={addingDealId === deal.id || pendingDeal?.id === deal.id}
-            onAddDeal={handleDealClick}
-          />
-        ))}
-      </div>
+      <Carousel
+        opts={{ align: "start", dragFree: true }}
+        className="min-w-0"
+      >
+        <CarouselContent className="-ml-5 cursor-grab active:cursor-grabbing">
+          {activeDeals.map((deal, index) => (
+            <CarouselItem
+              key={deal.id}
+              className="basis-[82%] pl-5 sm:basis-[48%] lg:basis-1/4"
+            >
+              <CustomerDealCard
+                deal={deal}
+                index={index}
+                isAdding={addingDealId === deal.id || pendingDeal?.id === deal.id}
+                onAddDeal={handleDealClick}
+              />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
 
       <DealChooserDrawer
         deal={selectedChooserDeal}

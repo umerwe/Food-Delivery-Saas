@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import {
   FaFingerprint,
   FaTruck,
@@ -8,9 +8,50 @@ import {
   FaGavel,
 } from "react-icons/fa";
 import { useTranslations } from "next-intl";
+import type { HelpSupportContent } from "@/services/public-content";
 
-export default function HelpCenterSection() {
+type HelpCenterSectionProps = {
+  supportContent?: HelpSupportContent;
+};
+
+const sanitizeSupportHtml = (value: string) => {
+  let sanitized = value
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*(["']).*?\1/gi, "")
+    .replace(/\s(?:href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\1/gi, "");
+
+  sanitized = sanitized.replace(/<\/?([a-z][a-z0-9-]*)([^>]*)>/gi, (match, tagName: string, rawAttributes: string) => {
+    const tag = tagName.toLowerCase();
+    const allowedTags = new Set(["p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "a"]);
+
+    if (!allowedTags.has(tag)) {
+      return "";
+    }
+
+    if (tag !== "a" || match.startsWith("</")) {
+      return match.startsWith("</") ? `</${tag}>` : `<${tag}>`;
+    }
+
+    const hrefMatch = rawAttributes.match(/\shref\s*=\s*(["'])(.*?)\1/i);
+    const href = hrefMatch?.[2]?.trim();
+
+    if (!href || (!href.startsWith("https://") && !href.startsWith("mailto:") && !href.startsWith("tel:"))) {
+      return "<a>";
+    }
+
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">`;
+  });
+
+  return sanitized;
+};
+
+export default function HelpCenterSection({ supportContent }: HelpCenterSectionProps) {
   const t = useTranslations("contact.helpCenter");
+  const safeSupportContent = useMemo(
+    () => sanitizeSupportHtml(supportContent?.content ?? ""),
+    [supportContent?.content]
+  );
 
   return (
     <section className="bg-[#F4F4F4] py-16 px-6 md:px-12 lg:px-20">
@@ -19,12 +60,19 @@ export default function HelpCenterSection() {
         {/* HEADER */}
         <div className="mb-12 max-w-[600px]">
           <h1 className="text-[40px] font-semibold text-gray-900 leading-tight">
-            {t("title")}
+            {supportContent?.title || t("title")}
           </h1>
 
           <p className="text-gray-500 mt-3 text-[15px] leading-relaxed">
             {t("description")}
           </p>
+
+          {safeSupportContent ? (
+            <div
+              className="mt-4 text-[15px] leading-relaxed text-gray-600 [&_a]:font-semibold [&_a]:text-primary [&_li]:ml-5 [&_li]:list-disc [&_p]:mb-3"
+              dangerouslySetInnerHTML={{ __html: safeSupportContent }}
+            />
+          ) : null}
         </div>
 
         {/* CARDS GRID */}

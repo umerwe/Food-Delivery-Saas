@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import useBranchSelector from "@/hooks/useBranchSelector";
 import { BranchPopup } from "@/components/common/popups/BranchPopup";
 import { getStoredAuthState } from "@/lib/auth";
-import type { Order, OrderItem, OrderMeta } from "@/services/orders";
+import { canReviewOrder, type Order, type OrderItem, type OrderMeta } from "@/services/orders";
 import { useTranslations } from "next-intl";
 export function OrdersHistoryPage() {
   const t = useTranslations("ordersHistory");
@@ -130,6 +130,8 @@ const {
         return t("status.preparing");
       case "PICKED_UP":
         return t("status.pickedUp");
+      case "SERVED":
+        return t("status.served");
       default:
         return status;
     }
@@ -173,6 +175,7 @@ const {
           <div className="space-y-4 sm:space-y-5">
             {orders.map((order) => {
               const firstItem = order.itemsPreview?.[0];
+              const reviewRating = order.review?.rating ?? 0;
 
               return (
                 <div
@@ -257,8 +260,7 @@ const {
                   {/* BOTTOM */}
                  <div className="bg-[#f6f6f6] border-t border-[#f2f2f2] px-4 py-3 flex justify-between items-center">
 
-  {order.status === "PLACED" ? (
-    order.review ? (
+  {order.review ? (
       <>
         {/*  Already reviewed */}
         <span className="text-[12px] text-gray-400">
@@ -271,7 +273,7 @@ const {
               key={star}
               size={14}
               className={
-                star <= (order.review?.rating || 0)
+                star <= reviewRating
                   ? "text-[#EC5834] fill-[#EC5834]"
                   : "text-gray-300"
               }
@@ -279,7 +281,7 @@ const {
           ))}
         </div>
       </>
-    ) : (
+  ) : canReviewOrder(order) ? (
       <>
         {/*  No review */}
         <span className="text-[12px] text-gray-400">
@@ -295,7 +297,6 @@ const {
           {t("writeReview")}
         </button>
       </>
-    )
   ) : (
     <span className="text-[12px] text-gray-400">
       {t("orderProcessing")}

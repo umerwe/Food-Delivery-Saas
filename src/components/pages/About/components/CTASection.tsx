@@ -5,9 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Apple, Play } from "lucide-react";
 import { useTranslations } from "next-intl";
+import type { AboutCtaContent } from "@/services/public-content";
 
-export default function CTASection() {
+type CTASectionProps = {
+  content?: AboutCtaContent;
+};
+
+export default function CTASection({ content }: CTASectionProps) {
   const t = useTranslations("about.cta");
+  const title = content?.title;
+  const description = content?.description || t("appDescription");
+  const imageUrl = content?.imageUrl || "/about/phone.png";
+  const subscribeTitle = content?.subscribeTitle || t("subscribeTitle");
+  const subscribeDescription = content?.subscribeDescription || t("subscribeDescription");
 
   return (
     <section className="w-full py-16 md:py-20 bg-white">
@@ -19,27 +29,49 @@ export default function CTASection() {
           {/* LEFT CONTENT */}
           <div className="text-white max-w-lg">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-[1.2]">
-              {t("appTitleLineOne")}
-              <br />
-              {t("appTitleLineTwo")}
-              <br />
-              {t("appTitleLineThree")}
+              {title || (
+                <>
+                  {t("appTitleLineOne")}
+                  <br />
+                  {t("appTitleLineTwo")}
+                  <br />
+                  {t("appTitleLineThree")}
+                </>
+              )}
             </h2>
 
             <p className="mt-4 text-sm md:text-base text-white/80 leading-relaxed">
-              {t("appDescription")}
+              {description}
             </p>
 
             {/* Buttons */}
             <div className="mt-6 flex gap-3 flex-wrap">
-              <Button className="h-12 bg-black text-white hover:bg-black/80 flex items-center gap-2 px-5">
-                <Apple className="w-4 h-4" />
-                <span className="text-sm">App Store</span>
+              <Button asChild={Boolean(content?.appStoreUrl)} className="h-12 bg-black text-white hover:bg-black/80 flex items-center gap-2 px-5">
+                {content?.appStoreUrl ? (
+                  <a href={content.appStoreUrl} target="_blank" rel="noopener noreferrer">
+                    <Apple className="w-4 h-4" />
+                    <span className="text-sm">App Store</span>
+                  </a>
+                ) : (
+                  <>
+                    <Apple className="w-4 h-4" />
+                    <span className="text-sm">App Store</span>
+                  </>
+                )}
               </Button>
 
-              <Button className="h-12 bg-black text-white hover:bg-black/80 flex items-center gap-2 px-5">
-                <Play className="w-4 h-4" />
-                <span className="text-sm">Google Play</span>
+              <Button asChild={Boolean(content?.playStoreUrl)} className="h-12 bg-black text-white hover:bg-black/80 flex items-center gap-2 px-5">
+                {content?.playStoreUrl ? (
+                  <a href={content.playStoreUrl} target="_blank" rel="noopener noreferrer">
+                    <Play className="w-4 h-4" />
+                    <span className="text-sm">Google Play</span>
+                  </a>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4" />
+                    <span className="text-sm">Google Play</span>
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -48,7 +80,7 @@ export default function CTASection() {
           <div className="bg-[#2b2b2b] rounded-2xl p-8 md:p-10 shadow-2xl flex items-center justify-center">
             <div className="relative w-[180px] h-[340px] md:w-[220px] md:h-[420px]">
               <Image
-                src="/about/phone.png"
+                src={imageUrl}
                 alt={t("appPreviewAlt")}
                 fill
                 className="object-contain"
@@ -60,11 +92,11 @@ export default function CTASection() {
         {/* SUBSCRIBE SECTION */}
         <div className="mt-16 text-center">
           <h3 className="text-xl md:text-2xl font-semibold text-gray-900">
-            {t("subscribeTitle")}
+            {subscribeTitle}
           </h3>
 
           <p className="text-sm text-gray-500 mt-2">
-            {t("subscribeDescription")}
+            {subscribeDescription}
           </p>
 
 

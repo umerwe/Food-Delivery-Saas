@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { poppins } from "@/lib/fonts";
+import { onest } from "@/lib/fonts";
 import { Toaster } from "sonner";
 import { Providers } from "@/app/providers";
 
@@ -19,13 +19,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={poppins.className}>
-  <Providers>
-    <Toaster position="top-right" richColors />
+      <body className={`${onest.className} ${onest.variable}`}>
+        <Providers>
+          <Toaster position="top-right" richColors />
 
-    {children}
-  </Providers>
-</body>
+          {children}
+        </Providers>
+      </body>
     </html>
   );
 }

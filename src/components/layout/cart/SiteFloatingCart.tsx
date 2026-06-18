@@ -28,6 +28,7 @@ export function SiteFloatingCart() {
     useState<CheckoutTypePreference | null>(null);
 
   const isHiddenRoute = HIDDEN_CART_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  const hideOnMobileHome = pathname === "/";
   const userCheckoutType = getSelectedOrderType(user) === "TAKEAWAY" ? "pickup" : "delivery";
   const checkoutType = storedCheckoutType ?? userCheckoutType;
 
@@ -58,7 +59,8 @@ export function SiteFloatingCart() {
   return (
     <div
       className={cn(
-        "fixed bottom-5 right-4 z-40 flex items-end justify-end sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8"
+        "fixed bottom-5 right-4 z-40 flex items-end justify-end sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8",
+        hideOnMobileHome && "hidden md:flex"
       )}
     >
       {isOpen ? (

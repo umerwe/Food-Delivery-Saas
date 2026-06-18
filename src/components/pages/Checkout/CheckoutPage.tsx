@@ -12,6 +12,7 @@ import { useHome } from "@/hooks/useHome";
 import { useLoyalty } from "@/hooks/useLoyalty";
 import { toast } from "sonner";
 import { useAuthContext } from "@/hooks/useAuth";
+import { X } from "lucide-react";
 import {
   Elements,
   PaymentElement,
@@ -19,7 +20,6 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import { useAuth } from "@/hooks/useAuth";
 import type { ApiRecord, BackendErrorState, CartItem } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorMeta, hasBackendError, normalizeCartItem, normalizeCartQuote, normalizeCartResponse, recalculateCartItemQuantity, toNumber } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import type { BranchRecord } from "@/types/branch-selector";
@@ -31,6 +31,7 @@ import {
   setStoredCheckoutTypePreference,
   type CheckoutTypePreference,
 } from "@/lib/checkout-type-preference";
+import { dispatchCartChanged } from "@/lib/cart-events";
 import {
   addPreparationMinutesToScheduledDelivery,
   buildDeliveryTimeSlots,
@@ -408,6 +409,28 @@ function CheckoutPageContent() {
     if (!stripePayment.publishableKey) return null;
     return loadStripe(stripePayment.publishableKey);
   }, [stripePayment.publishableKey]);
+
+  const resetStripePayment = () => {
+    setStripePayment({
+      open: false,
+      clientSecret: "",
+      publishableKey: "",
+      paymentId: "",
+      orderId: "",
+    });
+  };
+
+  const handleCloseStripePayment = async () => {
+    const pendingOrderId = stripePayment.orderId;
+
+    resetStripePayment();
+
+    if (pendingOrderId) {
+      toast.success(t("toast.orderPlaced"));
+      await clearCart();
+      router.push(`/order?orderId=${pendingOrderId}`);
+    }
+  };
 
   const fetchCart = async () => {
     if (!customerId) return;
@@ -797,6 +820,7 @@ function CheckoutPageContent() {
       }
 
       clearBackendError();
+      dispatchCartChanged();
       return true;
     } catch (err) {
       setCartItems(previousCartItems);
@@ -1150,12 +1174,25 @@ function CheckoutPageContent() {
         }
 
         const payment = asRecord(attemptRes?.data);
+        const paymentSession = asRecord(attemptRes?.paymentSession);
         const providerData = asRecord(payment.providerData);
+        const clientSecret =
+          typeof paymentSession.clientSecret === "string"
+            ? paymentSession.clientSecret
+            : typeof providerData.clientSecret === "string"
+              ? providerData.clientSecret
+              : "";
+        const publishableKey =
+          typeof paymentSession.publishableKey === "string"
+            ? paymentSession.publishableKey
+            : typeof providerData.publishableKey === "string"
+              ? providerData.publishableKey
+              : "";
 
         setStripePayment({
           open: true,
-          clientSecret: typeof providerData.clientSecret === "string" ? providerData.clientSecret : "",
-          publishableKey: typeof providerData.publishableKey === "string" ? providerData.publishableKey : "",
+          clientSecret,
+          publishableKey,
           paymentId: typeof payment.id === "string" ? payment.id : String(payment.id ?? ""),
           orderId,
         });
@@ -1344,36 +1381,34 @@ function CheckoutPageContent() {
 
       {stripePayment.open && stripePromise && stripePayment.clientSecret ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="max-h-[90vh] w-[400px] overflow-auto rounded-2xl bg-white p-6">
-            <h2 className="mb-4 text-lg font-semibold">{t("completePayment")}</h2>
+          <div className="relative max-h-[90vh] w-[min(420px,calc(100vw-32px))] overflow-auto rounded-2xl bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.22)]">
+            <button
+              type="button"
+              onClick={handleCloseStripePayment}
+              className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              aria-label="Close payment popup"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h2 className="mb-2 pr-10 text-lg font-semibold">{t("completePayment")}</h2>
+            <p className="mb-5 text-sm leading-6 text-gray-500">
+              You can close this and continue payment later from your order details.
+            </p>
 
             <Elements
               stripe={stripePromise}
               options={{ clientSecret: stripePayment.clientSecret }}
             >
               <OrderStripeCheckout
-                paymentId={stripePayment.paymentId}
                 onSuccess={async () => {
-                  setStripePayment({
-                    open: false,
-                    clientSecret: "",
-                    publishableKey: "",
-                    paymentId: "",
-                    orderId: "",
-                  });
+                  const paidOrderId = stripePayment.orderId;
+
+                  resetStripePayment();
 
                   window.dispatchEvent(new Event("loyalty-updated"));
                   await clearCart();
-                  router.push(`/order?success=true&orderId=${stripePayment.orderId}`);
-                }}
-                onFail={() => {
-                  setStripePayment({
-                    open: false,
-                    clientSecret: "",
-                    publishableKey: "",
-                    paymentId: "",
-                    orderId: "",
-                  });
+                  router.push(`/order?success=true&orderId=${paidOrderId}`);
                 }}
               />
             </Elements>
@@ -1385,21 +1420,14 @@ function CheckoutPageContent() {
 }
 
 const OrderStripeCheckout = ({
-  paymentId,
   onSuccess,
-  onFail,
 }: {
-  paymentId: string;
   onSuccess: () => void;
-  onFail: () => void;
 }) => {
   const t = useTranslations("checkout");
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
-
-  const { token } = useAuth();
-  const { post } = useCheckout(token);
 
   const handlePay = async () => {
     if (!stripe || !elements) return;
@@ -1413,22 +1441,11 @@ const OrderStripeCheckout = ({
       });
 
       if (error) {
-        await post(`/v1/payments/${paymentId}/fail`, {
-          note: error.message,
-        });
-
         toast.error(error.message || t("toast.paymentFailed"));
-        onFail();
         return;
       }
 
       if (paymentIntent?.status === "succeeded") {
-        await post(`/v1/payments/${paymentId}/mark-paid`, {
-          providerRef: paymentIntent.id,
-          providerData: paymentIntent,
-          note: "Stripe success",
-        });
-
         toast.success(t("toast.paymentSuccessful"));
         onSuccess();
         return;
@@ -1437,7 +1454,6 @@ const OrderStripeCheckout = ({
       toast.error(t("toast.paymentNotCompleted"));
     } catch (err) {
       toast.error(t("toast.paymentFailed"));
-      onFail();
     } finally {
       setLoading(false);
     }

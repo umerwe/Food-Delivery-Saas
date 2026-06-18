@@ -9,10 +9,39 @@ import {
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import type { CustomerFaqItem, HelpSupportContent } from "@/services/public-content";
 
-export default function FAQSection() {
+type FAQSectionProps = {
+  supportContent?: HelpSupportContent;
+  faqs?: CustomerFaqItem[];
+};
+
+export default function FAQSection({ supportContent, faqs: dynamicFaqs }: FAQSectionProps) {
   const router = useRouter();
   const t = useTranslations("contact.faq");
+  const fallbackFaqs = [
+    {
+      id: "credential",
+      question: t("credentialQuestion"),
+      answer: t("credentialAnswer"),
+    },
+    {
+      id: "safety",
+      question: t("safetyQuestion"),
+      answer: t("safetyAnswer"),
+    },
+    {
+      id: "compliance",
+      question: t("complianceQuestion"),
+      answer: t("complianceAnswer"),
+    },
+  ];
+  const faqs = dynamicFaqs?.length ? dynamicFaqs : fallbackFaqs;
+  const email = supportContent?.contacts.email;
+  const phone = supportContent?.contacts.phone;
+  const whatsapp = supportContent?.contacts.whatsapp;
+  const phoneHref = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : undefined;
+  const whatsappHref = whatsapp ? `https://wa.me/${whatsapp.replace(/[^\d]/g, "")}` : undefined;
 
   return (
     <section className="bg-[#F4F4F4] py-16 px-6 md:px-12 lg:px-20">
@@ -34,20 +63,13 @@ export default function FAQSection() {
 
           {/* FAQ LIST */}
           <div className="space-y-4">
-            <FAQItem
-              question={t("credentialQuestion")}
-              answer={t("credentialAnswer")}
-            />
-
-            <FAQItem
-              question={t("safetyQuestion")}
-              answer={t("safetyAnswer")}
-            />
-
-            <FAQItem
-              question={t("complianceQuestion")}
-              answer={t("complianceAnswer")}
-            />
+            {faqs.map((item) => (
+              <FAQItem
+                key={item.id}
+                question={item.question}
+                answer={item.answer}
+              />
+            ))}
           </div>
         </div>
 
@@ -67,15 +89,40 @@ export default function FAQSection() {
             {/* CONTACT */}
             <div className="mt-6 space-y-4 text-sm">
 
-              <div className="flex items-center gap-3 text-gray-700">
-                <FaEnvelope className="text-gray-700" />
-                concierge@editorialtrust.sys
-              </div>
+              {email ? (
+                <a href={`mailto:${email}`} className="flex items-center gap-3 text-gray-700 hover:text-primary">
+                  <FaEnvelope className="text-gray-700" />
+                  {email}
+                </a>
+              ) : null}
 
-              <div className="flex items-center gap-3 text-gray-700">
-                <FaPhoneAlt className="text-gray-700" />
-                +1 (800) TRUST-SYS
-              </div>
+              {phone ? (
+                <a href={phoneHref} className="flex items-center gap-3 text-gray-700 hover:text-primary">
+                  <FaPhoneAlt className="text-gray-700" />
+                  {phone}
+                </a>
+              ) : null}
+
+              {whatsapp ? (
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-gray-700 hover:text-primary">
+                  <FaPhoneAlt className="text-gray-700" />
+                  {whatsapp}
+                </a>
+              ) : null}
+
+              {!email && !phone && !whatsapp ? (
+                <>
+                  <div className="flex items-center gap-3 text-gray-700">
+                    <FaEnvelope className="text-gray-700" />
+                    concierge@editorialtrust.sys
+                  </div>
+
+                  <div className="flex items-center gap-3 text-gray-700">
+                    <FaPhoneAlt className="text-gray-700" />
+                    +1 (800) TRUST-SYS
+                  </div>
+                </>
+              ) : null}
             </div>
 
             {/* CTA */}

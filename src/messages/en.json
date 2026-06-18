@@ -42,6 +42,11 @@
   },
   "navigation": {
     "changeLanguage": "Change language",
+    "openMenu": "Open menu",
+    "home": "Home",
+    "menus": "Menus",
+    "groupOrder": "Group order",
+    "reservations": "Reservations",
     "searchFood": "Search Food",
     "reserveTable": "Reserve a Table",
     "cart": "Cart",
@@ -147,8 +152,18 @@
   "home": {
     "hero": {
       "defaultTitle": "Are you starving?",
-      "defaultTagline": "Within a few clicks, find meals that are accessible near you",
+      "defaultTagline": "Good Food, great mood",
       "heroImageAlt": "Hero food background",
+      "deliveryTitle": "Delicious food, delivered to you",
+      "description": "Fresh meals, warm service, and easy ordering from your favorite local kitchen.",
+      "freshTitle": "Freshly prepared",
+      "freshDescription": "Order crowd-pleasing favorites made hot and ready for your table.",
+      "trackingTitle": "Live tracking",
+      "trackingDescription": "Follow your order from kitchen prep to arrival.",
+      "offersTitle": "Best offers",
+      "offersDescription": "Unlock branch deals and menu promos whenever they are live.",
+      "orderPanelEyebrow": "Start your order",
+      "orderPanelTitle": "Delivery or pickup",
       "categories": "Categories",
       "items": "Items",
       "searchCategories": "Search categories",
@@ -160,8 +175,12 @@
       "menuItemFallback": "Menu item"
     },
     "categories": {
-      "title": "Categories",
+      "eyebrow": "Top categories",
+      "title": "Top categories",
       "viewAll": "View All",
+      "viewAllCategories": "View all categories",
+      "previous": "Previous categories",
+      "next": "Next categories",
       "empty": "No categories found",
       "groupOrder": "Group Order",
       "menu": "Menu",
@@ -189,6 +208,7 @@
     "deals": {
       "label": "Deals",
       "available": "Available Deals",
+      "bestSeller": "Best seller",
       "includes": "Includes {items}",
       "noAvailableItems": "This deal has no available items.",
       "adding": "Adding...",
@@ -234,6 +254,8 @@
       "instantCheckout": "Secure Stripe checkout",
       "emailDelivery": "Sent after payment confirmation",
       "customAmount": "Custom amount",
+      "buy": "Buy Gift Card",
+      "purchase": "Purchase",
       "buyPreset": "Buy this card",
       "customOnlyTitle": "Create a custom gift card",
       "customOnlyDescription": "Pick an amount, add your details, and complete payment by card.",
@@ -274,7 +296,11 @@
       "happyCustomers": "Happy Customers",
       "customerSatisfaction": "Customer Satisfaction",
       "branches": "Our Branches",
-      "employees": "Total Employees"
+      "employees": "Total Employees",
+      "completedOrders": "Completed Orders",
+      "averageRating": "Average Rating",
+      "activeMenuItems": "Menu Items",
+      "fiveStarReviews": "Five-Star Reviews"
     },
     "blog": {
       "decorativeAlt": "Decorative background",
@@ -300,7 +326,26 @@
       "titleLineOne": "Great food and lots",
       "titleLineTwo": "of discounted prices",
       "happyCustomer": "Our Happy Customer",
-      "review": "(1.9k Review)"
+      "review": "(1.9k Review)",
+      "eyebrow": "Deliveryway mobile app",
+      "headline": "Great food, greater deals on the app.",
+      "headlineLineOne": "Great food, greater deals",
+      "headlineLineTwo": "on the app",
+      "description": "Order faster, track every meal, and unlock app-only offers from your favorite local restaurants.",
+      "appStoreAlt": "Download on the App Store",
+      "googlePlayAlt": "Get it on Google Play",
+      "dealCardEyebrow": "App exclusive",
+      "dealCardTitle": "Save more today",
+      "features": {
+        "offers": "Exclusive offers",
+        "faster": "Faster ordering",
+        "tracking": "Real-time tracking",
+        "reorder": "Easy reordering",
+        "exclusiveOffers": "Exclusive app offers",
+        "realTimeTracking": "Real-time tracking",
+        "fasterOrdering": "Faster ordering",
+        "easyReordering": "Easy reordering"
+      }
     },
     "branchOpeningHours": {
       "temporaryUnavailable": "Temporarily unavailable",
@@ -424,6 +469,18 @@
       "titleLineTwo": "Editorial Standard.",
       "description": "We don't just deliver packages; we manage reputations. Every document, every protocol, and every support ticket is handled with the precision of a master chef's garnish.",
       "button": "View Our Compliance Philosophy"
+    },
+    "form": {
+      "title": "Send us a message",
+      "description": "Questions, order concerns, or feedback go straight to the restaurant support team.",
+      "name": "Your name",
+      "email": "Email address",
+      "subject": "Subject",
+      "message": "Message",
+      "send": "Send message",
+      "sending": "Sending...",
+      "success": "Message sent successfully",
+      "missingRestaurant": "Restaurant context is still loading. Please try again in a moment."
     },
     "chat": {
       "loadingChat": "Loading chat...",
@@ -859,6 +916,24 @@
     "discountApplied": "Discount Applied",
     "discount": "Discount",
     "total": "Total",
+    "paymentDetails": "Payment Details",
+    "paymentDescription": "Payment information for this order.",
+    "paymentPendingDescription": "Your order is placed, but payment is still pending. You can complete it now or come back later.",
+    "paymentMethod": "Payment method",
+    "amountDue": "Amount due",
+    "paymentReference": "Payment reference",
+    "scheduledFor": "Scheduled for",
+    "deliveryAddress": "Delivery address",
+    "continuePayment": "Continue Payment",
+    "retryPayment": "Retry Payment",
+    "notAvailable": "Not available",
+    "paymentStatus": {
+      "paid": "Paid",
+      "pending": "Pending",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "unknown": "Unknown"
+    },
     "chatAboutOrder": "Chat about this order",
     "orderNotFound": "Order not found",
     "reviewOrderNotFoundDescription": "We couldn't find the order you're trying to review.",
@@ -873,6 +948,12 @@
     "upload": "Upload",
     "previewAlt": "preview",
     "submitReview": "Submit Review",
+    "submittingReview": "Submitting...",
+    "reviewSubmitted": "Review submitted successfully",
+    "alreadyReviewedTitle": "Review already submitted",
+    "reviewAlreadySubmitted": "You have already reviewed this order.",
+    "reviewUnavailableTitle": "Review not available yet",
+    "reviewUnavailableDescription": "You can review this order once it has been completed.",
     "cancel": "Cancel",
     "loadingReviewsPage": "Loading reviews page..."
   },
@@ -900,7 +981,8 @@
       "processing": "Processing",
       "confirmed": "Confirmed",
       "preparing": "Preparing",
-      "pickedUp": "Picked up"
+      "pickedUp": "Picked up",
+      "served": "Served"
     }
   },
   "payments": {
@@ -1270,7 +1352,20 @@
       "delivery": "Delivery",
       "pickup": "Pickup",
       "takeaway": "Pickup"
-    }
+    },
+    "youRatedThisOrder": "You rated this order",
+    "howWasYourFood": "How was your food?",
+    "reviewCompletedOrder": "Share feedback for this completed order.",
+    "writeReview": "Write Review",
+    "successNotice": {
+      "title": "Order placed successfully",
+      "description": "We have received your order. You can track the latest status below.",
+      "paymentPendingTitle": "Order placed, payment pending",
+      "paymentPendingDescription": "Your order has been created. Complete the Stripe payment from the payment panel to finish checkout."
+    },
+    "completePayment": "Complete payment",
+    "completePaymentDescription": "This will retry the pending Stripe payment attempt for the same order.",
+    "closePaymentPopup": "Close payment popup"
   },
   "notifications": {
     "title": "Notifications",
@@ -1614,6 +1709,7 @@
     "reservationNoteMax": "Special request must be 500 characters or fewer",
     "contactNameRequired": "Name is required",
     "contactEmailRequired": "Valid email is required",
+    "contactSubjectRequired": "Subject is required",
     "contactMessageRequired": "Message is required",
     "reviewMax": "Review must be 1000 characters or fewer"
   },

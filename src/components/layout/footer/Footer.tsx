@@ -10,6 +10,7 @@ import {
   Twitter,
 } from "lucide-react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -139,6 +140,7 @@ const buildSocialLinks = (
 };
 
 export const Footer = () => {
+  const pathname = usePathname();
   const t = useTranslations("footer");
   const { user, loading } = useAuthContext();
   const restaurantId = resolveHomeRestaurantId(user);
@@ -189,8 +191,14 @@ export const Footer = () => {
     { label: t("refundPolicy"), href: "/refund" },
   ];
 
+  const hideOnMobileHome = pathname === "/";
+
   return (
-    <footer className="bg-[#111116] pt-[94.39px] pb-8 px-4 transition-colors duration-300">
+    <footer
+      className={`bg-[#111116] pt-[94.39px] pb-8 px-4 transition-colors duration-300 ${
+        hideOnMobileHome ? "hidden md:block" : ""
+      }`}
+    >
       <div className="max-w-[1400px] mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
 

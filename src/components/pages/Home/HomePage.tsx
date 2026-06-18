@@ -12,6 +12,7 @@ import { RequiredBranchSelectionModal } from "@/components/common/branch-selecto
 import BranchOpeningHoursPopup from "@/components/pages/Home/components/BranchOpeningHours";
 import { CustomerDealsSection } from "@/components/pages/Home/components/CustomerDealsSection";
 import { GiftCardsSection } from "@/components/pages/Home/components/GiftCardsSection";
+import { MobileHomeExperience } from "@/components/pages/Home/components/MobileHomeExperience";
 
 import { DEFAULT_BRANDING } from "@/config/default-branding";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +21,7 @@ import { useAddDealToCart } from "@/hooks/useCart";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useCustomerDeals } from "@/hooks/useCustomerDeals";
 import { useHome } from "@/hooks/useHome";
+import { useHomeCategories } from "@/hooks/useHomeCategories";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
 import type { CustomerDeal } from "@/types/customer-deals";
 
@@ -32,6 +34,7 @@ const HomePage = () => {
   const restaurantId = useMemo(() => resolveHomeRestaurantId(user, authRestaurantId), [authRestaurantId, user]);
   const branchId = useMemo(() => resolveHomeBranchId(user), [user]);
   const homeQuery = useHome(restaurantId, branchId, Boolean(token && branchId));
+  const categoriesQuery = useHomeCategories(restaurantId, Boolean(token));
   const dealsQuery = useCustomerDeals({ restaurantId, branchId, locale, limit: 20 });
   const addDealMutation = useAddDealToCart(branchId);
   const handleAddDeal = useCallback(
@@ -53,38 +56,64 @@ const HomePage = () => {
     <div>
       <BranchOpeningHoursPopup popup={landingPopup} branch={resolvedBranch} />
 
-      {branding.showHeroBanner ? (
-        <HeroSection
-          restaurantName={heroTitle}
-          tagline={heroTagline}
-          heroImage={heroImage}
-        />
-      ) : null}
-
-      {branding.showCategories ? (
-        <section id="categories">
-          <FoodCategorySection />
-        </section>
-      ) : null}
-
-      <CustomerDealsSection
+      <MobileHomeExperience
+        restaurantName={heroTitle}
+        tagline={heroTagline}
+        heroImage={heroImage}
+        branding={branding}
+        branch={resolvedBranch}
+        categories={categoriesQuery.data ?? []}
+        categoriesLoading={categoriesQuery.isLoading}
         deals={dealsQuery.deals}
-        isLoading={dealsQuery.isLoading}
-        addingDealId={addDealMutation.isPending ? addDealMutation.variables?.deal.id ?? null : null}
-        branchId={branchId}
-        onAddDeal={handleAddDeal}
       />
 
-      <GiftCardsSection
-        giftCards={homeData?.giftCards}
-        restaurantId={restaurantId}
-        branchId={branchId}
-        currency={homeData?.config?.currency}
-      />
+      <div className="md:hidden">
+        <GiftCardsSection
+          giftCards={homeData?.giftCards}
+          restaurantId={restaurantId}
+          branchId={branchId}
+          currency={homeData?.config?.currency}
+        />
 
-      <WhyChooseUs />
-      <AppPromo />
-      <Stats />
+        <WhyChooseUs />
+        <AppPromo />
+        <Stats />
+      </div>
+
+      <div className="hidden md:block">
+        {branding.showHeroBanner ? (
+          <HeroSection
+            restaurantName={heroTitle}
+            tagline={heroTagline}
+            heroImage={heroImage}
+          />
+        ) : null}
+
+        {branding.showCategories ? (
+          <section id="categories">
+            <FoodCategorySection />
+          </section>
+        ) : null}
+
+        <CustomerDealsSection
+          deals={dealsQuery.deals}
+          isLoading={dealsQuery.isLoading}
+          addingDealId={addDealMutation.isPending ? addDealMutation.variables?.deal.id ?? null : null}
+          branchId={branchId}
+          onAddDeal={handleAddDeal}
+        />
+
+        <GiftCardsSection
+          giftCards={homeData?.giftCards}
+          restaurantId={restaurantId}
+          branchId={branchId}
+          currency={homeData?.config?.currency}
+        />
+
+        <WhyChooseUs />
+        <AppPromo />
+        <Stats />
+      </div>
 
       {user && token && !branchId ? <RequiredBranchSelectionModal /> : null}
     </div>

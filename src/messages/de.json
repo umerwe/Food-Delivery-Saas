@@ -42,6 +42,11 @@
   },
   "navigation": {
     "changeLanguage": "Sprache ändern",
+    "openMenu": "Menü öffnen",
+    "home": "Startseite",
+    "menus": "Menüs",
+    "groupOrder": "Gruppenbestellung",
+    "reservations": "Reservierungen",
     "searchFood": "Essen suchen",
     "reserveTable": "Tisch reservieren",
     "cart": "Warenkorb",
@@ -147,8 +152,18 @@
   "home": {
     "hero": {
       "defaultTitle": "Haben Sie Hunger?",
-      "defaultTagline": "Mit wenigen Klicks finden Sie Mahlzeiten in Ihrer Nähe",
+      "defaultTagline": "Gutes Essen, gute Laune",
       "heroImageAlt": "Hero-Essenshintergrund",
+      "deliveryTitle": "Leckeres Essen, zu Ihnen geliefert",
+      "description": "Frische Gerichte, herzlicher Service und einfache Bestellung aus Ihrer Lieblingsküche vor Ort.",
+      "freshTitle": "Frisch zubereitet",
+      "freshDescription": "Bestellen Sie beliebte Favoriten, heiß und bereit für Ihren Tisch.",
+      "trackingTitle": "Live-Verfolgung",
+      "trackingDescription": "Verfolgen Sie Ihre Bestellung von der Küche bis zur Ankunft.",
+      "offersTitle": "Beste Angebote",
+      "offersDescription": "Nutzen Sie Filialangebote und Menüaktionen, sobald sie verfügbar sind.",
+      "orderPanelEyebrow": "Bestellung starten",
+      "orderPanelTitle": "Lieferung oder Abholung",
       "categories": "Kategorien",
       "items": "Artikel",
       "searchCategories": "Kategorien suchen",
@@ -160,8 +175,12 @@
       "menuItemFallback": "Menüartikel"
     },
     "categories": {
-      "title": "Kategorien",
+      "eyebrow": "Top-Kategorien",
+      "title": "Top-Kategorien",
       "viewAll": "Alle anzeigen",
+      "viewAllCategories": "Alle Kategorien anzeigen",
+      "previous": "Vorherige Kategorien",
+      "next": "Nächste Kategorien",
       "empty": "Keine Kategorien gefunden",
       "groupOrder": "Gruppenbestellung",
       "menu": "Menü",
@@ -189,6 +208,7 @@
     "deals": {
       "label": "Angebote",
       "available": "Verfügbare Angebote",
+      "bestSeller": "Bestseller",
       "includes": "Enthält {items}",
       "noAvailableItems": "Dieses Angebot enthält keine verfügbaren Artikel.",
       "adding": "Wird hinzugefügt...",
@@ -234,6 +254,8 @@
       "instantCheckout": "Sicherer Stripe-Checkout",
       "emailDelivery": "Versand nach Zahlungsbestätigung",
       "customAmount": "Eigener Betrag",
+      "buy": "Geschenkkarte kaufen",
+      "purchase": "Kaufen",
       "buyPreset": "Diese Karte kaufen",
       "customOnlyTitle": "Eigene Geschenkkarte erstellen",
       "customOnlyDescription": "Wählen Sie einen Betrag, geben Sie Ihre Daten ein und bezahlen Sie per Karte.",
@@ -274,7 +296,11 @@
       "happyCustomers": "Zufriedene Kunden",
       "customerSatisfaction": "Kundenzufriedenheit",
       "branches": "Unsere Filialen",
-      "employees": "Mitarbeitende insgesamt"
+      "employees": "Mitarbeitende insgesamt",
+      "completedOrders": "Abgeschlossene Bestellungen",
+      "averageRating": "Durchschnittliche Bewertung",
+      "activeMenuItems": "Menüartikel",
+      "fiveStarReviews": "Fünf-Sterne-Bewertungen"
     },
     "blog": {
       "decorativeAlt": "Dekorativer Hintergrund",
@@ -300,7 +326,26 @@
       "titleLineOne": "Großartiges Essen und viele",
       "titleLineTwo": "reduzierte Preise",
       "happyCustomer": "Unsere zufriedenen Kunden",
-      "review": "(1,9k Bewertungen)"
+      "review": "(1,9k Bewertungen)",
+      "eyebrow": "Deliveryway Mobile App",
+      "headline": "Großartiges Essen, bessere Angebote in der App.",
+      "headlineLineOne": "Großartiges Essen, bessere Angebote",
+      "headlineLineTwo": "in der App",
+      "description": "Bestellen Sie schneller, verfolgen Sie jede Mahlzeit und sichern Sie sich exklusive App-Angebote Ihrer Lieblingsrestaurants.",
+      "appStoreAlt": "Im App Store herunterladen",
+      "googlePlayAlt": "Bei Google Play erhalten",
+      "dealCardEyebrow": "App-exklusiv",
+      "dealCardTitle": "Heute mehr sparen",
+      "features": {
+        "offers": "Exklusive Angebote",
+        "faster": "Schneller bestellen",
+        "tracking": "Echtzeitverfolgung",
+        "reorder": "Einfach erneut bestellen",
+        "exclusiveOffers": "Exklusive App-Angebote",
+        "realTimeTracking": "Echtzeitverfolgung",
+        "fasterOrdering": "Schneller bestellen",
+        "easyReordering": "Einfach erneut bestellen"
+      }
     },
     "branchOpeningHours": {
       "temporaryUnavailable": "Vorübergehend nicht verfügbar",
@@ -424,6 +469,18 @@
       "titleLineTwo": "redaktionelles Niveau heben.",
       "description": "Wir liefern nicht nur Pakete; wir verwalten Reputation. Jedes Dokument, jedes Protokoll und jedes Support-Ticket wird mit der Präzision einer meisterhaften Garnitur behandelt.",
       "button": "Unsere Compliance-Philosophie ansehen"
+    },
+    "form": {
+      "title": "Nachricht senden",
+      "description": "Fragen, Bestellthemen oder Feedback gehen direkt an das Restaurant-Support-Team.",
+      "name": "Ihr Name",
+      "email": "E-Mail-Adresse",
+      "subject": "Betreff",
+      "message": "Nachricht",
+      "send": "Nachricht senden",
+      "sending": "Wird gesendet...",
+      "success": "Nachricht erfolgreich gesendet",
+      "missingRestaurant": "Restaurantkontext wird noch geladen. Bitte versuchen Sie es gleich erneut."
     },
     "chat": {
       "loadingChat": "Chat wird geladen...",
@@ -859,6 +916,24 @@
     "discountApplied": "Rabatt angewendet",
     "discount": "Rabatt",
     "total": "Gesamt",
+    "paymentDetails": "Zahlungsdetails",
+    "paymentDescription": "Zahlungsinformationen für diese Bestellung.",
+    "paymentPendingDescription": "Ihre Bestellung wurde aufgegeben, aber die Zahlung ist noch ausstehend. Sie können sie jetzt abschließen oder später fortsetzen.",
+    "paymentMethod": "Zahlungsmethode",
+    "amountDue": "Fälliger Betrag",
+    "paymentReference": "Zahlungsreferenz",
+    "scheduledFor": "Geplant für",
+    "deliveryAddress": "Lieferadresse",
+    "continuePayment": "Zahlung fortsetzen",
+    "retryPayment": "Zahlung erneut versuchen",
+    "notAvailable": "Nicht verfügbar",
+    "paymentStatus": {
+      "paid": "Bezahlt",
+      "pending": "Ausstehend",
+      "failed": "Fehlgeschlagen",
+      "cancelled": "Storniert",
+      "unknown": "Unbekannt"
+    },
     "chatAboutOrder": "Über diese Bestellung chatten",
     "orderNotFound": "Bestellung nicht gefunden",
     "reviewOrderNotFoundDescription": "Wir konnten die Bestellung, die Sie bewerten möchten, nicht finden.",
@@ -873,6 +948,12 @@
     "upload": "Hochladen",
     "previewAlt": "Vorschau",
     "submitReview": "Bewertung senden",
+    "submittingReview": "Wird gesendet...",
+    "reviewSubmitted": "Bewertung erfolgreich gesendet",
+    "alreadyReviewedTitle": "Bewertung bereits gesendet",
+    "reviewAlreadySubmitted": "Sie haben diese Bestellung bereits bewertet.",
+    "reviewUnavailableTitle": "Bewertung noch nicht verfügbar",
+    "reviewUnavailableDescription": "Sie können diese Bestellung bewerten, sobald sie abgeschlossen ist.",
     "cancel": "Abbrechen",
     "loadingReviewsPage": "Bewertungsseite wird geladen..."
   },
@@ -900,7 +981,8 @@
       "processing": "In Bearbeitung",
       "confirmed": "Bestätigt",
       "preparing": "In Zubereitung",
-      "pickedUp": "Abgeholt"
+      "pickedUp": "Abgeholt",
+      "served": "Serviert"
     }
   },
   "payments": {
@@ -1270,7 +1352,20 @@
       "delivery": "Lieferung",
       "pickup": "Abholung",
       "takeaway": "Abholung"
-    }
+    },
+    "youRatedThisOrder": "Sie haben diese Bestellung bewertet",
+    "howWasYourFood": "Wie war Ihr Essen?",
+    "reviewCompletedOrder": "Teilen Sie Feedback zu dieser abgeschlossenen Bestellung.",
+    "writeReview": "Bewertung schreiben",
+    "successNotice": {
+      "title": "Bestellung erfolgreich aufgegeben",
+      "description": "Wir haben Ihre Bestellung erhalten. Den aktuellen Status können Sie unten verfolgen.",
+      "paymentPendingTitle": "Bestellung aufgegeben, Zahlung ausstehend",
+      "paymentPendingDescription": "Ihre Bestellung wurde erstellt. Schließen Sie die Stripe-Zahlung im Zahlungsbereich ab, um den Checkout zu beenden."
+    },
+    "completePayment": "Zahlung abschließen",
+    "completePaymentDescription": "Dies startet den ausstehenden Stripe-Zahlungsversuch für dieselbe Bestellung erneut.",
+    "closePaymentPopup": "Zahlungspopup schließen"
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -1614,6 +1709,7 @@
     "reservationNoteMax": "Der besondere Wunsch darf höchstens 500 Zeichen lang sein",
     "contactNameRequired": "Name ist erforderlich",
     "contactEmailRequired": "Eine gültige E-Mail-Adresse ist erforderlich",
+    "contactSubjectRequired": "Betreff ist erforderlich",
     "contactMessageRequired": "Nachricht ist erforderlich",
     "reviewMax": "Bewertung darf höchstens 1000 Zeichen lang sein"
   },

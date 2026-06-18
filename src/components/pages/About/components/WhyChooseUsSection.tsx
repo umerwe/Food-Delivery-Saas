@@ -2,34 +2,67 @@
 
 import { MousePointerClick, Zap, ShieldCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
+import type { AboutTextCard, BranchStats } from "@/services/public-content";
 
-export default function WhyChooseUsSection() {
+type WhyChooseUsSectionProps = {
+  features?: AboutTextCard[];
+  branchStats?: BranchStats;
+};
+
+const compactNumber = (value: number) =>
+  new Intl.NumberFormat("en", {
+    notation: value >= 1000 ? "compact" : "standard",
+    maximumFractionDigits: 1,
+  }).format(value);
+
+export default function WhyChooseUsSection({ features: dynamicFeatures, branchStats }: WhyChooseUsSectionProps) {
   const t = useTranslations("about.whyChooseUs");
+  const homeStatsT = useTranslations("home.stats");
 
-  const features = [
+  const fallbackFeatures = [
     {
       title: t("easyTitle"),
       description: t("easyDescription"),
-      icon: MousePointerClick,
     },
     {
       title: t("fastTitle"),
       description: t("fastDescription"),
-      icon: Zap,
     },
     {
       title: t("qualityTitle"),
       description: t("qualityDescription"),
-      icon: ShieldCheck,
     },
   ];
 
-  const stats = [
+  const fallbackStats = [
     { value: "2M+", label: t("happyCustomers") },
     { value: "98%", label: t("satisfaction") },
     { value: "20+", label: t("branches") },
     { value: "100+", label: t("employees") },
   ];
+  const branchStatItems = branchStats
+    ? [
+        {
+          value: `${compactNumber(branchStats.completedOrders)}+`,
+          label: homeStatsT("completedOrders"),
+        },
+        {
+          value: branchStats.averageRating ? `${branchStats.averageRating.toFixed(1)}/5` : "0/5",
+          label: homeStatsT("averageRating"),
+        },
+        {
+          value: `${compactNumber(branchStats.activeMenuItems)}+`,
+          label: homeStatsT("activeMenuItems"),
+        },
+        {
+          value: `${compactNumber(branchStats.fiveStarReviews)}+`,
+          label: homeStatsT("fiveStarReviews"),
+        },
+      ]
+    : null;
+  const icons = [MousePointerClick, Zap, ShieldCheck];
+  const features = dynamicFeatures?.length ? dynamicFeatures.slice(0, 3) : fallbackFeatures;
+  const stats = branchStatItems ?? fallbackStats;
 
   return (
     <section className="w-full">
@@ -46,7 +79,7 @@ export default function WhyChooseUsSection() {
         {/* features */}
         <div className="mt-12 max-w-5xl mx-auto px-4 grid md:grid-cols-3 gap-10">
           {features.map((item, index) => {
-            const Icon = item.icon;
+            const Icon = icons[index % icons.length];
 
             return (
               <div key={index} className="flex flex-col items-center text-center">

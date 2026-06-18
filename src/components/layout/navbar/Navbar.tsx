@@ -15,9 +15,9 @@ import {
   Coffee,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useAuthContext } from "@/hooks/useAuth"
 import { useAuth } from "@/hooks/useAuth"
@@ -26,7 +26,9 @@ import { BranchSwitcher } from "@/components/common/branch-selector/BranchSwitch
 import { BrandLogo } from "@/components/common/BrandLogo"
 import { LanguageSelector } from "@/components/layout/navbar/LanguageSelector"
 import { useHome } from "@/hooks/useHome"
+import { CART_CHANGED_EVENT } from "@/lib/cart-events"
 import { resolveHomeBranchId, resolveHomeRestaurantId, resolveTableReservationsEnabled } from "@/lib/home"
+import { fetchCustomerCart } from "@/services/cart"
 
 type MenuItem = {
   id: string
@@ -99,6 +101,18 @@ type SearchResponse = {
 const isSearchResponse = (value: unknown): value is SearchResponse =>
   typeof value === "object" && value !== null && "success" in value
 
+const NAV_LINKS = [
+  { href: "/", labelKey: "home" },
+  { href: "/menu", labelKey: "menus" },
+  { href: "/group-order", labelKey: "groupOrder" },
+  { href: "/reservetable", labelKey: "reservations" },
+] as const
+
+const toCartQuantity = (value: unknown) => {
+  const quantity = Number(value)
+  return Number.isFinite(quantity) ? Math.max(0, Math.floor(quantity)) : 0
+}
+
 export const Navbar = () => {
   const { user, logout } = useAuthContext()
   const { token, loading: authLoading, restaurantId } = useAuth()
@@ -119,6 +133,7 @@ export const Navbar = () => {
   )
 
   const isAuth = !!user
+  const userId = user?.id
   const userName = `${user?.profile?.firstName || ""} ${user?.profile?.lastName || ""}`.trim()
   const tableReservationsEnabled = resolveTableReservationsEnabled(
     homeQuery.data?.data.branch,
@@ -133,6 +148,7 @@ export const Navbar = () => {
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchResults, setSearchResults] = useState<MenuItem[]>([])
   const [searchMeta, setSearchMeta] = useState<SearchResponse["meta"] | null>(null)
+  const [cartItemCount, setCartItemCount] = useState(0)
 
   const dropdownRef = useRef<HTMLDivElement | null>(null)
   const navbarWrapRef = useRef<HTMLDivElement | null>(null)
@@ -140,8 +156,18 @@ export const Navbar = () => {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
+  const pathname = usePathname()
   const tNav = useTranslations("navigation")
   const tCommon = useTranslations("common")
+  const hideOnMobileHome = pathname === "/"
+
+  const isNavLinkActive = (href: string) => {
+    if (href === "/") return pathname === "/"
+    return pathname === href || pathname.startsWith(`${href}/`)
+  }
+
+  const isNavLinkDisabled = (href: string) =>
+    href === "/reservetable" && !tableReservationsEnabled
 
   const getSafeImageSrc = (src?: string | null) => {
     if (!src || typeof src !== "string") return "/placeholder-food.png"
@@ -253,6 +279,36 @@ export const Navbar = () => {
     }
   }
 
+  const refreshCartItemCount = useCallback(async () => {
+    if (!userId || authLoading) {
+      setCartItemCount(0)
+      return
+    }
+
+    try {
+      const { items } = await fetchCustomerCart({ customerId: userId, token })
+      setCartItemCount(items.reduce((total, item) => total + toCartQuantity(item.quantity), 0))
+    } catch {
+      setCartItemCount(0)
+    }
+  }, [authLoading, token, userId])
+
+  useEffect(() => {
+    refreshCartItemCount()
+  }, [refreshCartItemCount])
+
+  useEffect(() => {
+    const handleCartChanged = () => {
+      refreshCartItemCount()
+    }
+
+    window.addEventListener(CART_CHANGED_EVENT, handleCartChanged)
+
+    return () => {
+      window.removeEventListener(CART_CHANGED_EVENT, handleCartChanged)
+    }
+  }, [refreshCartItemCount])
+
   useEffect(() => {
     if (!searchOpen) return
 
@@ -280,67 +336,96 @@ export const Navbar = () => {
 
   return (
     <>
-      <div ref={navbarWrapRef} className="relative z-30">
+      <div
+        ref={navbarWrapRef}
+        className={`relative z-30 ${hideOnMobileHome ? "hidden md:block" : ""}`}
+      >
         {/* NAVBAR */}
-        <nav className="flex items-center justify-between px-6 2xl:px-40 py-6">
+        <nav className="mx-auto flex max-w-[1440px] items-center justify-between gap-5 px-5 py-5 lg:px-8 2xl:px-10">
           {/* LEFT - LOGO */}
-          <Link href="/" className="relative w-[160px] h-[32px]">
+          <Link href="/" className="relative h-[34px] w-[150px] shrink-0">
             <BrandLogo alt="Logo" fill className="object-contain" />
           </Link>
 
           {/* DESKTOP NAV */}
-          <div className="hidden md:flex items-center gap-10 font-medium text-[#555]">
-            {/* Search */}
-            <button
-              onClick={handleToggleSearch}
-              className="flex items-center gap-2 hover:text-primary transition-colors"
-            >
-              <Search size={18} className="text-primary font-semibold" />
-              <span className="font-semibold">{tNav("searchFood")}</span>
-            </button>
+          <div className="hidden min-w-0 flex-1 items-center justify-between gap-4 xl:flex">
+            <div className="flex min-w-0 items-center gap-8 text-sm font-semibold text-[#20242A]">
+              {NAV_LINKS.map((item) => {
+                const isActive = isNavLinkActive(item.href)
+                const isDisabled = isNavLinkDisabled(item.href)
 
-            {/* Reserve */}
-            <Link
-              href={tableReservationsEnabled ? "/reservetable" : "#"}
-              aria-disabled={!tableReservationsEnabled}
-              onClick={(event) => {
-                if (!tableReservationsEnabled) {
-                  event.preventDefault()
-                }
-              }}
-              className={`flex items-center gap-2 hover:text-primary ${
-                tableReservationsEnabled ? "" : "pointer-events-auto cursor-not-allowed opacity-40"
-              }`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M9.99984 7.91797C14.6022 7.91797 18.3332 6.79868 18.3332 5.41797C18.3332 4.03726 14.6022 2.91797 9.99984 2.91797C5.39746 2.91797 1.6665 4.03726 1.6665 5.41797C1.6665 6.79868 5.39746 7.91797 9.99984 7.91797Z" fill="#CE181B" stroke="#CE181B" strokeWidth="1.25" />
-                <path d="M9.99992 17.0859C10.649 17.0906 11.2847 16.9008 11.8249 16.5409C11.9448 16.4565 12.0301 16.3315 12.0652 16.1891C12.1003 16.0467 12.0827 15.8964 12.0158 15.7659C11.7274 15.2176 11.1083 14.5859 9.99992 14.5859C8.89159 14.5859 8.27242 15.2193 7.98409 15.7651C7.91713 15.8956 7.89957 16.0459 7.93464 16.1883C7.9697 16.3307 8.05503 16.4556 8.17492 16.5401C8.67492 16.8818 9.30992 17.0859 9.99992 17.0859Z" fill="#CE181B" stroke="#CE181B" strokeWidth="1.25" strokeLinejoin="round" />
-                <path d="M10 14.5846V7.91797" stroke="#CE181B" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="text-primary font-semibold">{tNav("reserveTable")}</span>
-            </Link>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-disabled={isDisabled}
+                    tabIndex={isDisabled ? -1 : undefined}
+                    onClick={(event) => {
+                      if (isDisabled) {
+                        event.preventDefault()
+                      }
+                    }}
+                    className={`relative whitespace-nowrap py-2 transition-colors after:absolute after:left-1/2 after:-bottom-1 after:h-[3px] after:-translate-x-1/2 after:rounded-full after:transition-all ${
+                      isDisabled
+                        ? "pointer-events-none cursor-not-allowed text-gray-300 after:w-0 after:bg-transparent"
+                        : isActive
+                        ? "text-primary after:w-6 after:bg-primary"
+                        : "hover:text-primary after:w-0 after:bg-transparent"
+                    }`}
+                  >
+                    {tNav(item.labelKey)}
+                  </Link>
+                )
+              })}
+            </div>
 
-            {/* Cart */}
-            <Link
-              href="/checkout"
-              className="flex items-center gap-2 hover:text-primary"
-            >
-              <ShoppingBag size={18} className="text-primary" />
-              <span className="text-primary font-semibold">{tNav("cart")}</span>
-            </Link>
-            <BranchSwitcher />
-            <LanguageSelector />
-            {/* USER */}
-            {isAuth ? (
-              <div ref={dropdownRef} className="relative">
-                <button
-                  onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="flex items-center gap-2 text-primary cursor-pointer"
-                >
-                  <User size={18} fill="currentColor" />
-                  <span className="font-semibold">{userName}</span>
-                  <ChevronDown size={16} />
-                </button>
+            <div className="flex min-w-0 items-center justify-end gap-2">
+              {/* Search */}
+              <button
+                onClick={handleToggleSearch}
+                className="flex h-11 w-[180px] items-center gap-2 rounded-full bg-[#F7F7F8] px-4 text-left text-sm font-semibold text-[#7A8088] transition-colors hover:bg-[#F1F2F4] hover:text-primary 2xl:w-[240px]"
+              >
+                <Search size={18} className="shrink-0 text-primary" />
+                <span className="truncate">{tNav("searchFood")}</span>
+              </button>
+
+              <BranchSwitcher presentation="navbar" />
+              <LanguageSelector className="h-11 rounded-full border-none bg-[#F7F7F8] px-4 text-[#20242A] shadow-none hover:bg-[#F1F2F4]" />
+
+              <Link
+                href="/checkout"
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F7F7F8] text-primary transition-colors hover:bg-[#F1F2F4]"
+                aria-label={tNav("cart")}
+              >
+                <ShoppingBag size={19} />
+                {cartItemCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                    {cartItemCount > 99 ? "99+" : cartItemCount}
+                  </span>
+                ) : null}
+              </Link>
+              {/* USER */}
+              {isAuth ? (
+                <div ref={dropdownRef} className="relative">
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex h-11 max-w-[180px] cursor-pointer items-center gap-2 rounded-full bg-[#F7F7F8] pl-2 pr-3 text-[#20242A] transition-colors hover:bg-[#F1F2F4] 2xl:max-w-[220px]"
+                  >
+                    <span className="relative h-8 w-8 overflow-hidden rounded-full bg-white">
+                      <Image
+                        src={
+                          user?.profile?.avatarUrl?.startsWith("http")
+                            ? user.profile.avatarUrl
+                            : "/profile-user.png"
+                        }
+                        alt={userName || tNav("user")}
+                        fill
+                        className="object-cover"
+                      />
+                    </span>
+                    <span className="truncate text-sm font-semibold">{userName || tNav("user")}</span>
+                    <ChevronDown size={15} className="shrink-0 text-[#7A8088]" />
+                  </button>
 
                 {dropdownOpen && (
                   <div
@@ -460,18 +545,19 @@ export const Navbar = () => {
             ) : (
               <Link
                 href="/auth/login"
-                className="flex items-center gap-2 text-primary"
+                className="flex h-11 items-center gap-2 rounded-full bg-[#F7F7F8] px-4 text-sm font-semibold text-primary transition-colors hover:bg-[#F1F2F4]"
               >
                 <User size={18} />
                 {tNav("login")}
               </Link>
             )}
+            </div>
           </div>
 
           {/* MOBILE BUTTON */}
           <button
             onClick={() => setMobileOpen(true)}
-            className="md:hidden"
+            className="xl:hidden"
           >
             <Menu />
           </button>
@@ -616,6 +702,17 @@ export const Navbar = () => {
         </div>
       </div>
 
+      {hideOnMobileHome ? (
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="fixed right-16 top-5 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 md:hidden"
+          aria-label={tNav("openMenu")}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      ) : null}
+
       {/* MOBILE MENU */}
       {mobileOpen && (
         <div className="fixed inset-0 bg-black/40 z-50">
@@ -626,6 +723,39 @@ export const Navbar = () => {
             >
               <X />
             </button>
+
+            <div className="flex flex-col gap-2">
+              {NAV_LINKS.map((item) => {
+                const isActive = isNavLinkActive(item.href)
+                const isDisabled = isNavLinkDisabled(item.href)
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-disabled={isDisabled}
+                    tabIndex={isDisabled ? -1 : undefined}
+                    onClick={(event) => {
+                      if (isDisabled) {
+                        event.preventDefault()
+                        return
+                      }
+
+                      setMobileOpen(false)
+                    }}
+                    className={`rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${
+                      isDisabled
+                        ? "pointer-events-none cursor-not-allowed bg-gray-50 text-gray-300"
+                        : isActive
+                          ? "bg-primary text-white"
+                          : "bg-gray-50 text-gray-800 hover:bg-primary/10"
+                    }`}
+                  >
+                    {tNav(item.labelKey)}
+                  </Link>
+                )
+              })}
+            </div>
 
             <button
               onClick={() => {
@@ -653,7 +783,15 @@ export const Navbar = () => {
             </Link>
 
             <Link href="/checkout" className="flex items-center gap-3">
-              <ShoppingBag /> {tNav("cart")}
+              <span className="relative">
+                <ShoppingBag />
+                {cartItemCount > 0 ? (
+                  <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                    {cartItemCount > 99 ? "99+" : cartItemCount}
+                  </span>
+                ) : null}
+              </span>
+              {tNav("cart")}
             </Link>
 
             <LanguageSelector className="w-full justify-between" />

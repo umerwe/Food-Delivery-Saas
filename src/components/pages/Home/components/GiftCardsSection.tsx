@@ -1,11 +1,19 @@
 "use client";
 
-import Image from "next/image";
-import { ArrowRight, BadgeCheck, CreditCard, Gift, Mail, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  CreditCard,
+  Gift,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel";
 import type { GiftCardAvailableItem, HomeGiftCards } from "@/types/gift-cards";
 import { GiftCardPurchaseModal } from "@/components/pages/Home/components/GiftCardPurchaseModal";
 
@@ -26,65 +34,94 @@ const formatAmount = (amount: number, currency = "USD") =>
 type GiftCardTicketProps = {
   giftCard: GiftCardAvailableItem;
   currency?: string | null;
+  index: number;
   onSelect: (giftCard: GiftCardAvailableItem) => void;
 };
+
+const giftCardBackgrounds = [
+  "bg-[linear-gradient(135deg,#ff7a68_0%,#df202b_48%,#8f0e18_100%)]",
+  "bg-[linear-gradient(135deg,#ff8f5e_0%,#d71d2b_46%,#71101a_100%)]",
+  "bg-[linear-gradient(135deg,#f84e61_0%,#bd1424_48%,#5f0d14_100%)]",
+  "bg-[linear-gradient(135deg,#ff9b92_0%,#e2243a_45%,#90101d_100%)]",
+] as const;
 
 const GiftCardTicket = ({
   giftCard,
   currency,
+  index,
   onSelect,
 }: GiftCardTicketProps) => {
   const t = useTranslations("home.giftCards");
+  const background = giftCardBackgrounds[index % giftCardBackgrounds.length];
 
   return (
-    <article className="group relative overflow-hidden rounded-[22px] bg-white shadow-[0_18px_55px_rgba(239,68,68,0.13)] transition duration-200 before:absolute before:inset-x-6 before:-top-10 before:h-20 before:rounded-full before:bg-primary/20 before:blur-3xl hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(239,68,68,0.2)]">
-      <div className="absolute -right-10 -top-12 h-28 w-28 rounded-full bg-primary/10 blur-2xl transition duration-200 group-hover:bg-primary/20" />
-      <div className="relative flex min-h-[188px] min-w-0 flex-col p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-2xl font-black leading-none text-gray-950">
-              {formatAmount(giftCard.amount, currency ?? "USD")}
-            </p>
-            <h3 className="mt-3 line-clamp-2 text-lg font-bold leading-snug text-gray-900">
-              {giftCard.title}
-            </h3>
-          </div>
+    <button
+      type="button"
+      className={`group relative flex h-[206px] w-full cursor-grab flex-col overflow-hidden rounded-[24px] ${background} p-5 text-left  transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_52px_rgba(169,15,23,0.28)] focus:outline-none focus:ring-2 focus:ring-primary/30 active:cursor-grabbing sm:h-[236px] sm:p-5`}
+      onClick={() => onSelect(giftCard)}
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_12%,rgba(255,255,255,0.26)_0_17%,transparent_18%)]" />
+      
+      <div className="absolute -bottom-14 left-3 h-28 w-28 rounded-full bg-black/10 blur-xl" />
+      <div className="absolute bottom-0 right-0 h-20 w-24 rounded-tl-full bg-black/10" />
 
-          {giftCard.imageUrl ? (
-            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gray-100">
-              <Image
-                src={giftCard.imageUrl}
-                alt={giftCard.title}
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            </div>
-          ) : (
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-lg shadow-primary/10">
-              <BadgeCheck size={22} />
-            </span>
-          )}
+      <div className="relative z-10 flex h-full flex-col">
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/70">
+            {t("label")}
+          </p>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-white ring-1 ring-white/35 backdrop-blur">
+            <Gift size={18} strokeWidth={2.3} />
+          </span>
         </div>
 
-        {giftCard.description ? (
-          <p className="mt-3 line-clamp-2 text-sm leading-5 text-gray-500">
-            {giftCard.description}
+        <div className="mt-5 min-h-0 flex-1 space-y-1.5 pr-20 sm:mt-6">
+          <p className="text-[30px] font-black leading-none tracking-tight text-white sm:text-[32px]">
+            {formatAmount(giftCard.amount, currency ?? "USD")}
           </p>
-        ) : null}
+          <h3 className="line-clamp-2 text-[14px] font-bold leading-tight text-white sm:text-[15px]">
+            {giftCard.title}
+          </h3>
+        </div>
 
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="inline-flex h-9 min-w-[118px] items-center justify-center rounded-full bg-white px-4 text-[11px] font-extrabold uppercase tracking-[0.08em] text-primary shadow-sm transition group-hover:bg-white/95 sm:h-10 sm:text-[12px]">
+            {t("purchase")}
+          </span>
+          <span className="h-px flex-1 bg-white/20" />
+        </div>
+      </div>
+    </button>
+  );
+};
+
+function GiftCardIntroTile({ onBuy }: { onBuy: () => void }) {
+  const t = useTranslations("home.giftCards");
+
+  return (
+    <article className="flex h-[208px] w-full flex-col bg-transparent p-0 sm:h-[218px]">
+      <div className="flex max-w-[255px] flex-1 flex-col">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+          {t("label")}
+        </p>
+        <h2 className="mt-2 text-2xl font-black leading-[1.05] tracking-tight text-gray-950 sm:text-[28px]">
+          {t("buy")}
+        </h2>
+        <p className="mt-2 line-clamp-2 text-sm font-medium leading-5 text-gray-600">
+          {t("description")}
+        </p>
         <Button
           type="button"
-          className="mt-auto h-10 rounded-full bg-primary text-white hover:bg-primary/90"
-          onClick={() => onSelect(giftCard)}
+          className="mt-auto h-10 w-fit rounded-full bg-primary px-5 text-sm font-bold text-white shadow-lg shadow-primary/20 hover:bg-primary/90"
+          onClick={onBuy}
         >
-          {t("buyPreset")}
+          {t("buy")}
           <ArrowRight size={15} />
         </Button>
       </div>
     </article>
   );
-};
+}
 
 export const GiftCardsSection = ({
   giftCards,
@@ -111,106 +148,55 @@ export const GiftCardsSection = ({
       id="gift-cards"
       className="mx-auto max-w-[1400px] px-4 pb-[30px] pt-[30px] sm:px-6 sm:pb-[60px] sm:pt-[60px]"
     >
-      <div className="overflow-hidden rounded-[28px] border border-gray-100 bg-white shadow-xl shadow-primary/5">
-        <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="relative min-h-[520px] bg-[#fbfbfb] p-6 sm:p-8 lg:p-10">
-            <div className="max-w-xl">
-              <p className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
-                <Gift size={14} />
-                {t("label")}
-              </p>
-              <h2 className="mt-4 text-3xl font-bold leading-tight text-gray-950 sm:text-4xl">
-                {t("title")}
-              </h2>
-              <p className="mt-4 text-sm leading-6 text-gray-500 sm:text-base">
-                {t("description")}
-              </p>
+      <div className="rounded-[30px] bg-white px-4 py-5 sm:px-6 sm:py-6">
+        {items.length > 0 ? (
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch">
+            <div className="lg:w-[280px] lg:shrink-0">
+              <GiftCardIntroTile onBuy={() => openPurchaseModal()} />
             </div>
 
-            <div className="relative mt-10 h-[230px] max-w-[430px]">
-              <div className="absolute left-4 top-6 h-[170px] w-[86%] max-w-[360px] rotate-[-8deg] rounded-[26px] bg-gray-950 shadow-2xl shadow-gray-300/70" />
-              <div className="absolute left-1 top-2 h-[178px] w-[88%] max-w-[368px] rotate-[4deg] rounded-[26px] border border-primary/15 bg-white shadow-2xl shadow-primary/10" />
-              <div className="absolute left-0 top-0 flex h-[188px] w-[90%] max-w-[376px] flex-col justify-between rounded-[26px] bg-primary p-5 text-white shadow-2xl shadow-primary/25">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-                      {t("label")}
-                    </p>
-                    <h3 className="mt-4 max-w-[230px] text-2xl font-black leading-tight">
-                      {t("customOnlyTitle")}
-                    </h3>
-                  </div>
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-primary">
-                    <Gift size={22} />
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-t border-white/20 pt-4 text-sm text-white/80">
-                  <span>{t("instantCheckout")}</span>
-                  <CreditCard size={18} />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-3 text-sm font-medium text-gray-700 sm:grid-cols-2">
-              <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm shadow-gray-200/70">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Sparkles size={16} />
-                </span>
-                {t("instantCheckout")}
-              </div>
-              <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm shadow-gray-200/70">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Mail size={16} />
-                </span>
-                {t("emailDelivery")}
-              </div>
-            </div>
-
+            <Carousel
+              opts={{ align: "start", dragFree: true }}
+              className="min-w-0 flex-1"
+            >
+              <CarouselContent className="-ml-4 cursor-grab active:cursor-grabbing">
+                {items.map((giftCard, index) => (
+                  <CarouselItem
+                    key={giftCard.id}
+                    className="basis-[76%] pl-4 sm:basis-[36%] lg:basis-1/4"
+                  >
+                    <GiftCardTicket
+                      giftCard={giftCard}
+                      currency={currency}
+                      index={index}
+                      onSelect={openPurchaseModal}
+                    />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+            </Carousel>
+          </div>
+        ) : (
+          <div className="flex min-h-[258px] flex-col items-center justify-center rounded-[28px] bg-gradient-to-br from-[#EB4D3D] via-[#D93528] to-[#A91216] p-6 text-center text-white">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-primary">
+              <Gift size={34} />
+            </span>
+            <h3 className="mt-4 text-xl font-bold">
+              {t("customOnlyTitle")}
+            </h3>
+            <p className="mt-2 max-w-md text-sm leading-6 text-white/80">
+              {t("customOnlyDescription")}
+            </p>
             <Button
               type="button"
-              className="mt-6 h-11 w-full rounded-full bg-primary px-5 text-white shadow-lg shadow-primary/20 hover:bg-primary/90 sm:w-fit"
+              className="mt-5 h-10 rounded-full bg-white px-5 text-primary hover:bg-white/90"
               onClick={() => openPurchaseModal()}
             >
-              {t("customAmount")}
-              <ArrowRight size={16} />
+              {t("buy")}
+              <CreditCard size={15} />
             </Button>
           </div>
-
-          <div className="border-t border-gray-100 p-5 sm:p-6 lg:border-l lg:border-t-0 lg:p-8">
-            {items.length > 0 ? (
-              <div className="grid gap-4 xl:grid-cols-2">
-                {items.slice(0, 6).map((giftCard) => (
-                  <GiftCardTicket
-                    key={giftCard.id}
-                    giftCard={giftCard}
-                    currency={currency}
-                    onSelect={openPurchaseModal}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[24px] border border-dashed border-primary/20 bg-primary/5 p-6 text-center">
-                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Gift size={34} />
-                </span>
-                <h3 className="mt-4 text-xl font-bold text-gray-900">
-                  {t("customOnlyTitle")}
-                </h3>
-                <p className="mt-2 max-w-md text-sm leading-6 text-gray-500">
-                  {t("customOnlyDescription")}
-                </p>
-                <Button
-                  type="button"
-                  className="mt-5 h-10 rounded-full bg-primary text-white hover:bg-primary/90"
-                  onClick={() => openPurchaseModal()}
-                >
-                  {t("customAmount")}
-                  <ArrowRight size={15} />
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
       <GiftCardPurchaseModal

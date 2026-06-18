@@ -1,4 +1,11 @@
-import { Poppins, Montserrat, Nunito, Roboto } from "next/font/google";
+import { Onest, Poppins, Montserrat, Nunito, Roboto } from "next/font/google";
+
+export const onest = Onest({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  display: "swap",
+  variable: "--font-onest",
+});
 
 export const poppins = Poppins({
   subsets: ["latin"],
