@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { AboutHeroContent } from "@/services/public-content";
+import { isRemoteHttpsImageUrl } from "@/lib/image-fallback";
 
 type AboutBannerProps = {
   content?: AboutHeroContent;
@@ -30,6 +31,7 @@ export default function AboutBanner({ content, coverImage }: AboutBannerProps) {
         alt={t("imageAlt")}
         fill
         priority
+        unoptimized={isRemoteHttpsImageUrl(imageUrl)}
         className="object-cover"
       />
 

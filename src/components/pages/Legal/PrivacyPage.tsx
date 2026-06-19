@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 
 import { getStoredRestaurantId } from "@/lib/auth";
 import { formatDisplayAddress } from "@/lib/address-display";
+import { isRemoteHttpsImageUrl } from "@/lib/image-fallback";
 import { fetchPrivacyPolicyContent, type PrivacyPolicyContent } from "@/services/legal-content";
 
 const ALLOWED_POLICY_TAGS = new Set([
@@ -164,6 +165,7 @@ const PrivacyPage = () => {
                 sizes="(min-width: 1024px) 900px, 100vw"
                 className="object-cover"
                 priority
+                unoptimized={isRemoteHttpsImageUrl(policy.restaurantCoverImage)}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-transparent" />
             </div>
