@@ -4,13 +4,32 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import CategorySidebar from "./CategorySidebar";
 import { ItemsListing } from "./Items";
 import useItems from "@/hooks/useItems";
+import useMenu from "@/hooks/useMenu";
 import { useAuth } from "@/hooks/useAuth";
 import { getStoredRestaurantId } from "@/lib/auth";
 import { getItemsMenuViewMode, setItemsMenuViewMode } from "@/lib/view-preferences";
-import type { ApiMeta, ItemsCategory } from "@/components/pages/Items/types";
+import type { ApiMeta, ItemsCategory, MenuItem } from "@/components/pages/Items/types";
 import { resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
 
 type MenuViewMode = "multiple" | "onePage";
+type ItemsContentSource = "category" | "menu";
+
+type ItemsMenu = {
+  id?: string | number | null;
+  name?: string | null;
+  description?: string | null;
+  isActive?: boolean;
+  sortOrder?: string | number | null;
+  items?: Array<{
+    id?: string | number | null;
+    sortOrder?: string | number | null;
+    menuItem?: MenuItem | null;
+  }>;
+};
+
+type ItemsSectionForListing = Omit<ItemsCategory, "items"> & {
+  items?: ItemsMenu["items"];
+};
 
 const CATEGORY_PAGE_LIMIT = 20;
 
@@ -21,10 +40,13 @@ type ItemsLayoutProps = {
 export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
   const { token, restaurantId: authRestaurantId, user } = useAuth();
   const { fetchMenuCategoriesPage } = useItems(token);
+  const { fetchSignatureMenus } = useMenu(token);
 
   const [categories, setCategories] = useState<ItemsCategory[]>([]);
+  const [menus, setMenus] = useState<ItemsMenu[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loadingMoreCategories, setLoadingMoreCategories] = useState(false);
+  const [loadingMenus, setLoadingMenus] = useState(false);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -32,7 +54,10 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreCategories, setHasMoreCategories] = useState(false);
 
+  const [contentSource, setContentSource] = useState<ItemsContentSource>("category");
   const [activeOnePageCategoryId, setActiveOnePageCategoryId] = useState("");
+  const [activeOnePageMenuId, setActiveOnePageMenuId] = useState("");
+  const [activeMenuId, setActiveMenuId] = useState("");
   const [scrollTarget, setScrollTarget] = useState<{
     id: string;
     nonce: number;
@@ -64,6 +89,48 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
 
     return () => clearTimeout(timer);
   }, [search]);
+
+  const normalizedMenus = useMemo(() => {
+    const deduped = new Map<string, ItemsMenu>();
+
+    menus.forEach((menu) => {
+      const id = String(menu?.id || "");
+      if (!id || menu?.isActive === false) return;
+
+      deduped.set(id, {
+        ...menu,
+        id,
+        items: Array.isArray(menu?.items) ? menu.items : [],
+      });
+    });
+
+    return Array.from(deduped.values()).sort((a, b) => {
+      return Number(a?.sortOrder ?? 0) - Number(b?.sortOrder ?? 0);
+    });
+  }, [menus]);
+
+  const filteredMenus = useMemo(() => {
+    const term = debouncedSearch.toLowerCase();
+
+    if (!term) return normalizedMenus;
+
+    return normalizedMenus.filter((menu) => {
+      return String(menu?.name || "").toLowerCase().includes(term);
+    });
+  }, [normalizedMenus, debouncedSearch]);
+
+  const activeSections = contentSource === "menu" ? filteredMenus : categories;
+  const listingSections = useMemo<ItemsSectionForListing[]>(() => {
+    if (contentSource === "menu") return filteredMenus;
+
+    return categories.map((category) => ({
+      ...category,
+      items: undefined,
+    }));
+  }, [contentSource, filteredMenus, categories]);
+  const loadingSections = contentSource === "menu" ? loadingMenus : loadingCategories;
+  const loadingMoreSections = contentSource === "menu" ? false : loadingMoreCategories;
+  const hasMoreSections = contentSource === "menu" ? false : hasMoreCategories;
 
   const fetchCategories = async ({
     page = 1,
@@ -133,6 +200,24 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
     }
   };
 
+  const fetchMenus = async () => {
+    if (!token || !restaurantId) return;
+
+    try {
+      setLoadingMenus(true);
+
+      const { menus: fetchedMenus } = await fetchSignatureMenus({
+        restaurantId: String(restaurantId),
+      });
+
+      setMenus(fetchedMenus as ItemsMenu[]);
+    } catch {
+      setMenus([]);
+    } finally {
+      setLoadingMenus(false);
+    }
+  };
+
   useEffect(() => {
     if (!token || !restaurantId) return;
 
@@ -142,6 +227,12 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
       append: false,
     });
   }, [token, restaurantId, debouncedSearch]);
+
+  useEffect(() => {
+    if (!token || !restaurantId) return;
+
+    fetchMenus();
+  }, [token, restaurantId]);
 
   useEffect(() => {
     if (!categories.length) {
@@ -157,6 +248,30 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
       setActiveOnePageCategoryId(String(categories[0].id));
     }
   }, [categories, activeOnePageCategoryId]);
+
+  useEffect(() => {
+    if (!filteredMenus.length) {
+      setActiveOnePageMenuId("");
+      setActiveMenuId("");
+      return;
+    }
+
+    const firstMenuId = String(filteredMenus[0].id || "");
+    const activeMenuStillExists = filteredMenus.some(
+      (menu) => String(menu.id) === String(activeMenuId)
+    );
+    const activeOnePageStillExists = filteredMenus.some(
+      (menu) => String(menu.id) === String(activeOnePageMenuId)
+    );
+
+    if (!activeMenuId || !activeMenuStillExists) {
+      setActiveMenuId(firstMenuId);
+    }
+
+    if (!activeOnePageMenuId || !activeOnePageStillExists) {
+      setActiveOnePageMenuId(firstMenuId);
+    }
+  }, [filteredMenus, activeMenuId, activeOnePageMenuId]);
 
   const handleLoadMoreCategories = async () => {
     if (loadingCategories || loadingMoreCategories || !hasMoreCategories) {
@@ -178,14 +293,33 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
     return String(categoryId || categories?.[0]?.id || "");
   }, [viewMode, activeOnePageCategoryId, categoryId, categories]);
 
+  const activeMenuSectionId = useMemo(() => {
+    if (viewMode === "onePage") {
+      return activeOnePageMenuId || String(filteredMenus?.[0]?.id || "");
+    }
+
+    return activeMenuId || String(filteredMenus?.[0]?.id || "");
+  }, [viewMode, activeOnePageMenuId, activeMenuId, filteredMenus]);
+
+  const activeSectionId = contentSource === "menu" ? activeMenuSectionId : activeCategoryId;
+
   const handleViewModeChange = (nextMode: MenuViewMode) => {
     setViewMode(nextMode);
 
     if (nextMode === "onePage") {
-      const id = String(activeCategoryId || categories?.[0]?.id || "");
+      const id = String(
+        contentSource === "menu"
+          ? activeMenuSectionId || filteredMenus?.[0]?.id || ""
+          : activeCategoryId || categories?.[0]?.id || ""
+      );
 
       if (id) {
-        setActiveOnePageCategoryId(id);
+        if (contentSource === "menu") {
+          setActiveOnePageMenuId(id);
+        } else {
+          setActiveOnePageCategoryId(id);
+        }
+
         setScrollTarget({
           id,
           nonce: Date.now(),
@@ -194,7 +328,28 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
     }
   };
 
+  const handleContentSourceChange = (nextSource: ItemsContentSource) => {
+    setContentSource(nextSource);
+    setSearch("");
+    setDebouncedSearch("");
+    setScrollTarget(null);
+  };
+
   const handleCategorySelect = (id: string) => {
+    if (contentSource === "menu") {
+      if (viewMode === "onePage") {
+        setActiveOnePageMenuId(String(id));
+        setScrollTarget({
+          id: String(id),
+          nonce: Date.now(),
+        });
+        return;
+      }
+
+      setActiveMenuId(String(id));
+      return;
+    }
+
     if (viewMode !== "onePage") return;
 
     setActiveOnePageCategoryId(String(id));
@@ -209,15 +364,17 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
       {/* SIDEBAR */}
       <aside className="w-full min-w-0 shrink-0 lg:sticky lg:top-24 lg:w-[280px] lg:self-start">
         <CategorySidebar
-          activeCategoryId={activeCategoryId}
-          categories={categories}
-          loading={loadingCategories}
-          loadingMore={loadingMoreCategories}
-          hasMore={hasMoreCategories}
+          activeCategoryId={activeSectionId}
+          categories={activeSections}
+          loading={loadingSections}
+          loadingMore={loadingMoreSections}
+          hasMore={hasMoreSections}
           search={search}
           onSearchChange={setSearch}
           onLoadMore={handleLoadMoreCategories}
           viewMode={viewMode}
+          contentSource={contentSource}
+          onContentSourceChange={handleContentSourceChange}
           onViewModeChange={handleViewModeChange}
           onCategorySelect={handleCategorySelect}
         />
@@ -226,11 +383,14 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
       {/* ITEMS */}
       <main className="min-w-0 flex-1">
         <ItemsListing
-          categoryId={categoryId}
-          categories={categories}
+          activeSectionId={activeSectionId}
+          sections={listingSections}
+          contentSource={contentSource}
           viewMode={viewMode}
           scrollTarget={scrollTarget}
-          onActiveCategoryChange={setActiveOnePageCategoryId}
+          onActiveCategoryChange={
+            contentSource === "menu" ? setActiveOnePageMenuId : setActiveOnePageCategoryId
+          }
         />
       </main>
     </div>

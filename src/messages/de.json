@@ -44,6 +44,7 @@
     "changeLanguage": "Sprache ändern",
     "openMenu": "Menü öffnen",
     "home": "Startseite",
+    "items": "Artikel",
     "menus": "Menüs",
     "groupOrder": "Gruppenbestellung",
     "reservations": "Reservierungen",
@@ -559,9 +560,13 @@
       "categoryDescription": "Entdecken Sie frisch zubereitete Artikel in dieser Kategorie.",
       "menuDescription": "Durchsuchen Sie alle verfügbaren Kategorien und Menüartikel dieses Restaurants.",
       "noCategories": "Keine Kategorien gefunden",
+      "menusDescription": "Durchsuchen Sie Menübereiche und deren Artikel dieses Restaurants.",
+      "noMenus": "Keine Menüs gefunden",
       "noItems": "Keine Artikel gefunden",
       "noItemsInCategory": "Keine Artikel in dieser Kategorie gefunden",
+      "noItemsInMenu": "Keine Artikel in diesem Menü gefunden",
       "selectCategory": "Wählen Sie eine Kategorie aus, um Artikel anzuzeigen",
+      "selectMenu": "Wählen Sie ein Menü aus, um Artikel anzuzeigen",
       "loadingItems": "Artikel werden geladen...",
       "loadingMore": "Weitere werden geladen...",
       "loadMoreItems": "Weitere Artikel laden"
@@ -569,10 +574,15 @@
     "sidebar": {
       "description": "Nach Kategorie durchsuchen oder das vollständige Menü anzeigen.",
       "byCategory": "Nach Kategorie",
+      "byMenus": "Nach Menüs",
+      "displayMode": "Anzeige",
       "onePage": "1 Seite",
+      "individual": "Einzeln",
       "searchCategories": "Kategorien suchen",
+      "searchMenus": "Menüs suchen",
       "loadingCategories": "Kategorien werden geladen...",
-      "loadMoreCategories": "Weitere Kategorien laden"
+      "loadMoreCategories": "Weitere Kategorien laden",
+      "loadMoreMenus": "Weitere Menüs laden"
     },
     "groupOrder": {
       "joining": "Gruppenbestellung wird beigetreten...",

@@ -44,6 +44,7 @@
     "changeLanguage": "Change language",
     "openMenu": "Open menu",
     "home": "Home",
+    "items": "Items",
     "menus": "Menus",
     "groupOrder": "Group order",
     "reservations": "Reservations",
@@ -559,9 +560,13 @@
       "categoryDescription": "Explore freshly prepared items in this category.",
       "menuDescription": "Browse all available categories and menu items from this restaurant.",
       "noCategories": "No categories found",
+      "menusDescription": "Browse menu sections and their items from this restaurant.",
+      "noMenus": "No menus found",
       "noItems": "No items found",
       "noItemsInCategory": "No items found in this category",
+      "noItemsInMenu": "No items found in this menu",
       "selectCategory": "Select a category to view items",
+      "selectMenu": "Select a menu to view items",
       "loadingItems": "Loading items...",
       "loadingMore": "Loading more...",
       "loadMoreItems": "Load More Items"
@@ -569,10 +574,15 @@
     "sidebar": {
       "description": "Browse by category or view the full menu.",
       "byCategory": "By Category",
+      "byMenus": "By Menus",
+      "displayMode": "Display",
       "onePage": "1 Page",
+      "individual": "Individual",
       "searchCategories": "Search categories",
+      "searchMenus": "Search menus",
       "loadingCategories": "Loading categories...",
-      "loadMoreCategories": "Load More Categories"
+      "loadMoreCategories": "Load More Categories",
+      "loadMoreMenus": "Load More Menus"
     },
     "groupOrder": {
       "joining": "Joining group order...",

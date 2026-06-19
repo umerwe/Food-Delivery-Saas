@@ -103,7 +103,7 @@ const isSearchResponse = (value: unknown): value is SearchResponse =>
 
 const NAV_LINKS = [
   { href: "/", labelKey: "home" },
-  { href: "/menu", labelKey: "menus" },
+  { href: "/items", labelKey: "items" },
   { href: "/group-order", labelKey: "groupOrder" },
   { href: "/reservetable", labelKey: "reservations" },
 ] as const

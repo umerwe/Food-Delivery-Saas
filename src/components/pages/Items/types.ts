@@ -186,6 +186,7 @@ export type MenuItem = {
   supportsDealIdCartPayload?: boolean | null;
   supportsDealCartPayload?: boolean | null;
   isDealMenuItem?: boolean | null;
+  isActive?: boolean | null;
   minSelect?: string | number | null;
   maxSelect?: string | number | null;
   isRequired?: boolean | null;

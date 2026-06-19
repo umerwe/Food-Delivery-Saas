@@ -9,7 +9,7 @@ export type SignatureMenuViewMode = "multiple" | "onePage";
 export const getItemsMenuViewMode = (): MenuViewMode => {
   const stored = safeGetLocalStorageItem(MENU_VIEW_MODE_KEY);
 
-  return stored === "onePage" || stored === "multiple" ? stored : "multiple";
+  return stored === "onePage" || stored === "multiple" ? stored : "onePage";
 };
 
 export const setItemsMenuViewMode = (viewMode: MenuViewMode) => {

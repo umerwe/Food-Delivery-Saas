@@ -2,10 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { List, Loader2, Menu, Search } from "lucide-react";
+import { Grid2X2, List, Loader2, Menu, Search, Utensils } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 type MenuViewMode = "multiple" | "onePage";
+type ItemsContentSource = "category" | "menu";
 
 type CategorySidebarItem = {
   id?: string | number | null;
@@ -22,6 +23,8 @@ type CategorySidebarProps = {
   onSearchChange?: (value: string) => void;
   onLoadMore?: () => void;
   viewMode?: MenuViewMode;
+  contentSource?: ItemsContentSource;
+  onContentSourceChange?: (source: ItemsContentSource) => void;
   onViewModeChange?: (mode: MenuViewMode) => void;
   onCategorySelect?: (id: string) => void;
 };
@@ -36,6 +39,8 @@ export default function CategorySidebar({
   onSearchChange,
   onLoadMore,
   viewMode = "multiple",
+  contentSource = "category",
+  onContentSourceChange,
   onViewModeChange,
   onCategorySelect,
 }: CategorySidebarProps) {
@@ -54,7 +59,12 @@ export default function CategorySidebar({
       return;
     }
 
-    router.push(`/items?categoryId=${id}`);
+    if (contentSource === "category") {
+      router.push(`/items?categoryId=${id}`);
+      return;
+    }
+
+    onCategorySelect?.(String(id));
   };
 
   useEffect(() => {
@@ -93,42 +103,67 @@ export default function CategorySidebar({
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold text-gray-900">{tCommon("fullMenuLower")}</h2>
-          <p className="mt-1 text-xs text-gray-500">
-            {tSidebar("description")}
-          </p>
+          <p className="mt-1 text-xs text-gray-500">{tSidebar("description")}</p>
         </div>
       </div>
 
-      {/* VIEW MODE CONTROL */}
+      {/* CONTENT SOURCE CONTROL */}
       <div className="mb-4 rounded-2xl bg-gray-100 p-1">
         <div className="grid grid-cols-2 gap-1">
           <button
             type="button"
-            onClick={() => onViewModeChange?.("multiple")}
+            onClick={() => onContentSourceChange?.("category")}
             className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition ${
-              viewMode === "multiple"
+              contentSource === "category"
                 ? "bg-white text-primary shadow-sm"
                 : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
             }`}
           >
-            <Menu size={15} className="shrink-0" />
+            <Grid2X2 size={15} className="shrink-0" />
             <span className="truncate">{tSidebar("byCategory")}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => onViewModeChange?.("onePage")}
+            onClick={() => onContentSourceChange?.("menu")}
             className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl text-xs font-semibold transition ${
-              viewMode === "onePage"
+              contentSource === "menu"
                 ? "bg-white text-primary shadow-sm"
                 : "text-gray-500 hover:bg-white/70 hover:text-gray-800"
             }`}
           >
-            <List size={15} className="shrink-0" />
-            <span className="truncate">{tSidebar("onePage")}</span>
+            <Menu size={15} className="shrink-0" />
+            <span className="truncate">{tSidebar("byMenus")}</span>
           </button>
         </div>
       </div>
+
+      {/* DISPLAY MODE CONTROL */}
+      <label className="mb-4 block">
+        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-400">
+          {tSidebar("displayMode")}
+        </span>
+        <div className="relative">
+          <List
+            size={16}
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-primary"
+          />
+          <select
+            value={viewMode}
+            onChange={(event) =>
+              onViewModeChange?.(event.target.value === "multiple" ? "multiple" : "onePage")
+            }
+            className="cursor-pointer h-11 w-full appearance-none rounded-xl bg-gray-100 pl-10 pr-9 text-sm font-semibold text-gray-800 outline-none transition focus:bg-white focus:ring-2 focus:ring-primary/15"
+          >
+            <option value="onePage">{tSidebar("onePage")}</option>
+            <option value="multiple">{tSidebar("individual")}</option>
+          </select>
+          <Utensils
+            size={15}
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+        </div>
+      </label>
 
       {/* SEARCH */}
       <div className="relative mb-4">
@@ -140,7 +175,11 @@ export default function CategorySidebar({
         <input
           value={search || ""}
           onChange={(e) => onSearchChange?.(e.target.value)}
-          placeholder={tSidebar("searchCategories")}
+          placeholder={
+            contentSource === "menu"
+              ? tSidebar("searchMenus")
+              : tSidebar("searchCategories")
+          }
           className="h-11 w-full rounded-xl bg-gray-100 pl-10 pr-4 text-sm text-gray-800 outline-none transition focus:bg-white focus:ring-2 focus:ring-primary/15"
         />
       </div>
@@ -157,7 +196,7 @@ export default function CategorySidebar({
           </div>
         ) : categories.length === 0 ? (
           <p className="py-6 text-center text-sm text-gray-400">
-            {tCommon("noCategories")}
+            {contentSource === "menu" ? tCommon("noMenus") : tCommon("noCategories")}
           </p>
         ) : (
           <>
@@ -203,7 +242,9 @@ export default function CategorySidebar({
                     {tCommon("loadingMore")}
                   </>
                 ) : (
-                  tSidebar("loadMoreCategories")
+                  contentSource === "menu"
+                    ? tSidebar("loadMoreMenus")
+                    : tSidebar("loadMoreCategories")
                 )}
               </button>
             ) : null}
