@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { useAuthContext } from "@/hooks/useAuth";
+import { formatDisplayAddress } from "@/lib/address-display";
 import { useHome } from "@/hooks/useHome";
 import { normalizeBranch } from "@/lib/branch-selector";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
@@ -79,43 +80,6 @@ const getNestedTextField = (record: unknown, keys: string[]) => {
   return getTextField(record.contactInfo, keys);
 };
 
-const getAddressRecord = (value: unknown) => {
-  if (!isRecord(value)) return null;
-
-  if (isRecord(value.address)) return value.address;
-  if (isRecord(value.location)) return value.location;
-  if (isRecord(value.businessAddress)) return value.businessAddress;
-
-  return value;
-};
-
-const formatRealAddress = (value: unknown) => {
-  const address = getAddressRecord(value);
-
-  if (!address) return "";
-
-  const shopOrHouse = getTextField(address, [
-    "shopNumber",
-    "houseNumber",
-    "addressLine2",
-    "line2",
-  ]);
-  const area = getTextField(address, ["area", "district", "neighborhood"]);
-  const shouldShowArea = area && area !== shopOrHouse;
-
-  return [
-    getTextField(address, ["street", "addressLine1", "line1", "address"]),
-    shopOrHouse,
-    getTextField(address, ["postalCode", "zipCode", "zip"]),
-    getTextField(address, ["city"]),
-    shouldShowArea ? area : null,
-    getTextField(address, ["state", "province", "region"]),
-    getTextField(address, ["country"]),
-  ]
-    .filter(Boolean)
-    .join(", ");
-};
-
 const buildSocialLinks = (
   links?: Record<string, string | null | undefined> | null
 ): SocialLink[] => {
@@ -167,8 +131,8 @@ export const Footer = () => {
     homeData?.branding.logo.default ||
     null;
   const branchAddress =
-    formatRealAddress(homeData?.branch) ||
-    (branch?.address ? formatRealAddress(branch.address) : "");
+    formatDisplayAddress(homeData?.branch) ||
+    (branch?.address ? formatDisplayAddress(branch.address) : "");
   const branchPhone =
     getNestedTextField(homeData?.branch, ["phone", "phoneNumber", "contactPhone", "contactNumber", "mobile"]) ||
     getNestedTextField(restaurant, ["phone", "phoneNumber", "contactPhone", "contactNumber", "mobile"]);
@@ -181,7 +145,7 @@ export const Footer = () => {
     // { label: "Menu", href: "/menu" },
     { label: t("categories"), href: "/#categories" },
     { label: t("contact"), href: "/contact" },
-    { label: t("orderNow"), href: "/categories" },
+    { label: t("orderNow"), href: "/items" },
   ];
 
   const companyLinks = [

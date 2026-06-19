@@ -55,7 +55,7 @@ describe("branch selector helpers", () => {
   });
 
   it("formats branch address from known address parts", () => {
-    expect(formatBranchAddress(nearbyBranch)).toBe("Main Road, Karachi, Pakistan");
+    expect(formatBranchAddress(nearbyBranch)).toBe("Main Road, Karachi");
     expect(
       formatBranchAddress({
         address: {
@@ -67,7 +67,7 @@ describe("branch selector helpers", () => {
           country: "Pakistan",
         },
       })
-    ).toBe("21, dha 5, 46330, Rawalpindi, Punjab, Pakistan");
+    ).toBe("21, dha 5, 46330, Rawalpindi");
   });
 
   it("keeps selected branch persistence shape compatible", () => {

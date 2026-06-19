@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useCheckout } from "@/hooks/useCheckout";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDisplayAddress } from "@/lib/address-display";
 import { reverseGeocode } from "@/services/geocoding";
 import {
   fetchAddresses as fetchProfileAddresses,
@@ -102,6 +103,7 @@ export function DeliveryAddressSection({
       setGuestDeliveryAddress({
         ...guestDeliveryAddress,
         street: geocode.displayName || guestDeliveryAddress.street,
+        houseNumber: guestDeliveryAddress.houseNumber,
         area:
           getAddressValue(address.suburb) ||
           getAddressValue(address.neighbourhood) ||
@@ -183,11 +185,11 @@ export function DeliveryAddressSection({
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">{t("area")}</label>
+              <label className="text-sm font-medium text-gray-700">{addressT("houseNumber")}</label>
               <Input
-                value={guestDeliveryAddress.area}
-                onChange={(event) => updateGuestAddressField("area", event.target.value)}
-                placeholder={t("areaPlaceholder")}
+                value={guestDeliveryAddress.houseNumber}
+                onChange={(event) => updateGuestAddressField("houseNumber", event.target.value)}
+                placeholder={addressT("houseNumberPlaceholder")}
                 className="h-12 rounded-xl border-gray-200"
               />
             </div>
@@ -295,15 +297,6 @@ export function DeliveryAddressSection({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[20px] md:gap-[30px]">
 
           {addresses.map((addr) => {
-            const fullAddress = [
-              addr.street,
-              addr.area,
-              addr.postalCode,
-              addr.city,
-              addr.state,
-              addr.country,
-            ].filter(Boolean).join(", ");
-
             const isSelected = selectedAddress === addr.id;
 
             return (
@@ -342,7 +335,7 @@ export function DeliveryAddressSection({
                       isSelected ? "" : "text-gray-700"
                     }`}
                   >
-                    {fullAddress}
+                    {formatDisplayAddress(addr)}
                   </p>
                 </div>
               </Card>

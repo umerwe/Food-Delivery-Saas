@@ -3,6 +3,21 @@ export type GoogleLatLngLiteral = {
   lng: number;
 };
 
+export type GoogleAddressDetails = {
+  street?: string;
+  houseNumber?: string;
+  postalCode?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+};
+
+export type GoogleAddressComponent = {
+  long_name: string;
+  short_name: string;
+  types: string[];
+};
+
 export type GooglePlacePrediction = {
   place_id: string;
   description: string;
@@ -14,6 +29,7 @@ export type GooglePlacePrediction = {
 
 export type GooglePlaceDetails = {
   formatted_address?: string;
+  address_components?: GoogleAddressComponent[];
   geometry?: {
     location?: {
       lat: () => number;
@@ -24,6 +40,7 @@ export type GooglePlaceDetails = {
 
 export type GoogleGeocoderResult = {
   formatted_address?: string;
+  address_components?: GoogleAddressComponent[];
   geometry?: {
     location?: {
       lat: () => number;

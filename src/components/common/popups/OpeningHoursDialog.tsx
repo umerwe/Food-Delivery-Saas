@@ -29,7 +29,7 @@ type OpeningHoursDialogRow = {
 type OpeningHoursDialogSection = {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   icon: LucideIcon;
   rows: OpeningHoursDialogRow[];
   emptyTitle: string;
@@ -39,14 +39,14 @@ type OpeningHoursDialogProps = {
   triggerLabel: string;
   badgeLabel: string;
   title: string;
-  description: string;
+  description?: string;
   branchPill?: string;
   stats: Array<{
     label: string;
     value: number | string;
   }>;
-  infoTitle: string;
-  infoDescription: string;
+  infoTitle?: string;
+  infoDescription?: string;
   sections: OpeningHoursDialogSection[];
   closeLabel: string;
 };
@@ -90,9 +90,11 @@ export function OpeningHoursDialog({
                   <DialogTitle className="text-[22px] font-semibold leading-tight tracking-tight text-gray-950 sm:text-[26px]">
                     {title}
                   </DialogTitle>
-                  <DialogDescription className="mt-2 max-w-[560px] text-sm leading-6 text-gray-600">
-                    {description}
-                  </DialogDescription>
+                  {description ? (
+                    <DialogDescription className="mt-2 max-w-[560px] text-sm leading-6 text-gray-600">
+                      {description}
+                    </DialogDescription>
+                  ) : null}
                 </div>
               </div>
 
@@ -104,33 +106,41 @@ export function OpeningHoursDialog({
             </div>
           </DialogHeader>
 
-          <div className="mt-5 grid grid-cols-3 gap-2 sm:max-w-[440px] sm:gap-3">
-            {stats.map((item) => (
-              <div
-                key={item.label}
-                className="rounded-[16px] bg-white/90 px-3 py-3 text-center shadow-sm ring-1 ring-gray-100 backdrop-blur"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 sm:text-[11px]">
-                  {item.label}
-                </p>
-                <p className="mt-1 text-lg font-semibold text-gray-900">{item.value}</p>
-              </div>
-            ))}
-          </div>
+          {stats.length > 0 ? (
+            <div className="mt-5 grid grid-cols-3 gap-2 sm:max-w-[440px] sm:gap-3">
+              {stats.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-[16px] bg-white/90 px-3 py-3 text-center shadow-sm ring-1 ring-gray-100 backdrop-blur"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 sm:text-[11px]">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-gray-900">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-[#F8FAFC] px-5 py-5 sm:px-6">
-          <div className="mb-5 rounded-[18px] border border-blue-100 bg-blue-50/80 p-4">
-            <div className="flex gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-blue-600 shadow-sm">
-                <Info size={16} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{infoTitle}</p>
-                <p className="mt-1 text-xs leading-5 text-gray-600">{infoDescription}</p>
+          {infoTitle || infoDescription ? (
+            <div className="mb-5 rounded-[18px] border border-blue-100 bg-blue-50/80 p-4">
+              <div className="flex gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-blue-600 shadow-sm">
+                  <Info size={16} />
+                </span>
+                <div className="min-w-0">
+                  {infoTitle ? (
+                    <p className="text-sm font-semibold text-gray-900">{infoTitle}</p>
+                  ) : null}
+                  {infoDescription ? (
+                    <p className="mt-1 text-xs leading-5 text-gray-600">{infoDescription}</p>
+                  ) : null}
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="space-y-5">
             {sections.map((section) => {
@@ -145,7 +155,9 @@ export function OpeningHoursDialog({
                       </span>
                       <div className="min-w-0">
                         <h3 className="text-base font-semibold leading-6 text-gray-950">{section.title}</h3>
-                        <p className="mt-0.5 text-sm leading-5 text-gray-500">{section.description}</p>
+                        {section.description ? (
+                          <p className="mt-0.5 text-sm leading-5 text-gray-500">{section.description}</p>
+                        ) : null}
                       </div>
                     </div>
                     <CircleCheck size={18} className="mt-1 shrink-0 text-emerald-600" />

@@ -13,6 +13,7 @@ import { CalendarDays, Clock3, Loader2, MapPin, PencilLine, RotateCcw, X } from 
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { resolveGroupOrderDeliveryAddressId, setStoredGroupOrderCode } from "@/lib/group-order";
+import { formatDisplayAddress } from "@/lib/address-display";
 import { getBackendErrorMessage, hasBackendError } from "@/components/pages/Checkout/utils/checkout-normalizers";
 import { fetchAddresses as fetchProfileAddresses, type AddressRecord } from "@/services/profile";
 import type { CreateGroupOrderPayload, GroupOrderType } from "@/types/group-order";
@@ -42,16 +43,6 @@ const getLocalScheduleDate = (date: string, time: string) => {
 };
 
 const isPastDateValue = (value: string) => Boolean(value) && value < getCurrentSchedule().date;
-
-const formatAddress = (address: AddressRecord) =>
-  [
-    address.street,
-    address.area,
-    address.postalCode,
-    address.city,
-    address.state,
-    address.country,
-  ].filter(Boolean).join(", ");
 
 export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
   const t = useTranslations("groupOrder.modal");
@@ -283,7 +274,7 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
                     <div className="mt-4 grid gap-2">
                       {deliveryAddresses.map((address) => {
                         const isSelected = selectedDeliveryAddress === address.id;
-                        const addressLabel = formatAddress(address) || t("unnamedAddress");
+                        const addressLabel = formatDisplayAddress(address) || t("unnamedAddress");
 
                         return (
                           <button

@@ -1,4 +1,5 @@
 import type { ApiMeta, ApiRecord, AuthRestaurantUser, ItemsCategory, MenuItem, RestaurantInfo, StoredAuthState } from "../types";
+import { formatDisplayAddress } from "@/lib/address-display";
 import type { BranchSettings } from "@/types/branches";
 
 export const FALLBACK_BANNER = "/categories/background_banner.png";
@@ -112,25 +113,7 @@ export const getItemImageUrl = (item: MenuItem | null | undefined) => {
 
 export const formatAddress = (value: unknown) => {
   if (!value) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    const address = value as ApiRecord;
-    const shopOrHouse = address.houseNumber ?? address.shopNumber;
-    const area = address.area && address.area !== shopOrHouse ? address.area : null;
-
-    return [
-      address.street,
-      shopOrHouse,
-      address.postalCode,
-      address.city,
-      area,
-      address.state,
-      address.country,
-    ]
-      .filter(hasText)
-      .join(", ");
-  }
-  return "";
+  return formatDisplayAddress(value);
 };
 
 export const getRestaurantName = (authUser: AuthRestaurantUser | null | undefined, storedAuth: StoredAuthState | null | undefined) => {
@@ -510,6 +493,9 @@ export const getBranchHoursSummary = (branch: unknown) => {
     delivery: resolvedDelivery,
     openingSchedule: effectiveOpeningSchedule,
     deliverySchedule: effectiveDeliverySchedule,
+    regularOpeningSchedule: openingSchedule,
+    regularDeliverySchedule: deliverySchedule,
+    holidaySchedule: holidaySchedule ? [holidaySchedule] : [],
     showDeliveryHours,
     showDeliveryHoursCard,
     deliveryMatchesOpening,

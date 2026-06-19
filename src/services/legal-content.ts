@@ -31,11 +31,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const getString = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : undefined);
 
+const looksLikePostalCode = (value: unknown) =>
+  typeof value === "string" && /[0-9]/.test(value) && /^[A-Za-z0-9][A-Za-z0-9 -]{2,10}$/.test(value.trim());
+
 const normalizeLegalAddress = (value: unknown): LegalAddress | undefined => {
   if (!isRecord(value)) {
     return undefined;
   }
 
+  const explicitPostalCode = getString(value.postalCode) ?? getString(value.zipCode) ?? getString(value.zip);
+  const state = getString(value.state);
+  const stateAsPostalCode = !explicitPostalCode && looksLikePostalCode(state) ? state : undefined;
   const address = {
     street: getString(value.street),
     shopNumber:
@@ -44,9 +50,9 @@ const normalizeLegalAddress = (value: unknown): LegalAddress | undefined => {
       getString(value.area) ??
       getString(value.addressLine2) ??
       getString(value.line2),
-    postalCode: getString(value.postalCode) ?? getString(value.zipCode) ?? getString(value.zip),
+    postalCode: explicitPostalCode ?? stateAsPostalCode,
     city: getString(value.city),
-    state: getString(value.state),
+    state: stateAsPostalCode ? undefined : state,
     country: getString(value.country),
   };
 

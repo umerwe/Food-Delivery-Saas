@@ -24,6 +24,19 @@ import { useHome } from "@/hooks/useHome";
 import { useHomeCategories } from "@/hooks/useHomeCategories";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
 import type { CustomerDeal } from "@/types/customer-deals";
+import type { HomeRestaurant } from "@/types/home";
+
+const getRestaurantHeroImage = (restaurant?: HomeRestaurant | null) =>
+  restaurant?.coverImage ||
+  restaurant?.coverImageUrl ||
+  restaurant?.heroImageUrl ||
+  null;
+
+const getTrimmedText = (value?: string | null) => {
+  const trimmedValue = value?.trim();
+
+  return trimmedValue ? trimmedValue : null;
+};
 
 const HomePage = () => {
   const t = useTranslations("home.hero");
@@ -50,7 +63,13 @@ const HomePage = () => {
   const landingPopup = homeData?.landingPopup ?? null;
   const heroTitle = homeData?.restaurant?.name ?? branding.restaurantName ?? t("defaultTitle");
   const heroTagline = branding.tagline;
-  const heroImage = branding.assets.heroImage ?? branding.assets.coverImage ?? DEFAULT_BRANDING.assets.heroImage;
+  const heroBannerTitle = getTrimmedText(homeData?.restaurant?.tagline) ?? t("deliveryTitle");
+  const heroBannerDescription = getTrimmedText(homeData?.restaurant?.bio) ?? t("description");
+  const heroImage =
+    getRestaurantHeroImage(homeData?.restaurant) ??
+    branding.assets.heroImage ??
+    branding.assets.coverImage ??
+    DEFAULT_BRANDING.assets.heroImage;
 
   return (
     <div>
@@ -85,6 +104,8 @@ const HomePage = () => {
           <HeroSection
             restaurantName={heroTitle}
             tagline={heroTagline}
+            title={heroBannerTitle}
+            description={heroBannerDescription}
             heroImage={heroImage}
           />
         ) : null}

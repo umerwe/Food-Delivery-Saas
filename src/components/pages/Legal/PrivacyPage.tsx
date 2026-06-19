@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useTranslations } from "next-intl";
 
 import { getStoredRestaurantId } from "@/lib/auth";
+import { formatDisplayAddress } from "@/lib/address-display";
 import { fetchPrivacyPolicyContent, type PrivacyPolicyContent } from "@/services/legal-content";
 
 const ALLOWED_POLICY_TAGS = new Set([
@@ -127,18 +128,9 @@ const PrivacyPage = () => {
   }, []);
 
   const legalAddress = useMemo(() => {
-    const address = policy?.legalProfile?.businessAddress;
-
-    return [
-      address?.street,
-      address?.shopNumber,
-      address?.postalCode,
-      address?.city,
-      address?.state,
-      address?.country,
-    ]
-      .filter(Boolean)
-      .join(", ");
+    return formatDisplayAddress(policy?.legalProfile?.businessAddress, {
+      includeRegionCountry: true,
+    });
   }, [policy?.legalProfile?.businessAddress]);
 
   const hasLegalProfile = Boolean(
@@ -153,6 +145,11 @@ const PrivacyPage = () => {
     [policy?.content]
   );
   const hasPolicyContent = Boolean(safePolicyContent.trim());
+  const safeContractText = useMemo(
+    () => sanitizePolicyHtml(policy?.legalProfile?.contractText || ""),
+    [policy?.legalProfile?.contractText]
+  );
+  const hasContractText = Boolean(safeContractText.trim());
 
   return (
     <div className="min-h-screen py-12 px-6 md:px-12 lg:px-20">
@@ -290,15 +287,16 @@ const PrivacyPage = () => {
                 ) : null}
               </div>
 
-              {policy?.legalProfile?.contractText ? (
+              {hasContractText ? (
                 <div className="mt-4 rounded-2xl bg-white p-4">
                   <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-900">
                     <FileText className="h-4 w-4 text-[#E74C3C]" />
                     {t("contractText")}
                   </div>
-                  <p className="whitespace-pre-line text-sm leading-6 text-gray-600">
-                    {policy.legalProfile.contractText}
-                  </p>
+                  <article
+                    className="space-y-4 text-sm leading-6 text-gray-600 [&_a]:font-semibold [&_a]:text-primary [&_a]:underline [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:text-gray-950 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:text-gray-950 [&_h3]:pt-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-gray-950 [&_h4]:pt-1 [&_h4]:font-semibold [&_h4]:text-gray-950 [&_li]:ml-5 [&_li]:list-disc [&_ol_li]:list-decimal [&_p]:text-gray-600"
+                    dangerouslySetInnerHTML={{ __html: safeContractText }}
+                  />
                 </div>
               ) : null}
             </div>

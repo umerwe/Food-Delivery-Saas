@@ -9,10 +9,10 @@ describe("restaurant card utils", () => {
   });
 
   it("formats address and operating hours", () => {
-    expect(formatAddress({ street: "A", city: "B", country: "C" })).toBe("A, B, C");
+    expect(formatAddress({ street: "A", city: "B", country: "C" })).toBe("A, B");
     expect(
       formatAddress({
-        street: "21",
+        street: "Teststr.",
         houseNumber: "House 8",
         postalCode: "46330",
         city: "Rawalpindi",
@@ -22,7 +22,7 @@ describe("restaurant card utils", () => {
         lat: "33.6135842",
         lng: "73.1321428",
       })
-    ).toBe("21, House 8, 46330, Rawalpindi, dha 5, Punjab, Pakistan");
+    ).toBe("Teststr. House 8, 46330, Rawalpindi");
     expect(
       formatAddress({
         street: "21",
@@ -172,6 +172,18 @@ describe("restaurant card utils", () => {
       label: "Today",
       value: "10:00 AM - 2:00 PM",
     });
+    expect(summary.regularOpeningSchedule).toEqual([
+      { dayOfWeek: "MONDAY", openTime: "09:00", closeTime: "18:00" },
+    ]);
+    expect(summary.regularDeliverySchedule).toEqual([
+      { dayOfWeek: "MONDAY", openTime: "10:00", closeTime: "22:00" },
+    ]);
+    expect(summary.openingSchedule).toEqual([
+      { date: todayValue, openTime: "10:00", closeTime: "14:00" },
+    ]);
+    expect(summary.holidaySchedule).toEqual([
+      { date: todayValue, openTime: "10:00", closeTime: "14:00" },
+    ]);
     expect(summary.showDeliveryHoursCard).toBe(false);
   });
 

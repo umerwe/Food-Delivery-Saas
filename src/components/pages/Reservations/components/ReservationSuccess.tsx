@@ -11,6 +11,7 @@ import {
   FaMapMarkerAlt,
 } from "react-icons/fa";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDisplayAddress } from "@/lib/address-display";
 import { getReservationStatusLabelKey, type Reservation, type ReservationBranch } from "@/services/reservations";
 
 const toFiniteNumber = (value: unknown) => {
@@ -22,20 +23,6 @@ const getRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
-
-const buildAddressText = (address: unknown) => {
-  const record = getRecord(address);
-
-  return [
-    record?.street,
-    record?.area,
-    record?.city,
-    record?.state,
-    record?.country,
-  ]
-    .filter(Boolean)
-    .join(", ");
-};
 
 const getCoordinatesFromCandidates = (candidates: unknown[]) => {
   for (const candidate of candidates) {
@@ -105,7 +92,7 @@ export function ReservationSuccess({ data }: { data: Reservation | null }) {
     branch?.name || getRecord(data)?.branchName || getRecord(getRecord(data)?.restaurant)?.name || t("restaurantFallback")
   );
 
-  const addressText = buildAddressText(branchAddress);
+  const addressText = formatDisplayAddress(branchAddress);
   const statusKey = getReservationStatusLabelKey(data?.status);
   const statusLabel = statusKey !== "unknown" ? statusT(statusKey) : data?.status || statusT("booked");
   const description =

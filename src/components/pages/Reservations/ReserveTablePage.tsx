@@ -653,11 +653,6 @@ export function ReserveTablePage() {
   const hasOpeningHours = normalizeArray(selectedBranch?.settings?.openingHours).length > 0;
   const dateRangeRules = getDateRangeRules(selectedBranch);
   const openingHoursRows = normalizeArray<OpeningHours>(selectedBranch?.settings?.openingHours);
-  const entriesCount = openingHoursRows.length + dateRangeRules.length;
-  const openRowsCount = openingHoursRows.filter((hour) => !hour.isClosed).length;
-  const closedRowsCount =
-    openingHoursRows.filter((hour) => hour.isClosed).length +
-    dateRangeRules.filter((rule) => rule?.isClosed).length;
 
   const dateError = useMemo(() => {
     if (!date) return "";
@@ -948,22 +943,15 @@ export function ReserveTablePage() {
                 {selectedBranch?.settings ? (
                   <OpeningHoursDialog
                     triggerLabel={t("openingHours")}
-                    badgeLabel={t("hoursAvailable")}
+                    badgeLabel={t("openingHours")}
                     title={t("hoursPopupTitle")}
-                    description={t("openingHoursPopupNote")}
+                    description=""
                     branchPill={selectedBranch?.name || undefined}
-                    stats={[
-                      { label: t("entries"), value: entriesCount },
-                      { label: t("open"), value: openRowsCount },
-                      { label: t("closed"), value: closedRowsCount },
-                    ]}
-                    infoTitle={t("hoursAvailable")}
-                    infoDescription={t("openingHoursPopupNote")}
+                    stats={[]}
                     sections={[
                       {
                         id: "opening-hours",
                         title: t("openingHours"),
-                        description: t("openingHoursDescription"),
                         icon: Store,
                         rows: openingHoursRows.map((hour, index) => ({
                           id: String(hour.dayOfWeek || `opening-hour-${index}`),
@@ -983,7 +971,6 @@ export function ReserveTablePage() {
                         ? [{
                             id: "date-range-rules",
                             title: t("dateRangeRules"),
-                            description: t("openingHoursPopupNote"),
                             icon: CalendarX,
                             rows: dateRangeRules.slice(0, 5).map((rule, index) => {
                               const { fromDate, toDate } = getDateRangeDates(rule);

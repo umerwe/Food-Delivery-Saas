@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Star, MapPin, Clock, Utensils, Loader2, Store, Truck, Coffee } from "lucide-react";
+import { CalendarDays, Star, MapPin, Clock, Utensils, Loader2, Store, Truck, Coffee } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -40,35 +40,23 @@ function BranchHoursDialog({
   branchHours: ReturnType<typeof getBranchHoursSummary>;
 }) {
   const t = useTranslations("items.common");
-  const openingDetails = getBranchHoursDetails(branchHours.openingSchedule);
-  const deliveryDetails = getBranchHoursDetails(branchHours.deliverySchedule);
-  const hasOpeningDetails = openingDetails.length > 0;
-  const visibleDetails = branchHours.showDeliveryHours
-    ? [...openingDetails, ...deliveryDetails]
-    : openingDetails;
-  const entriesCount = visibleDetails.length;
-  const openDaysCount = visibleDetails.filter((day) => !day.isClosed).length;
-  const closedDaysCount = visibleDetails.filter((day) => day.isClosed).length;
+  const openingDetails = getBranchHoursDetails(branchHours.regularOpeningSchedule);
+  const deliveryDetails = getBranchHoursDetails(branchHours.regularDeliverySchedule);
+  const holidayDetails = getBranchHoursDetails(branchHours.holidaySchedule);
+  const showDeliveryDetails = deliveryDetails.length > 0 && !branchHours.deliveryMatchesOpening;
 
   return (
     <OpeningHoursDialog
       triggerLabel={t("viewHours")}
-      badgeLabel={t("hoursAvailable")}
+      badgeLabel={t("hours")}
       title={t("hoursPopupTitle")}
-      description={t("hoursPopupNote")}
+      description=""
       branchPill={branchName}
-      stats={[
-        { label: t("entries"), value: entriesCount },
-        { label: t("open"), value: openDaysCount },
-        { label: t("closed"), value: closedDaysCount },
-      ]}
-      infoTitle={t("hoursAvailable")}
-      infoDescription={t("hoursPopupNote")}
+      stats={[]}
       sections={[
         {
           id: "opening",
           title: t("openingHours"),
-          description: t("openingHoursDescription"),
           icon: Store,
           rows: openingDetails.map((day) => ({
             id: `opening-${day.dayOfWeek}`,
@@ -84,16 +72,35 @@ function BranchHoursDialog({
           })),
           emptyTitle: t("hoursNotConfigured"),
         },
-        ...(branchHours.showDeliveryHours
+        ...(showDeliveryDetails
           ? [{
               id: "delivery",
               title: t("deliveryHours"),
-              description: t("deliveryHoursDescription"),
               icon: Truck,
               rows: deliveryDetails.map((day) => ({
                 id: `delivery-${day.dayOfWeek}`,
                 title: day.dayLabel,
                 subtitle: t("deliveryHours"),
+                statusLabel: day.isClosed ? t("closed") : t("open"),
+                isClosed: Boolean(day.isClosed),
+                hoursLabel: day.hoursLabel,
+                breakLabels: day.breakLabels,
+                closedTitle: t("closed"),
+                closedDescription: t("hoursNotConfigured"),
+                breakPrefix: t("breakTime", { time: "" }).replace(/\s*$/, ""),
+              })),
+              emptyTitle: t("hoursNotConfigured"),
+            }]
+          : []),
+        ...(holidayDetails.length > 0
+          ? [{
+              id: "holiday",
+              title: t("holidayHours"),
+              icon: CalendarDays,
+              rows: holidayDetails.map((day, index) => ({
+                id: `holiday-${day.date || day.dayOfWeek || index}`,
+                title: day.dayLabel,
+                subtitle: t("holidayHours"),
                 statusLabel: day.isClosed ? t("closed") : t("open"),
                 isClosed: Boolean(day.isClosed),
                 hoursLabel: day.hoursLabel,

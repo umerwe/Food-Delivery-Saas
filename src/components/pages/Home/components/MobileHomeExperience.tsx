@@ -142,7 +142,7 @@ export function MobileHomeExperience({
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-black text-gray-950">Categories</h2>
             <Link
-              href="/categories"
+              href="/items"
               className="flex items-center gap-1 text-sm font-bold text-primary"
             >
               View all

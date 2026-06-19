@@ -52,7 +52,11 @@ describe("branding normalization", () => {
     const branding = normalizeBrandingApiResponse({
       data: {
         data: {
-          restaurant: { name: "Envelope Restaurant", logoUrl: "/envelope-logo.png" },
+          restaurant: {
+            name: "Envelope Restaurant",
+            logoUrl: "/envelope-logo.png",
+            coverImage: "https://cdn.example.com/cover.png",
+          },
           config: { branding: { primaryColor: "#abcdef" } },
         },
       },
@@ -61,6 +65,8 @@ describe("branding normalization", () => {
     expect(branding.restaurantName).toBe("Envelope Restaurant");
     expect(branding.primaryColor).toBe("#abcdef");
     expect(branding.logo.default).toBe("/envelope-logo.png");
+    expect(branding.assets.coverImage).toBe("https://cdn.example.com/cover.png");
+    expect(branding.assets.heroImage).toBe("https://cdn.example.com/cover.png");
   });
 
   it("uses flattened and nested fallback branding keys and defaults", () => {

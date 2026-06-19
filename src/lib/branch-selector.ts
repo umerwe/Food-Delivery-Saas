@@ -1,4 +1,5 @@
 import { readAuthSession, saveAuthSession } from "@/lib/auth";
+import { formatDisplayAddress } from "@/lib/address-display";
 import {
   orderTypeToCheckoutType,
   setStoredCheckoutTypePreference,
@@ -293,25 +294,9 @@ export const branchSupportsDelivery = (branch: Pick<BranchRecord, "settings"> | 
   branch.settings?.allowedOrderTypes?.includes("DELIVERY") ?? false;
 
 export function formatBranchAddress(branch: Pick<BranchRecord, "address"> | NearbyBranch) {
-  const shopOrHouse = branch.address?.shopNumber ?? branch.address?.houseNumber;
-  const area =
-    branch.address?.area && branch.address.area !== shopOrHouse
-      ? branch.address.area
-      : null;
-
-  return (
-    [
-      branch.address?.street,
-      shopOrHouse,
-      branch.address?.postalCode,
-      branch.address?.city,
-      area,
-      branch.address?.state,
-      branch.address?.country,
-    ]
-      .filter(Boolean)
-      .join(", ") || "Branch location available"
-  );
+  return formatDisplayAddress(branch.address, {
+    fallback: "Branch location available",
+  });
 }
 
 export function formatBranchDistance(distanceKm?: number | null) {

@@ -14,6 +14,7 @@ import {
   TicketPercent,
 } from "lucide-react";
 import Link from "next/link";
+import { formatDisplayAddress } from "@/lib/address-display";
 import { canReviewOrder, type Order, type OrderItem } from "@/services/orders";
 import { useTranslations } from "next-intl";
 
@@ -43,12 +44,7 @@ export default function OrderSummary({
     Boolean(onContinuePayment && order?.id) &&
     paymentMethod === "STRIPE" &&
     (paymentStatus === "PENDING" || paymentStatus === "FAILED");
-  const deliveryAddress = [
-    order?.deliveryAddress?.houseNumber,
-    order?.deliveryAddress?.street,
-    order?.deliveryAddress?.area,
-    order?.deliveryAddress?.city,
-  ].filter(Boolean).join(", ");
+  const deliveryAddress = formatDisplayAddress(order?.deliveryAddress);
 
   const formatMoney = (value?: number | string | null, currency = "USD") => {
     const amount = Number(value || 0);

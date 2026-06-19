@@ -139,6 +139,7 @@ export const Navbar = () => {
     homeQuery.data?.data.branch,
     user?.branch
   )
+  const restaurantLogoUrl = homeQuery.data?.data.restaurant?.logoUrl ?? null
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -344,7 +345,12 @@ export const Navbar = () => {
         <nav className="mx-auto flex max-w-[1440px] items-center justify-between gap-5 px-5 py-5 lg:px-8 2xl:px-10">
           {/* LEFT - LOGO */}
           <Link href="/" className="relative h-[34px] w-[150px] shrink-0">
-            <BrandLogo alt="Logo" fill className="object-contain" />
+            <BrandLogo
+              alt="Logo"
+              fill
+              restaurantLogoUrl={restaurantLogoUrl}
+              className="object-contain"
+            />
           </Link>
 
           {/* DESKTOP NAV */}

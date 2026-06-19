@@ -44,6 +44,7 @@ import type { LoyaltySummary } from "@/services/loyalty";
 
 const emptyGuestDeliveryAddress: CheckoutAddressValues = {
   street: "",
+  houseNumber: "",
   postalCode: "",
   city: "",
   state: "",
@@ -200,6 +201,7 @@ const normalizeGuestPrivacyPolicy = (value: unknown, restaurantId: string): Gues
 
 const trimAddress = (address: CheckoutAddressValues) => ({
   street: address.street.trim(),
+  houseNumber: address.houseNumber.trim(),
   area: address.area.trim(),
   postalCode: address.postalCode.trim(),
   city: address.city.trim(),
@@ -214,7 +216,8 @@ const getGuestDeliveryAddressPayload = (address: CheckoutAddressValues) => {
 
   return {
     street: trimmed.street,
-    area: trimmed.area,
+    houseNumber: trimmed.houseNumber,
+    area: trimmed.houseNumber || trimmed.area,
     postalCode: trimmed.postalCode,
     city: trimmed.city,
     state: trimmed.state,

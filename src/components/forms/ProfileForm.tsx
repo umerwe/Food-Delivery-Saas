@@ -28,6 +28,7 @@ import {
   type AddressRecord,
   type WalletSummary,
 } from "@/services/profile";
+import { formatDisplayAddress } from "@/lib/address-display";
 import {
   createProfileSchema,
   type ProfileFormValues,
@@ -477,17 +478,8 @@ export function ProfileForm() {
                 ) : null}
               </div>
 
-              <p className="text-sm text-[#7A7A7A]">{addr.street}</p>
-              <p className="text-sm text-[#7A7A7A]">
-                {addr.area}, {addr.city}
-              </p>
-              {addr.postalCode ? (
-                <p className="text-sm text-[#7A7A7A]">
-                  {addr.postalCode}
-                </p>
-              ) : null}
-              <p className="text-sm text-[#7A7A7A]">
-                {addr.state}, {addr.country}
+              <p className="text-sm leading-6 text-[#7A7A7A]">
+                {formatDisplayAddress(addr)}
               </p>
 
               <div className="absolute bottom-4 right-4 flex gap-3">

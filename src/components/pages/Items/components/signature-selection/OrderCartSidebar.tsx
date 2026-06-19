@@ -19,7 +19,6 @@ import {
   formatCurrency,
   getAddonQuantity,
   getAddonTotal,
-  getBillChargeDetailLines,
   getCheckoutPriceAdjustmentTotal,
   getItemImage,
   getItemPricing,
@@ -152,18 +151,6 @@ export function OrderCartSidebar({
   const selectedOrderFee = checkoutType === "pickup" ? pickupFee : deliveryFee;
   const serviceCharge = Math.max(0, toNumber(cartQuote?.serviceChargeAmount, 0));
   const tipAmount = Math.max(0, toNumber(cartQuote?.tipAmount, 0));
-  const chargeDetailLines = getBillChargeDetailLines({
-    chargeBreakdown:
-      typeof cartQuote?.chargeBreakdown === "object" && cartQuote.chargeBreakdown !== null
-        ? cartQuote.chargeBreakdown
-        : undefined,
-    taxes,
-    serviceCharge,
-    selectedOrderFee,
-    orderFeeLabel: checkoutType === "pickup" ? t("pickupPrice") : t("deliveryFee"),
-    serviceChargeLabel: t("totals.serviceCharge"),
-    taxFallbackLabel: t("taxesAndCharges"),
-  });
   const quoteSubtotal = cartQuote ? toNumber(cartQuote.subtotal, itemTotal) : itemTotal;
   const appliedPromotion =
     typeof cartQuote?.appliedPromotion === "object" && cartQuote.appliedPromotion !== null
@@ -553,22 +540,6 @@ export function OrderCartSidebar({
             <div className="flex items-center justify-between">
               <span>{t("taxesAndCharges")}</span>
               <span>{formatCurrency(taxes)}</span>
-            </div>
-
-            <div className="rounded-[10px] border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
-              <p className="mb-1.5 font-medium text-gray-700">{t("includedCharges")}</p>
-              {chargeDetailLines.length > 0 ? (
-                <div className="space-y-1">
-                  {chargeDetailLines.map((line) => (
-                    <div key={line.id} className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 truncate">{line.label}</span>
-                      <span className="shrink-0">{formatCurrency(line.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p>{t("noExtraCharges")}</p>
-              )}
             </div>
 
             {serviceCharge > 0 ? (

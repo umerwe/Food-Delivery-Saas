@@ -32,6 +32,8 @@ import type { BranchOrderType, NearbyBranch } from "@/types/branches";
 type HeroSectionProps = {
   restaurantName?: string;
   tagline?: string;
+  title?: string;
+  description?: string;
   heroImage?: string | null;
 };
 
@@ -41,6 +43,8 @@ const getOrderType = (mode: BranchSearchMode): BranchOrderType =>
   mode === "pickup" ? "TAKEAWAY" : "DELIVERY";
 
 export const HeroSection = ({
+  title,
+  description,
   heroImage = "/hero.png",
 }: HeroSectionProps) => {
   const t = useTranslations("home.hero");
@@ -198,11 +202,11 @@ export const HeroSection = ({
           {/* Restaurant name intentionally hidden from the banner per design request. */}
 
           <h1 className="max-w-[680px] text-[46px] font-black leading-[0.95] tracking-normal text-white sm:text-[62px] lg:text-[76px]">
-            {t("deliveryTitle")}
+            {title || t("deliveryTitle")}
           </h1>
 
           <p className="mt-6 max-w-[560px] text-lg font-medium leading-8 text-white/86">
-            {t("description")}
+            {description || t("description")}
           </p>
 
           <div className="mt-6 grid max-w-[680px] gap-2.5 sm:grid-cols-3">

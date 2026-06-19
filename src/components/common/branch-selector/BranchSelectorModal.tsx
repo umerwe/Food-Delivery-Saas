@@ -125,7 +125,7 @@ export function BranchSelectorModal({
   const resolvedTitle = title || "Choose your nearest branch";
   const resolvedDescription =
     description ??
-    "We use your location to show nearby pickup and delivery branches.";
+    "";
   const nearbyBranches = useMemo(
     () =>
       nearbyQuery.branches

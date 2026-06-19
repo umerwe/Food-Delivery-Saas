@@ -5,7 +5,10 @@ export type CheckoutValidationMessages = {
   streetRequired: string;
   postalCodeRequired: string;
   cityRequired: string;
+  stateRequired: string;
   countryRequired: string;
+  latitudeRequired: string;
+  longitudeRequired: string;
 };
 
 export const defaultEnglishCheckoutValidationMessages: CheckoutValidationMessages = {
@@ -13,7 +16,10 @@ export const defaultEnglishCheckoutValidationMessages: CheckoutValidationMessage
   streetRequired: "Street address is required",
   postalCodeRequired: "Postal code is required",
   cityRequired: "City is required",
+  stateRequired: "State is required",
   countryRequired: "Country is required",
+  latitudeRequired: "Pick a location before saving",
+  longitudeRequired: "Pick a location before saving",
 };
 
 export const createCheckoutCustomerSchema = (
@@ -39,16 +45,18 @@ export const createCheckoutAddressSchema = (
   messages: Pick<
     CheckoutValidationMessages,
     "streetRequired" | "postalCodeRequired" | "cityRequired" | "countryRequired"
+    | "stateRequired" | "latitudeRequired" | "longitudeRequired"
   >
 ) => z.object({
   street: z.string().trim().min(1, messages.streetRequired),
+  houseNumber: z.string().trim(),
   postalCode: z.string().trim().min(1, messages.postalCodeRequired),
   city: z.string().trim().min(1, messages.cityRequired),
-  state: z.string().trim(),
+  state: z.string().trim().min(1, messages.stateRequired),
   country: z.string().trim().min(1, messages.countryRequired),
   area: z.string().trim(),
-  lat: z.string().trim(),
-  lng: z.string().trim(),
+  lat: z.string().trim().min(1, messages.latitudeRequired),
+  lng: z.string().trim().min(1, messages.longitudeRequired),
   isDefault: z.boolean(),
 });
 

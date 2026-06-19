@@ -9,12 +9,28 @@ import {
   normalizeCheckoutTipAmount,
 } from "./checkout";
 
+const validAddress = {
+  street: "A",
+  houseNumber: "12",
+  postalCode: "12345",
+  city: "B",
+  state: "S",
+  country: "C",
+  area: "",
+  lat: "31.5204",
+  lng: "74.3587",
+  isDefault: false,
+};
+
 describe("checkout validation", () => {
   it("validates checkout address requirements", () => {
-    expect(checkoutAddressSchema.safeParse({ street: "", postalCode: "", city: "", state: "", country: "", area: "", lat: "", lng: "", isDefault: false }).success).toBe(false);
-    expect(checkoutAddressSchema.safeParse({ street: "A", postalCode: "12345", city: "B", state: "", country: "C", area: "", lat: "", lng: "", isDefault: true }).success).toBe(true);
-    expect(checkoutAddressSchema.safeParse({ street: "A", postalCode: "", city: "B", state: "", country: "C", area: "", lat: "", lng: "", isDefault: false }).success).toBe(false);
-    expect(checkoutAddressSchema.safeParse({ street: "A", postalCode: "12345", city: "B", state: "", country: "C", area: "", lat: "", lng: "" }).success).toBe(false);
+    expect(checkoutAddressSchema.safeParse({ ...validAddress, street: "" }).success).toBe(false);
+    expect(checkoutAddressSchema.safeParse({ ...validAddress, isDefault: true }).success).toBe(true);
+    expect(checkoutAddressSchema.safeParse({ ...validAddress, postalCode: "" }).success).toBe(false);
+    expect(checkoutAddressSchema.safeParse({ ...validAddress, state: "" }).success).toBe(false);
+    expect(checkoutAddressSchema.safeParse({ ...validAddress, lat: "" }).success).toBe(false);
+    expect(checkoutAddressSchema.safeParse({ ...validAddress, lng: "" }).success).toBe(false);
+    expect(checkoutAddressSchema.safeParse({ ...validAddress, isDefault: undefined }).success).toBe(false);
   });
 
   it("validates customer and notes shapes", () => {
@@ -43,10 +59,24 @@ describe("checkout validation", () => {
       streetRequired: "Street translated",
       postalCodeRequired: "Postal translated",
       cityRequired: "City translated",
+      stateRequired: "State translated",
       countryRequired: "Country translated",
+      latitudeRequired: "Latitude translated",
+      longitudeRequired: "Longitude translated",
     });
 
-    const result = schema.safeParse({ street: "", postalCode: "", city: "", state: "", country: "", area: "", lat: "", lng: "", isDefault: false });
+    const result = schema.safeParse({
+      street: "",
+      houseNumber: "",
+      postalCode: "",
+      city: "",
+      state: "",
+      country: "",
+      area: "",
+      lat: "",
+      lng: "",
+      isDefault: false,
+    });
 
     expect(result.success).toBe(false);
 
@@ -54,7 +84,10 @@ describe("checkout validation", () => {
       expect(result.error.flatten().fieldErrors.street).toContain("Street translated");
       expect(result.error.flatten().fieldErrors.postalCode).toContain("Postal translated");
       expect(result.error.flatten().fieldErrors.city).toContain("City translated");
+      expect(result.error.flatten().fieldErrors.state).toContain("State translated");
       expect(result.error.flatten().fieldErrors.country).toContain("Country translated");
+      expect(result.error.flatten().fieldErrors.lat).toContain("Latitude translated");
+      expect(result.error.flatten().fieldErrors.lng).toContain("Longitude translated");
     }
   });
 });

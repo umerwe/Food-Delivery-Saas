@@ -143,6 +143,7 @@ export const normalizeBrandingApiResponse = (homeData: unknown): Branding => {
         assets.heroImageUrl,
         getNestedString(branding, ["assets", "cover", "url"]),
         data.coverImage,
+        restaurant.coverImage,
         restaurant.coverImageUrl,
         DEFAULT_BRANDING.assets.coverImage
       ),
@@ -153,6 +154,7 @@ export const normalizeBrandingApiResponse = (homeData: unknown): Branding => {
         assets.coverImageUrl,
         data.heroImage,
         restaurant.heroImageUrl,
+        restaurant.coverImage,
         restaurant.coverImageUrl,
         DEFAULT_BRANDING.assets.heroImage
       ),

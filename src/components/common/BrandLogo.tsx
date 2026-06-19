@@ -30,9 +30,13 @@ export const BrandLogo = ({
   const { branding } = useBranding();
   const [hasImageError, setHasImageError] = useState(false);
   const variantLogo = variant === "dark" ? branding.logo.dark : branding.logo.light;
+  const fallbackLogo = useMemo(
+    () => resolveHttpsImageUrl(variantLogo ?? branding.logo.default, "/logo.png"),
+    [branding.logo.default, variantLogo]
+  );
   const src = useMemo(
-    () => resolveHttpsImageUrl(variantLogo ?? restaurantLogoUrl ?? branding.logo.default, "/logo.png"),
-    [branding.logo.default, restaurantLogoUrl, variantLogo]
+    () => resolveHttpsImageUrl(restaurantLogoUrl, fallbackLogo),
+    [fallbackLogo, restaurantLogoUrl]
   );
   useEffect(() => {
     setHasImageError(false);
