@@ -26,7 +26,7 @@ import {
   getStoredCheckoutTypePreference,
   setStoredCheckoutTypePreference,
 } from "@/lib/checkout-type-preference";
-import { resolveHttpsImageUrl } from "@/lib/image-fallback";
+import { isRemoteHttpsImageUrl, resolveHttpsImageUrl } from "@/lib/image-fallback";
 import type { BranchOrderType, NearbyBranch } from "@/types/branches";
 
 type HeroSectionProps = {
@@ -193,6 +193,7 @@ export const HeroSection = ({
           fill
           className="object-cover"
           priority
+          unoptimized={isRemoteHttpsImageUrl(resolvedHeroImage)}
         />
       </div>
       <div className="absolute inset-0 z-0 bg-gradient-to-r from-black/70 via-black/38 to-black/12" />

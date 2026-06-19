@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 
 import { useBranding } from "@/hooks/useBranding";
-import { resolveHttpsImageUrl } from "@/lib/image-fallback";
+import { isRemoteHttpsImageUrl, resolveHttpsImageUrl } from "@/lib/image-fallback";
 
 type BrandLogoProps = {
   restaurantLogoUrl?: string | null;
@@ -59,8 +59,29 @@ export const BrandLogo = ({
   };
 
   if (fill) {
-    return <Image src={src} alt={alt} fill className={className} priority={priority} onError={handleImageError} />;
+    return (
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        className={className}
+        priority={priority}
+        unoptimized={isRemoteHttpsImageUrl(src)}
+        onError={handleImageError}
+      />
+    );
   }
 
-  return <Image src={src} alt={alt} width={width} height={height} className={className} priority={priority} onError={handleImageError} />;
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      priority={priority}
+      unoptimized={isRemoteHttpsImageUrl(src)}
+      onError={handleImageError}
+    />
+  );
 };
