@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { formatDisplayAddress } from "@/lib/address-display";
+import { formatMoney, resolveCustomerCurrency } from "@/lib/money";
 import { canReviewOrder, type Order, type OrderItem } from "@/services/orders";
 import { useTranslations } from "next-intl";
 
@@ -38,27 +39,15 @@ export default function OrderSummary({
   ) ?? order?.transactions?.[0];
   const paymentStatus = String(order?.paymentStatus || latestCharge?.status || "").toUpperCase();
   const paymentMethod = String(order?.paymentMethod || latestCharge?.paymentMethod || "").toUpperCase();
-  const paymentCurrency = latestCharge?.currency || "USD";
+  const paymentCurrency = resolveCustomerCurrency({
+    moneyCurrency: latestCharge?.currency,
+  });
   const paymentAmount = order?.payableAmount ?? order?.totalAmount ?? latestCharge?.amount;
   const canContinuePayment =
     Boolean(onContinuePayment && order?.id) &&
     paymentMethod === "STRIPE" &&
     (paymentStatus === "PENDING" || paymentStatus === "FAILED");
   const deliveryAddress = formatDisplayAddress(order?.deliveryAddress);
-
-  const formatMoney = (value?: number | string | null, currency = "USD") => {
-    const amount = Number(value || 0);
-
-    if (!Number.isFinite(amount)) {
-      return "$0.00";
-    }
-
-    return new Intl.NumberFormat("en", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
-    }).format(amount);
-  };
 
   const formatDateTime = (value?: string | null) => {
     if (!value) return "";
@@ -71,6 +60,7 @@ export default function OrderSummary({
     return new Intl.DateTimeFormat("en", {
       dateStyle: "medium",
       timeStyle: "short",
+      hourCycle: "h23",
     }).format(date);
   };
 
@@ -132,7 +122,7 @@ export default function OrderSummary({
 
                 <div className="flex justify-between">
                   <p className="text-base font-medium text-primary">
-                    ${item.unitPrice}
+                    {formatMoney(item.unitPrice, paymentCurrency)}
                   </p>
 
                   <div className="text-sm text-gray-700">
@@ -154,7 +144,7 @@ export default function OrderSummary({
         <div className="space-y-4 text-gray-500 text-sm">
           <div className="flex justify-between">
             <span>{t("itemTotal")}</span>
-            <span>${order?.subtotal}</span>
+            <span>{formatMoney(order?.subtotal, paymentCurrency)}</span>
           </div>
 
           <div className="flex justify-between">
@@ -162,7 +152,7 @@ export default function OrderSummary({
               <span>{t("deliveryFee")}</span>
               <Info size={14} />
             </div>
-            <span>${order?.deliveryFee}</span>
+            <span>{formatMoney(order?.deliveryFee, paymentCurrency)}</span>
           </div>
 
           <div className="flex justify-between">
@@ -170,7 +160,7 @@ export default function OrderSummary({
               <span>{t("taxes")}</span>
               <Info size={14} />
             </div>
-            <span>${order?.taxAmount}</span>
+            <span>{formatMoney(order?.taxAmount, paymentCurrency)}</span>
           </div>
         </div>
 
@@ -184,7 +174,7 @@ export default function OrderSummary({
         <div className="space-y-[10px] pt-[10px]">
           <div className="flex justify-between text-sm text-gray-500">
             <span>{t("discount")}</span>
-            <span>${order?.discountAmount}</span>
+            <span>{formatMoney(order?.discountAmount, paymentCurrency)}</span>
           </div>
 
           <div className="flex justify-between text-lg font-semibold text-gray-900">

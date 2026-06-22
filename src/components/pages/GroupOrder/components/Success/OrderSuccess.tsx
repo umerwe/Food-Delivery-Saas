@@ -83,7 +83,11 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
                 <div>
                   <p>
                     {order?.orderTime
-                      ? new Date(order.orderTime).toLocaleTimeString()
+                      ? new Date(order.orderTime).toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hourCycle: "h23",
+                        })
                       : "—"}
                   </p>
                   <p className="text-xs text-gray-400">

@@ -10,6 +10,7 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
+import { formatMoney } from "@/lib/money";
 import type { GiftCardAvailableItem, HomeGiftCards } from "@/types/gift-cards";
 import { GiftCardPurchaseModal } from "@/components/pages/Home/components/GiftCardPurchaseModal";
 
@@ -56,23 +57,8 @@ const getMessage = (t: unknown, key: string, fallback: string) => {
   }
 };
 
-const formatAmount = (amount: number, currency = "USD") => {
-  const safeCurrency = currency?.trim()?.toUpperCase() || "USD";
-
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: safeCurrency,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  }
-};
+const formatAmount = (amount: number, currency?: string | null) =>
+  formatMoney(amount, currency, { maximumFractionDigits: 0 });
 
 const ticketVisuals: GiftCardVisual[] = [
   {
@@ -468,7 +454,7 @@ const GiftCardTicket = ({
       variant={visual.variant}
       icon={visual.icon}
       decor={visual.decor}
-      amount={formatAmount(giftCard.amount, currency ?? "USD")}
+      amount={formatAmount(giftCard.amount, currency)}
       title={giftCard.title}
       ariaLabel={`${purchaseText} ${giftCard.title}`}
       onClick={() => onSelect(giftCard)}

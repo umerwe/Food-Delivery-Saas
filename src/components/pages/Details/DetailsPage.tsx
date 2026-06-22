@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { formatMoney } from "@/lib/money";
 
 const categories = ["All", "Burgers", "Pizza", "Bread", "Chiffon & Rolls", "Donut", "Pastry & Danish", "Cakes", "Drinks"];
 
@@ -100,7 +101,7 @@ export function DetailsPage() {
                         <div className="flex items-center gap-3 text-gray-700">
                             <Clock size={20} />
                             <span className="text-base font-medium">
-                                <span className="text-primary">{t("openFrom")}</span> 10:00 AM - 11:00 PM
+                                <span className="text-primary">{t("openFrom")}</span> 10:00 - 23:00
                             </span>
                         </div>
                     </div>
@@ -150,7 +151,10 @@ export function DetailsPage() {
                                     {item.name}
                                 </h3>
                                 <p className="text-base  text-gray-900">
-                                    $ {item.price.toFixed(2)}
+                                    {formatMoney(item.price, undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
                                 </p>
                                 <p className="text-base text-gray-500 leading-[20px] line-clamp-3">
                                     {item.desc}

@@ -3,6 +3,7 @@ export type GiftCardPurchasePayload = {
   title?: string;
   message?: string;
   expiresAt?: string;
+  currency?: string;
 };
 
 export type GiftCardAvailableItem = {

@@ -13,7 +13,7 @@ describe("formatDisplayAddress", () => {
         state: "NRW",
         country: "Germany",
       })
-    ).toBe("Main Road, 40, 45475, Essen");
+    ).toBe("Main Road, 40, 45475 Essen");
   });
 
   it("removes the comma between a dotted street and house number", () => {
@@ -29,6 +29,12 @@ describe("formatDisplayAddress", () => {
         },
         { includeRegionCountry: true }
       )
-    ).toBe("Teststr. 40, 45475, Essen, NRW, Germany");
+    ).toBe("Teststr. 40, 45475 Essen, NRW, Germany");
+  });
+
+  it("removes the postal code and city comma from preformatted addresses", () => {
+    expect(formatDisplayAddress("Main Road, 40, 45475, Essen, NRW")).toBe(
+      "Main Road, 40, 45475 Essen, NRW"
+    );
   });
 });

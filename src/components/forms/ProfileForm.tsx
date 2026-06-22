@@ -29,6 +29,7 @@ import {
   type WalletSummary,
 } from "@/services/profile";
 import { formatDisplayAddress } from "@/lib/address-display";
+import { DEFAULT_DISPLAY_CURRENCY, formatMoney } from "@/lib/money";
 import {
   createProfileSchema,
   type ProfileFormValues,
@@ -77,7 +78,7 @@ export function ProfileForm() {
   const [addressOpen, setAddressOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<AddressRecord | null>(null);
   const [walletBalance, setWalletBalance] = useState(0);
-  const [walletCurrency, setWalletCurrency] = useState("USD");
+  const [walletCurrency, setWalletCurrency] = useState(DEFAULT_DISPLAY_CURRENCY);
   const [walletTxns, setWalletTxns] = useState(0);
   const [updating, setUpdating] = useState(false);
   const [addresses, setAddresses] = useState<AddressRecord[]>([]);
@@ -388,7 +389,10 @@ export function ProfileForm() {
   </p>
 
   <h3 className="text-[38px] md:text-[42px] font-semibold mt-2 leading-none">
-    {walletCurrency} {Number(walletBalance || 0).toFixed(2)}
+    {formatMoney(walletBalance || 0, walletCurrency, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}
   </h3>
 
   <div className="grid grid-cols-2 gap-3 mt-8">

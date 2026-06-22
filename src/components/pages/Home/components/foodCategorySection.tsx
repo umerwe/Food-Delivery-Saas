@@ -21,8 +21,10 @@ import type { UseEmblaCarouselType } from "embla-carousel-react";
 import { useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/useAuth";
+import { useHome } from "@/hooks/useHome";
 import { useHomeCategories, useHomePromotions } from "@/hooks/useHomeCategories";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
+import { formatMoney, resolveCustomerCurrency } from "@/lib/money";
 import type { HomeCategory, PromotionCampaign } from "@/types/home";
 
 type CarouselApi = UseEmblaCarouselType[1];
@@ -32,7 +34,11 @@ const toNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const formatDiscount = (promotion: PromotionCampaign, fallbackLabel: string) => {
+const formatDiscount = (
+  promotion: PromotionCampaign,
+  fallbackLabel: string,
+  currency?: string | null
+) => {
   const value = toNumber(promotion.discountValue, 0);
 
   if (promotion.discountType === "PERCENTAGE") {
@@ -40,15 +46,15 @@ const formatDiscount = (promotion: PromotionCampaign, fallbackLabel: string) => 
   }
 
   if (promotion.discountType === "FLAT") {
-    return `$${value} OFF`;
+    return `${formatMoney(value, currency)} OFF`;
   }
 
   return fallbackLabel;
 };
 
-const formatAmount = (value: unknown) => {
+const formatAmount = (value: unknown, currency?: string | null) => {
   const amount = toNumber(value, 0);
-  return amount > 0 ? `$${amount}` : "";
+  return amount > 0 ? formatMoney(amount, currency) : "";
 };
 
 const formatDate = (value?: string) => {
@@ -130,9 +136,11 @@ const PromotionBannerSkeleton = () => {
 function PromotionBannerCard({
   promotion,
   index,
+  currency,
 }: {
   promotion: PromotionCampaign;
   index: number;
+  currency?: string | null;
 }) {
   const t = useTranslations("home.promotions");
   const router = useRouter();
@@ -140,8 +148,8 @@ function PromotionBannerCard({
   const image = getPromotionImage(promotion);
   const startsAt = formatDate(promotion.startsAt);
   const expiresAt = formatDate(promotion.expiresAt);
-  const minOrder = formatAmount(promotion.minOrderAmount);
-  const maxDiscount = formatAmount(promotion.maxDiscountAmount);
+  const minOrder = formatAmount(promotion.minOrderAmount, currency);
+  const maxDiscount = formatAmount(promotion.maxDiscountAmount, currency);
 
   const gradients = [
     "from-primary via-primary/90 to-[#111827]",
@@ -203,7 +211,7 @@ function PromotionBannerCard({
 
         <div className="mb-3 w-fit rounded-[18px] bg-white px-4 py-2 text-primary shadow-lg">
           <p className="text-[22px] font-black leading-none sm:text-[26px]">
-            {formatDiscount(promotion, t("specialOffer"))}
+            {formatDiscount(promotion, t("specialOffer"), currency)}
           </p>
         </div>
 
@@ -256,6 +264,11 @@ export function FoodCategorySection() {
   const branchId = resolveHomeBranchId(user);
   const categoriesQuery = useHomeCategories(restaurantId, Boolean(token));
   const promotionsQuery = useHomePromotions(restaurantId, branchId, Boolean(token));
+  const homeQuery = useHome(restaurantId, branchId, Boolean(token && restaurantId && branchId));
+  const currency = resolveCustomerCurrency({
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+  });
   const categories = categoriesQuery.data ?? [];
   const promotions = promotionsQuery.data ?? [];
   const loading = categoriesQuery.isLoading;
@@ -393,6 +406,7 @@ export function FoodCategorySection() {
               key={promotion.id}
               promotion={promotion}
               index={index}
+              currency={currency}
             />
           ))}
         </div>

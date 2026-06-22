@@ -37,9 +37,11 @@ export type CartIncludedItem = {
   type?: string;
   id?: string | number;
   menuItemId?: string | number;
+  variationId?: string | number;
   name: string;
   quantity: number;
   menuItem?: ApiRecord;
+  selectedModifiers: CartModifier[];
 };
 
 export type CartItem = {
@@ -354,9 +356,11 @@ const normalizeIncludedDealItem = (itemInput: unknown): CartIncludedItem => {
     type: getStringValue(item.type) || undefined,
     id: item.id as string | number | undefined,
     menuItemId: item.menuItemId as string | number | undefined,
+    variationId: item.variationId as string | number | undefined,
     name: getStringValue(menuItem.name || item.name, "Included item"),
     quantity: Math.max(1, toNumber(item.quantity, 1)),
     menuItem,
+    selectedModifiers: getSelectedModifiers(item),
   };
 };
 

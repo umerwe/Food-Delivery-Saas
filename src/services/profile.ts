@@ -1,4 +1,5 @@
 import { uploadAvatarFile as uploadStorageFile } from "@/services/storage";
+import { DEFAULT_DISPLAY_CURRENCY } from "@/lib/money";
 import type { AuthSession, AuthUser } from "@/types/auth";
 import type { ProfileFormValues } from "@/validations/profile";
 
@@ -87,7 +88,7 @@ export const fetchWalletSummary = async (api: Pick<ApiClient, "get">): Promise<W
   if (isRecord(res) && res.error) {
     return {
       balance: 0,
-      currency: "USD",
+      currency: DEFAULT_DISPLAY_CURRENCY,
       transactionCount: 0,
     };
   }
@@ -97,7 +98,7 @@ export const fetchWalletSummary = async (api: Pick<ApiClient, "get">): Promise<W
 
   return {
     balance: isRecord(data) ? getNumber(data.balance) : 0,
-    currency: isRecord(data) ? getString(data.currency) || "USD" : "USD",
+    currency: isRecord(data) ? getString(data.currency) || DEFAULT_DISPLAY_CURRENCY : DEFAULT_DISPLAY_CURRENCY,
     transactionCount: Array.isArray(history) ? history.length : 0,
   };
 };

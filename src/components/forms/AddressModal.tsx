@@ -450,24 +450,24 @@ export function AddressModal({
 
                 <div className="rounded-[22px] border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className={LABEL_TEXT_CLASS}>
-                        {t("streetAddress")}
-                      </label>
-                      <div className="relative">
-                        <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                        <Input
-                          placeholder={t("streetPlaceholder")}
-                          {...register("street")}
-                          className="h-[56px] rounded-[16px] border-0 bg-[#F6F6F6] pl-11 pr-4 text-[15px] shadow-none focus-visible:ring-1 focus-visible:ring-primary"
-                        />
-                      </div>
-                      {errors.street?.message ? (
-                        <p className="text-xs font-medium text-primary">{errors.street.message}</p>
-                      ) : null}
-                    </div>
-
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className={LABEL_TEXT_CLASS}>
+                          {t("streetAddress")}
+                        </label>
+                        <div className="relative">
+                          <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <Input
+                            placeholder={t("streetPlaceholder")}
+                            {...register("street")}
+                            className="h-[56px] rounded-[16px] border-0 bg-[#F6F6F6] pl-11 pr-4 text-[15px] shadow-none focus-visible:ring-1 focus-visible:ring-primary"
+                          />
+                        </div>
+                        {errors.street?.message ? (
+                          <p className="text-xs font-medium text-primary">{errors.street.message}</p>
+                        ) : null}
+                      </div>
+
                       <div className="space-y-2">
                         <label className={LABEL_TEXT_CLASS}>
                           {t("houseNumber")}
@@ -478,7 +478,9 @@ export function AddressModal({
                           className={INPUT_BASE_CLASS}
                         />
                       </div>
+                    </div>
 
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <label className={LABEL_TEXT_CLASS}>
                           {t("postalCode")}
@@ -492,9 +494,7 @@ export function AddressModal({
                           <p className="text-xs font-medium text-primary">{errors.postalCode.message}</p>
                         ) : null}
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.25fr_1fr]">
                       <div className="space-y-2">
                         <label className={LABEL_TEXT_CLASS}>
                           {t("city")}
@@ -508,7 +508,9 @@ export function AddressModal({
                           <p className="text-xs font-medium text-primary">{errors.city.message}</p>
                         ) : null}
                       </div>
+                    </div>
 
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <label className={LABEL_TEXT_CLASS}>
                           {t("state")}
@@ -522,20 +524,20 @@ export function AddressModal({
                           <p className="text-xs font-medium text-primary">{errors.state.message}</p>
                         ) : null}
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <label className={LABEL_TEXT_CLASS}>
-                        {t("country")}
-                      </label>
-                      <Input
-                        placeholder={t("countryPlaceholder")}
-                        {...register("country")}
-                        className={INPUT_BASE_CLASS}
-                      />
-                      {errors.country?.message ? (
-                        <p className="text-xs font-medium text-primary">{errors.country.message}</p>
-                      ) : null}
+                      <div className="space-y-2">
+                        <label className={LABEL_TEXT_CLASS}>
+                          {t("country")}
+                        </label>
+                        <Input
+                          placeholder={t("countryPlaceholder")}
+                          {...register("country")}
+                          className={INPUT_BASE_CLASS}
+                        />
+                        {errors.country?.message ? (
+                          <p className="text-xs font-medium text-primary">{errors.country.message}</p>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </div>

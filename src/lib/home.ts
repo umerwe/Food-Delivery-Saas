@@ -2,6 +2,7 @@ import { readAuthSession } from "./auth";
 import { getArrayData } from "./response";
 import type { AuthUser } from "../types/auth";
 import type { HomeBranch, HomeCategory, LandingPopup, PromotionCampaign } from "../types/home";
+import type { HappyHourInfo } from "@/components/pages/Items/types";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -58,6 +59,7 @@ export const normalizeHomeCategories = (response: unknown): HomeCategory[] =>
       id: getString(item.id) ?? "",
       name: getString(item.name) ?? "",
       imageUrl: getString(item.imageUrl) ?? null,
+      happyHour: isRecord(item.happyHour) ? item.happyHour as HappyHourInfo : null,
     }))
     .filter((item) => item.id);
 

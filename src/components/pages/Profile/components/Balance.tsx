@@ -21,6 +21,7 @@ import {
 
 import { useAuth } from "@/hooks/useAuth";
 import usePayments from "@/hooks/usePayments";
+import { DEFAULT_DISPLAY_CURRENCY, formatMoney, normalizeCurrencyCode } from "@/lib/money";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 
@@ -99,7 +100,7 @@ const CheckoutForm = ({
 };
 const Balance = ({
   balance = 0,
-  currency = "USD",
+  currency = DEFAULT_DISPLAY_CURRENCY,
   loyaltyPoints = 0,
 }: Props) => {
   const t = useTranslations("profile.wallet");
@@ -107,6 +108,7 @@ const Balance = ({
   const commonT = useTranslations("common");
   const { token } = useAuth();
   const api = usePayments(token);
+  const walletCurrency = normalizeCurrencyCode(currency);
 
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("1000");
@@ -148,7 +150,7 @@ const Balance = ({
 
     const res = await api.post("/customer-app/wallet/top-up", {
       amount: numericAmount,
-      currency: "PKR",
+      currency: walletCurrency,
       note,
     });
 
@@ -184,7 +186,7 @@ const Balance = ({
         <div className="mt-2 flex items-end justify-between gap-4">
           <div>
           <h2 className="text-[40px] font-semibold tracking-tight">
-  {currency} {Number(balance).toLocaleString()}
+  {formatMoney(balance, walletCurrency, { maximumFractionDigits: 0 })}
 </h2>
 <div className="mt-6">
   <p className="text-xs text-white/70">
@@ -262,7 +264,7 @@ const Balance = ({
                             : {}
                         }
                       >
-                        PKR {item}
+                        {formatMoney(item, walletCurrency, { maximumFractionDigits: 0 })}
                       </button>
                     ))}
                   </div>
@@ -275,7 +277,7 @@ const Balance = ({
 
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
-                      PKR
+                      {walletCurrency}
                     </span>
 
                     <Input

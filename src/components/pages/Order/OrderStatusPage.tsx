@@ -23,6 +23,7 @@ import {
   getOrderProgressStepKeys,
   type OrderProgressStepKey,
 } from "@/components/pages/Order/order-status-progress";
+import { resolveCustomerCurrency } from "@/lib/money";
 
 function OrderStatusContent() {
   const t = useTranslations("orderStatus");
@@ -102,7 +103,9 @@ function OrderStatusContent() {
         orderId: order.id,
         payload: {
           paymentMethod: "STRIPE",
-          currency: order.transactions?.find((transaction) => transaction.currency)?.currency || "USD",
+          currency: resolveCustomerCurrency({
+            moneyCurrency: order.transactions?.find((transaction) => transaction.currency)?.currency,
+          }),
           note: "Retry order payment",
         },
       });

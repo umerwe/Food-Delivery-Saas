@@ -284,8 +284,8 @@ describe("modifier pricing", () => {
   });
 
   it("formats modifier price deltas", () => {
-    expect(formatModifierPriceDelta(10)).toBe("+$10.00");
-    expect(formatModifierPriceDelta(-2.5)).toBe("-$2.50");
-    expect(formatModifierPriceDelta(0)).toBe("$0.00");
+    expect(formatModifierPriceDelta(10)).toBe("+€10.00");
+    expect(formatModifierPriceDelta(-2.5, "USD")).toBe("-$2.50");
+    expect(formatModifierPriceDelta(0)).toBe("€0.00");
   });
 });

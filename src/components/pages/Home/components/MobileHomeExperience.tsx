@@ -22,6 +22,7 @@ type MobileHomeExperienceProps = {
   categories: HomeCategory[];
   categoriesLoading: boolean;
   deals: CustomerDeal[];
+  currency?: string | null;
 };
 
 const getCategoryImage = (category: HomeCategory) =>
@@ -47,6 +48,7 @@ export function MobileHomeExperience({
   categories,
   categoriesLoading,
   deals,
+  currency,
 }: MobileHomeExperienceProps) {
   const router = useRouter();
   const activeDeals = deals.filter(isDealActive).slice(0, 8);
@@ -211,7 +213,7 @@ export function MobileHomeExperience({
             <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {activeDeals.map((deal) => {
                 const image = resolveHttpsImageUrl(getDealImage(deal), "/burger.png");
-                const price = formatDealPrice(deal.discountValue);
+                const price = formatDealPrice(deal.discountValue, currency);
 
                 return (
                   <article

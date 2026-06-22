@@ -22,8 +22,8 @@ const deal: CustomerDeal = {
 
 describe("customer deals formatters", () => {
   it("formats fixed price", () => {
-    expect(formatDealPrice(799)).toBe("$799.00");
-    expect(formatDealPrice("12.5")).toBe("$12.50");
+    expect(formatDealPrice(799)).toBe("€799.00");
+    expect(formatDealPrice("12.5", "USD")).toBe("$12.50");
   });
 
   it("formats invalid date fallback", () => {

@@ -32,6 +32,7 @@ export const giftCardPurchaseSchema = z.object({
     .positive("Gift card amount must be greater than 0"),
   title: optionalTrimmedString,
   message: optionalTrimmedString,
+  currency: optionalTrimmedString,
   expiresAt: optionalTrimmedString
     .refine((value) => !value || isValidDateTime(value), "Expiry date must be valid")
     .refine((value) => !value || isFutureDateTime(value), "Expiry date must be in the future"),
@@ -70,6 +71,7 @@ export const buildGiftCardPurchasePayload = (
     amount: values.amount,
     ...(getOptionalText(values.title) ? { title: getOptionalText(values.title) } : {}),
     ...(getOptionalText(values.message) ? { message: getOptionalText(values.message) } : {}),
+    ...(getOptionalText(values.currency) ? { currency: getOptionalText(values.currency) } : {}),
     ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
   };
 };

@@ -24,10 +24,13 @@ import { useAuth } from "@/hooks/useAuth"
 import useMenu from "@/hooks/useMenu"
 import { BranchSwitcher } from "@/components/common/branch-selector/BranchSwitcher"
 import { BrandLogo } from "@/components/common/BrandLogo"
+import { CouponPerkBanner } from "@/components/layout/navbar/CouponPerkBanner"
 import { LanguageSelector } from "@/components/layout/navbar/LanguageSelector"
+import { useCustomerCoupons } from "@/hooks/useCustomerCoupons"
 import { useHome } from "@/hooks/useHome"
 import { CART_CHANGED_EVENT } from "@/lib/cart-events"
 import { resolveHomeBranchId, resolveHomeRestaurantId, resolveTableReservationsEnabled } from "@/lib/home"
+import { formatMoney, resolveCustomerCurrency } from "@/lib/money"
 import { fetchCustomerCart } from "@/services/cart"
 
 type MenuItem = {
@@ -131,6 +134,10 @@ export const Navbar = () => {
       refetchOnWindowFocus: "always",
     }
   )
+  const couponsQuery = useCustomerCoupons({
+    restaurantId: homeRestaurantId,
+    branchId,
+  })
 
   const isAuth = !!user
   const userId = user?.id
@@ -140,6 +147,10 @@ export const Navbar = () => {
     user?.branch
   )
   const restaurantLogoUrl = homeQuery.data?.data.restaurant?.logoUrl ?? null
+  const currency = resolveCustomerCurrency({
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+  })
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -341,6 +352,8 @@ export const Navbar = () => {
         ref={navbarWrapRef}
         className={`relative z-30 ${hideOnMobileHome ? "hidden md:block" : ""}`}
       >
+        <CouponPerkBanner coupons={couponsQuery.coupons} currency={currency} />
+
         {/* NAVBAR */}
         <nav className="mx-auto flex max-w-[1440px] items-center justify-between gap-5 px-5 py-5 lg:px-8 2xl:px-10">
           {/* LEFT - LOGO */}
@@ -652,7 +665,10 @@ export const Navbar = () => {
                           </div>
 
                           <div className="shrink-0 text-sm font-semibold text-gray-900">
-                            ${Number(item.basePrice || 0).toFixed(2)}
+                            {formatMoney(item.basePrice, currency, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </div>
                         </div>
 

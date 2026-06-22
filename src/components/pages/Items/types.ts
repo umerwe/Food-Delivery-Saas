@@ -1,14 +1,25 @@
 export type PromotionInfo = {
   promotionId?: string;
+  id?: string;
   title?: string | null;
   description?: string | null;
   applyMode?: "ORDER_TOTAL" | "SCOPED_ITEMS" | string;
   discountType?: "FLAT" | "PERCENTAGE" | string;
   discountValue?: number | string | null;
   maxDiscountAmount?: number | string | null;
+  originalPrice?: number | string | null;
   discountAmount?: number | string | null;
+  discountedPrice?: number | string | null;
   discountedAmount?: number | string | null;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  activeDays?: string[] | null;
+  dailyStartTime?: string | null;
+  dailyEndTime?: string | null;
+  isCurrentlyActive?: boolean | null;
 };
+
+export type HappyHourInfo = PromotionInfo;
 
 
 export type PromotionPricing = {
@@ -54,8 +65,10 @@ export type VariationPriceOverride = {
   modifierPriceOverrides?: MenuItemVariationModifierPriceOverride[];
   itemPriceOverrides?: VariationPriceOverride[];
   discountedPrice?: string | number | null;
+  happyHourDiscountedPrice?: string | number | null;
   discountedBasePrice?: string | number | null;
   promotion?: PromotionInfo | null;
+  happyHour?: HappyHourInfo | null;
 };
 
 export type MenuItemVariationPriceOverride = VariationPriceOverride;
@@ -71,8 +84,10 @@ export type MenuVariation = {
   pickupPrice?: string | number | null;
   displayText?: string | null;
   discountedPrice?: string | number | null;
+  happyHourDiscountedPrice?: string | number | null;
   discountedBasePrice?: string | number | null;
   promotion?: PromotionInfo | null;
+  happyHour?: HappyHourInfo | null;
   sortOrder?: number;
   isDefault?: boolean;
   isActive?: boolean;
@@ -194,7 +209,9 @@ export type MenuItem = {
   maxQuantity?: string | number | null;
   depositAmount?: string | number | null;
   promotion?: PromotionInfo | null;
+  happyHour?: HappyHourInfo | null;
   discountedPrice?: string | number | null;
+  happyHourDiscountedBasePrice?: string | number | null;
   discountedBasePrice?: string | number | null;
   settings?: ApiRecord;
   restaurant?: (Record<string, unknown> & { id?: string | number | null });
@@ -341,6 +358,7 @@ export type MenuCategory = {
   imageUrl?: string | null;
   coverImage?: string | null;
   bannerUrl?: string | null;
+  happyHour?: HappyHourInfo | null;
 };
 
 export type ItemsCategory = MenuCategory;

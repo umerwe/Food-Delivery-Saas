@@ -32,6 +32,7 @@ import {
   type CheckoutTypePreference,
 } from "@/lib/checkout-type-preference";
 import { dispatchCartChanged } from "@/lib/cart-events";
+import { resolveCustomerCurrency } from "@/lib/money";
 import {
   addPreparationMinutesToScheduledDelivery,
   buildDeliveryTimeSlots,
@@ -310,6 +311,10 @@ function CheckoutPageContent() {
     () => normalizeBranch(homeQuery.data?.data.branch),
     [homeQuery.data?.data.branch]
   );
+  const currency = resolveCustomerCurrency({
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+  });
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartQuote, setCartQuote] = useState<ApiRecord | null>(null);
@@ -1163,7 +1168,7 @@ function CheckoutPageContent() {
       if (checkoutPaymentMethod === "STRIPE") {
         const attemptRes = await post(`/v1/payments/orders/${orderId}/attempts`, {
           paymentMethod: "STRIPE",
-          currency: "USD",
+          currency,
           note: "Order payment",
         });
 
@@ -1378,6 +1383,7 @@ function CheckoutPageContent() {
             setLoyaltyPoints={setLoyaltyPoints}
             loadingLoyalty={loadingLoyalty}
             isGuest={isGuest}
+            currency={currency}
           />
         </div>
       </div>

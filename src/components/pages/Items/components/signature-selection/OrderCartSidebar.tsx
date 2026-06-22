@@ -46,6 +46,7 @@ type OrderCartSidebarProps = {
   onCartRefresh?: () => void;
   presentation?: "embedded" | "floating";
   checkoutType?: CheckoutType;
+  currency?: string | null;
 };
 
 export function OrderCartSidebar({
@@ -54,6 +55,7 @@ export function OrderCartSidebar({
   onCartRefresh,
   presentation = "embedded",
   checkoutType = "delivery",
+  currency,
 }: OrderCartSidebarProps) {
   const t = useTranslations("checkout");
   const cartT = useTranslations("cart");
@@ -356,6 +358,9 @@ export function OrderCartSidebar({
                                 String(includedItem.menuItem?.name || includedItem.name || "").trim() ||
                                 t("includedItemFallback");
                               const includedQuantity = Math.max(1, toNumber(includedItem.quantity, 1));
+                              const includedModifiers = Array.isArray(includedItem.selectedModifiers)
+                                ? includedItem.selectedModifiers
+                                : [];
                               const includedKey =
                                 includedItem.id ||
                                 includedItem.menuItemId ||
@@ -364,10 +369,45 @@ export function OrderCartSidebar({
                               return (
                                 <div
                                   key={String(includedKey)}
-                                  className="flex items-center justify-between gap-3 text-xs"
+                                  className="space-y-1 text-xs"
                                 >
-                                  <span className="min-w-0 truncate text-gray-700">{includedName}</span>
-                                  <span className="shrink-0 font-medium text-primary">× {includedQuantity}</span>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="min-w-0 truncate text-gray-700">{includedName}</span>
+                                    <span className="shrink-0 font-medium text-primary">× {includedQuantity}</span>
+                                  </div>
+
+                                  {includedModifiers.length > 0 ? (
+                                    <div className="space-y-0.5 pl-2">
+                                      {includedModifiers.map((modifier, modifierIndex) => {
+                                        const modifierKey =
+                                          modifier.id ||
+                                          modifier.modifierId ||
+                                          `${includedKey}-modifier-${modifierIndex}`;
+                                        const modifierQuantity = Math.max(
+                                          1,
+                                          toNumber(modifier.quantity, 1)
+                                        );
+                                        const modifierTotal = toNumber(modifier.total, 0);
+
+                                        return (
+                                          <div
+                                            key={String(modifierKey)}
+                                            className="flex items-center justify-between gap-3 text-[11px] text-gray-500"
+                                          >
+                                            <span className="min-w-0 truncate">
+                                              {modifier.name}
+                                              {modifierQuantity > 1 ? ` × ${modifierQuantity}` : ""}
+                                            </span>
+                                            {modifierTotal > 0 ? (
+                                              <span className="shrink-0 font-medium text-gray-600">
+                                                +{formatCurrency(modifierTotal, currency)}
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : null}
                                 </div>
                               );
                             })}
@@ -397,7 +437,7 @@ export function OrderCartSidebar({
 
                                 {section.checkoutPrice > 0 ? (
                                   <p className="shrink-0 font-medium text-gray-800">
-                                    {formatCurrency(section.checkoutPrice)}
+                                    {formatCurrency(section.checkoutPrice, currency)}
                                   </p>
                                 ) : null}
                               </div>
@@ -429,7 +469,7 @@ export function OrderCartSidebar({
                                     {addonQty > 1 ? ` × ${addonQty}` : ""}
                                   </span>
                                   <span className="shrink-0 font-medium text-gray-700">
-                                    {addonTotal > 0 ? `+${formatCurrency(addonTotal)}` : t("free")}
+                                    {addonTotal > 0 ? `+${formatCurrency(addonTotal, currency)}` : t("free")}
                                   </span>
                                 </div>
                               );
@@ -445,7 +485,7 @@ export function OrderCartSidebar({
                             {t("deposit")}
                           </span>
                           <span className="font-semibold text-amber-700">
-                            {formatCurrency(depositUnitAmount)}
+                            {formatCurrency(depositUnitAmount, currency)}
                             {quantity > 1 ? ` × ${quantity}` : ""}
                           </span>
                         </div>
@@ -460,23 +500,23 @@ export function OrderCartSidebar({
                       <div className="flex items-end justify-between gap-3 pt-1">
                         <div>
                           <p className="text-sm font-semibold text-primary">
-                            {formatCurrency(lineTotal)}
+                            {formatCurrency(lineTotal, currency)}
                           </p>
                           <div className="space-y-0.5">
                             <p className="text-[11px] text-gray-400">
-                              {t("each", { price: formatCurrency(unitPriceWithModifiers) })}
+                              {t("each", { price: formatCurrency(unitPriceWithModifiers, currency) })}
                             </p>
                             {selectedAddons.length > 0 ? (
                               <p className="text-[11px] text-gray-400">
                                 {t("priceWithAddons", {
-                                  price: formatCurrency(checkoutUnitPrice),
-                                  addons: formatCurrency(modifiersTotal),
+                                  price: formatCurrency(checkoutUnitPrice, currency),
+                                  addons: formatCurrency(modifiersTotal, currency),
                                 })}
                               </p>
                             ) : null}
                             {itemDepositTotal > 0 ? (
                               <p className="text-[11px] text-gray-400">
-                                {t("includesDeposit", { amount: formatCurrency(itemDepositTotal) })}
+                                {t("includesDeposit", { amount: formatCurrency(itemDepositTotal, currency) })}
                               </p>
                             ) : null}
                           </div>
@@ -518,13 +558,13 @@ export function OrderCartSidebar({
           <div className="space-y-3 border-t border-black/5 pt-5 text-sm text-gray-500">
             <div className="flex items-center justify-between">
               <span>{t("itemTotal")}</span>
-              <span>{formatCurrency(quoteSubtotal)}</span>
+              <span>{formatCurrency(quoteSubtotal, currency)}</span>
             </div>
 
             {depositTotal > 0 ? (
               <div className="flex items-center justify-between text-amber-700">
                 <span>{t("deposit")}</span>
-                <span>{formatCurrency(depositTotal)}</span>
+                <span>{formatCurrency(depositTotal, currency)}</span>
               </div>
             ) : null}
 
@@ -533,38 +573,38 @@ export function OrderCartSidebar({
                 <span>
                   {checkoutType === "pickup" ? t("pickupPrice") : t("deliveryFee")}
                 </span>
-                <span>{formatCurrency(selectedOrderFee)}</span>
+                <span>{formatCurrency(selectedOrderFee, currency)}</span>
               </div>
             ) : null}
 
             <div className="flex items-center justify-between">
               <span>{t("taxesAndCharges")}</span>
-              <span>{formatCurrency(taxes)}</span>
+              <span>{formatCurrency(taxes, currency)}</span>
             </div>
 
             {serviceCharge > 0 ? (
               <div className="flex items-center justify-between">
                 <span>{t("totals.serviceCharge")}</span>
-                <span>{formatCurrency(serviceCharge)}</span>
+                <span>{formatCurrency(serviceCharge, currency)}</span>
               </div>
             ) : null}
 
             {tipAmount > 0 ? (
               <div className="flex items-center justify-between">
                 <span>{t("totals.tip")}</span>
-                <span>{formatCurrency(tipAmount)}</span>
+                <span>{formatCurrency(tipAmount, currency)}</span>
               </div>
             ) : null}
 
             <div className="flex items-center justify-between pt-2">
               <span>{t("totalBeforeDiscount")}</span>
-              <span>{formatCurrency(totalBeforeDiscount)}</span>
+              <span>{formatCurrency(totalBeforeDiscount, currency)}</span>
             </div>
 
             {discount > 0 ? (
               <div className="flex items-center justify-between text-green-600">
                 <span>{hasAppliedPromotion ? t("appliedDealDiscount") : t("discount")}</span>
-                <span>- {formatCurrency(discount)}</span>
+                <span>- {formatCurrency(discount, currency)}</span>
               </div>
             ) : null}
 
@@ -577,20 +617,20 @@ export function OrderCartSidebar({
                       })
                     : t("loyaltyDiscount")}
                 </span>
-                <span>- {formatCurrency(loyaltyDiscount)}</span>
+                <span>- {formatCurrency(loyaltyDiscount, currency)}</span>
               </div>
             ) : null}
 
             {walletAppliedAmount > 0 ? (
               <div className="flex items-center justify-between text-green-600">
                 <span>{t("walletApplied")}</span>
-                <span>- {formatCurrency(walletAppliedAmount)}</span>
+                <span>- {formatCurrency(walletAppliedAmount, currency)}</span>
               </div>
             ) : null}
 
             <div className="flex items-center justify-between pt-2 text-[22px] font-semibold tracking-[-0.02em] text-gray-900">
               <span>{walletAppliedAmount > 0 ? t("payableTotal") : t("total")}</span>
-              <span>{formatCurrency(finalTotal)}</span>
+              <span>{formatCurrency(finalTotal, currency)}</span>
             </div>
           </div>
 

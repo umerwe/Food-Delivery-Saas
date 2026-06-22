@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/money";
 import { normalizeArray, toNumber } from "./product-normalizers";
 
 type ModifierReference = {
@@ -240,12 +241,23 @@ export const getModifierPriceForVariation = ({
   return toNumber(groupModifier?.priceDelta, 0);
 };
 
-export const formatModifierPriceDelta = (value: number | string | null | undefined) => {
+export const formatModifierPriceDelta = (
+  value: number | string | null | undefined,
+  currency?: string | null
+) => {
   const amount = toNumber(value, 0);
 
-  if (amount === 0) return "$0.00";
+  if (amount === 0) {
+    return formatMoney(0, currency, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
 
   const sign = amount > 0 ? "+" : "-";
 
-  return `${sign}$${Math.abs(amount).toFixed(2)}`;
+  return `${sign}${formatMoney(Math.abs(amount), currency, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };

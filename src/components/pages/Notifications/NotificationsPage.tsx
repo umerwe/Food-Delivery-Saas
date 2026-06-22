@@ -174,7 +174,11 @@ const disableMarkAll = !hasNotifications || !hasUnread;
                     {/* Time */}
                     <span className="text-xs text-gray-400 sm:whitespace-nowrap">
                       {item.createdAt
-                        ? new Date(item.createdAt).toLocaleString()
+                        ? new Date(item.createdAt).toLocaleString("en-US", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                            hourCycle: "h23",
+                          })
                         : ""}
                     </span>
                   </div>

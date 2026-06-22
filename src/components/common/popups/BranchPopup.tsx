@@ -3,6 +3,7 @@
 import { FaMapMarkerAlt, FaTimes, FaStore } from "react-icons/fa";
 import { useTranslations } from "next-intl";
 import type { BranchRecord } from "@/types/branch-selector";
+import { formatDisplayAddress } from "@/lib/address-display";
 
 type BranchPopupProps = {
   show: boolean;
@@ -97,9 +98,9 @@ export function BranchPopup({
                     </p>
 
                     <p className="mt-1 text-sm leading-relaxed text-gray-500">
-                      {[branch.address?.area, branch.address?.city]
-                        .filter(Boolean)
-                        .join(", ") || t("branchLocationAvailable")}
+                      {formatDisplayAddress(branch.address, {
+                        fallback: t("branchLocationAvailable"),
+                      })}
                     </p>
 
                     <span className="mt-3 inline-flex items-center text-[12px] font-semibold text-[#EC5834]">

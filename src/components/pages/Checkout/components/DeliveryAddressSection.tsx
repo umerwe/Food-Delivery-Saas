@@ -174,7 +174,7 @@ export function DeliveryAddressSection({
 
         <div className="rounded-[22px] border border-gray-100 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">{t("street")}</label>
               <Input
                 value={guestDeliveryAddress.street}

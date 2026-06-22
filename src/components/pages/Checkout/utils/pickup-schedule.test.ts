@@ -34,9 +34,9 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "11:00", label: "11:00 AM" },
-      { value: "11:30", label: "11:30 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "11:00", label: "11:00" },
+      { value: "11:30", label: "11:30" },
     ]);
   });
 
@@ -111,14 +111,14 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "11:00", label: "11:00 AM" },
-      { value: "11:30", label: "11:30 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "11:00", label: "11:00" },
+      { value: "11:30", label: "11:30" },
     ]);
     expect(
       buildScheduleBreakLabels(branch.settings?.deliveryHours?.[0])
     ).toEqual([
-      { label: "10:30 AM - 11:00 AM" },
+      { label: "10:30 - 11:00" },
     ]);
   });
 
@@ -143,8 +143,8 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "10:30", label: "10:30 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "10:30", label: "10:30" },
     ]);
   });
 
@@ -186,8 +186,8 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "09:00", label: "9:00 AM" },
-      { value: "09:30", label: "9:30 AM" },
+      { value: "09:00", label: "09:00" },
+      { value: "09:30", label: "09:30" },
     ]);
   });
 
@@ -227,9 +227,9 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "10:20", label: "10:20 AM" },
-      { value: "10:40", label: "10:40 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "10:20", label: "10:20" },
+      { value: "10:40", label: "10:40" },
     ]);
     expect(
       buildDeliveryTimeSlots({
@@ -237,10 +237,10 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "10:15", label: "10:15 AM" },
-      { value: "10:30", label: "10:30 AM" },
-      { value: "10:45", label: "10:45 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "10:15", label: "10:15" },
+      { value: "10:30", label: "10:30" },
+      { value: "10:45", label: "10:45" },
     ]);
   });
 
@@ -269,10 +269,10 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "10:15", label: "10:15 AM" },
-      { value: "10:30", label: "10:30 AM" },
-      { value: "10:45", label: "10:45 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "10:15", label: "10:15" },
+      { value: "10:30", label: "10:30" },
+      { value: "10:45", label: "10:45" },
     ]);
   });
 
@@ -301,8 +301,8 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "10:45", label: "10:45 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "10:45", label: "10:45" },
     ]);
   });
 
@@ -336,9 +336,9 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "09:00", label: "9:00 AM" },
-      { value: "09:20", label: "9:20 AM" },
-      { value: "09:40", label: "9:40 AM" },
+      { value: "09:00", label: "09:00" },
+      { value: "09:20", label: "09:20" },
+      { value: "09:40", label: "09:40" },
     ]);
     expect(
       buildDeliveryTimeSlots({
@@ -346,10 +346,10 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "10:15", label: "10:15 AM" },
-      { value: "10:30", label: "10:30 AM" },
-      { value: "10:45", label: "10:45 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "10:15", label: "10:15" },
+      { value: "10:30", label: "10:30" },
+      { value: "10:45", label: "10:45" },
     ]);
   });
 
@@ -378,8 +378,8 @@ describe("pickup schedule helpers", () => {
         dateValue: "2030-06-17",
       })
     ).toEqual([
-      { value: "10:00", label: "10:00 AM" },
-      { value: "10:30", label: "10:30 AM" },
+      { value: "10:00", label: "10:00" },
+      { value: "10:30", label: "10:30" },
     ]);
   });
 
@@ -398,8 +398,8 @@ describe("pickup schedule helpers", () => {
         preparationMinutes: 20,
       })
     ).toMatchObject({
-      selectedLabel: "9:30 AM",
-      readyLabel: "9:50 AM",
+      selectedLabel: "09:30",
+      readyLabel: "09:50",
       preparationMinutes: 20,
     });
   });

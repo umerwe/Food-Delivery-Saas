@@ -1,15 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CategorySidebar from "./CategorySidebar";
 import { ItemsListing } from "./Items";
+import { CustomerDealsSection } from "@/components/pages/Home/components/CustomerDealsSection";
 import useItems from "@/hooks/useItems";
 import useMenu from "@/hooks/useMenu";
 import { useAuth } from "@/hooks/useAuth";
+import { useAddDealToCart } from "@/hooks/useCart";
+import { useAppLocale } from "@/hooks/useAppLocale";
+import { useCustomerDeals } from "@/hooks/useCustomerDeals";
+import { useHome } from "@/hooks/useHome";
 import { getStoredRestaurantId } from "@/lib/auth";
+import { resolveHomeBranchId } from "@/lib/home";
+import { resolveCustomerCurrency } from "@/lib/money";
 import { getItemsMenuViewMode, setItemsMenuViewMode } from "@/lib/view-preferences";
 import type { ApiMeta, ItemsCategory, MenuItem } from "@/components/pages/Items/types";
 import { resolveHasNext } from "@/components/pages/Items/utils/restaurant-card-utils";
+import type { CustomerDeal } from "@/types/customer-deals";
 
 type MenuViewMode = "multiple" | "onePage";
 type ItemsContentSource = "category" | "menu";
@@ -39,6 +47,7 @@ type ItemsLayoutProps = {
 
 export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
   const { token, restaurantId: authRestaurantId, user } = useAuth();
+  const { locale } = useAppLocale();
   const { fetchMenuCategoriesPage } = useItems(token);
   const { fetchSignatureMenus } = useMenu(token);
 
@@ -77,6 +86,30 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
       ""
     );
   }, [authRestaurantId, user?.restaurantId]);
+  const branchId = useMemo(() => resolveHomeBranchId(user), [user]);
+  const homeQuery = useHome(
+    restaurantId,
+    branchId,
+    Boolean(token && restaurantId && branchId)
+  );
+  const currency = resolveCustomerCurrency({
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+  });
+  const dealsRestaurantId = contentSource === "menu" ? restaurantId : "";
+  const dealsQuery = useCustomerDeals({
+    restaurantId: dealsRestaurantId,
+    branchId,
+    locale,
+    limit: 20,
+  });
+  const addDealMutation = useAddDealToCart(branchId);
+  const handleAddDeal = useCallback(
+    (deal: CustomerDeal, selectedMenuItemIds?: string[]) => {
+      addDealMutation.mutate({ deal, selectedMenuItemIds });
+    },
+    [addDealMutation]
+  );
 
   useEffect(() => {
     setItemsMenuViewMode(viewMode);
@@ -382,6 +415,18 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
 
       {/* ITEMS */}
       <main className="min-w-0 flex-1">
+        {contentSource === "menu" ? (
+          <CustomerDealsSection
+            deals={dealsQuery.deals}
+            isLoading={dealsQuery.isLoading}
+            addingDealId={addDealMutation.isPending ? addDealMutation.variables?.deal.id ?? null : null}
+            branchId={branchId}
+            onAddDeal={handleAddDeal}
+            compact
+            currency={currency}
+          />
+        ) : null}
+
         <ItemsListing
           activeSectionId={activeSectionId}
           sections={listingSections}
@@ -391,6 +436,7 @@ export function ItemsLayout({ categoryId }: ItemsLayoutProps) {
           onActiveCategoryChange={
             contentSource === "menu" ? setActiveOnePageMenuId : setActiveOnePageCategoryId
           }
+          currency={currency}
         />
       </main>
     </div>

@@ -1,4 +1,5 @@
 import { getDealImage } from "@/components/pages/Home/utils/customer-deal-cart";
+import { formatMoney } from "@/lib/money";
 import type { CustomerDeal, CustomerDealMenuItem } from "@/types/customer-deals";
 
 const toNumber = (value: number | string | null | undefined, fallback = 0) => {
@@ -21,8 +22,13 @@ const formatShortDate = (date: Date) =>
     day: "2-digit",
   });
 
-export const formatDealPrice = (value: number | string | null | undefined): string =>
-  `$${toNumber(value, 0).toFixed(2)}`;
+export const formatDealPrice = (
+  value: number | string | null | undefined,
+  currency?: string | null
+): string => formatMoney(toNumber(value, 0), currency, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 export const formatDealDateRange = (
   startsAt?: string | null,

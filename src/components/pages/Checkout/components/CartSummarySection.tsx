@@ -32,6 +32,7 @@ import {
 import { useTranslations } from "next-intl";
 import type { LoyaltySummary } from "@/services/loyalty";
 import type { CartChargeBreakdown } from "@/types/cart";
+import { formatMoney } from "@/lib/money";
 
 interface CartAddon {
   id?: string;
@@ -116,9 +117,11 @@ export interface CartItem {
     type?: string;
     id?: string | number;
     menuItemId?: string | number;
+    variationId?: string | number;
     name?: string;
     quantity?: number | string;
     menuItem?: ApiRecord & { name?: string };
+    selectedModifiers?: CartAddon[];
   }>;
 }
 
@@ -177,6 +180,7 @@ interface Props {
   setLoyaltyPoints?: (value: string) => void;
   loadingLoyalty?: boolean;
   isGuest?: boolean;
+  currency?: string | null;
 }
 
 export type CheckoutType = "delivery" | "pickup";
@@ -201,9 +205,11 @@ const normalizeArray = <T = unknown,>(value: unknown): T[] => {
   return Array.isArray(value) ? (value as T[]) : [];
 };
 
-export const formatCurrency = (value: unknown) => {
-  return `$${toNumber(value, 0).toFixed(2)}`;
-};
+export const formatCurrency = (value: unknown, currency?: string | null) =>
+  formatMoney(toNumber(value, 0), currency, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const slugify = (value: string) => {
   return String(value || "")
@@ -632,6 +638,7 @@ export function CartSummarySection({
   setLoyaltyPoints,
   loadingLoyalty = false,
   isGuest = false,
+  currency,
 }: Props) {
   const t = useTranslations("checkout");
   const router = useRouter();
@@ -870,7 +877,11 @@ export function CartSummarySection({
                 {backendError.timestamp ? (
                   <div className="mt-2 flex flex-wrap justify-center gap-2 text-[11px] text-red-700/80">
                     <span className="rounded-full bg-white/70 px-2 py-1">
-                      {new Date(backendError.timestamp).toLocaleString()}
+                      {new Date(backendError.timestamp).toLocaleString("en-US", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        hourCycle: "h23",
+                      })}
                     </span>
                   </div>
                 ) : null}
@@ -1010,6 +1021,9 @@ export function CartSummarySection({
                                 1,
                                 toNumber(includedItem.quantity, 1)
                               );
+                              const includedModifiers = Array.isArray(includedItem.selectedModifiers)
+                                ? includedItem.selectedModifiers
+                                : [];
                               const includedKey =
                                 includedItem.id ||
                                 includedItem.menuItemId ||
@@ -1018,14 +1032,49 @@ export function CartSummarySection({
                               return (
                                 <div
                                   key={String(includedKey)}
-                                  className="flex items-center justify-between gap-3 text-xs"
+                                  className="space-y-1 text-xs"
                                 >
-                                  <span className="min-w-0 truncate text-gray-700">
-                                    {includedName}
-                                  </span>
-                                  <span className="shrink-0 font-medium text-primary">
-                                    × {includedQuantity}
-                                  </span>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="min-w-0 truncate text-gray-700">
+                                      {includedName}
+                                    </span>
+                                    <span className="shrink-0 font-medium text-primary">
+                                      × {includedQuantity}
+                                    </span>
+                                  </div>
+
+                                  {includedModifiers.length > 0 ? (
+                                    <div className="space-y-0.5 pl-2">
+                                      {includedModifiers.map((modifier, modifierIndex) => {
+                                        const modifierKey =
+                                          modifier.id ||
+                                          modifier.modifierId ||
+                                          `${includedKey}-modifier-${modifierIndex}`;
+                                        const modifierQuantity = Math.max(
+                                          1,
+                                          toNumber(modifier.quantity, 1)
+                                        );
+                                        const modifierTotal = toNumber(modifier.total, 0);
+
+                                        return (
+                                          <div
+                                            key={String(modifierKey)}
+                                            className="flex items-center justify-between gap-3 text-[11px] text-gray-500"
+                                          >
+                                            <span className="min-w-0 truncate">
+                                              {modifier.name}
+                                              {modifierQuantity > 1 ? ` × ${modifierQuantity}` : ""}
+                                            </span>
+                                            {modifierTotal > 0 ? (
+                                              <span className="shrink-0 font-medium text-gray-600">
+                                                +{formatCurrency(modifierTotal, currency)}
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : null}
                                 </div>
                               );
                             })}
@@ -1066,7 +1115,7 @@ export function CartSummarySection({
                                       {section.checkoutPrice > 0 ? (
                                         <div className="shrink-0 text-right">
                                           <p className="font-semibold text-primary">
-                                            {formatCurrency(section.checkoutPrice)}
+                                            {formatCurrency(section.checkoutPrice, currency)}
                                           </p>
                                         </div>
                                       ) : null}
@@ -1110,7 +1159,7 @@ export function CartSummarySection({
                                   {section.checkoutPrice > 0 ? (
                                     <div className="shrink-0 text-right">
                                       <p className="font-medium text-gray-800">
-                                        {formatCurrency(section.checkoutPrice)}
+                                        {formatCurrency(section.checkoutPrice, currency)}
                                       </p>
                                     </div>
                                   ) : null}
@@ -1158,7 +1207,7 @@ export function CartSummarySection({
 
                                   <span className="shrink-0 font-medium text-gray-700">
                                     {addonTotal > 0
-                                      ? `+${formatCurrency(addonTotal)}`
+                                      ? `+${formatCurrency(addonTotal, currency)}`
                                       : t("free")}
                                   </span>
                                 </div>
@@ -1176,7 +1225,7 @@ export function CartSummarySection({
                           </span>
 
                           <span className="font-semibold text-amber-700">
-                            {formatCurrency(depositUnitAmount)}
+                            {formatCurrency(depositUnitAmount, currency)}
                             {quantity > 1 ? ` × ${quantity}` : ""}
                           </span>
                         </div>
@@ -1191,26 +1240,26 @@ export function CartSummarySection({
                       <div className="flex justify-between py-[4px]">
                         <div>
                           <p className="text-base font-medium text-primary">
-                            {formatCurrency(lineTotal)}
+                            {formatCurrency(lineTotal, currency)}
                           </p>
 
                           <div className="space-y-0.5">
                             <p className="text-[11px] text-gray-400">
-                              {t("each", { price: formatCurrency(unitPriceWithModifiers) })}
+                              {t("each", { price: formatCurrency(unitPriceWithModifiers, currency) })}
                             </p>
 
                             {selectedAddons.length > 0 ? (
                               <p className="text-[11px] text-gray-400">
                                 {t("priceWithAddons", {
-                                  price: formatCurrency(checkoutUnitPrice),
-                                  addons: formatCurrency(modifiersTotal),
+                                  price: formatCurrency(checkoutUnitPrice, currency),
+                                  addons: formatCurrency(modifiersTotal, currency),
                                 })}
                               </p>
                             ) : null}
 
                             {depositTotal > 0 ? (
                               <p className="text-[11px] text-gray-400">
-                                {t("includesDeposit", { amount: formatCurrency(depositTotal) })}
+                                {t("includesDeposit", { amount: formatCurrency(depositTotal, currency) })}
                               </p>
                             ) : null}
                           </div>
@@ -1255,7 +1304,7 @@ export function CartSummarySection({
         <div className="space-y-4 text-sm text-gray-500">
           <div className="flex items-center justify-between">
             <span>{t("itemTotal")}</span>
-            <span>{formatCurrency(quoteSubtotal ?? itemTotal)}</span>
+            <span>{formatCurrency(quoteSubtotal ?? itemTotal, currency)}</span>
           </div>
 
           {depositTotal > 0 ? (
@@ -1264,7 +1313,7 @@ export function CartSummarySection({
                 <span>{t("deposit")}</span>
                 <Info size={16} />
               </div>
-              <span>{formatCurrency(depositTotal)}</span>
+              <span>{formatCurrency(depositTotal, currency)}</span>
             </div>
           ) : null}
 
@@ -1276,7 +1325,7 @@ export function CartSummarySection({
                 </span>
                 <Info size={16} />
               </div>
-              <span>{formatCurrency(selectedOrderFee)}</span>
+              <span>{formatCurrency(selectedOrderFee, currency)}</span>
             </div>
           ) : null}
 
@@ -1285,7 +1334,7 @@ export function CartSummarySection({
               <span>{t("taxesAndCharges")}</span>
               <Info size={16} />
             </div>
-            <span>{formatCurrency(taxes)}</span>
+            <span>{formatCurrency(taxes, currency)}</span>
           </div>
 
           {shouldShowPositiveAmountLine(serviceCharge) ? (
@@ -1302,14 +1351,14 @@ export function CartSummarySection({
                 </span>
                 <Info size={16} />
               </div>
-              <span>{formatCurrency(serviceCharge)}</span>
+              <span>{formatCurrency(serviceCharge, currency)}</span>
             </div>
           ) : null}
 
           {shouldShowPositiveAmountLine(tipAmount) ? (
             <div className="flex items-center justify-between">
               <span>{t("totals.tip")}</span>
-              <span>{formatCurrency(tipAmount)}</span>
+              <span>{formatCurrency(tipAmount, currency)}</span>
             </div>
           ) : null}
         </div>
@@ -1361,7 +1410,7 @@ export function CartSummarySection({
                 role="status"
                 className="mt-2 text-xs font-medium text-green-700"
               >
-                {t("tip.applied", { amount: formatCurrency(tipAmount) })}
+                {t("tip.applied", { amount: formatCurrency(tipAmount, currency) })}
               </p>
             ) : null}
           </div>
@@ -1418,14 +1467,14 @@ export function CartSummarySection({
                   ? ` · ${String(appliedPromotion.applyMode).replace(/_/g, " ")}`
                   : ""}
                 {promotionDiscountLine && promotionDiscountLine.amount > 0
-                  ? ` · ${t("off", { amount: formatCurrency(promotionDiscountLine.amount) })}`
+                  ? ` · ${t("off", { amount: formatCurrency(promotionDiscountLine.amount, currency) })}`
                   : ""}
               </p>
             ) : hasAppliedCoupon ? (
               <p className="mt-1 pl-6 text-xs font-normal text-green-700/90">
                 {appliedCouponCode}
                 {discount > 0
-                  ? ` · ${t("off", { amount: formatCurrency(discount) })}`
+                  ? ` · ${t("off", { amount: formatCurrency(discount, currency) })}`
                   : ""}
               </p>
             ) : null}
@@ -1482,7 +1531,7 @@ export function CartSummarySection({
                   <p className={`mt-2 text-xs font-medium ${loyaltyCanRedeem ? "text-green-700" : "text-amber-700"}`}>
                     {loyaltyCanRedeem
                       ? t("loyalty.estimatedDiscount", {
-                          amount: formatCurrency(loyaltyEstimatedDiscount),
+                          amount: formatCurrency(loyaltyEstimatedDiscount, currency),
                         })
                       : t("loyalty.requirements")}
                   </p>
@@ -1500,7 +1549,7 @@ export function CartSummarySection({
         <div className="space-y-[15px]">
           <div className="flex items-center justify-between pt-[15px] text-sm text-gray-500">
             <span>{t("totalBeforeDiscount")}</span>
-            <span>{formatCurrency(totalBeforeDiscount)}</span>
+            <span>{formatCurrency(totalBeforeDiscount, currency)}</span>
           </div>
 
           {discount > 0 ? (
@@ -1512,7 +1561,7 @@ export function CartSummarySection({
                     ? `${t("discount")} (${appliedCouponCode})`
                     : t("discount")}
               </span>
-              <span>- {formatCurrency(discount)}</span>
+              <span>- {formatCurrency(discount, currency)}</span>
             </div>
           ) : null}
 
@@ -1525,21 +1574,21 @@ export function CartSummarySection({
                     })
                   : t("loyaltyDiscount")}
               </span>
-              <span>- {formatCurrency(loyaltyDiscount)}</span>
+              <span>- {formatCurrency(loyaltyDiscount, currency)}</span>
             </div>
           ) : null}
 
           {loyaltyPreviewDiscount > 0 ? (
             <div className="flex items-center justify-between text-sm text-green-600">
               <span>{t("estimatedLoyaltyDiscount")}</span>
-              <span>- {formatCurrency(loyaltyPreviewDiscount)}</span>
+              <span>- {formatCurrency(loyaltyPreviewDiscount, currency)}</span>
             </div>
           ) : null}
 
           {walletAppliedAmount > 0 ? (
             <div className="flex items-center justify-between pb-[15px] text-sm text-green-600">
               <span>{t("walletApplied")}</span>
-              <span>- {formatCurrency(walletAppliedAmount)}</span>
+              <span>- {formatCurrency(walletAppliedAmount, currency)}</span>
             </div>
           ) : hasAnyDiscount ? (
             <div className="pb-[15px]" />
@@ -1558,10 +1607,10 @@ export function CartSummarySection({
             <span className="flex flex-col items-end leading-none">
               {loyaltyPreviewDiscount > 0 ? (
                 <span className="mb-1 text-sm font-medium text-gray-400 line-through">
-                  {formatCurrency(finalTotal)}
+                  {formatCurrency(finalTotal, currency)}
                 </span>
               ) : null}
-              <span>{formatCurrency(displayedFinalTotal)}</span>
+              <span>{formatCurrency(displayedFinalTotal, currency)}</span>
             </span>
           </div>
         </div>

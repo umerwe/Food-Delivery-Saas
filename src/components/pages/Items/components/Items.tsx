@@ -33,6 +33,7 @@ type ItemsListingProps = {
   viewMode?: MenuViewMode;
   scrollTarget?: ScrollTarget;
   onActiveCategoryChange?: (categoryId: string) => void;
+  currency?: string | null;
 };
 
 type CategoryItemsState = {
@@ -77,6 +78,7 @@ export function ItemsListing({
   viewMode = "multiple",
   scrollTarget,
   onActiveCategoryChange,
+  currency,
 }: ItemsListingProps) {
   const t = useTranslations("items.common");
   const { token, restaurantId: authRestaurantId, user } = useAuth();
@@ -513,7 +515,7 @@ export function ItemsListing({
       <>
         <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
           {state.items.map((item) => (
-            <RestaurantCard key={item.id} item={item} />
+            <RestaurantCard key={item.id} item={item} currency={currency} />
           ))}
         </div>
 
@@ -552,7 +554,7 @@ export function ItemsListing({
     return (
       <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-2">
         {items.map((item) => (
-          <RestaurantCard key={item.id} item={item} />
+          <RestaurantCard key={item.id} item={item} currency={currency} />
         ))}
       </div>
     );

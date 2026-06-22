@@ -113,9 +113,10 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
   );
 
   const selectedScheduleLabel = selectedScheduleDate
-    ? new Intl.DateTimeFormat(undefined, {
+      ? new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium",
         timeStyle: "short",
+        hourCycle: "h23",
       }).format(selectedScheduleDate)
     : t("selectDateTime");
 

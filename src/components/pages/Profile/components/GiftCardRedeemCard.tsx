@@ -10,6 +10,7 @@ import { CARD_PANEL_CLASS } from "@/components/common/common-classes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRedeemGiftCard } from "@/hooks/useGiftCards";
+import { DEFAULT_DISPLAY_CURRENCY, formatMoney } from "@/lib/money";
 import type { GiftCardRedeemResult } from "@/types/gift-cards";
 import {
   buildGiftCardRedeemPayload,
@@ -21,8 +22,8 @@ const defaultValues: GiftCardRedeemFormValues = {
   code: "",
 };
 
-const formatWalletAmount = (amount: number, currency = "PKR") =>
-  `${currency} ${Number(amount || 0).toLocaleString()}`;
+const formatWalletAmount = (amount: number, currency = DEFAULT_DISPLAY_CURRENCY) =>
+  formatMoney(amount, currency, { maximumFractionDigits: 0 });
 
 export const GiftCardRedeemCard = () => {
   const t = useTranslations("profile.giftCards");

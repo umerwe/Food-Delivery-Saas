@@ -11,13 +11,13 @@ import { useRouter } from "next/navigation";
 import useBranchSelector from "@/hooks/useBranchSelector";
 import { BranchPopup } from "@/components/common/popups/BranchPopup";
 import { getStoredAuthState } from "@/lib/auth";
-import { canReviewOrder, type Order, type OrderItem, type OrderMeta } from "@/services/orders";
+import { buildReorderCartPayloads, canReviewOrder, type Order, type OrderItem, type OrderMeta } from "@/services/orders";
 import { useTranslations } from "next-intl";
 export function OrdersHistoryPage() {
   const t = useTranslations("ordersHistory");
   const errorT = useTranslations("errors");
   const { token } = useAuthContext();
-  const { addCartItemForReorder, fetchOrdersPage } = useOrders(token);
+  const { addCartItemForReorder, fetchOrderById, fetchOrdersPage } = useOrders(token);
 const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,13 +60,19 @@ const {
 }
 
 
-    for (const item of order.itemsPreview) {
-      await addCartItemForReorder({ customerId, payload: {
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        branchId,
-        note: "",
-      } });
+    const { order: fullOrder } = await fetchOrderById({ orderId: order.id });
+    const reorderPayloads = buildReorderCartPayloads({
+      order: fullOrder || order,
+      branchId,
+    });
+
+    if (reorderPayloads.length === 0) {
+      toast.error(t("reorderFailed"));
+      return;
+    }
+
+    for (const payload of reorderPayloads) {
+      await addCartItemForReorder({ customerId, payload });
     }
 
     toast.success(t("reorderSuccessful"));
@@ -112,7 +118,11 @@ const {
 
   // ================= FORMAT DATE =================
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleString();
+    return new Date(date).toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      hourCycle: "h23",
+    });
   };
 
   // ================= STATUS MAP =================

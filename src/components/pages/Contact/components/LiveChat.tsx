@@ -104,6 +104,7 @@ useEffect(() => {
     new Date(date).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
+      hourCycle: "h23",
     });
 
   const formatDate = (date: string) =>

@@ -1,4 +1,5 @@
 import { createDomainApiService } from "@/services/domain-api";
+import { DEFAULT_DISPLAY_CURRENCY } from "@/lib/money";
 
 export type LoyaltyTransactionType = "EARN" | "REDEEM" | "RESTORE" | "ADJUSTMENT" | "EXPIRE" | string;
 
@@ -125,7 +126,7 @@ export const normalizeLoyaltyRedeemResult = (value: unknown): LoyaltyRedeemResul
     redeemedAmount: toNumber(data.redeemedAmount, 0),
     remainingPoints: toNumber(data.remainingPoints, 0),
     walletBalance: toNumber(data.walletBalance, 0),
-    currency: getString(data.currency) || "USD",
+    currency: getString(data.currency) || DEFAULT_DISPLAY_CURRENCY,
   };
 };
 

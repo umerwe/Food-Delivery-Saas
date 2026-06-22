@@ -323,17 +323,83 @@ describe("checkout normalizers", () => {
         type: "ITEM",
         id: undefined,
         menuItemId: "burger-1",
+        variationId: undefined,
         name: "Burger",
         quantity: 1,
         menuItem: { name: "Burger" },
+        selectedModifiers: [],
       },
       {
         type: "ITEM",
         id: undefined,
         menuItemId: "drink-1",
+        variationId: undefined,
         name: "Drink",
         quantity: 1,
         menuItem: { name: "Drink" },
+        selectedModifiers: [],
+      },
+    ]);
+  });
+
+  it("preserves selected modifiers returned on flexible deal included items", () => {
+    const normalized = normalizeCartItem({
+      id: "deal:deal-flex",
+      type: "DEAL",
+      dealId: "deal-flex",
+      quantity: 1,
+      unitPrice: 99,
+      lineTotal: 99,
+      deal: {
+        id: "deal-flex",
+        title: "Flexible Deal",
+      },
+      includedItems: [
+        {
+          type: "ITEM",
+          menuItemId: "pizza-1",
+          variationId: "large",
+          quantity: 1,
+          menuItem: { name: "Pizza" },
+          modifierSelections: [
+            {
+              modifierGroupId: "group-toppings",
+              modifiers: [{ modifierId: "modifier-cheese", quantity: 2 }],
+            },
+          ],
+          selectedModifiers: [
+            {
+              modifierId: "modifier-cheese",
+              name: "Cheese",
+              quantity: 2,
+              unitPrice: 0,
+              total: 0,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(normalized.includedItems).toEqual([
+      {
+        type: "ITEM",
+        id: undefined,
+        menuItemId: "pizza-1",
+        variationId: "large",
+        name: "Pizza",
+        quantity: 1,
+        menuItem: { name: "Pizza" },
+        selectedModifiers: [
+          {
+            id: "",
+            modifierId: "modifier-cheese",
+            name: "Cheese",
+            quantity: 2,
+            unitPrice: 0,
+            priceDelta: undefined,
+            total: 0,
+          },
+        ],
       },
     ]);
   });

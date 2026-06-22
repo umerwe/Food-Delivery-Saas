@@ -8,7 +8,9 @@ import TestimonialsSection from "@/components/pages/Items/components/Testimonial
 import useItems from "@/hooks/useItems";
 import { useCart } from "@/hooks/useCart";
 import { useAuthContext } from "@/hooks/useAuth";
+import { useHome } from "@/hooks/useHome";
 import { getStoredGroupOrderCode } from "@/lib/group-order";
+import { formatMoney as formatDisplayMoney, resolveCustomerCurrency } from "@/lib/money";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Eye, Loader2, Minus, Plus, X } from "lucide-react";
@@ -59,18 +61,24 @@ const getCheckoutType = (type?: string | null): CheckoutType => {
 
 /* ================= PROMOTION HELPERS ================= */
 
-const formatMoney = (value: unknown) => {
-  return `$${toNumber(value, 0).toFixed(2)}`;
-};
+const formatMoney = (value: unknown, currency?: string | null) =>
+  formatDisplayMoney(value, currency, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
-const formatModifierSelectionPrice = (unitPrice: number, quantity: number) => {
+const formatModifierSelectionPrice = (
+  unitPrice: number,
+  quantity: number,
+  currency?: string | null
+) => {
   const safeQuantity = Math.max(1, Math.floor(toNumber(quantity, 1)));
 
   if (safeQuantity <= 1) {
-    return `+${formatMoney(unitPrice)}`;
+    return `+${formatMoney(unitPrice, currency)}`;
   }
 
-  return `+${formatMoney(unitPrice)} * ${safeQuantity} = +${formatMoney(unitPrice * safeQuantity)}`;
+  return `+${formatMoney(unitPrice, currency)} * ${safeQuantity} = +${formatMoney(unitPrice * safeQuantity, currency)}`;
 };
 
 const isPromotionObject = (value: unknown): value is PromotionInfo => {
@@ -78,6 +86,10 @@ const isPromotionObject = (value: unknown): value is PromotionInfo => {
 };
 
 const getPromotionInfo = (source: ApiRecord | null | undefined): PromotionInfo | null => {
+  if (isPromotionObject(source?.happyHour) && source.happyHour.isCurrentlyActive !== false) {
+    return source.happyHour;
+  }
+
   return isPromotionObject(source?.promotion) ? source.promotion : null;
 };
 
@@ -111,9 +123,13 @@ const getBackendDiscountedPriceCandidate = (
   source: ApiRecord | null | undefined,
   promotion?: PromotionInfo | null
 ) => {
+  const record = source || {};
   const candidates = [
-    source?.discountedPrice,
-    source?.discountedBasePrice,
+    record.happyHourDiscountedPrice,
+    record.happyHourDiscountedBasePrice,
+    record.discountedPrice,
+    record.discountedBasePrice,
+    promotion?.discountedPrice,
     promotion?.discountedAmount,
   ];
 
@@ -215,11 +231,20 @@ const getPromotionSourceForPrice = (menuItem: MenuItem | null, variation?: MenuV
   return variation || menuItem;
 };
 
-function PromotionBadge({ promotion }: { promotion?: PromotionInfo | null }) {
+function PromotionBadge({
+  promotion,
+  currency,
+}: {
+  promotion?: PromotionInfo | null;
+  currency?: string | null;
+}) {
   const t = useTranslations("productDetails");
   if (!promotion) return null;
 
-  const label = getPromotionDiscountLabel(promotion);
+  const label = getPromotionDiscountLabel(promotion)?.replace(
+    formatMoney(toNumber(promotion.discountValue, 0)),
+    formatMoney(toNumber(promotion.discountValue, 0), currency)
+  );
 
   return (
     <span className="inline-flex w-fit items-center rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700 ring-1 ring-green-100">
@@ -232,21 +257,23 @@ function PromotionPrice({
   pricing,
   className = "",
   originalClassName = "",
+  currency,
 }: {
   pricing: PromotionPricing;
   className?: string;
   originalClassName?: string;
+  currency?: string | null;
 }) {
   if (!pricing.hasDiscount) {
-    return <span className={className}>{formatMoney(pricing.originalPrice)}</span>;
+    return <span className={className}>{formatMoney(pricing.originalPrice, currency)}</span>;
   }
 
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <span className={`text-gray-400 line-through ${originalClassName}`}>
-        {formatMoney(pricing.originalPrice)}
+        {formatMoney(pricing.originalPrice, currency)}
       </span>
-      <span>{formatMoney(pricing.finalPrice)}</span>
+      <span>{formatMoney(pricing.finalPrice, currency)}</span>
     </span>
   );
 }
@@ -857,13 +884,22 @@ function ProductDetailsPageContent() {
 
   const { user } = useAuth();
   const customerId = user?.id;
-  const branchId = user?.branchId;
-  const restaurantId =
+  const branchId = user?.branchId ? String(user.branchId) : "";
+  const restaurantId = String(
     item?.restaurantId ||
-    item?.restaurant?.id ||
-    user?.restaurantId ||
-
-    "";
+      item?.restaurant?.id ||
+      user?.restaurantId ||
+      ""
+  );
+  const homeQuery = useHome(
+    restaurantId,
+    branchId,
+    Boolean(token && restaurantId && branchId)
+  );
+  const currency = resolveCustomerCurrency({
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+  });
 
 
   const getMenuItemBasePrice = (menuItem: MenuItem | null) => {
@@ -992,8 +1028,10 @@ function ProductDetailsPageContent() {
         price: getVariationDisplayPrice(menuItem, raw),
         pickupPrice: getVariationPickupPrice(menuItem, raw),
         displayText: getVariationDisplayText(menuItem, raw),
-        discountedPrice: raw?.discountedPrice ?? raw?.promotion?.discountedAmount ?? null,
+        discountedPrice: raw?.happyHourDiscountedPrice ?? raw?.discountedPrice ?? raw?.happyHour?.discountedPrice ?? raw?.promotion?.discountedAmount ?? null,
+        happyHourDiscountedPrice: raw?.happyHourDiscountedPrice ?? raw?.happyHour?.discountedPrice ?? null,
         promotion: getPromotionInfo(raw),
+        happyHour: raw?.happyHour ?? null,
         sortOrder: toNumber(raw?.sortOrder, 0),
         isDefault: Boolean(raw?.isDefault),
         isActive: raw?.isActive !== false,
@@ -2041,7 +2079,8 @@ function ProductDetailsPageContent() {
                       <span className="shrink-0 text-right font-medium text-primary">
                         {formatModifierSelectionPrice(
                           effectivePrice,
-                          selectedModifierQuantity
+                          selectedModifierQuantity,
+                          currency
                         )}
                       </span>
                     ) : null}
@@ -2372,14 +2411,15 @@ function ProductDetailsPageContent() {
                       hasDiscount: true,
                     }}
                     originalClassName="text-base font-semibold"
+                    currency={currency}
                   />
                 ) : (
-                  formatMoney(totalPrice)
+                  formatMoney(totalPrice, currency)
                 )}
               </div>
 
               {activeVisiblePromotion ? (
-                <PromotionBadge promotion={activeVisiblePromotion} />
+                <PromotionBadge promotion={activeVisiblePromotion} currency={currency} />
               ) : null}
             </div>
 
@@ -2397,7 +2437,7 @@ function ProductDetailsPageContent() {
 
                 {hasTotalPromotionDiscount ? (
                   <p className="mt-1 text-xs text-green-700">
-                    You save {formatMoney(totalPromotionDiscount)}
+                    You save {formatMoney(totalPromotionDiscount, currency)}
                   </p>
                 ) : null}
               </div>
@@ -2411,7 +2451,7 @@ function ProductDetailsPageContent() {
 
             {depositAmount > 0 ? (
               <p className="mt-1 text-xs text-amber-600">
-                Includes deposit {formatMoney(depositAmount)} per item
+                Includes deposit {formatMoney(depositAmount, currency)} per item
               </p>
             ) : null}
           </div>
@@ -2478,12 +2518,14 @@ function ProductDetailsPageContent() {
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <PromotionBadge
                                   promotion={variationPromotionPricing.promotion}
+                                  currency={currency}
                                 />
 
                                 {variationPromotionPricing.hasDiscount ? (
                                   <span className="text-xs font-medium text-green-700">
                                     Save {formatMoney(
-                                      variationPromotionPricing.discountAmount
+                                      variationPromotionPricing.discountAmount,
+                                      currency
                                     )}
                                   </span>
                                 ) : null}
@@ -2493,7 +2535,7 @@ function ProductDetailsPageContent() {
                         </div>
 
                         <div className="shrink-0 text-right font-medium text-primary">
-                          <PromotionPrice pricing={variationPromotionPricing} />
+                          <PromotionPrice pricing={variationPromotionPricing} currency={currency} />
                         </div>
                       </div>
                     </label>
@@ -2568,12 +2610,13 @@ function ProductDetailsPageContent() {
 
                         {splitPizzaResolvedItemPrice > 0 ? (
                           <div className="shrink-0 text-right font-medium text-primary">
-                            <PromotionPrice pricing={splitPizzaPromotionPricing} />
+                            <PromotionPrice pricing={splitPizzaPromotionPricing} currency={currency} />
 
                             {splitPizzaPromotionPricing.hasPromotion ? (
                               <div className="mt-1 flex justify-end">
                                 <PromotionBadge
                                   promotion={splitPizzaPromotionPricing.promotion}
+                                  currency={currency}
                                 />
                               </div>
                             ) : null}
@@ -2663,7 +2706,7 @@ function ProductDetailsPageContent() {
                 ? isEditingCartItem
                   ? t("updating")
                   : t("processing")
-                : `${isEditingCartItem ? t("updateCart") : t("addToCart")} | ${formatMoney(displayTotalPrice)}`}
+                : `${isEditingCartItem ? t("updateCart") : t("addToCart")} | ${formatMoney(displayTotalPrice, currency)}`}
             </button>
           </div>
         </div>

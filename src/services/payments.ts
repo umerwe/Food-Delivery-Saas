@@ -1,4 +1,5 @@
 import { createDomainApiService } from "@/services/domain-api";
+import { DEFAULT_DISPLAY_CURRENCY } from "@/lib/money";
 import type { ApiResult } from "@/services/http";
 
 export type PaymentItem = {
@@ -111,7 +112,7 @@ export const fetchWallet = async (token?: string | null) => {
     response,
     wallet: response?.error ? [] : data?.history || [],
     balance: response?.error ? 0 : data?.balance || 0,
-    currency: response?.error ? "USD" : data?.currency || "USD",
+    currency: response?.error ? DEFAULT_DISPLAY_CURRENCY : data?.currency || DEFAULT_DISPLAY_CURRENCY,
   };
 };
 

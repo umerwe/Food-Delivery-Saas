@@ -63,6 +63,7 @@ export function ReservationSuccess({ data }: { data: Reservation | null }) {
     ? reservationDate.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
+        hourCycle: "h23",
       })
     : "-";
 

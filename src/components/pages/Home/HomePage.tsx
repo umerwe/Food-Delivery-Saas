@@ -23,6 +23,7 @@ import { useCustomerDeals } from "@/hooks/useCustomerDeals";
 import { useHome } from "@/hooks/useHome";
 import { useHomeCategories } from "@/hooks/useHomeCategories";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
+import { resolveCustomerCurrency } from "@/lib/money";
 import type { CustomerDeal } from "@/types/customer-deals";
 import type { HomeRestaurant } from "@/types/home";
 
@@ -70,6 +71,10 @@ const HomePage = () => {
     branding.assets.heroImage ??
     branding.assets.coverImage ??
     DEFAULT_BRANDING.assets.heroImage;
+  const currency = resolveCustomerCurrency({
+    configCurrency: homeData?.config?.currency,
+    restaurant: homeData?.restaurant,
+  });
 
   return (
     <div>
@@ -84,6 +89,7 @@ const HomePage = () => {
         categories={categoriesQuery.data ?? []}
         categoriesLoading={categoriesQuery.isLoading}
         deals={dealsQuery.deals}
+        currency={currency}
       />
 
       <div className="md:hidden">
@@ -91,7 +97,7 @@ const HomePage = () => {
           giftCards={homeData?.giftCards}
           restaurantId={restaurantId}
           branchId={branchId}
-          currency={homeData?.config?.currency}
+          currency={currency}
         />
 
         <WhyChooseUs />
@@ -121,6 +127,7 @@ const HomePage = () => {
           isLoading={dealsQuery.isLoading}
           addingDealId={addDealMutation.isPending ? addDealMutation.variables?.deal.id ?? null : null}
           branchId={branchId}
+          currency={currency}
           onAddDeal={handleAddDeal}
         />
 
@@ -128,7 +135,7 @@ const HomePage = () => {
           giftCards={homeData?.giftCards}
           restaurantId={restaurantId}
           branchId={branchId}
-          currency={homeData?.config?.currency}
+          currency={currency}
         />
 
         <WhyChooseUs />

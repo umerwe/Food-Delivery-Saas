@@ -67,7 +67,22 @@
     "uncategorized": "Nicht kategorisiert",
     "showingResults": "{count} von {total} Ergebnissen werden angezeigt",
     "pageOf": "Seite {page} von {totalPages}",
-    "minutesShort": "{count} Min."
+    "minutesShort": "{count} Min.",
+    "couponBanner": {
+      "eyebrow": "Heutiger Genussvorteil",
+      "headline": "Spare {discount} bei deiner ersten Online-Bestellung",
+      "minimum": "{amount} Mindestbestellwert",
+      "maxDiscount": "Bis zu {amount} Rabatt",
+      "perCustomer": "Einmal pro Kunde",
+      "browseOffer": "Menü ansehen und Code im Checkout nutzen",
+      "coupon": "Gutschein",
+      "copyCode": "Code kopieren",
+      "copied": "Gutscheincode kopiert",
+      "copyFailed": "Gutscheincode konnte nicht kopiert werden",
+      "ends": "Endet {date}",
+      "browse": "Menü ansehen",
+      "dismiss": "Gutscheinbanner schließen"
+    }
   },
   "footer": {
     "quickLinks": "Schnelllinks",
@@ -209,6 +224,9 @@
     "deals": {
       "label": "Angebote",
       "available": "Verfügbare Angebote",
+      "specialMenusLimited": "Zeitlich begrenzte Menüangebote",
+      "from": "Ab",
+      "completeMenu": "Komplettes Menü",
       "bestSeller": "Bestseller",
       "includes": "Enthält {items}",
       "noAvailableItems": "Dieses Angebot enthält keine verfügbaren Artikel.",

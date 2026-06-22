@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useLoyalty } from "@/hooks/useLoyalty";
 import { getApiErrorMessage } from "@/lib/errors";
+import { DEFAULT_DISPLAY_CURRENCY, formatMoney } from "@/lib/money";
 import type { LoyaltySummary, LoyaltyTransaction } from "@/services/loyalty";
 
 type LoyaltyProgramCardProps = {
@@ -19,12 +20,8 @@ type LoyaltyProgramCardProps = {
 
 const formatPoints = (value: number) => new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(value)));
 
-const formatCurrency = (value: number, currency = "USD") =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(Math.max(0, value));
+const formatCurrency = (value: number, currency = DEFAULT_DISPLAY_CURRENCY) =>
+  formatMoney(Math.max(0, value), currency, { maximumFractionDigits: 2 });
 
 const formatDate = (value: string | null) => {
   if (!value) return "";
@@ -134,7 +131,7 @@ export function LoyaltyProgramCard({ onWalletRedeemed }: LoyaltyProgramCardProps
 
       toast.success(
         t("redeemedSuccess", {
-          amount: formatCurrency(redemption?.redeemedAmount ?? estimatedWalletValue, redemption?.currency ?? "USD"),
+          amount: formatCurrency(redemption?.redeemedAmount ?? estimatedWalletValue, redemption?.currency ?? DEFAULT_DISPLAY_CURRENCY),
         })
       );
       setPoints("");
@@ -211,7 +208,7 @@ export function LoyaltyProgramCard({ onWalletRedeemed }: LoyaltyProgramCardProps
                 <p className="mt-1 text-xs leading-5 text-[#8A8A8A]">
                   {t("convertDescription", {
                     minimum: formatPoints(loyalty?.minimumRedeemPoints ?? 0),
-                    value: formatCurrency(loyalty?.redemptionValuePerPoint ?? 0, "USD"),
+                    value: formatCurrency(loyalty?.redemptionValuePerPoint ?? 0),
                   })}
                 </p>
               </div>
@@ -239,7 +236,7 @@ export function LoyaltyProgramCard({ onWalletRedeemed }: LoyaltyProgramCardProps
 
             {redeemablePoints > 0 ? (
               <p className="mt-3 text-xs font-medium text-[#303030]">
-                {t("estimatedWalletCredit", { amount: formatCurrency(estimatedWalletValue, "USD") })}
+                {t("estimatedWalletCredit", { amount: formatCurrency(estimatedWalletValue) })}
               </p>
             ) : null}
           </div>

@@ -17,9 +17,11 @@ import {
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useCart } from "@/hooks/useCart";
+import { useHome } from "@/hooks/useHome";
 import useMenu from "@/hooks/useMenu";
 import { setStoredRestaurantMenuId } from "@/lib/timed-menu";
 import { useAuth } from "@/hooks/useAuth";
+import { formatMoney as formatDisplayMoney, resolveCustomerCurrency } from "@/lib/money";
 import { getSignatureMenuViewMode, setSignatureMenuViewMode } from "@/lib/view-preferences";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
@@ -51,18 +53,24 @@ const hasText = (value: unknown) => {
   return text !== "" && text.toLowerCase() !== "null";
 };
 
-const formatMoney = (value: unknown) => {
-  return `$${toNumber(value, 0).toFixed(2)}`;
-};
+const formatMoney = (value: unknown, currency?: string | null) =>
+  formatDisplayMoney(value, currency, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
-const formatModifierSelectionPrice = (unitPrice: number, quantity: number) => {
+const formatModifierSelectionPrice = (
+  unitPrice: number,
+  quantity: number,
+  currency?: string | null
+) => {
   const safeQuantity = Math.max(1, Math.floor(toNumber(quantity, 1)));
 
   if (safeQuantity <= 1) {
-    return `+${formatMoney(unitPrice)}`;
+    return `+${formatMoney(unitPrice, currency)}`;
   }
 
-  return `+${formatMoney(unitPrice)} * ${safeQuantity} = +${formatMoney(unitPrice * safeQuantity)}`;
+  return `+${formatMoney(unitPrice, currency)} * ${safeQuantity} = +${formatMoney(unitPrice * safeQuantity, currency)}`;
 };
 
 const titleizeConstant = (value: unknown) => {
@@ -497,6 +505,15 @@ export function SignatureSelectionContent({
   const { token } = useAuth();
   const { fetchSignatureMenus, fetchSignatureSplitPizzaItems } = useMenu(token);
   const { addCustomerCartItem, clearCustomerCart } = useCart(token);
+  const homeQuery = useHome(
+    restaurantId,
+    branchId,
+    Boolean(token && restaurantId && branchId)
+  );
+  const currency = resolveCustomerCurrency({
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+  });
 
   const [menus, setMenus] = useState<MenuRecord[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string>("");
@@ -1984,7 +2001,7 @@ export function SignatureSelectionContent({
 
                 {effectivePrice > 0 ? (
                   <span className="shrink-0 font-semibold text-primary">
-                    +${effectivePrice.toFixed(2)}
+                    {formatModifierSelectionPrice(effectivePrice, 1, currency)}
                   </span>
                 ) : null}
               </label>
@@ -2132,7 +2149,8 @@ export function SignatureSelectionContent({
                       <span className="shrink-0 font-medium text-primary">
                         {formatModifierSelectionPrice(
                           effectivePrice,
-                          selectedModifierQuantity
+                          selectedModifierQuantity,
+                          currency
                         )}
                       </span>
                     ) : null}
@@ -2233,7 +2251,7 @@ export function SignatureSelectionContent({
             </h3>
 
             <span className="shrink-0 pt-0.5 text-[18px] font-semibold text-primary">
-              ${toNumber(product.price, 0).toFixed(2)}
+              {formatMoney(product.price, currency)}
             </span>
           </div>
 
@@ -2538,7 +2556,7 @@ export function SignatureSelectionContent({
 
                           {toNumber(variation.price, 0) > 0 ? (
                             <span className="shrink-0 text-sm font-semibold text-primary">
-                              ${toNumber(variation.price, 0).toFixed(2)}
+                              {formatMoney(variation.price, currency)}
                             </span>
                           ) : null}
                         </div>
@@ -2618,11 +2636,10 @@ export function SignatureSelectionContent({
                               splitPizzaPricingVariation
                             ) > 0 ? (
                               <span className="shrink-0 font-medium text-primary">
-                                $
-                                {getMenuItemResolvedPrice(
+                                {formatMoney(getMenuItemResolvedPrice(
                                   splitPizzaItem,
                                   splitPizzaPricingVariation
-                                ).toFixed(2)}
+                                ), currency)}
                               </span>
                             ) : null}
                           </div>
@@ -2699,7 +2716,7 @@ export function SignatureSelectionContent({
                 </div>
 
                 <div className="text-lg font-semibold text-primary">
-                  ${totalModalPrice.toFixed(2)}
+                  {formatMoney(totalModalPrice, currency)}
                 </div>
               </div>
 

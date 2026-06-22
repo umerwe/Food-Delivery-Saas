@@ -96,8 +96,9 @@ const minutesToTime = (value: number) => {
 
 const formatEstimateTimeLabel = (date: Date) =>
   date.toLocaleTimeString([], {
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   });
 
 const formatEstimateDateTimeLabel = (date: Date, baseDate: Date) => {
@@ -122,8 +123,9 @@ export const formatPickupTimeLabel = (value: string) => {
   date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
 
   return date.toLocaleTimeString([], {
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   });
 };
 
