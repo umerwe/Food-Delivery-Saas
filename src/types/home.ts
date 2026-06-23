@@ -1,7 +1,7 @@
 import type { Branding } from "@/types/branding";
 import type { BranchScheduleTimings } from "@/types/branches";
 import type { HomeGiftCards } from "@/types/gift-cards";
-import type { HappyHourInfo } from "@/components/pages/Items/types";
+import type { HappyHourInfo, MenuItem } from "@/components/pages/Items/types";
 
 export type HomeRestaurant = {
   id?: string | null;
@@ -67,11 +67,16 @@ export type PromotionCampaign = {
   id: string;
   title?: string;
   description?: string;
+  code?: string;
+  couponCode?: string;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
   applyMode?: "ORDER_TOTAL" | "SCOPED_ITEMS" | string;
   discountType?: "FLAT" | "PERCENTAGE" | string;
   discountValue?: number | string;
   maxDiscountAmount?: number | string;
   minOrderAmount?: number | string;
+  maxUsesPerCustomer?: number | string;
   startsAt?: string;
   expiresAt?: string;
   branch?: {
@@ -85,11 +90,7 @@ export type PromotionCampaign = {
     logoUrl?: string | null;
     coverImage?: string | null;
   } | null;
-  scopeMenuItems?: {
-    id?: string;
-    name?: string;
-    imageUrl?: string | null;
-  }[];
+  scopeMenuItems?: MenuItem[];
   scopeCategories?: {
     id?: string;
     name?: string;

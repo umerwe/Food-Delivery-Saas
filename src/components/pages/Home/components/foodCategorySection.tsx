@@ -160,11 +160,10 @@ function PromotionBannerCard({
   const gradientClass = gradients[index % gradients.length];
 
   const handleOpenPromotion = () => {
-    const firstItemId = promotion.scopeMenuItems?.[0]?.id;
     const firstCategoryId = promotion.scopeCategories?.[0]?.id;
 
-    if (firstItemId) {
-      router.push(`/items/details?itemId=${firstItemId}`);
+    if (promotion.id) {
+      router.push(`/promotions?promotionId=${encodeURIComponent(promotion.id)}`);
       return;
     }
 
