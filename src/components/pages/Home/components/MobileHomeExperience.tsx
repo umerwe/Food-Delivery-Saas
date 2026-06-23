@@ -173,7 +173,7 @@ export function MobileHomeExperience({
                   onClick={() => router.push(`/items?categoryId=${category.id}`)}
                   className="flex min-w-[84px] flex-col items-center gap-2 rounded-[24px] bg-white px-3 py-3 shadow-[0_12px_26px_rgba(31,41,55,0.07)]"
                 >
-                  <span className="relative h-12 w-12 overflow-hidden rounded-full bg-primary/10">
+                  <span className="relative h-[49px] w-[49px] overflow-hidden rounded-full bg-primary/10">
                     <Image
                       src={getCategoryImage(category)}
                       alt={category.name}

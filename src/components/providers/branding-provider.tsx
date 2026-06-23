@@ -7,6 +7,7 @@ import { useAuthContext } from "@/hooks/useAuth";
 import { BrandingContext } from "@/hooks/useBranding";
 import { useHome } from "@/hooks/useHome";
 import { getBrandingCssVariables } from "@/lib/branding";
+import { resolveHttpsImageUrl } from "@/lib/image-fallback";
 
 const getUserRestaurantId = (user: ReturnType<typeof useAuthContext>["user"]) =>
   user?.restaurantId ?? user?.branch?.restaurantId ?? null;
@@ -33,6 +34,27 @@ export const BrandingProvider = ({ children }: BrandingProviderProps) => {
       root.style.setProperty(name, value);
     }
   }, [branding]);
+
+  useEffect(() => {
+    const faviconHref = user
+      ? resolveHttpsImageUrl(branding.logo.default, "/logo.png")
+      : "/logo.png";
+    const iconLinks = document.querySelectorAll<HTMLLinkElement>(
+      "link[rel='icon'], link[rel='shortcut icon'], link[rel='apple-touch-icon']"
+    );
+
+    if (iconLinks.length === 0) {
+      const link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+      link.href = faviconHref;
+      return;
+    }
+
+    iconLinks.forEach((link) => {
+      link.href = faviconHref;
+    });
+  }, [branding.logo.default, user]);
 
   const value = useMemo(
     () => ({

@@ -344,7 +344,7 @@ export function FoodCategorySection() {
                       onClick={() => router.push(`/items?categoryId=${item.id}`)}
                     >
                       <div className="group flex min-h-[132px] cursor-pointer flex-col items-center justify-center gap-3 rounded-[22px] px-2 py-3 text-center transition hover:-translate-y-1">
-                        <div className="relative h-20 w-20 overflow-hidden rounded-full transition group-hover:scale-105">
+                        <div className="relative h-[81px] w-[81px] overflow-hidden rounded-full transition group-hover:scale-105">
                           <Image
                             src={image}
                             alt={item.name}
