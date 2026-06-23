@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import { useCart } from "@/hooks/useCart";
+import { FavoriteHeartButton } from "@/components/common/favorites/FavoriteHeartButton";
 import { useHome } from "@/hooks/useHome";
 import useMenu from "@/hooks/useMenu";
 import { setStoredRestaurantMenuId } from "@/lib/timed-menu";
@@ -2241,6 +2242,11 @@ export function SignatureSelectionContent({
               <Eye size={16} />
             </button>
           ) : null}
+
+          <FavoriteHeartButton
+            menuItemId={product.id}
+            className="absolute left-3 top-3 z-10"
+          />
         </div>
 
         <div className="p-4">
@@ -2515,6 +2521,11 @@ export function SignatureSelectionContent({
                     {tSignature("selectOptions")}
                   </p>
                 </div>
+
+                <FavoriteHeartButton
+                  menuItemId={selectedItem.id}
+                  className="h-9 w-9 shrink-0 border border-gray-100"
+                />
               </div>
 
               {getItemVariations(selectedItem).length > 0 ? (

@@ -13,6 +13,7 @@ import {
   X,
   Bell,
   Coffee,
+  Heart,
 } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -500,6 +501,20 @@ export const Navbar = () => {
                             <ShoppingCart size={16} />
                           </div>
                           <span className="text-sm text-gray-700">{tNav("myOrders")}</span>
+                        </div>
+                        <ChevronDown className="rotate-[-90deg]" size={16} />
+                      </Link>
+
+                      <Link
+                        href="/favourites"
+                        onClick={() => setDropdownOpen(false)}
+                        className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100">
+                            <Heart size={16} />
+                          </div>
+                          <span className="text-sm text-gray-700">{tNav("myFavourites")}</span>
                         </div>
                         <ChevronDown className="rotate-[-90deg]" size={16} />
                       </Link>

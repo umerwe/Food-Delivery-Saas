@@ -13,6 +13,7 @@ import BranchOpeningHoursPopup from "@/components/pages/Home/components/BranchOp
 import { CustomerDealsSection } from "@/components/pages/Home/components/CustomerDealsSection";
 import { GiftCardsSection } from "@/components/pages/Home/components/GiftCardsSection";
 import { MobileHomeExperience } from "@/components/pages/Home/components/MobileHomeExperience";
+import { PromotionalItemsSection } from "@/components/pages/Home/components/PromotionalItemsSection";
 
 import { DEFAULT_BRANDING } from "@/config/default-branding";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,7 +22,7 @@ import { useAddDealToCart } from "@/hooks/useCart";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useCustomerDeals } from "@/hooks/useCustomerDeals";
 import { useHome } from "@/hooks/useHome";
-import { useHomeCategories } from "@/hooks/useHomeCategories";
+import { useHomeCategories, useHomePromotionalItems } from "@/hooks/useHomeCategories";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
 import { resolveCustomerCurrency } from "@/lib/money";
 import type { CustomerDeal } from "@/types/customer-deals";
@@ -49,6 +50,13 @@ const HomePage = () => {
   const branchId = useMemo(() => resolveHomeBranchId(user), [user]);
   const homeQuery = useHome(restaurantId, branchId, Boolean(token && branchId));
   const categoriesQuery = useHomeCategories(restaurantId, Boolean(token));
+  const promotionalItemsQuery = useHomePromotionalItems({
+    restaurantId,
+    branchId,
+    locale,
+    limit: 8,
+    enabled: Boolean(token),
+  });
   const dealsQuery = useCustomerDeals({ restaurantId, branchId, locale, limit: 20 });
   const addDealMutation = useAddDealToCart(branchId);
   const handleAddDeal = useCallback(
@@ -88,6 +96,8 @@ const HomePage = () => {
         branch={resolvedBranch}
         categories={categoriesQuery.data ?? []}
         categoriesLoading={categoriesQuery.isLoading}
+        promotionalItems={promotionalItemsQuery.data ?? []}
+        promotionalItemsLoading={promotionalItemsQuery.isLoading}
         deals={dealsQuery.deals}
         currency={currency}
       />
@@ -121,6 +131,12 @@ const HomePage = () => {
             <FoodCategorySection />
           </section>
         ) : null}
+
+        <PromotionalItemsSection
+          items={promotionalItemsQuery.data ?? []}
+          isLoading={promotionalItemsQuery.isLoading}
+          currency={currency}
+        />
 
         <CustomerDealsSection
           deals={dealsQuery.deals}

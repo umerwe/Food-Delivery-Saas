@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { getStoredGroupOrderCode } from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney } from "@/lib/money";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
+import { FavoriteHeartButton } from "@/components/common/favorites/FavoriteHeartButton";
 import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuVariation, Modifier, ModifierGroup, ModifierLink, SelectedModifiersMap, PromotionInfo, PromotionPricing, RawModifierLink, SelectedModifier, VariationPriceOverride } from "@/components/pages/Items/types";
 import { hasText, formatPrice, getSplitPizzaPricingVariation, toNumber } from "@/components/pages/Items/utils/restaurant-card-utils";
 import { getModifierPriceForVariation } from "@/components/pages/Items/utils/modifier-pricing";
@@ -2021,6 +2022,11 @@ export function RestaurantCard({
               unoptimized
             />
 
+            <FavoriteHeartButton
+              menuItemId={item?.id}
+              className="absolute right-2 top-2 z-10 h-9 w-9"
+            />
+
             <button
               type="button"
               onClick={(event) => {
@@ -2080,17 +2086,26 @@ export function RestaurantCard({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[95vh] max-w-md overflow-auto rounded-2xl p-6">
           <div className="mb-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {item?.name}
-              </h2>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {item?.name}
+                  </h2>
 
-              {selectedItemPromotionPricing.hasPromotion ? (
-                <PromotionBadge
-                  promotion={selectedItemPromotionPricing.promotion}
-                  currency={currency}
-                />
-              ) : null}
+                  {selectedItemPromotionPricing.hasPromotion ? (
+                    <PromotionBadge
+                      promotion={selectedItemPromotionPricing.promotion}
+                      currency={currency}
+                    />
+                  ) : null}
+                </div>
+              </div>
+
+              <FavoriteHeartButton
+                menuItemId={item?.id}
+                className="h-9 w-9 shrink-0 border border-gray-100"
+              />
             </div>
 
             {selectedItemPromotionPricing.hasPromotion ? (

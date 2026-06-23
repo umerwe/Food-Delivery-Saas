@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/config/query-keys";
-import { getHomeCategories, getHomePromotions } from "@/services/home";
+import { getHomeCategories, getHomePromotions, getPromotionalItems } from "@/services/home";
 
 export const useHomeCategories = (restaurantId?: string | null, enabled = true) =>
   useQuery({
@@ -22,3 +22,30 @@ export const useHomePromotions = (
     queryFn: () => getHomePromotions(restaurantId ?? "", branchId),
     enabled: enabled && Boolean(restaurantId),
   });
+
+export const useHomePromotionalItems = ({
+  restaurantId,
+  branchId,
+  locale,
+  limit = 8,
+  enabled = true,
+}: {
+  restaurantId?: string | null;
+  branchId?: string | null;
+  locale?: string | null;
+  limit?: number;
+  enabled?: boolean;
+}) => {
+  const params = {
+    restaurantId: restaurantId ?? null,
+    branchId: branchId ?? null,
+    locale: locale ?? null,
+    limit,
+  };
+
+  return useQuery({
+    queryKey: queryKeys.home.promotionalItems(params),
+    queryFn: () => getPromotionalItems(params),
+    enabled: enabled && Boolean(restaurantId),
+  });
+};

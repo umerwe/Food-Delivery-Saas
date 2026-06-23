@@ -603,7 +603,7 @@ export const CustomerDealsSection = ({
             opts={{ align: "start", dragFree: true }}
             className="relative z-10 min-w-0"
           >
-            <CarouselContent className="-ml-4 cursor-grab active:cursor-grabbing">
+            <CarouselContent className="-ml-4 cursor-grab pb-8 active:cursor-grabbing">
               {activeDeals.map((deal, index) => (
                 <CarouselItem
                   key={deal.id}
@@ -638,7 +638,7 @@ export const CustomerDealsSection = ({
       </div>
 
       <Carousel opts={{ align: "start", dragFree: true }} className="min-w-0">
-        <CarouselContent className="-ml-5 cursor-grab active:cursor-grabbing">
+        <CarouselContent className="-ml-5 cursor-grab pb-8 active:cursor-grabbing">
           {activeDeals.map((deal, index) => (
             <CarouselItem
               key={deal.id}

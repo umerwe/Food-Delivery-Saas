@@ -1,4 +1,6 @@
 import { getRequest } from "@/services/http";
+import { normalizeApiArray } from "@/components/pages/Items/utils/restaurant-card-utils";
+import type { MenuItem } from "@/components/pages/Items/types";
 import { normalizeBrandingApiResponse } from "../lib/branding";
 import { isHomeBranch, isLandingPopup, normalizeHomeCategories, normalizePromotions } from "../lib/home";
 import { getMeta } from "../lib/response";
@@ -144,6 +146,40 @@ export const getHomePromotions = async (restaurantId: string, branchId?: string 
   }
 
   return normalizePromotions(await getRequest(`/customer-app/promotions?${params.toString()}`));
+};
+
+export const getPromotionalItems = async ({
+  restaurantId,
+  branchId,
+  limit = 8,
+  locale,
+}: {
+  restaurantId?: string | null;
+  branchId?: string | null;
+  limit?: number;
+  locale?: string | null;
+}) => {
+  const params = new URLSearchParams();
+
+  if (restaurantId) {
+    params.set("restaurantId", restaurantId);
+  }
+
+  if (branchId) {
+    params.set("branchId", branchId);
+  }
+
+  if (locale) {
+    params.set("locale", locale);
+  }
+
+  params.set("limit", String(limit));
+
+  const response = await getRequest(
+    `/customer-app/promotional-items?${params.toString()}`,
+  );
+
+  return normalizeApiArray<MenuItem>(response);
 };
 
 export const getHome = async (

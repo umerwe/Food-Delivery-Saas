@@ -534,7 +534,7 @@ export const GiftCardsSection = ({
               }}
               className="min-w-0 flex-1"
             >
-              <CarouselContent className="-ml-4 cursor-grab py-3 active:cursor-grabbing">
+              <CarouselContent className="-ml-4 cursor-grab pb-8 pt-3 active:cursor-grabbing">
                 {items.map((giftCard, index) => (
                   <CarouselItem
                     key={giftCard.id}

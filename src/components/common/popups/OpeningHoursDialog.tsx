@@ -1,6 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { CalendarDays, CircleCheck, Clock, Coffee, Info } from "lucide-react";
 import {
   Dialog,
@@ -49,6 +50,8 @@ type OpeningHoursDialogProps = {
   infoDescription?: string;
   sections: OpeningHoursDialogSection[];
   closeLabel: string;
+  triggerClassName?: string;
+  triggerContent?: ReactNode;
 };
 
 export function OpeningHoursDialog({
@@ -62,6 +65,8 @@ export function OpeningHoursDialog({
   infoDescription,
   sections,
   closeLabel,
+  triggerClassName,
+  triggerContent,
 }: OpeningHoursDialogProps) {
   return (
     <Dialog>
@@ -69,9 +74,9 @@ export function OpeningHoursDialog({
         <button
           type="button"
           aria-label={triggerLabel}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-primary hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className={triggerClassName ?? "inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-primary hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"}
         >
-          <Info size={16} />
+          {triggerContent ?? <Info size={16} />}
         </button>
       </DialogTrigger>
 

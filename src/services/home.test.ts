@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getHome, getHomeCategories } from "./home";
+import { getHome, getHomeCategories, getPromotionalItems } from "./home";
 
 const getRequestMock = vi.hoisted(() => vi.fn());
 
@@ -120,5 +120,36 @@ describe("getHomeCategories", () => {
 
     expect(categories).toHaveLength(1);
     expect(categories[0].id).toBe("c1");
+  });
+});
+
+describe("getPromotionalItems", () => {
+  beforeEach(() => {
+    getRequestMock.mockReset();
+  });
+
+  it("calls promotional-items with restaurant, branch, locale, and limit params", async () => {
+    getRequestMock.mockResolvedValue({
+      data: [
+        {
+          id: "item-1",
+          name: "Promo Pizza",
+          basePrice: 12,
+          discountedBasePrice: 9,
+        },
+      ],
+    });
+
+    const items = await getPromotionalItems({
+      restaurantId: "restaurant-1",
+      branchId: "branch-1",
+      locale: "en",
+      limit: 8,
+    });
+
+    expect(getRequestMock).toHaveBeenCalledWith(
+      "/customer-app/promotional-items?restaurantId=restaurant-1&branchId=branch-1&locale=en&limit=8"
+    );
+    expect(items[0]?.id).toBe("item-1");
   });
 });

@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { Download, Eye, Loader2, Minus, Plus, X } from "lucide-react";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
+import { FavoriteHeartButton } from "@/components/common/favorites/FavoriteHeartButton";
 import type { CartPayload, CheckoutType, ItemPriceOverride, MenuItem, MenuVariation, Modifier, ModifierGroup, ModifierLink, ModifierSelectionMap, PromotionInfo, RawModifierLink, SelectedModifier, VariationPriceOverride } from "@/components/pages/Items/types";
 import {
   buildCartPayload,
@@ -2347,7 +2348,7 @@ function ProductDetailsPageContent() {
     <>
       <div className="mx-auto grid grid-cols-1 gap-8 px-4 py-6 sm:px-6 md:grid-cols-2 md:px-10 md:py-10 lg:gap-12 lg:px-40">
         <div className="flex flex-col gap-6">
-          <div className="overflow-hidden rounded-2xl">
+          <div className="relative overflow-hidden rounded-2xl">
             <Image
               src={item?.imageUrl || "/placeholder.png"}
               alt={item?.name || t("productImageAlt")}
@@ -2355,6 +2356,11 @@ function ProductDetailsPageContent() {
               height={600}
               className="h-[250px] w-full object-cover sm:h-[350px] md:h-auto"
               unoptimized
+            />
+
+            <FavoriteHeartButton
+              menuItemId={item?.id}
+              className="absolute left-3 top-3 z-10"
             />
           </div>
 
@@ -2376,16 +2382,23 @@ function ProductDetailsPageContent() {
                 {item?.name}
               </h1>
 
-              {hasProductInfoContent(item) ? (
-                <button
-                  type="button"
-                  onClick={() => setInfoOpen(true)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-primary hover:text-white"
-                  title={t("viewProductInformation")}
-                >
-                  <Eye size={18} />
-                </button>
-              ) : null}
+              <div className="flex shrink-0 items-center gap-2">
+                <FavoriteHeartButton
+                  menuItemId={item?.id}
+                  className="h-9 w-9 border border-gray-100"
+                />
+
+                {hasProductInfoContent(item) ? (
+                  <button
+                    type="button"
+                    onClick={() => setInfoOpen(true)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition hover:bg-primary hover:text-white"
+                    title={t("viewProductInformation")}
+                  >
+                    <Eye size={18} />
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-2 flex flex-wrap gap-2 text-sm text-gray-500">

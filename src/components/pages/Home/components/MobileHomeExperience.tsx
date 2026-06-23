@@ -2,16 +2,18 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, ChevronRight, Clock3, MapPin, Search, Star } from "lucide-react";
+import { Bell, ChevronRight, MapPin, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { getDealImage } from "@/components/pages/Home/utils/customer-deal-cart";
-import { formatDealPrice, isDealActive } from "@/components/pages/Home/utils/customer-deals-formatters";
+import { isDealActive } from "@/components/pages/Home/utils/customer-deals-formatters";
+import { PromotionalItemsSection } from "@/components/pages/Home/components/PromotionalItemsSection";
 import { Button } from "@/components/ui/button";
 import { resolveHttpsImageUrl } from "@/lib/image-fallback";
 import type { Branding } from "@/types/branding";
 import type { HomeCategory } from "@/types/home";
 import type { CustomerDeal } from "@/types/customer-deals";
+import type { MenuItem } from "@/components/pages/Items/types";
 
 type MobileHomeExperienceProps = {
   restaurantName: string;
@@ -21,6 +23,8 @@ type MobileHomeExperienceProps = {
   branch: { name?: string | null } | null;
   categories: HomeCategory[];
   categoriesLoading: boolean;
+  promotionalItems: MenuItem[];
+  promotionalItemsLoading: boolean;
   deals: CustomerDeal[];
   currency?: string | null;
 };
@@ -47,6 +51,8 @@ export function MobileHomeExperience({
   branch,
   categories,
   categoriesLoading,
+  promotionalItems,
+  promotionalItemsLoading,
   deals,
   currency,
 }: MobileHomeExperienceProps) {
@@ -190,80 +196,15 @@ export function MobileHomeExperience({
           )}
         </section>
 
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-                Special for you
-              </p>
-              <h2 className="mt-1 text-xl font-black text-gray-950">
-                Recommended food
-              </h2>
-            </div>
-            <Link
-              href="/items"
-              className="flex items-center gap-1 text-sm font-bold text-primary"
-            >
-              See all
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
+        <PromotionalItemsSection
+          items={promotionalItems}
+          isLoading={promotionalItemsLoading}
+          currency={currency}
+          compact
+        />
 
-          {activeDeals.length > 0 ? (
-            <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {activeDeals.map((deal) => {
-                const image = resolveHttpsImageUrl(getDealImage(deal), "/burger.png");
-                const price = formatDealPrice(deal.discountValue, currency);
-
-                return (
-                  <article
-                    key={deal.id}
-                    className="min-w-[238px] overflow-hidden rounded-[28px] bg-white shadow-[0_16px_34px_rgba(31,41,55,0.09)]"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => router.push("/items")}
-                      className="block w-full text-left"
-                    >
-                      <div className="relative h-[132px] bg-primary/5">
-                        <Image
-                          src={image}
-                          alt={deal.title}
-                          fill
-                          className="object-cover"
-                          sizes="238px"
-                          unoptimized
-                        />
-                        <span className="absolute left-3 top-3 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-primary shadow-sm">
-                          {price}
-                        </span>
-                      </div>
-
-                      <div className="p-4">
-                        <h3 className="line-clamp-1 text-[16px] font-black text-gray-950">
-                          {deal.title}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-gray-500">
-                          {deal.description || "Freshly prepared and ready to order."}
-                        </p>
-
-                        <div className="mt-4 flex items-center justify-between">
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-500">
-                            <Star className="h-4 w-4 fill-current" />
-                            4.8
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400">
-                            <Clock3 className="h-4 w-4" />
-                            25 min
-                          </span>
-                        </div>
-                      </div>
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
+        {activeDeals.length === 0 && promotionalItems.length === 0 && !promotionalItemsLoading ? (
+          <section>
             <div className="rounded-[28px] bg-white p-6 text-center shadow-[0_16px_34px_rgba(31,41,55,0.07)]">
               <h3 className="text-base font-black text-gray-950">
                 Browse the menu
@@ -280,8 +221,8 @@ export function MobileHomeExperience({
                 Explore food
               </Button>
             </div>
-          )}
-        </section>
+          </section>
+        ) : null}
       </main>
     </div>
   );
