@@ -3,12 +3,13 @@
 import Image from "next/image";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import TestimonialsSection from "@/components/pages/Items/components/Testimonials";
 import useItems from "@/hooks/useItems";
 import { useCart } from "@/hooks/useCart";
 import { useAuthContext } from "@/hooks/useAuth";
 import { useHome } from "@/hooks/useHome";
+import { useCustomerReviews } from "@/hooks/useCustomerReviews";
 import { getStoredGroupOrderCode } from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney, resolveCustomerCurrency } from "@/lib/money";
 import { toast } from "sonner";
@@ -840,6 +841,7 @@ const getModifierSideVariationOverrides = (menuItem: MenuItem | null, modifier: 
 function ProductDetailsPageContent() {
   const t = useTranslations("productDetails");
   const tErrors = useTranslations("errors");
+  const locale = useLocale();
   const params = useSearchParams();
   const slug = params.get("slug");
   const itemIdParam = params.get("itemId") || "";
@@ -897,6 +899,30 @@ function ProductDetailsPageContent() {
     branchId,
     Boolean(token && restaurantId && branchId)
   );
+  const { reviews: customerReviews } = useCustomerReviews({
+    restaurantId,
+    branchId,
+    page: 1,
+    limit: 50,
+    locale,
+  });
+  const itemReviews = useMemo(() => {
+    const currentMenuItemId = getId(item?.id);
+
+    if (!currentMenuItemId) {
+      return [];
+    }
+
+    return customerReviews.filter((review) =>
+      review.order?.items.some(
+        (reviewItem) => reviewItem.menuItemId === currentMenuItemId
+      )
+    );
+  }, [customerReviews, item?.id]);
+  const itemAverageRating = itemReviews.length
+    ? itemReviews.reduce((total, review) => total + review.rating, 0) /
+      itemReviews.length
+    : null;
   const currency = resolveCustomerCurrency({
     configCurrency: homeQuery.data?.data.config?.currency,
     restaurant: homeQuery.data?.data.restaurant,
@@ -2402,8 +2428,17 @@ function ProductDetailsPageContent() {
             </div>
 
             <div className="mt-2 flex flex-wrap gap-2 text-sm text-gray-500">
-              <span className="font-medium text-primary">★ 4.8</span>
-              <span>(150 reviews)</span>
+              {itemAverageRating ? (
+                <>
+                  <span className="font-medium text-primary">
+                    ★ {itemAverageRating.toFixed(1)}
+                  </span>
+                  <span>
+                    ({itemReviews.length}{" "}
+                    {itemReviews.length === 1 ? "review" : "reviews"})
+                  </span>
+                </>
+              ) : null}
               <span>• 20–25 mins delivery</span>
             </div>
           </div>
@@ -2750,7 +2785,11 @@ function ProductDetailsPageContent() {
         </div>
       ) : null}
 
-      <TestimonialsSection />
+      <TestimonialsSection
+        reviews={itemReviews}
+        menuItemId={getId(item.id)}
+        averageRating={itemAverageRating}
+      />
     </>
   );
 }

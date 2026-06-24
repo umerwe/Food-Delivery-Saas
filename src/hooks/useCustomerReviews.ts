@@ -15,6 +15,7 @@ export const useCustomerReviews = (params: CustomerReviewsParams) => {
     page: params.page ?? 1,
     limit: params.limit ?? 10,
     rating: params.rating ?? null,
+    locale: params.locale ?? null,
   };
 
   const query = useQuery({

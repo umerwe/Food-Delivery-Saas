@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useCheckout } from "@/hooks/useCheckout";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDisplayAddress } from "@/lib/address-display";
-import { reverseGeocode } from "@/services/geocoding";
+import { parseReverseGeocodeAddress, reverseGeocode } from "@/services/geocoding";
 import {
   fetchAddresses as fetchProfileAddresses,
   type AddressRecord,
@@ -97,28 +97,22 @@ export function DeliveryAddressSection({
       const lng = position.coords.longitude.toString();
       const geocode = await reverseGeocode(position.coords.latitude, position.coords.longitude);
 
-      const address = geocode.ok ? geocode.address || {} : {};
-      const getAddressValue = (value: unknown) => typeof value === "string" ? value : "";
+      const parsedAddress = geocode.ok
+        ? parseReverseGeocodeAddress(geocode.address || {}, geocode.displayName)
+        : null;
 
       setGuestDeliveryAddress({
         ...guestDeliveryAddress,
-        street: geocode.displayName || guestDeliveryAddress.street,
-        houseNumber: guestDeliveryAddress.houseNumber,
+        street: parsedAddress?.street || guestDeliveryAddress.street,
+        houseNumber: parsedAddress?.houseNumber || guestDeliveryAddress.houseNumber,
         area:
-          getAddressValue(address.suburb) ||
-          getAddressValue(address.neighbourhood) ||
-          getAddressValue(address.quarter) ||
-          getAddressValue(address.village) ||
+          parsedAddress?.houseNumber ||
+          parsedAddress?.area ||
           guestDeliveryAddress.area,
-        city:
-          getAddressValue(address.city) ||
-          getAddressValue(address.town) ||
-          getAddressValue(address.village) ||
-          getAddressValue(address.municipality) ||
-          guestDeliveryAddress.city,
-        state: getAddressValue(address.state) || guestDeliveryAddress.state,
-        postalCode: getAddressValue(address.postcode) || guestDeliveryAddress.postalCode,
-        country: getAddressValue(address.country) || guestDeliveryAddress.country,
+        city: parsedAddress?.city || guestDeliveryAddress.city,
+        state: parsedAddress?.state || guestDeliveryAddress.state,
+        postalCode: parsedAddress?.postalCode || guestDeliveryAddress.postalCode,
+        country: parsedAddress?.country || guestDeliveryAddress.country,
         lat,
         lng,
       });

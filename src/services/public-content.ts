@@ -122,6 +122,30 @@ export type CustomerReview = {
     id: string;
     name: string;
   };
+  order: CustomerReviewOrder | null;
+};
+
+export type CustomerReviewOrderItem = {
+  id: string;
+  menuItemId: string | null;
+  menuItemName: string | null;
+  variationId: string | null;
+  variationName: string | null;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  snapshotModifiers: unknown;
+};
+
+export type CustomerReviewOrder = {
+  id: string;
+  orderType: string | null;
+  status: string | null;
+  paymentMethod: string | null;
+  paymentStatus: string | null;
+  totalAmount: number;
+  createdAt: string;
+  items: CustomerReviewOrderItem[];
 };
 
 export type CustomerReviewsSummary = {
@@ -150,7 +174,10 @@ export type CustomerReviewsParams = {
   page?: number;
   limit?: number;
   rating?: number | null;
+  locale?: string | null;
 };
+
+const MAX_CUSTOMER_REVIEWS_LIMIT = 50;
 
 export type HelpSupportContent = {
   restaurantId: string;
@@ -341,6 +368,22 @@ const normalizeCustomerReview = (value: unknown): CustomerReview | null => {
 
   const customer = isRecord(record.customer) ? record.customer : {};
   const branch = isRecord(record.branch) ? record.branch : {};
+  const order = isRecord(record.order) ? record.order : null;
+  const orderItems = Array.isArray(order?.items)
+    ? order.items
+      .filter(isRecord)
+      .map((item) => ({
+        id: getString(item.id) ?? "",
+        menuItemId: getString(item.menuItemId) ?? null,
+        menuItemName: getString(item.menuItemName) ?? null,
+        variationId: getString(item.variationId) ?? null,
+        variationName: getString(item.variationName) ?? null,
+        quantity: getNumber(item.quantity),
+        unitPrice: getNumber(item.unitPrice),
+        lineTotal: getNumber(item.lineTotal),
+        snapshotModifiers: item.snapshotModifiers,
+      }))
+    : [];
 
   return {
     id: getString(record.id) ?? "",
@@ -360,6 +403,18 @@ const normalizeCustomerReview = (value: unknown): CustomerReview | null => {
       id: getString(branch.id) ?? "",
       name: getString(branch.name) ?? "",
     },
+    order: order
+      ? {
+          id: getString(order.id) ?? "",
+          orderType: getString(order.orderType) ?? null,
+          status: getString(order.status) ?? null,
+          paymentMethod: getString(order.paymentMethod) ?? null,
+          paymentStatus: getString(order.paymentStatus) ?? null,
+          totalAmount: getNumber(order.totalAmount),
+          createdAt: getString(order.createdAt) ?? "",
+          items: orderItems,
+        }
+      : null,
   };
 };
 
@@ -486,10 +541,15 @@ export const fetchCustomerReviews = async ({
   page = 1,
   limit = 10,
   rating,
+  locale,
 }: CustomerReviewsParams) => {
+  const safeLimit = Math.min(
+    MAX_CUSTOMER_REVIEWS_LIMIT,
+    Math.max(1, Number.isFinite(limit) ? limit : 10)
+  );
   const params = new URLSearchParams({
     page: String(page),
-    limit: String(limit),
+    limit: String(safeLimit),
   });
 
   if (restaurantId) {
@@ -502,6 +562,10 @@ export const fetchCustomerReviews = async ({
 
   if (rating) {
     params.set("rating", String(rating));
+  }
+
+  if (locale) {
+    params.set("locale", locale);
   }
 
   const response = await getRequest(`/customer-app/reviews?${params.toString()}`);

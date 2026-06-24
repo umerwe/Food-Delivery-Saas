@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   addPreparationMinutesToScheduledDelivery,
@@ -8,10 +8,16 @@ import {
   buildScheduleBreakLabels,
   getBranchScheduleForDate,
   getPickupScheduleForDate,
+  isImmediateScheduleAvailable,
+  isScheduleTimeAvailable,
 } from "@/components/pages/Checkout/utils/pickup-schedule";
 import type { BranchRecord } from "@/types/branch-selector";
 
 describe("pickup schedule helpers", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("builds slots from branch opening hours and skips breaks", () => {
     const branch: BranchRecord = {
       id: "branch-1",
@@ -402,5 +408,96 @@ describe("pickup schedule helpers", () => {
       readyLabel: "09:50",
       preparationMinutes: 20,
     });
+  });
+
+  it("validates scheduled pickup and delivery times against available branch slots", () => {
+    const branch: BranchRecord = {
+      id: "branch-1",
+      name: "Main",
+      settings: {
+        openingHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "10:00",
+            closeTime: "12:00",
+            breakTimes: [{ startTime: "10:30", endTime: "11:00" }],
+          },
+        ],
+        deliveryHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "13:00",
+            closeTime: "14:00",
+          },
+        ],
+      },
+    };
+
+    expect(
+      isScheduleTimeAvailable({
+        branch,
+        dateValue: "2030-06-17",
+        timeValue: "10:00",
+        scheduleType: "pickup",
+      })
+    ).toBe(true);
+    expect(
+      isScheduleTimeAvailable({
+        branch,
+        dateValue: "2030-06-17",
+        timeValue: "10:30",
+        scheduleType: "pickup",
+      })
+    ).toBe(false);
+    expect(
+      isScheduleTimeAvailable({
+        branch,
+        dateValue: "2030-06-17",
+        timeValue: "13:00",
+        scheduleType: "delivery",
+      })
+    ).toBe(true);
+    expect(
+      isScheduleTimeAvailable({
+        branch,
+        dateValue: "2030-06-17",
+        timeValue: "12:00",
+        scheduleType: "delivery",
+      })
+    ).toBe(false);
+  });
+
+  it("requires scheduling later when immediate ordering has no available slot today", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2030-06-17T15:00:00"));
+
+    const branch: BranchRecord = {
+      id: "branch-1",
+      name: "Main",
+      settings: {
+        openingHours: [
+          {
+            dayOfWeek: "MONDAY",
+            openTime: "10:00",
+            closeTime: "12:00",
+          },
+        ],
+      },
+    };
+
+    expect(
+      isImmediateScheduleAvailable({
+        branch,
+        scheduleType: "pickup",
+      })
+    ).toBe(false);
+    expect(
+      isScheduleTimeAvailable({
+        branch,
+        dateValue: "2030-06-24",
+        timeValue: "10:00",
+        scheduleType: "pickup",
+      })
+    ).toBe(true);
   });
 });

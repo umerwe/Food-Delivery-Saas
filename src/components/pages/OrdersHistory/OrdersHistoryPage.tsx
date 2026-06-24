@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { Star, RefreshCw, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Loader2, Star } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import useOrders from "@/hooks/useOrders";
 import { useAuthContext } from "@/hooks/useAuth";
 import Link from "next/link";
@@ -11,12 +11,21 @@ import { useRouter } from "next/navigation";
 import useBranchSelector from "@/hooks/useBranchSelector";
 import { BranchPopup } from "@/components/common/popups/BranchPopup";
 import { getStoredAuthState } from "@/lib/auth";
-import { buildReorderCartPayloads, canReviewOrder, type Order, type OrderItem, type OrderMeta } from "@/services/orders";
-import { useTranslations } from "next-intl";
+import {
+  buildReorderCartPayloads,
+  canReviewOrder,
+  type Order,
+  type OrderItem,
+  type OrderMeta,
+} from "@/services/orders";
+import { useCustomerReviews } from "@/hooks/useCustomerReviews";
+import { useLocale, useTranslations } from "next-intl";
+
 export function OrdersHistoryPage() {
   const t = useTranslations("ordersHistory");
   const errorT = useTranslations("errors");
-  const { token } = useAuthContext();
+  const locale = useLocale();
+  const { token, user } = useAuthContext();
   const { addCartItemForReorder, fetchOrderById, fetchOrdersPage } = useOrders(token);
 const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -34,6 +43,31 @@ const {
   fetchBranches,
   selectBranch,
 } = useBranchSelector(() => handleReorder(pendingOrder));
+  const restaurantId = useMemo(() => {
+    return String(user?.restaurantId || user?.branch?.restaurantId || "");
+  }, [user?.branch?.restaurantId, user?.restaurantId]);
+  const branchId = useMemo(
+    () =>
+      user?.branchId || user?.branch?.id
+        ? String(user?.branchId || user?.branch?.id)
+        : null,
+    [user?.branch?.id, user?.branchId]
+  );
+  const { reviews: customerReviews } = useCustomerReviews({
+    restaurantId,
+    branchId,
+    page: 1,
+    limit: 50,
+    locale,
+  });
+  const reviewByOrderId = useMemo(() => {
+    return new Map(
+      customerReviews
+        .filter((review) => review.orderId)
+        .map((review) => [review.orderId, review])
+    );
+  }, [customerReviews]);
+
   // ================= REORDER FUNCTION =================
   const handleReorder = async (order: Order | null) => {
   try {
@@ -185,7 +219,10 @@ const {
           <div className="space-y-4 sm:space-y-5">
             {orders.map((order) => {
               const firstItem = order.itemsPreview?.[0];
-              const reviewRating = order.review?.rating ?? 0;
+              const connectedReview =
+                order.review ?? reviewByOrderId.get(order.id) ?? null;
+              const orderForReviewState = { ...order, review: connectedReview };
+              const reviewRating = connectedReview?.rating ?? 0;
 
               return (
                 <div
@@ -270,7 +307,7 @@ const {
                   {/* BOTTOM */}
                  <div className="bg-[#f6f6f6] border-t border-[#f2f2f2] px-4 py-3 flex justify-between items-center">
 
-  {order.review ? (
+  {connectedReview ? (
       <>
         {/*  Already reviewed */}
         <span className="text-[12px] text-gray-400">
@@ -291,7 +328,7 @@ const {
           ))}
         </div>
       </>
-  ) : canReviewOrder(order) ? (
+  ) : canReviewOrder(orderForReviewState) ? (
       <>
         {/*  No review */}
         <span className="text-[12px] text-gray-400">

@@ -450,3 +450,54 @@ export const buildDeliveryTimeSlots = ({
   branch?: BranchRecord | null;
   dateValue: string;
 }): PickupTimeSlot[] => buildTimeSlots({ branch, dateValue, scheduleType: "delivery" });
+
+export const isScheduleTimeAvailable = ({
+  branch,
+  dateValue,
+  timeValue,
+  scheduleType,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+  timeValue: string;
+  scheduleType: "pickup" | "delivery";
+}) => {
+  if (!dateValue || !timeValue || isPastDateValue(dateValue)) return false;
+
+  const scheduleState = getBranchScheduleForDate({
+    branch,
+    dateValue,
+    scheduleType,
+  });
+
+  if (!scheduleState.hasOpeningHours) return true;
+
+  return buildTimeSlots({
+    branch,
+    dateValue,
+    scheduleType,
+  }).some((slot) => slot.value === timeValue);
+};
+
+export const isImmediateScheduleAvailable = ({
+  branch,
+  scheduleType,
+}: {
+  branch?: BranchRecord | null;
+  scheduleType: "pickup" | "delivery";
+}) => {
+  const dateValue = getTodayDateValue();
+  const scheduleState = getBranchScheduleForDate({
+    branch,
+    dateValue,
+    scheduleType,
+  });
+
+  if (!scheduleState.hasOpeningHours) return true;
+
+  return buildTimeSlots({
+    branch,
+    dateValue,
+    scheduleType,
+  }).length > 0;
+};

@@ -4,10 +4,12 @@ import Image from "next/image";
 import { Star, Loader2 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useSearchParams, useRouter } from "next/navigation";
 import useOrders from "@/hooks/useOrders";
 import { useAuthContext } from "@/hooks/useAuth";
+import { queryKeys } from "@/config/query-keys";
 import { createReviewSchema, type ReviewFormValues } from "@/validations/reviews";
 import { canReviewOrder, type Order } from "@/services/orders";
 import { useTranslations } from "next-intl";
@@ -19,6 +21,7 @@ export default function WriteReview() {
   const validationT = useTranslations("validation");
   const params = useSearchParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const orderId = params.get("orderId");
 
   const { token } = useAuthContext();
@@ -112,6 +115,8 @@ export default function WriteReview() {
       }
 
       toast.success(t("reviewSubmitted"));
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      queryClient.invalidateQueries({ queryKey: ["customer-reviews"] });
       router.push("/orders-history");
     } catch (error) {
       toast.error(getApiErrorMessage(error));

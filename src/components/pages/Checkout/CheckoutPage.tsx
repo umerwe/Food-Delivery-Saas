@@ -35,11 +35,11 @@ import { dispatchCartChanged } from "@/lib/cart-events";
 import { resolveCustomerCurrency } from "@/lib/money";
 import {
   addPreparationMinutesToScheduledDelivery,
-  buildDeliveryTimeSlots,
-  getBranchScheduleForDate,
   getScheduledDateTime,
   getDateValue,
+  isImmediateScheduleAvailable,
   isPastDateValue,
+  isScheduleTimeAvailable,
 } from "@/components/pages/Checkout/utils/pickup-schedule";
 import type { LoyaltySummary } from "@/services/loyalty";
 
@@ -64,6 +64,31 @@ type GuestPrivacyPolicy = {
 
 const getCheckoutOrderType = (checkoutType: string) =>
   checkoutType === "pickup" ? "TAKEAWAY" : "DELIVERY";
+
+const normalizePickupTimeValue = (value: string) => {
+  const [time, modifier] = value.includes(" ")
+    ? value.split(" ")
+    : [value, ""];
+  let [hours, minutes] = time.split(":").map(Number);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+
+  if (modifier === "PM" && hours !== 12) {
+    hours += 12;
+  }
+
+  if (modifier === "AM" && hours === 12) {
+    hours = 0;
+  }
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+
+  return {
+    hours,
+    minutes,
+    value: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
+  };
+};
 
 const isMeaningfulCartText = (value: unknown) =>
   typeof value === "string" && value.trim() !== "" && value.trim() !== "Untitled Item";
@@ -876,7 +901,14 @@ function CheckoutPageContent() {
   };
 
   const getOrderTime = () => {
-    if (!pickupDate || !pickupTime) return undefined;
+    if (!pickupDate || !pickupTime) {
+      return isImmediateScheduleAvailable({
+        branch: checkoutBranch,
+        scheduleType: "pickup",
+      })
+        ? undefined
+        : null;
+    }
 
     try {
       const date = new Date(pickupDate);
@@ -887,24 +919,31 @@ function CheckoutPageContent() {
       }
 
       if (pickupTime === "ASAP") {
-        return new Date().toISOString();
+        return isImmediateScheduleAvailable({
+          branch: checkoutBranch,
+          scheduleType: "pickup",
+        })
+          ? new Date().toISOString()
+          : null;
       }
 
-      const [time, modifier] = pickupTime.includes(" ")
-        ? pickupTime.split(" ")
-        : [pickupTime, ""];
-      let [hours, minutes] = time.split(":").map(Number);
+      const pickupTimeValue = normalizePickupTimeValue(pickupTime);
 
-      if (modifier === "PM" && hours !== 12) {
-        hours += 12;
+      if (!pickupTimeValue) return null;
+
+      if (
+        !isScheduleTimeAvailable({
+          branch: checkoutBranch,
+          dateValue,
+          timeValue: pickupTimeValue.value,
+          scheduleType: "pickup",
+        })
+      ) {
+        return null;
       }
 
-      if (modifier === "AM" && hours === 12) {
-        hours = 0;
-      }
-
-      date.setHours(hours);
-      date.setMinutes(minutes);
+      date.setHours(pickupTimeValue.hours);
+      date.setMinutes(pickupTimeValue.minutes);
       date.setSeconds(0);
       date.setMilliseconds(0);
 
@@ -921,7 +960,14 @@ function CheckoutPageContent() {
 
     const trimmedValue = scheduledDeliveryValue.trim();
 
-    if (!trimmedValue) return undefined;
+    if (!trimmedValue) {
+      return isImmediateScheduleAvailable({
+        branch: checkoutBranch,
+        scheduleType: "delivery",
+      })
+        ? undefined
+        : null;
+    }
 
     const scheduledDate = getScheduledDateTime(trimmedValue);
 
@@ -935,19 +981,14 @@ function CheckoutPageContent() {
 
     if (checkoutBranch) {
       const timeValue = trimmedValue.split("T")[1]?.slice(0, 5) || "";
-      const availableSlots = buildDeliveryTimeSlots({
-        branch: checkoutBranch,
-        dateValue,
-      });
-      const scheduleState = getBranchScheduleForDate({
-        branch: checkoutBranch,
-        dateValue,
-        scheduleType: "delivery",
-      });
 
       if (
-        scheduleState.hasOpeningHours &&
-        !availableSlots.some((slot) => slot.value === timeValue)
+        !isScheduleTimeAvailable({
+          branch: checkoutBranch,
+          dateValue,
+          timeValue,
+          scheduleType: "delivery",
+        })
       ) {
         return null;
       }

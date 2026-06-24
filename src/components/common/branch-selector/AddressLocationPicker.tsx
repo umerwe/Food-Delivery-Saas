@@ -60,7 +60,7 @@ const parseAddressDetails = (
     getAddressComponent(components, "neighborhood");
 
   return {
-    street: [streetNumber, route].filter(Boolean).join(" "),
+    street: route,
     houseNumber: streetNumber,
     postalCode: getAddressComponent(components, "postal_code"),
     city,

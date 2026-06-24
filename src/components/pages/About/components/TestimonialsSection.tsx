@@ -46,7 +46,8 @@ export default function TestimonialsSection({ testimonials: dynamicTestimonials 
       rating: 5,
     },
   ];
-  const testimonials = dynamicTestimonials?.length ? dynamicTestimonials : fallbackTestimonials;
+  const testimonials =
+    dynamicTestimonials === undefined ? fallbackTestimonials : dynamicTestimonials;
 
   return (
     <section className="w-full bg-[#f5f5f5] py-16 md:py-20">
@@ -58,6 +59,7 @@ export default function TestimonialsSection({ testimonials: dynamicTestimonials 
         </h2>
 
         {/* Cards */}
+        {testimonials.length ? (
         <div className="mt-12 grid md:grid-cols-3 gap-6">
           {testimonials.map((item, index) => (
             <div
@@ -109,6 +111,11 @@ export default function TestimonialsSection({ testimonials: dynamicTestimonials 
             </div>
           ))}
         </div>
+        ) : (
+          <p className="mx-auto mt-10 max-w-md text-center text-sm text-gray-500">
+            Customer reviews will appear here after verified orders are reviewed.
+          </p>
+        )}
 
       </div>
     </section>

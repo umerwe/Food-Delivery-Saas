@@ -17,7 +17,7 @@ import { INPUT_BASE_CLASS, LABEL_TEXT_CLASS } from "@/components/common/common-c
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useCheckout } from "@/hooks/useCheckout";
-import { reverseGeocode } from "@/services/geocoding";
+import { parseReverseGeocodeAddress, reverseGeocode } from "@/services/geocoding";
 import { useAuth } from "@/hooks/useAuth";
 import { createCheckoutAddressSchema, type CheckoutAddressValues } from "@/validations/checkout";
 import type { GoogleAddressDetails, GoogleLatLngLiteral } from "@/types/google-maps";
@@ -218,33 +218,28 @@ export function AddressModal({
         return;
       }
 
-      const address = data.address || {};
-      const getAddressValue = (value: unknown) => typeof value === "string" ? value : "";
+      const parsedAddress = parseReverseGeocodeAddress(
+        data.address || {},
+        data.displayName
+      );
 
       const currentValues = getValues();
-      setAddressValue("street", data.displayName || currentValues.street || "");
+      setAddressValue("street", parsedAddress.street || currentValues.street || "");
       setAddressValue(
         "area",
-        getAddressValue(address.suburb) ||
-          getAddressValue(address.neighbourhood) ||
-          getAddressValue(address.quarter) ||
-          getAddressValue(address.village) ||
-          currentValues.area ||
-          ""
+        parsedAddress.houseNumber || parsedAddress.area || currentValues.area || ""
       );
-      setAddressValue("houseNumber", currentValues.houseNumber || currentValues.area || "");
+      setAddressValue(
+        "houseNumber",
+        parsedAddress.houseNumber || currentValues.houseNumber || currentValues.area || ""
+      );
       setAddressValue(
         "city",
-        getAddressValue(address.city) ||
-          getAddressValue(address.town) ||
-          getAddressValue(address.village) ||
-          getAddressValue(address.municipality) ||
-          currentValues.city ||
-          ""
+        parsedAddress.city || currentValues.city || ""
       );
-      setAddressValue("state", getAddressValue(address.state) || currentValues.state || "");
-      setAddressValue("postalCode", getAddressValue(address.postcode) || currentValues.postalCode || "");
-      setAddressValue("country", getAddressValue(address.country) || currentValues.country || "");
+      setAddressValue("state", parsedAddress.state || currentValues.state || "");
+      setAddressValue("postalCode", parsedAddress.postalCode || currentValues.postalCode || "");
+      setAddressValue("country", parsedAddress.country || currentValues.country || "");
       setAddressValue("lat", lat);
       setAddressValue("lng", lng);
       setLocationPickerOpen(false);

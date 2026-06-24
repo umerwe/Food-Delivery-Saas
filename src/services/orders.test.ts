@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildReorderCartPayloads, canReviewOrder, type Order } from "./orders";
+import { buildReorderCartPayloads, canReviewOrder, normalizeOrderDetail, type Order } from "./orders";
 
 const createOrder = (order: Partial<Order>): Order => ({
   id: "order-1",
@@ -148,5 +148,97 @@ describe("buildReorderCartPayloads", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("normalizeOrderDetail", () => {
+  it("normalizes structured pricing, payment, fulfillment, and item fields", () => {
+    const order = normalizeOrderDetail({
+      id: "order-1",
+      displayId: "DW-10245",
+      orderType: "DELIVERY",
+      status: "PLACED",
+      paymentStatus: "PENDING",
+      paymentMethod: "PAYPAL",
+      createdAt: "2026-06-24T11:12:05.602Z",
+      pricing: {
+        currency: "EUR",
+        subtotal: 38,
+        deliveryFee: 2,
+        tipAmount: 23,
+        totalAmount: 63,
+        payableAmount: 63,
+        remainingAmount: 63,
+        breakdown: [
+          { key: "subtotal", label: "Items subtotal", amount: 38 },
+          { key: "deliveryFee", label: "Delivery fee", amount: 2 },
+          { key: "tip", label: "Tip", amount: 23 },
+          { key: "total", label: "Total", amount: 63 },
+        ],
+      },
+      payment: {
+        selectedMethod: "PAYPAL",
+        status: "PENDING",
+        transactions: [
+          {
+            id: "txn-1",
+            paymentMethod: "PAYPAL",
+            type: "CHARGE",
+            status: "PENDING",
+            amount: "63",
+            currency: "EUR",
+          },
+        ],
+      },
+      fulfillment: {
+        type: "DELIVERY",
+        deliveryAddress: {
+          street: "Main Street",
+          houseNumber: "12",
+          city: "Berlin",
+          postalCode: "10115",
+        },
+      },
+      items: [
+        {
+          id: "item-1",
+          menuItemId: "menu-1",
+          name: "Margherita pizza",
+          variationName: "Small",
+          quantity: 1,
+          unitPrice: 34,
+          lineTotal: 38,
+          modifiers: [{ modifierId: "extra-patty", quantity: 1 }],
+          category: { name: "Pizza" },
+        },
+      ],
+    });
+
+    expect(order?.displayId).toBe("DW-10245");
+    expect(order?.pricing?.tipAmount).toBe(23);
+    expect(order?.pricing?.breakdown?.some((line) => line.key === "tip" && line.amount === 23)).toBe(true);
+    expect(order?.paymentMethod).toBe("PAYPAL");
+    expect(order?.transactions?.[0]?.currency).toBe("EUR");
+    expect(order?.deliveryAddress?.street).toBe("Main Street");
+    expect(order?.deliveryAddress?.houseNumber).toBe("12");
+    expect(order?.items?.[0]?.menuItemName).toBe("Margherita pizza");
+    expect(order?.items?.[0]?.variationName).toBe("Small");
+  });
+
+  it("keeps legacy flat tip fields available for order details", () => {
+    const order = normalizeOrderDetail({
+      id: "order-1",
+      status: "PLACED",
+      createdAt: "2026-06-24T11:12:05.602Z",
+      subtotal: "38",
+      deliveryFee: "2",
+      tipAmount: "23",
+      totalAmount: "63",
+      transactions: [{ id: "txn-1", amount: "63", currency: "EUR" }],
+    });
+
+    expect(order?.tipAmount).toBe("23");
+    expect(order?.pricing?.tipAmount).toBe("23");
+    expect(order?.pricing?.totalAmount).toBe("63");
   });
 });

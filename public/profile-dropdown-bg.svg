@@ -1,0 +1,32 @@
+<svg width="1092" height="1092" viewBox="0 0 1092 1092" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1092" height="1092" fill="#FBF6EF"/>
+  <g opacity=".55" filter="url(#soft)">
+    <path d="M-30 902C183 789 217 617 388 492C562 365 719 408 847 272C921 193 953 98 1001-7H1092V1092H-30V902Z" fill="#F2E4D1"/>
+    <path d="M710 1078C794 963 907 905 1092 899V1092H710V1078Z" fill="#ECD7BE"/>
+  </g>
+  <g opacity=".38">
+    <path d="M11 924C220 783 288 615 479 503C643 407 779 394 908 245C982 160 1022 58 1056 0" stroke="#D5AA75" stroke-width="1.2"/>
+    <path d="M175 1002C253 903 360 866 481 779C607 688 677 575 824 485" stroke="#D5AA75" stroke-width=".8"/>
+    <path d="M325 249C481 191 617 174 763 70" stroke="#D5AA75" stroke-width=".7"/>
+  </g>
+  <g opacity=".72" stroke="#D5A667" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M873 339C873 339 889 257 953 197C953 197 958 282 873 339Z"/>
+    <path d="M887 399C887 399 915 321 990 271C990 271 982 357 887 399Z"/>
+    <path d="M902 463C902 463 939 390 1020 350C1020 350 1001 434 902 463Z"/>
+    <path d="M915 529C915 529 963 463 1049 434C1049 434 1018 515 915 529Z"/>
+    <path d="M927 595C927 595 986 538 1075 523C1075 523 1031 598 927 595Z"/>
+    <path d="M939 657C939 657 1006 612 1092 615"/>
+    <path d="M868 338C897 445 923 550 948 672"/>
+  </g>
+  <g opacity=".35">
+    <circle cx="812" cy="756" r="134" fill="#F7EAD8"/>
+    <circle cx="930" cy="811" r="94" fill="#F4E0C4"/>
+    <circle cx="768" cy="799" r="18" fill="#FFF8EF"/>
+    <circle cx="852" cy="829" r="13" fill="#FFF8EF"/>
+  </g>
+  <defs>
+    <filter id="soft" x="-86" y="-63" width="1234" height="1211" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="28"/>
+    </filter>
+  </defs>
+</svg>
