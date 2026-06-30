@@ -21,6 +21,7 @@ import { useBranding } from "@/hooks/useBranding";
 import { useAddDealToCart } from "@/hooks/useCart";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useCustomerDeals } from "@/hooks/useCustomerDeals";
+import { useDomainContext } from "@/hooks/useDomainContext";
 import { useHome } from "@/hooks/useHome";
 import { useHomeCategories, useHomePromotionalItems } from "@/hooks/useHomeCategories";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
@@ -43,19 +44,24 @@ const getTrimmedText = (value?: string | null) => {
 const HomePage = () => {
   const t = useTranslations("home.hero");
   const { user, token, restaurantId: authRestaurantId } = useAuth();
+  const { context: domainContext } = useDomainContext();
   const { locale } = useAppLocale();
   const { branding: fallbackBranding } = useBranding();
 
-  const restaurantId = useMemo(() => resolveHomeRestaurantId(user, authRestaurantId), [authRestaurantId, user]);
-  const branchId = useMemo(() => resolveHomeBranchId(user), [user]);
-  const homeQuery = useHome(restaurantId, branchId, Boolean(token && branchId));
-  const categoriesQuery = useHomeCategories(restaurantId, Boolean(token));
+  const restaurantId = useMemo(
+    () => resolveHomeRestaurantId(user, authRestaurantId) || domainContext?.restaurantId || "",
+    [authRestaurantId, domainContext?.restaurantId, user],
+  );
+  const branchId = useMemo(() => resolveHomeBranchId(user) || domainContext?.branchId || "", [domainContext?.branchId, user]);
+  const hasRestaurantContext = Boolean(restaurantId);
+  const homeQuery = useHome(restaurantId, branchId, hasRestaurantContext && Boolean(branchId));
+  const categoriesQuery = useHomeCategories(restaurantId, hasRestaurantContext);
   const promotionalItemsQuery = useHomePromotionalItems({
     restaurantId,
     branchId,
     locale,
     limit: 8,
-    enabled: Boolean(token),
+    enabled: hasRestaurantContext,
   });
   const dealsQuery = useCustomerDeals({ restaurantId, branchId, locale, limit: 20 });
   const addDealMutation = useAddDealToCart(branchId);

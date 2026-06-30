@@ -44,6 +44,11 @@ export type LoginCustomerPayload = {
   restaurantId: string;
 };
 
+export type GoogleLoginCustomerPayload = {
+  idToken: string;
+  restaurantId: string;
+};
+
 export type GuestLoginCustomerPayload = {
   firstName: string;
   lastName: string;

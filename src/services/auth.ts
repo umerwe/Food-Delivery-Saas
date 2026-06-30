@@ -5,6 +5,7 @@ import type {
   AuthSession,
   AuthUser,
   ForgotPasswordPayload,
+  GoogleLoginCustomerPayload,
   GuestLoginCustomerPayload,
   LoginCustomerPayload,
   RefreshTokenPayload,
@@ -74,6 +75,9 @@ const normalizeAuthUser = (payload: unknown, fallback = "Invalid user response")
 
 export const loginCustomer = async (payload: LoginCustomerPayload) =>
   normalizeAuthSession(await postAuth("/v1/auth/login", payload), "Login failed");
+
+export const googleLoginCustomer = async (payload: GoogleLoginCustomerPayload) =>
+  normalizeAuthSession(await postAuth("/v1/auth/google-login", payload), "Google login failed");
 
 export const guestLoginCustomer = async (payload: GuestLoginCustomerPayload) =>
   normalizeAuthSession(await postAuth("/v1/auth/register-guest", payload), "Guest login failed");

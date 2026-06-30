@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { AddressModal } from "./AddressModal";
 import useProfileApi from "@/hooks/useProfile";
 import { useAuth } from "@/hooks/useAuth";
+import { useHome } from "@/hooks/useHome";
 import Link from "next/link";
 import {
   getFullName,
@@ -29,7 +30,7 @@ import {
   type WalletSummary,
 } from "@/services/profile";
 import { formatDisplayAddress } from "@/lib/address-display";
-import { DEFAULT_DISPLAY_CURRENCY, formatMoney } from "@/lib/money";
+import { DEFAULT_DISPLAY_CURRENCY, formatMoney, resolveCustomerCurrency } from "@/lib/money";
 import {
   createProfileSchema,
   type ProfileFormValues,
@@ -44,7 +45,8 @@ export function ProfileForm() {
   const addressT = useTranslations("addresses");
   const commonT = useTranslations("common");
   const validationT = useTranslations("validation");
-  const { token, user } = useAuth();
+  const { token, user, restaurantId } = useAuth();
+  const homeQuery = useHome(restaurantId, user?.branchId, Boolean(restaurantId));
   const {
     deleteAddress,
     fetchAddresses: fetchProfileAddresses,
@@ -78,13 +80,18 @@ export function ProfileForm() {
   const [addressOpen, setAddressOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<AddressRecord | null>(null);
   const [walletBalance, setWalletBalance] = useState(0);
-  const [walletCurrency, setWalletCurrency] = useState(DEFAULT_DISPLAY_CURRENCY);
+  const [walletCurrency, setWalletCurrency] = useState<string | null>(null);
   const [walletTxns, setWalletTxns] = useState(0);
   const [updating, setUpdating] = useState(false);
   const [addresses, setAddresses] = useState<AddressRecord[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [addressesLoaded, setAddressesLoaded] = useState(false);
   const addressesLoadedRef = useRef(false);
+  const displayWalletCurrency = resolveCustomerCurrency({
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+    fallback: walletCurrency || DEFAULT_DISPLAY_CURRENCY,
+  });
 
   const fetchWallet = useCallback(async (skipStateUpdate = false): Promise<WalletSummary | null> => {
     try {
@@ -389,7 +396,7 @@ export function ProfileForm() {
   </p>
 
   <h3 className="text-[38px] md:text-[42px] font-semibold mt-2 leading-none">
-    {formatMoney(walletBalance || 0, walletCurrency, {
+    {formatMoney(walletBalance || 0, displayWalletCurrency, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}
@@ -425,7 +432,7 @@ export function ProfileForm() {
     <div className="mb-5 grid gap-5 lg:grid-cols-2">
       <GiftCardPurchaseCard
         walletBalance={walletBalance}
-        walletCurrency={walletCurrency}
+        walletCurrency={displayWalletCurrency}
       />
       <GiftCardRedeemCard />
     </div>

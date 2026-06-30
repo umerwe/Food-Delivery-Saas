@@ -86,3 +86,30 @@ export const checkoutCustomerCart = ({
   token?: string | null;
 }): Promise<ApiResult> =>
   postCheckout(`/v1/cart/checkout?customerId=${customerId}`, normalizeCheckoutPayload(payload), token);
+
+export const applyCheckoutCoupon = ({
+  customerId,
+  couponCode,
+  token,
+}: {
+  customerId: string;
+  couponCode: string;
+  token?: string | null;
+}): Promise<ApiResult> =>
+  patchCheckout(
+    `/v1/cart/coupon?customerId=${encodeURIComponent(customerId)}`,
+    { couponCode },
+    token
+  );
+
+export const removeCheckoutCoupon = ({
+  customerId,
+  token,
+}: {
+  customerId: string;
+  token?: string | null;
+}): Promise<ApiResult> =>
+  deleteCheckout(
+    `/v1/cart/coupon?customerId=${encodeURIComponent(customerId)}`,
+    token
+  );

@@ -1,20 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { checkoutCustomerCart, normalizeCheckoutPayload, normalizeCheckoutPaymentMethod } from "./checkout";
+import {
+  applyCheckoutCoupon,
+  checkoutCustomerCart,
+  normalizeCheckoutPayload,
+  normalizeCheckoutPaymentMethod,
+  removeCheckoutCoupon,
+} from "./checkout";
 
+const deleteCheckoutMock = vi.hoisted(() => vi.fn());
+const patchCheckoutMock = vi.hoisted(() => vi.fn());
 const postCheckoutMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/domain-api", () => ({
   createDomainApiService: () => ({
     get: vi.fn(),
     post: postCheckoutMock,
-    patch: vi.fn(),
-    del: vi.fn(),
+    patch: patchCheckoutMock,
+    del: deleteCheckoutMock,
   }),
 }));
 
 describe("checkout service", () => {
   beforeEach(() => {
+    deleteCheckoutMock.mockReset();
+    patchCheckoutMock.mockReset();
     postCheckoutMock.mockReset();
   });
 
@@ -60,6 +70,33 @@ describe("checkout service", () => {
       undefined
     );
     expect(postCheckoutMock.mock.calls[0][0]).not.toContain("/api/v1");
+  });
+
+  it("sends customerId when applying checkout coupon", async () => {
+    patchCheckoutMock.mockResolvedValue({ success: true });
+
+    await applyCheckoutCoupon({
+      customerId: "customer 1",
+      couponCode: "SAVE10",
+      token: "token-1",
+    });
+
+    expect(patchCheckoutMock).toHaveBeenCalledWith(
+      "/v1/cart/coupon?customerId=customer%201",
+      { couponCode: "SAVE10" },
+      "token-1"
+    );
+  });
+
+  it("sends customerId when removing checkout coupon", async () => {
+    deleteCheckoutMock.mockResolvedValue({ success: true });
+
+    await removeCheckoutCoupon({ customerId: "customer 1", token: "token-1" });
+
+    expect(deleteCheckoutMock).toHaveBeenCalledWith(
+      "/v1/cart/coupon?customerId=customer%201",
+      "token-1"
+    );
   });
 
   it("sends loyaltyPoints in cart checkout payload", async () => {

@@ -12,6 +12,7 @@ import {
   getOrders,
   patchOrders,
   postOrders,
+  reorderOrderToCart,
   submitOrderReview,
   type ReorderPayload,
   type SubmitOrderReviewPayload,
@@ -43,6 +44,12 @@ export const useOrders = (token: string | null) => {
     [token]
   );
 
+  const reorderOrder = useCallback(
+    ({ orderId, customerId }: { orderId: string; customerId?: string | null }) =>
+      reorderOrderToCart({ orderId, customerId, token }),
+    [token]
+  );
+
   const reviewOrder = useCallback(
     ({ orderId, payload }: { orderId: string; payload: SubmitOrderReviewPayload }) =>
       submitOrderReview({ orderId, payload, token }),
@@ -55,9 +62,10 @@ export const useOrders = (token: string | null) => {
       fetchOrderById: getOrderById,
       fetchOrdersPage: getOrdersPage,
       addCartItemForReorder: reorderCartItem,
+      reorderOrderToCart: reorderOrder,
       submitOrderReview: reviewOrder,
     }),
-    [api, getOrderById, getOrdersPage, reorderCartItem, reviewOrder]
+    [api, getOrderById, getOrdersPage, reorderCartItem, reorderOrder, reviewOrder]
   );
 };
 

@@ -29,7 +29,7 @@ import { CouponPerkBanner } from "@/components/layout/navbar/CouponPerkBanner"
 import { LanguageSelector } from "@/components/layout/navbar/LanguageSelector"
 import { useCustomerCoupons } from "@/hooks/useCustomerCoupons"
 import { useHome } from "@/hooks/useHome"
-import { CART_CHANGED_EVENT } from "@/lib/cart-events"
+import { CART_CHANGED_EVENT, type CartChangedDetail } from "@/lib/cart-events"
 import { resolveHomeBranchId, resolveHomeRestaurantId, resolveTableReservationsEnabled } from "@/lib/home"
 import { formatMoney, resolveCustomerCurrency } from "@/lib/money"
 import { fetchCustomerCart } from "@/services/cart"
@@ -311,7 +311,16 @@ export const Navbar = () => {
   }, [refreshCartItemCount])
 
   useEffect(() => {
-    const handleCartChanged = () => {
+    const handleCartChanged = (event: Event) => {
+      const detail = event instanceof CustomEvent
+        ? (event.detail as CartChangedDetail | undefined)
+        : undefined
+
+      if (typeof detail?.itemCount === "number") {
+        setCartItemCount(toCartQuantity(detail.itemCount))
+        return
+      }
+
       refreshCartItemCount()
     }
 

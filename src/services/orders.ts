@@ -771,6 +771,19 @@ export const addCartItemForReorder = ({
   token?: string | null;
 }) => postOrders(`/v1/cart/items?customerId=${customerId}`, payload, token);
 
+export const reorderOrderToCart = ({
+  orderId,
+  customerId,
+  token,
+}: {
+  orderId: string;
+  customerId?: string | null;
+  token?: string | null;
+}) => {
+  const query = customerId ? `?customerId=${encodeURIComponent(customerId)}` : "";
+  return postOrders(`/v1/cart/reorder${query}`, { orderId }, token);
+};
+
 export const submitOrderReview = ({
   orderId,
   payload,

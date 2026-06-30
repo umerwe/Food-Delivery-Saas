@@ -8,11 +8,7 @@ import { useAuthContext } from "@/hooks/useAuth";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import useBranchSelector from "@/hooks/useBranchSelector";
-import { BranchPopup } from "@/components/common/popups/BranchPopup";
-import { getStoredAuthState } from "@/lib/auth";
 import {
-  buildReorderCartPayloads,
   canReviewOrder,
   type Order,
   type OrderItem,
@@ -26,7 +22,7 @@ export function OrdersHistoryPage() {
   const errorT = useTranslations("errors");
   const locale = useLocale();
   const { token, user } = useAuthContext();
-  const { addCartItemForReorder, fetchOrderById, fetchOrdersPage } = useOrders(token);
+  const { fetchOrdersPage, reorderOrderToCart } = useOrders(token);
 const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,15 +30,6 @@ const router = useRouter();
  const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<OrderMeta | null>(null);
-  const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
-const {
-  showBranchPopup,
-  setShowBranchPopup,
-  branches,
-  loadingBranches,
-  fetchBranches,
-  selectBranch,
-} = useBranchSelector(() => handleReorder(pendingOrder));
   const restaurantId = useMemo(() => {
     return String(user?.restaurantId || user?.branch?.restaurantId || "");
   }, [user?.branch?.restaurantId, user?.restaurantId]);
@@ -75,39 +62,7 @@ const {
 
     setReorderingId(order.id);
 
-    const auth = getStoredAuthState();
-    const user = typeof auth?.user === "object" && auth.user !== null ? auth.user as Record<string, unknown> : null;
-
-    const customerId = user?.id ? String(user.id) : "";
-    let branchId = user?.branchId ? String(user.branchId) : "";
-
-    if (!customerId) {
-      toast.error(t("userNotFound"));
-      return;
-    }
-
-    // ❗ If no branch → STOP (same behavior as your other flow)
-    if (!branchId) {
-  setPendingOrder(order);
-  await fetchBranches();
-  return;
-}
-
-
-    const { order: fullOrder } = await fetchOrderById({ orderId: order.id });
-    const reorderPayloads = buildReorderCartPayloads({
-      order: fullOrder || order,
-      branchId,
-    });
-
-    if (reorderPayloads.length === 0) {
-      toast.error(t("reorderFailed"));
-      return;
-    }
-
-    for (const payload of reorderPayloads) {
-      await addCartItemForReorder({ customerId, payload });
-    }
+    await reorderOrderToCart({ orderId: order.id });
 
     toast.success(t("reorderSuccessful"));
 
@@ -390,13 +345,6 @@ const {
           </div>
         )}
       </div>
-      <BranchPopup
-  show={showBranchPopup}
-  onClose={() => setShowBranchPopup(false)}
-  branches={branches}
-  loading={loadingBranches}
-  onSelect={selectBranch}
-/>
     </div>
   );
 }

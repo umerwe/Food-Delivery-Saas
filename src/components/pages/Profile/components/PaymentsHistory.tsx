@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useHome } from "@/hooks/useHome";
 import usePayments from "@/hooks/usePayments";
 import type { PaymentItem, PaymentMeta, WalletItem } from "@/services/payments";
 import { Button } from "@/components/ui/button";
@@ -22,13 +23,14 @@ import {
 } from "lucide-react";
 import Balance from "./Balance";
 import { useTranslations } from "next-intl";
-import { DEFAULT_DISPLAY_CURRENCY, formatMoney } from "@/lib/money";
+import { DEFAULT_DISPLAY_CURRENCY, formatMoney, resolveCustomerCurrency } from "@/lib/money";
 
 export default function PaymentsHistory() {
   const t = useTranslations("payments");
   const orderStatusT = useTranslations("orderStatus");
   const commonT = useTranslations("common");
-  const { token, restaurantId } = useAuth();
+  const { token, restaurantId, user } = useAuth();
+  const homeQuery = useHome(restaurantId, user?.branchId, Boolean(restaurantId));
   const { fetchPaymentsPage, fetchWallet: fetchWalletData } = usePayments(token);
 
   const [tab, setTab] = useState<"payments" | "wallet">("wallet");
@@ -39,7 +41,12 @@ export default function PaymentsHistory() {
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [wallet, setWallet] = useState<WalletItem[]>([]);
   const [walletBalance, setWalletBalance] = useState(0);
-  const [walletCurrency, setWalletCurrency] = useState(DEFAULT_DISPLAY_CURRENCY);
+  const [walletCurrency, setWalletCurrency] = useState<string | null>(null);
+  const displayWalletCurrency = resolveCustomerCurrency({
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+    fallback: walletCurrency || DEFAULT_DISPLAY_CURRENCY,
+  });
 
   const [meta, setMeta] = useState<PaymentMeta>({});
   const [loading, setLoading] = useState(false);
@@ -190,7 +197,7 @@ export default function PaymentsHistory() {
         {/* BALANCE */}
         <Balance
           balance={walletBalance}
-          currency={walletCurrency}
+          currency={displayWalletCurrency}
           loyaltyPoints={wallet.length || 0}
         />
 
@@ -380,7 +387,7 @@ export default function PaymentsHistory() {
                       {/* RIGHT */}
                       <div className="shrink-0 text-right">
                         <p className="text-[22px] font-semibold leading-none text-primary">
-                          {formatMoney(item.amount, item.currency || walletCurrency)}
+                          {formatMoney(item.amount, item.currency || displayWalletCurrency)}
                         </p>
 
                         <div className="mt-2 flex flex-col items-end gap-1">
@@ -444,7 +451,7 @@ export default function PaymentsHistory() {
 
                       <p className="text-xs text-gray-500">
                         {t("balanceAfter", {
-                          amount: formatMoney(item.balanceAfter, walletCurrency),
+                          amount: formatMoney(item.balanceAfter, displayWalletCurrency),
                         })}
                       </p>
                     </div>
@@ -457,7 +464,7 @@ export default function PaymentsHistory() {
                         : "text-red-600"
                     }`}
                   >
-                    {isCredit ? "+" : "-"} {formatMoney(item.amount, walletCurrency)}
+                    {isCredit ? "+" : "-"} {formatMoney(item.amount, displayWalletCurrency)}
                   </p>
                 </div>
               );
