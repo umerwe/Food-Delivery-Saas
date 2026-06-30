@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { areBranchSchedulesIdentical, formatAddress, formatPrice, getBranchHoursDetails, getBranchHoursSummary, getImageUrl, getOperatingHours, getRestaurantAddress, getRestaurantName, getSplitPizzaPricingVariation, mergeUniqueById, resolveHasNext, resolvePromotionBadge } from "./restaurant-card-utils";
 
 describe("restaurant card utils", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("formats price and fallback image", () => {
     expect(formatPrice("12.5")).toBe("12.50");
     expect(getImageUrl({}, { imageUrl: "hero.jpg" })).toBe("hero.jpg");
@@ -142,6 +146,27 @@ describe("restaurant card utils", () => {
     expect(summary.showDeliveryHoursCard).toBe(false);
   });
 
+  it("uses opening hours as popup fallback for closed delivery day rows", () => {
+    const summary = getBranchHoursSummary({
+      scheduleTimings: {
+        openingHours: [
+          { dayOfWeek: "TUESDAY", openTime: "16:00", closeTime: "18:00" },
+        ],
+        deliveryHours: [
+          { dayOfWeek: "TUESDAY", isClosed: true, openTime: null, closeTime: null },
+        ],
+      },
+    });
+
+    const deliveryDetails = getBranchHoursDetails(summary.regularDeliverySchedule);
+    const tuesday = deliveryDetails.find((day) => day.dayLabel === "Tue");
+
+    expect(tuesday).toMatchObject({
+      hoursLabel: "16:00 - 18:00",
+    });
+    expect(tuesday?.hoursLabel).not.toBe("Closed");
+  });
+
   it("uses today's holiday opening hours before regular branch hours", () => {
     const todayDate = new Date();
     const todayValue = [
@@ -204,6 +229,76 @@ describe("restaurant card utils", () => {
         breakLabels: ["15:14 - 15:48 (lunch break)"],
       }),
     ]);
+  });
+
+  it("marks today's opening hours as closed before opening time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 30, 14, 41));
+
+    const summary = getBranchHoursSummary({
+      scheduleTimings: {
+        openingHours: [
+          { dayOfWeek: "TUESDAY", openTime: "16:00", closeTime: "18:00" },
+        ],
+      },
+    });
+
+    expect(summary.opening).toMatchObject({
+      status: "closed",
+      reason: "before-open",
+      opensAt: "16:00",
+    });
+  });
+
+  it("marks today's opening hours as closed during break time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 1, 15, 30));
+
+    const summary = getBranchHoursSummary({
+      scheduleTimings: {
+        openingHours: [
+          {
+            dayOfWeek: "WEDNESDAY",
+            openTime: "11:00",
+            closeTime: "22:30",
+            breakTimes: [{ startTime: "15:00", endTime: "17:00" }],
+          },
+        ],
+      },
+    });
+
+    expect(summary.opening).toMatchObject({
+      status: "closed",
+      reason: "break",
+      breakUntil: "17:00",
+    });
+  });
+
+  it("makes active temporary closure the top-level branch state", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 30, 14, 41));
+
+    const summary = getBranchHoursSummary({
+      availability: {
+        temporaryClosure: {
+          isClosed: true,
+          closedUntil: new Date(2026, 5, 30, 15, 30).toISOString(),
+          reason: "Busy kitchen",
+        },
+      },
+      scheduleTimings: {
+        openingHours: [
+          { dayOfWeek: "TUESDAY", openTime: "11:00", closeTime: "22:30" },
+        ],
+      },
+    });
+
+    expect(summary.opening).toMatchObject({
+      status: "closed",
+      reason: "temporary-closure",
+      value: "Busy kitchen",
+    });
+    expect(summary.temporaryClosure?.reason).toBe("Busy kitchen");
   });
 
   it("resolves restaurant and promotion text", () => {

@@ -320,6 +320,10 @@ export function isBranchCurrentlyAvailable(branch: Pick<BranchRecord, "availabil
     return false;
   }
 
+  if (branch.availability?.isTemporarilyClosed === true) {
+    return false;
+  }
+
   const status = branch.availability?.status?.toLowerCase();
   return status !== "closed" && status !== "inactive" && status !== "temporarily_closed";
 }

@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import {
   getDisplayTotalAmount,
-  getServiceChargeLabel,
   getTipAdjustedDisplayTotalAmount,
   shouldShowPositiveAmountLine,
 } from "@/components/pages/Checkout/utils/checkout-formatters";
@@ -1411,32 +1410,6 @@ export function CartSummarySection({
                 <Info size={16} />
               </div>
               <span>{formatCurrency(selectedOrderFee, currency)}</span>
-            </div>
-          ) : null}
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <span>{t("taxesAndCharges")}</span>
-              <Info size={16} />
-            </div>
-            <span>{formatCurrency(taxes, currency)}</span>
-          </div>
-
-          {shouldShowPositiveAmountLine(serviceCharge) ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                <span>
-                  {getServiceChargeLabel({
-                    serviceChargeType: resolvedQuote?.serviceChargeType,
-                    serviceChargeValue: resolvedQuote?.serviceChargeValue,
-                    serviceChargeLabel: t("totals.serviceCharge"),
-                    serviceChargeWithPercentageLabel: (value) =>
-                      t("totals.serviceChargeWithPercentage", { value }),
-                  })}
-                </span>
-                <Info size={16} />
-              </div>
-              <span>{formatCurrency(serviceCharge, currency)}</span>
             </div>
           ) : null}
 

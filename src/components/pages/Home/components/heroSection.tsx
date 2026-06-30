@@ -77,6 +77,16 @@ export const HeroSection = ({
   const selectedBranch = user?.branch ?? null;
   const selectedOrderType = getSelectedOrderType(user);
   const selectedOrderLabel = selectedOrderType === "TAKEAWAY" ? "Pickup" : selectedOrderType === "DELIVERY" ? "Delivery" : "";
+  const isSelectedBranchAvailable = selectedBranch ? isBranchCurrentlyAvailable(selectedBranch) : true;
+  const orderPanelTitle = mode === "delivery"
+    ? isSelectedBranchAvailable
+      ? t("deliveryPanelTitle")
+      : t("scheduleDeliveryPanelTitle")
+    : mode === "pickup"
+    ? isSelectedBranchAvailable
+      ? t("pickupPanelTitle")
+      : t("schedulePickupPanelTitle")
+    : t("orderPanelTitle");
   const hasOrderTypeRules = Boolean(selectedBranch?.settings?.allowedOrderTypes?.length);
   const showDeliveryOption = !hasOrderTypeRules || (selectedBranch ? branchSupportsDelivery(selectedBranch) : false);
   const showPickupOption = !hasOrderTypeRules || (selectedBranch ? branchSupportsPickup(selectedBranch) : false);
@@ -240,7 +250,7 @@ export const HeroSection = ({
         <div className="w-full rounded-[30px] bg-white p-5 shadow-[0_24px_80px_rgba(17,24,39,0.22)] ring-1 ring-black/5 md:p-7">
           <div className="mb-5">
             <h2 className="text-2xl font-black tracking-normal text-[#171717]">
-              {t("orderPanelTitle")}
+              {orderPanelTitle}
             </h2>
           </div>
 

@@ -3,9 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildGroupOrderInviteLink,
   canMutateGroupOrder,
+  canParticipantEditGroupOrderItems,
   clearStoredGroupOrderCode,
+  findCurrentGroupOrderParticipant,
   getStoredGroupOrderCode,
   isClosedGroupOrder,
+  isGroupOrderParticipantCompleted,
   resolveGroupOrderDeliveryAddressId,
   setStoredGroupOrderCode,
 } from "./group-order";
@@ -54,6 +57,23 @@ describe("group order helpers", () => {
     expect(canMutateGroupOrder({ id: "1", status: "LOCKED" })).toBe(true);
     expect(canMutateGroupOrder({ id: "1", status: "CHECKED_OUT" })).toBe(false);
     expect(canMutateGroupOrder({ id: "1", status: "CANCELLED" })).toBe(false);
+  });
+
+  it("blocks completed participants from editing group order items", () => {
+    const order = {
+      id: "1",
+      status: "OPEN",
+      participants: [
+        { id: "p1", userId: "user-1", status: "COMPLETED" },
+        { id: "p2", userId: "user-2", status: "ACTIVE" },
+      ],
+    };
+    const completedParticipant = findCurrentGroupOrderParticipant({ order, userId: "user-1" });
+    const activeParticipant = findCurrentGroupOrderParticipant({ order, userId: "user-2" });
+
+    expect(isGroupOrderParticipantCompleted(completedParticipant)).toBe(true);
+    expect(canParticipantEditGroupOrderItems({ order, participant: completedParticipant })).toBe(false);
+    expect(canParticipantEditGroupOrderItems({ order, participant: activeParticipant })).toBe(true);
   });
 
   it("builds invite links without changing the route", () => {

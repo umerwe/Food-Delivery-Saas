@@ -6,6 +6,7 @@ import {
   formatBranchAddress,
   formatBranchDistance,
   getSelectedOrderType,
+  isBranchCurrentlyAvailable,
   nearbyBranchToBranchRecord,
   normalizeBranch,
 } from "@/lib/branch-selector";
@@ -90,6 +91,15 @@ describe("branch selector helpers", () => {
         selectedOrderType: null,
       })
     ).toBe("TAKEAWAY");
+  });
+
+  it("treats temporary closure availability as unavailable", () => {
+    expect(
+      isBranchCurrentlyAvailable({
+        ...nearbyBranch,
+        availability: { isTemporarilyClosed: true },
+      })
+    ).toBe(false);
   });
 
   it("preserves branch availability and temporary closure details", () => {

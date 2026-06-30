@@ -1,5 +1,5 @@
 import type { Branding } from "@/types/branding";
-import type { BranchScheduleTimings } from "@/types/branches";
+import type { BranchScheduleTimings, BranchTemporaryClosure } from "@/types/branches";
 import type { HomeGiftCards } from "@/types/gift-cards";
 import type { HappyHourInfo, MenuItem } from "@/components/pages/Items/types";
 
@@ -31,6 +31,12 @@ export type HomeBranch = {
   settings?: Record<string, unknown>;
   scheduleTimings?: BranchScheduleTimings | null;
   tableReservationsEnabled?: boolean;
+  availability?: {
+    isTemporarilyClosed?: boolean;
+    temporaryClosure?: BranchTemporaryClosure | null;
+    status?: string | null;
+    reason?: string | null;
+  } | null;
 };
 
 export type HomeConfig = {
@@ -47,13 +53,7 @@ export type LandingPopup = {
     fromDate?: string | null;
     toDate?: string | null;
   } | null;
-  temporaryClosure?: {
-    isClosed?: boolean;
-    closedAt?: string | null;
-    closedUntil?: string | null;
-    reason?: string | null;
-    message?: string | null;
-  } | null;
+  temporaryClosure?: BranchTemporaryClosure | null;
 };
 
 export type HomeCategory = {

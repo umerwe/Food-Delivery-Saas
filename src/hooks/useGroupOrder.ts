@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { queryKeys } from "@/config/query-keys";
 import { useAuth } from "@/hooks/useAuth";
 import { useDomainApi } from "@/hooks/useDomainApi";
-import { canMutateGroupOrder, clearStoredGroupOrderCode, getStoredGroupOrderCode, isClosedGroupOrder } from "@/lib/group-order";
+import { canMutateGroupOrder, canParticipantEditGroupOrderItems, clearStoredGroupOrderCode, getStoredGroupOrderCode, isClosedGroupOrder, isGroupOrderParticipantCompleted } from "@/lib/group-order";
 import {
   cancelGroupOrder,
   checkoutGroupOrder,
@@ -21,6 +21,7 @@ import {
   postGroupOrders,
   searchGroupOrdersByInviteCode,
   updateGroupOrderItemQuantity,
+  updateMyGroupOrderParticipantStatus,
 } from "@/services/group-orders";
 import type { ApiResult } from "@/services/http";
 import type {
@@ -85,6 +86,12 @@ export const useGroupOrderApi = (token: string | null) => {
     [token]
   );
 
+  const updateMyParticipantStatus = useCallback(
+    ({ orderId, status }: { orderId: string | number; status: "ACTIVE" | "COMPLETED" }) =>
+      updateMyGroupOrderParticipantStatus({ orderId, status, token }),
+    [token]
+  );
+
   return useMemo(
     () => ({
       ...api,
@@ -97,8 +104,9 @@ export const useGroupOrderApi = (token: string | null) => {
       checkoutGroupOrder: checkoutOrder,
       updateGroupOrderItemQuantity: updateItemQuantity,
       deleteGroupOrderItem: deleteItem,
+      updateMyGroupOrderParticipantStatus: updateMyParticipantStatus,
     }),
-    [api, addGroupOrder, cancelOrder, checkoutOrder, deleteItem, findGroupOrderByInviteCode, joinOrder, leaveOrder, listGroupOrders, updateItemQuantity]
+    [api, addGroupOrder, cancelOrder, checkoutOrder, deleteItem, findGroupOrderByInviteCode, joinOrder, leaveOrder, listGroupOrders, updateItemQuantity, updateMyParticipantStatus]
   );
 };
 
@@ -174,7 +182,8 @@ export function useGroupOrder(): UseGroupOrderResult {
   const isParticipant = Boolean(participant);
   const canMutate = canMutateGroupOrder(order);
 
-  const canEditItems = isParticipant && canMutate;
+  const isParticipantCompleted = isGroupOrderParticipantCompleted(participant);
+  const canEditItems = canParticipantEditGroupOrderItems({ order, participant });
   const canCheckout = isHost && canMutate;
 
   return {
@@ -186,6 +195,7 @@ export function useGroupOrder(): UseGroupOrderResult {
     isParticipant,
     participant,
     canEditItems,
+    isParticipantCompleted,
     canCheckout,
     canMutateGroupOrder: canMutate,
   };

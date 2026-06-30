@@ -20,7 +20,7 @@ export function NotificationsPage() {
   const [meta, setMeta] = useState<NotificationMeta | null>(null);
 
   const getIcon = (item: NotificationItem) => {
-    const type = item?.type || "";
+    const type = String(item?.type || "").toLowerCase();
 
     if (type.includes("reservation")) {
       return {
@@ -43,6 +43,17 @@ export function NotificationsPage() {
       bg: "bg-blue-50",
       iconColor: "text-blue-500",
     };
+  };
+
+  const getTypeLabel = (type?: string | null) => {
+    switch (String(type || "").toUpperCase()) {
+      case "GROUP_ORDER_PARTICIPANT_COMPLETED":
+        return t("types.groupOrderParticipantCompleted");
+      case "GROUP_ORDER_ALL_PARTICIPANTS_COMPLETED":
+        return t("types.groupOrderAllParticipantsCompleted");
+      default:
+        return null;
+    }
   };
 
   // -------- FETCH
@@ -131,6 +142,7 @@ const disableMarkAll = !hasNotifications || !hasUnread;
           ) : (
             notifications.map((item, index) => {
               const { icon: Icon, bg, iconColor } = getIcon(item);
+              const typeLabel = getTypeLabel(item.type);
 
               return (
                 <div
@@ -158,6 +170,12 @@ const disableMarkAll = !hasNotifications || !hasUnread;
                         <p className="text-md font-semibold text-gray-900 truncate">
                           {item.title || t("fallbackTitle")}
                         </p>
+
+                        {typeLabel ? (
+                          <span className="mt-1 inline-flex rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-600">
+                            {typeLabel}
+                          </span>
+                        ) : null}
 
                         <p className="text-sm text-gray-600 mt-[2px] break-words">
                           {item.message || item.subtitle || ""}

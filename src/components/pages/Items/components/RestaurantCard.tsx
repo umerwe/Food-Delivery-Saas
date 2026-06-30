@@ -11,7 +11,7 @@ import { useAuthContext } from "@/hooks/useAuth";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { getStoredGroupOrderCode } from "@/lib/group-order";
+import { findCurrentGroupOrderParticipant, getStoredGroupOrderCode, isGroupOrderParticipantCompleted } from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney } from "@/lib/money";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import { FavoriteHeartButton } from "@/components/common/favorites/FavoriteHeartButton";
@@ -1858,6 +1858,16 @@ export function RestaurantCard({
 
         if (!groupOrder) {
           toast.error(t("invalidGroupOrder"));
+          return;
+        }
+
+        const currentParticipant = findCurrentGroupOrderParticipant({
+          order: groupOrder,
+          userId: customerId,
+        });
+
+        if (isGroupOrderParticipantCompleted(currentParticipant)) {
+          toast.error(t("groupOrderCompletedCannotEdit"));
           return;
         }
 

@@ -28,6 +28,7 @@ import {
   getDealChooserModifierGroups,
   getDealChooserModifierName,
   getDealChooserNumber,
+  getDealChooserSelectedModifiersTotal,
   getSelectedModifiersByGroup,
   isDealChooserItemConfigurable,
   validateDealChooserItemConfiguration,
@@ -56,12 +57,6 @@ type DealChooserDrawerProps = {
 };
 
 const getMenuItemInitial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
-
-const getMenuItemPrice = (item: CustomerDealMenuItem) =>
-  item.discountedBasePrice ?? item.basePrice;
-
-const hasMenuItemPrice = (value: CustomerDealMenuItem["basePrice"]) =>
-  value !== null && value !== undefined && value !== "";
 
 const formatModifierSelectionPrice = (
   unitPrice: number,
@@ -146,6 +141,18 @@ export function DealChooserDrawer({
   const selectedItems = useMemo(
     () => detailedItems.filter((item) => selectedMenuItemIds.includes(item.id)),
     [detailedItems, selectedMenuItemIds]
+  );
+  const selectedModifiersTotal = useMemo(() => {
+    return selectedItems.reduce((total, item) => {
+      return total + getDealChooserSelectedModifiersTotal({
+        item,
+        configuration: configurationsByItemId[item.id],
+      });
+    }, 0);
+  }, [configurationsByItemId, selectedItems]);
+  const displayedDealTotal = Math.max(
+    0,
+    getDealChooserNumber(deal?.discountValue, 0) + selectedModifiersTotal
   );
   const categoryNamesById = useMemo(
     () => new Map((deal?.scopeCategories ?? []).map((category) => [category.id, category.name])),
@@ -809,7 +816,7 @@ export function DealChooserDrawer({
         {deal ? (
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-600">
             <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">
-              {formatDealPrice(deal.discountValue, currency)}
+              {formatDealPrice(displayedDealTotal, currency)}
             </span>
             <span className="rounded-full bg-gray-100 px-2.5 py-1">
               {getDealTypeLabel(deal)}
@@ -854,7 +861,6 @@ export function DealChooserDrawer({
 
                 {section.items.map((item) => {
               const checked = selectedMenuItemIds.includes(item.id);
-              const itemPrice = getMenuItemPrice(item);
               const categoryName = item.category?.name?.trim();
               const description = item.description?.trim();
               const configurable = isDealChooserItemConfigurable(item);
@@ -895,11 +901,6 @@ export function DealChooserDrawer({
                         {item.name}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500">
-                        {hasMenuItemPrice(itemPrice) ? (
-                          <span className="text-primary">
-                            {formatDealPrice(itemPrice, currency)}
-                          </span>
-                        ) : null}
                         {categoryName ? <span>{categoryName}</span> : null}
                         {categoryRule ? (
                           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">

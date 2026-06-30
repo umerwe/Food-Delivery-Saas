@@ -1,3 +1,5 @@
+@import "react-time-picker/dist/TimePicker.css";
+@import "react-clock/dist/Clock.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -206,4 +208,54 @@
 
 button{
   cursor: pointer;
+}
+
+
+.time-24-picker,
+.time-24-picker .react-time-picker__wrapper {
+  border: 0;
+  width: 100%;
+}
+
+.time-24-picker .react-time-picker__wrapper {
+  align-items: center;
+  display: flex;
+  height: 100%;
+}
+
+.time-24-picker .react-time-picker__inputGroup {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  line-height: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.time-24-picker .react-time-picker__inputGroup__input {
+  appearance: textfield;
+  background: transparent;
+  border: 0;
+  box-sizing: content-box;
+  color: inherit;
+  font: inherit;
+  height: auto;
+  line-height: 1.25;
+  min-width: 2ch;
+  outline: none;
+  padding: 0;
+  text-align: center;
+}
+
+.time-24-picker .react-time-picker__inputGroup__divider,
+.time-24-picker .react-time-picker__inputGroup__leadingZero {
+  color: inherit;
+  font: inherit;
+  line-height: 1.25;
+  padding: 0 1px;
+}
+
+.time-24-picker .react-time-picker__inputGroup__amPm {
+  display: none;
 }

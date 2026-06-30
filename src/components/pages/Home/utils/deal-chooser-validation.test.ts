@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildDealCartItemPayload,
+  getDealChooserSelectedModifiersTotal,
   getSelectedModifiersByGroup,
   validateDealChooserItemConfiguration,
   validateDealChooserSelectedCount,
@@ -143,6 +144,43 @@ describe("deal chooser validation", () => {
         selectedQuantity: 1,
       },
     ]);
+  });
+
+  it("calculates selected paid modifier total for deal display", () => {
+    const item: CustomerDealMenuItem = {
+      ...requiredModifierItem,
+      modifierGroups: [
+        {
+          id: "toppings",
+          name: "Toppings",
+          selectionType: "MULTIPLE",
+          minSelect: 0,
+          maxSelect: 4,
+          modifiers: [
+            { id: "cheese", name: "Cheese", priceDelta: 2 },
+            { id: "sauce", name: "Sauce", priceDelta: "0.5" },
+          ],
+        },
+      ],
+    };
+
+    expect(
+      getDealChooserSelectedModifiersTotal({
+        item,
+        configuration: {
+          menuItemId: "pizza",
+          modifierSelections: [
+            {
+              modifierGroupId: "toppings",
+              modifiers: [
+                { modifierId: "cheese", quantity: 2 },
+                { modifierId: "sauce", quantity: 1 },
+              ],
+            },
+          ],
+        },
+      })
+    ).toBe(4.5);
   });
 
   it("blocks MULTIPLE group selections beyond maxSelect", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import {
   AlertTriangle,
@@ -20,6 +20,8 @@ import {
 import { Button } from "@/components/ui/button";
 import type { AuthBranch } from "@/types/auth";
 import type { HomeBranch, LandingPopup } from "@/types/home";
+
+const DISMISSED_POPUP_KEY = "deliveryway.dismissedLandingPopup";
 
 type LandingPopupType = NonNullable<LandingPopup["type"]>;
 
@@ -102,11 +104,28 @@ const getPopupKey = (popup?: LandingPopup | null, branchId?: string) => {
   return [
     branchId || "",
     popup?.type || "",
-    popup?.title || "",
-    popup?.message || popup?.temporaryClosure?.message || "",
     popup?.period?.fromDate || popup?.temporaryClosure?.closedAt || "",
     popup?.period?.toDate || popup?.temporaryClosure?.closedUntil || "",
   ].join("|");
+};
+
+const readDismissedPopupKey = () => {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return window.sessionStorage.getItem(DISMISSED_POPUP_KEY) || "";
+  } catch {
+    return "";
+  }
+};
+
+const writeDismissedPopupKey = (value: string) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(DISMISSED_POPUP_KEY, value);
+  } catch {
+  }
 };
 
 export default function BranchOpeningHoursPopup({
@@ -121,11 +140,7 @@ export default function BranchOpeningHoursPopup({
     [popup, branchId]
   );
 
-  const [dismissedKey, setDismissedKey] = useState("");
-
-  useEffect(() => {
-    setDismissedKey("");
-  }, [popupKey]);
+  const [dismissedKey, setDismissedKey] = useState(readDismissedPopupKey);
 
   const shouldShow = Boolean(popup?.show) && dismissedKey !== popupKey;
 
@@ -144,6 +159,7 @@ export default function BranchOpeningHoursPopup({
 
   const handleDismiss = () => {
     setDismissedKey(popupKey);
+    writeDismissedPopupKey(popupKey);
   };
 
   if (!shouldShow) return null;

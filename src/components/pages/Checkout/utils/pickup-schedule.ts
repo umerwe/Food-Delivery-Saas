@@ -18,7 +18,7 @@ type OpeningHours = {
 type PickupSchedule = {
   schedule: OpeningHours | null;
   hasOpeningHours: boolean;
-  source: "opening" | "delivery" | "holiday" | null;
+  source: "temporaryClosure" | "opening" | "delivery" | "holiday" | null;
 };
 
 export type PickupTimeSlot = {
@@ -232,6 +232,46 @@ const getScheduleTimingsRecord = (
   return branchTimings ?? settingsTimings;
 };
 
+const getActiveTemporaryClosure = (branch: BranchRecord | null | undefined) => {
+  const candidates = [
+    branch?.availability?.temporaryClosure,
+    branch?.settings?.temporaryClosure,
+    branch?.landingPopup?.temporaryClosure,
+  ];
+
+  return candidates.find((closure) => {
+    if (!closure?.isClosed) return false;
+
+    const closedUntil = closure.closedUntil ? new Date(closure.closedUntil) : null;
+
+    return !closedUntil || Number.isNaN(closedUntil.getTime()) || closedUntil.getTime() > Date.now();
+  }) ?? null;
+};
+
+const isTemporaryClosureActiveForDate = ({
+  branch,
+  dateValue,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+}) => {
+  const closure = getActiveTemporaryClosure(branch);
+
+  if (!closure) return false;
+
+  const closedAt = closure.closedAt ? new Date(closure.closedAt) : new Date();
+  const closedUntil = closure.closedUntil ? new Date(closure.closedUntil) : null;
+
+  if (Number.isNaN(closedAt.getTime())) return dateValue === getTodayDateValue();
+
+  const startDateValue = getDateValue(closedAt);
+  const endDateValue = closedUntil && !Number.isNaN(closedUntil.getTime())
+    ? getDateValue(closedUntil)
+    : startDateValue;
+
+  return dateValue >= startDateValue && dateValue <= endDateValue;
+};
+
 const getHolidayOpeningHours = (
   branch: BranchRecord | null | undefined
 ) => {
@@ -324,6 +364,14 @@ export const getBranchScheduleForDate = ({
   dateValue: string;
   scheduleType: "pickup" | "delivery";
 }): PickupSchedule => {
+  if (isTemporaryClosureActiveForDate({ branch, dateValue })) {
+    return {
+      schedule: { isClosed: true, date: dateValue },
+      hasOpeningHours: true,
+      source: "temporaryClosure",
+    };
+  }
+
   const scheduleTimings = getScheduleTimingsRecord(branch);
   const openingHours = normalizeArray<OpeningHours>(
     branch?.settings?.openingHours ?? scheduleTimings?.openingHours

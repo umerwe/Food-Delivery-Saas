@@ -347,6 +347,27 @@ function CheckoutPageContent() {
     () => normalizeBranch(homeQuery.data?.data.branch),
     [homeQuery.data?.data.branch]
   );
+  const homeBranchWithLandingPopup = useMemo(() => {
+    const landingPopup = homeQuery.data?.data.landingPopup;
+
+    if (!homeBranch || landingPopup?.type !== "TEMPORARY_CLOSURE" || !landingPopup.temporaryClosure) {
+      return homeBranch;
+    }
+
+    return {
+      ...homeBranch,
+      landingPopup,
+      availability: {
+        ...homeBranch.availability,
+        isTemporarilyClosed: landingPopup.temporaryClosure.isClosed,
+        temporaryClosure: landingPopup.temporaryClosure,
+      },
+      settings: {
+        ...homeBranch.settings,
+        temporaryClosure: landingPopup.temporaryClosure,
+      },
+    };
+  }, [homeBranch, homeQuery.data?.data.landingPopup]);
   const currency = resolveCustomerCurrency({
     configCurrency: homeQuery.data?.data.config?.currency,
     restaurant: homeQuery.data?.data.restaurant,
@@ -730,8 +751,8 @@ function CheckoutPageContent() {
 
     const fallbackBranch = normalizeBranch(user?.branch);
 
-    setCheckoutBranch(homeBranch ?? fallbackBranch);
-  }, [checkoutBranchId, homeBranch, user?.branch]);
+    setCheckoutBranch(homeBranchWithLandingPopup ?? fallbackBranch);
+  }, [checkoutBranchId, homeBranchWithLandingPopup, user?.branch]);
 
   useEffect(() => {
     if (!checkoutBranch?.settings?.allowedOrderTypes?.length) return;

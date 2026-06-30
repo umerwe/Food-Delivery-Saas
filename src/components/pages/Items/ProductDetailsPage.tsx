@@ -10,7 +10,7 @@ import { useCart } from "@/hooks/useCart";
 import { useAuthContext } from "@/hooks/useAuth";
 import { useHome } from "@/hooks/useHome";
 import { useCustomerReviews } from "@/hooks/useCustomerReviews";
-import { getStoredGroupOrderCode } from "@/lib/group-order";
+import { findCurrentGroupOrderParticipant, isGroupOrderParticipantCompleted, getStoredGroupOrderCode } from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney, resolveCustomerCurrency } from "@/lib/money";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -2278,6 +2278,16 @@ function ProductDetailsPageContent() {
 
         if (!groupOrder) {
           toast.error(t("invalidGroupOrder"));
+          return;
+        }
+
+        const currentParticipant = findCurrentGroupOrderParticipant({
+          order: groupOrder,
+          userId: customerId,
+        });
+
+        if (isGroupOrderParticipantCompleted(currentParticipant)) {
+          toast.error(t("groupOrderCompletedCannotEdit"));
           return;
         }
 

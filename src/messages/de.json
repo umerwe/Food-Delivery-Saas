@@ -184,6 +184,10 @@
       "offersDescription": "Nutzen Sie Filialangebote und Menüaktionen, sobald sie verfügbar sind.",
       "orderPanelEyebrow": "Bestellung starten",
       "orderPanelTitle": "Lieferung oder Abholung",
+      "deliveryPanelTitle": "Lieferung",
+      "pickupPanelTitle": "Abholung",
+      "scheduleDeliveryPanelTitle": "Lieferung planen",
+      "schedulePickupPanelTitle": "Abholung planen",
       "categories": "Kategorien",
       "items": "Artikel",
       "searchCategories": "Kategorien suchen",
@@ -607,6 +611,7 @@
       "deliveryHoursDescription": "Die Lieferverfügbarkeit weicht vom regulären Filialplan ab.",
       "open": "Geöffnet",
       "closed": "Geschlossen",
+      "closedToday": "Heute für diesen Service geschlossen.",
       "day": "Tag",
       "status": "Status",
       "hours": "Öffnung",
@@ -685,6 +690,7 @@
       "invalidGroupOrder": "Ungültige Gruppenbestellung",
       "failedAddToCart": "Artikel konnte nicht zum Warenkorb hinzugefügt werden",
       "addedToGroupOrder": "Zur Gruppenbestellung hinzugefügt",
+      "groupOrderCompletedCannotEdit": "Ihre Auswahl ist als fertig markiert. Klicken Sie in der Gruppenlobby auf Bestellung bearbeiten, um sie zu ändern.",
       "addedToCart": "Zum Warenkorb hinzugefügt",
       "freshPremiumItem": "Frischer Premium-Artikel",
       "viewIngredients": "Zutaten und Allergene anzeigen",
@@ -738,6 +744,7 @@
     "failedSaveItem": "Artikel konnte nicht gespeichert werden",
     "cartItemUpdated": "Warenkorbartikel erfolgreich aktualisiert",
     "addedToGroupOrder": "Zur Gruppenbestellung hinzugefügt",
+    "groupOrderCompletedCannotEdit": "Ihre Auswahl ist als fertig markiert. Klicken Sie in der Gruppenlobby auf Bestellung bearbeiten, um sie zu ändern.",
     "addedToCart": "Zum Warenkorb hinzugefügt",
     "productImageAlt": "Produktbild",
     "bestSeller": "Bestseller",
@@ -1476,7 +1483,11 @@
     "empty": "Keine Benachrichtigungen gefunden",
     "fallbackTitle": "Benachrichtigung",
     "loadingMore": "Wird geladen...",
-    "loadMore": "Weitere Benachrichtigungen laden"
+    "loadMore": "Weitere Benachrichtigungen laden",
+    "types": {
+      "groupOrderParticipantCompleted": "Teilnehmer der Gruppenbestellung fertig",
+      "groupOrderAllParticipantsCompleted": "Alle Teilnehmer fertig"
+    }
   },
   "groupOrder": {
     "landing": {
@@ -1599,6 +1610,9 @@
       "userCard": {
         "hostSuffix": "(Gastgeber)",
         "pickingItems": "Wählt Artikel aus...",
+        "active": "Bearbeitet",
+        "completed": "Abgeschlossen",
+        "completedCannotEdit": "Dieser Teilnehmer hat seine Bestellung als fertig markiert. Klicken Sie auf Bestellung bearbeiten, um Änderungen vorzunehmen.",
         "ready": "BEREIT"
       },
       "summary": {
@@ -1635,7 +1649,14 @@
         },
         "couponCode": "Gutscheincode",
         "couponPlaceholder": "Gutschein eingeben",
-        "confirmOrder": "Bestellung bestätigen"
+        "confirmOrder": "Bestellung bestätigen",
+        "done": "Fertig",
+        "editOrder": "Bestellung bearbeiten",
+        "updatingStatus": "Wird aktualisiert...",
+        "markedDone": "Ihre Auswahl ist als fertig markiert",
+        "editingEnabled": "Sie können Ihre Bestellung wieder bearbeiten",
+        "failedUpdateStatus": "Status der Gruppenbestellung konnte nicht aktualisiert werden",
+        "completedEditNotice": "Ihre Auswahl ist als fertig markiert. Klicken Sie auf Bestellung bearbeiten, wenn Sie Ihre Artikel ändern müssen."
       }
     },
     "success": {

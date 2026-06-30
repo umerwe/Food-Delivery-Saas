@@ -10,6 +10,7 @@ import {
   getPickupScheduleForDate,
   isPastDateValue,
 } from "@/components/pages/Checkout/utils/pickup-schedule";
+import { Time24Picker } from "@/components/ui/time-24-picker";
 import type { BranchRecord } from "@/types/branch-selector";
 import { useTranslations } from "next-intl";
 
@@ -122,8 +123,8 @@ export function SelectPickupTimeSection({
                     isSelected
                       ? "border-orange-500 bg-orange-500 text-white shadow-md"
                       : disabled
-                        ? "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-orange-400 hover:text-orange-500"
+                        ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-400"
+                        : "border-gray-200 bg-[#FAFAF9] text-gray-700 hover:border-orange-400 hover:bg-white hover:text-orange-500"
                   }`}
                 >
                   <span className="block text-xs font-semibold uppercase">
@@ -171,7 +172,7 @@ export function SelectPickupTimeSection({
                   className={`h-[48px] rounded-[10px] border-2 text-sm font-medium transition-all ${
                     pickupTime === slot.value
                       ? "border-orange-500 bg-orange-500 text-white shadow-md"
-                      : "border-gray-200 bg-white text-gray-700 hover:border-orange-400 hover:text-orange-500"
+                      : "border-gray-200 bg-[#FAFAF9] text-gray-700 hover:border-orange-400 hover:bg-white hover:text-orange-500"
                   }`}
                 >
                   {slot.label}
@@ -186,11 +187,10 @@ export function SelectPickupTimeSection({
         ) : (
           <label className="block max-w-[220px]">
             <span className="sr-only">{t("pickupTime")}</span>
-            <input
-              type="time"
+            <Time24Picker
               value={pickupTime || ""}
-              onChange={(event) => setPickupTime(event.target.value || null)}
-              className="h-[48px] w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 outline-none transition-all focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+              onChange={(value) => setPickupTime(value || null)}
+              className="h-[48px] w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 outline-none transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10"
             />
           </label>
         )}

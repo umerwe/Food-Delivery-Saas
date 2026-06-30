@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Time24Picker } from "@/components/ui/time-24-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useGroupOrderApi } from "@/hooks/useGroupOrder";
@@ -368,11 +369,10 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
 
                   <div>
                     <label className="text-sm text-gray-600">{t("time")}</label>
-                    <Input
-                      type="time"
+                    <Time24Picker
                       value={time}
-                      onChange={(e) => setTime(e.target.value)}
-                      className="mt-1 h-12 rounded-full border border-gray-200 bg-[#FAFAF9]"
+                      onChange={setTime}
+                      className="mt-1 h-12 rounded-full border border-gray-200 bg-[#FAFAF9] px-4 text-sm font-medium text-gray-700"
                     />
                   </div>
                 </div>

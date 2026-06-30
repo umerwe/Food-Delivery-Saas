@@ -577,18 +577,6 @@ export function OrderCartSidebar({
               </div>
             ) : null}
 
-            <div className="flex items-center justify-between">
-              <span>{t("taxesAndCharges")}</span>
-              <span>{formatCurrency(taxes, currency)}</span>
-            </div>
-
-            {serviceCharge > 0 ? (
-              <div className="flex items-center justify-between">
-                <span>{t("totals.serviceCharge")}</span>
-                <span>{formatCurrency(serviceCharge, currency)}</span>
-              </div>
-            ) : null}
-
             {tipAmount > 0 ? (
               <div className="flex items-center justify-between">
                 <span>{t("totals.tip")}</span>

@@ -184,6 +184,10 @@
       "offersDescription": "Unlock branch deals and menu promos whenever they are live.",
       "orderPanelEyebrow": "Start your order",
       "orderPanelTitle": "Delivery or pickup",
+      "deliveryPanelTitle": "Delivery",
+      "pickupPanelTitle": "Pickup",
+      "scheduleDeliveryPanelTitle": "Schedule Delivery",
+      "schedulePickupPanelTitle": "Schedule Pickup",
       "categories": "Categories",
       "items": "Items",
       "searchCategories": "Search categories",
@@ -607,6 +611,7 @@
       "deliveryHoursDescription": "Delivery availability differs from the regular branch schedule.",
       "open": "Open",
       "closed": "Closed",
+      "closedToday": "Closed today for this service.",
       "day": "Day",
       "status": "Status",
       "hours": "Hours",
@@ -685,6 +690,7 @@
       "invalidGroupOrder": "Invalid group order",
       "failedAddToCart": "Failed to add to cart",
       "addedToGroupOrder": "Added to group order",
+      "groupOrderCompletedCannotEdit": "Your selection is marked done. Click Edit Order in the group lobby to change it.",
       "addedToCart": "Added to cart",
       "freshPremiumItem": "Fresh premium item",
       "viewIngredients": "View ingredients and allergens",
@@ -738,6 +744,7 @@
     "failedSaveItem": "Failed to save item",
     "cartItemUpdated": "Cart item updated successfully",
     "addedToGroupOrder": "Added to group order",
+    "groupOrderCompletedCannotEdit": "Your selection is marked done. Click Edit Order in the group lobby to change it.",
     "addedToCart": "Added to cart",
     "productImageAlt": "Product image",
     "bestSeller": "Best Seller",
@@ -1476,7 +1483,11 @@
     "empty": "No notifications found",
     "fallbackTitle": "Notification",
     "loadingMore": "Loading...",
-    "loadMore": "Load more notifications"
+    "loadMore": "Load more notifications",
+    "types": {
+      "groupOrderParticipantCompleted": "Group order participant completed",
+      "groupOrderAllParticipantsCompleted": "All participants completed"
+    }
   },
   "groupOrder": {
     "landing": {
@@ -1599,6 +1610,9 @@
       "userCard": {
         "hostSuffix": "(Host)",
         "pickingItems": "Picking Items...",
+        "active": "Editing",
+        "completed": "Completed",
+        "completedCannotEdit": "This participant marked their order done. Click Edit Order to make changes.",
         "ready": "READY"
       },
       "summary": {
@@ -1635,7 +1649,14 @@
         },
         "couponCode": "Coupon Code",
         "couponPlaceholder": "Enter coupon",
-        "confirmOrder": "Confirm Order"
+        "confirmOrder": "Confirm Order",
+        "done": "Done",
+        "editOrder": "Edit Order",
+        "updatingStatus": "Updating...",
+        "markedDone": "Your selection is marked done",
+        "editingEnabled": "You can edit your order again",
+        "failedUpdateStatus": "Failed to update group order status",
+        "completedEditNotice": "Your selection is marked done. Click Edit Order if you need to change your items."
       }
     },
     "success": {

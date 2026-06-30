@@ -25,6 +25,17 @@ export type BranchRecord = {
     temporaryClosure?: BranchTemporaryClosure | null;
     holidayOpeningHour?: unknown;
   } | null;
+  landingPopup?: {
+    show?: boolean;
+    type?: string;
+    title?: string;
+    message?: string;
+    period?: {
+      fromDate?: string | null;
+      toDate?: string | null;
+    } | null;
+    temporaryClosure?: BranchTemporaryClosure | null;
+  } | null;
   selectedOrderType?: BranchOrderType;
   coverImage?: string | null;
   description?: string | null;

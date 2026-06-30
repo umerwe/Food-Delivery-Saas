@@ -137,3 +137,13 @@ export const deleteGroupOrderItem = ({
   itemId: string | number;
   token?: string | null;
 }) => deleteGroupOrders(`/v1/group-orders/${orderId}/items/${itemId}`, token);
+
+export const updateMyGroupOrderParticipantStatus = ({
+  orderId,
+  status,
+  token,
+}: {
+  orderId: string | number;
+  status: "ACTIVE" | "COMPLETED";
+  token?: string | null;
+}) => patchGroupOrders(`/v1/group-orders/${orderId}/participants/me/status`, { status }, token);

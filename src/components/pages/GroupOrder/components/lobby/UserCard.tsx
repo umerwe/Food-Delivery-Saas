@@ -3,9 +3,11 @@
 import Image from "next/image";
 import { Trash2, Plus, Minus } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useGroupOrder, useGroupOrderApi } from "@/hooks/useGroupOrder";
 import type { GroupOrderItem, GroupOrderParticipant } from "@/types/group-order";
+import { isGroupOrderParticipantCompleted } from "@/lib/group-order";
 
 type UserCardProps = {
   participant: GroupOrderParticipant;
@@ -20,13 +22,24 @@ export function UserCard({ participant, orderId, isHost }: UserCardProps) {
 
   const user = participant?.user;
   const items = participant?.items || [];
+  const isCompleted = isGroupOrderParticipantCompleted(participant);
 
   const handleDelete = async (itemId: string | number) => {
+    if (!canEdit) {
+      toast.error(t("completedCannotEdit"));
+      return;
+    }
+
     await deleteGroupOrderItem({ orderId, itemId });
     location.reload();
   };
 
   const updateQty = async (item: GroupOrderItem, qty: number) => {
+    if (!canEdit) {
+      toast.error(t("completedCannotEdit"));
+      return;
+    }
+
     if (qty < 1) return;
 
     await updateGroupOrderItemQuantity({ orderId, itemId: item.id, quantity: qty });
@@ -34,9 +47,15 @@ export function UserCard({ participant, orderId, isHost }: UserCardProps) {
     location.reload();
   };
 const { canEditItems, participant: currentUserParticipant } = useGroupOrder();
-  const picking = items.length === 0;
+  const picking = items.length === 0 && !isCompleted;
 const isCurrentUser = participant?.userId === currentUserParticipant?.userId;
 const canEdit = canEditItems && isCurrentUser;
+const statusLabel = isCompleted ? t("completed") : picking ? t("pickingItems") : t("active");
+const statusClassName = isCompleted
+  ? "bg-emerald-100 text-emerald-700"
+  : picking
+  ? "bg-orange-100 text-orange-600"
+  : "bg-blue-100 text-blue-700";
   return (
     <div className={`bg-white rounded-2xl p-5 shadow-md border border-gray-100 transition hover:shadow-lg hover:-translate-y-[2px] ${picking ? "border-dashed border-gray-300 bg-gray-50" : ""}`}>
 
@@ -58,19 +77,15 @@ const canEdit = canEditItems && isCurrentUser;
               {user?.firstName} {user?.lastName} {isHost && t("hostSuffix")}
             </p>
 
-            {picking && (
-              <p className="text-sm text-orange-500 mt-1">
-                {t("pickingItems")}
-              </p>
-            )}
+            <p className="text-sm text-gray-500 mt-1">
+              {statusLabel}
+            </p>
           </div>
         </div>
 
-        {!picking && (
-          <span className="text-xs bg-teal-100 text-teal-700 px-3 py-1 rounded-full font-medium">
-            {t("ready")}
-          </span>
-        )}
+        <span className={`text-xs px-3 py-1 rounded-full font-medium ${statusClassName}`}>
+          {statusLabel}
+        </span>
       </div>
 
       {!picking && (

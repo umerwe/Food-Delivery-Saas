@@ -30,8 +30,8 @@ export function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
   const errorT = useTranslations("errors");
   const summary = order?.summary;
   const { token } = useAuth();
-  const { canCheckout, canMutateGroupOrder, isHost } = useGroupOrder();
-  const { cancelGroupOrder, checkoutGroupOrder, leaveGroupOrder } = useGroupOrderApi(token);
+  const { canCheckout, canMutateGroupOrder, isHost, isParticipantCompleted, participant, refetch } = useGroupOrder();
+  const { cancelGroupOrder, checkoutGroupOrder, leaveGroupOrder, updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
 
   const [noteOpen, setNoteOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -42,7 +42,31 @@ export function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [loadingCancel, setLoadingCancel] = useState(false);
   const [loadingLeave, setLoadingLeave] = useState(false);
-  const actionsDisabled = !canMutateGroupOrder || loadingCancel || loadingCheckout || loadingLeave;
+  const [loadingStatus, setLoadingStatus] = useState(false);
+  const actionsDisabled = !canMutateGroupOrder || loadingCancel || loadingCheckout || loadingLeave || loadingStatus;
+
+  const handleParticipantStatusToggle = async () => {
+    if (isHost || !participant || !canMutateGroupOrder) return;
+
+    const nextStatus = isParticipantCompleted ? "ACTIVE" : "COMPLETED";
+
+    try {
+      setLoadingStatus(true);
+      const res = await updateMyGroupOrderParticipantStatus({ orderId: order.id, status: nextStatus });
+
+      if (hasBackendError(res)) {
+        toast.error(getBackendErrorMessage(res, t("failedUpdateStatus")));
+        return;
+      }
+
+      toast.success(nextStatus === "COMPLETED" ? t("markedDone") : t("editingEnabled"));
+      await refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("failedUpdateStatus"));
+    } finally {
+      setLoadingStatus(false);
+    }
+  };
 
   const handleLeave = async () => {
     if (isHost || !canMutateGroupOrder) return;
@@ -194,6 +218,16 @@ clearStoredGroupOrderCode();
         </div>
 
         {/* CHECKOUT BUTTON */}
+       {!isHost && participant ? (
+          <button
+            onClick={handleParticipantStatusToggle}
+            disabled={actionsDisabled}
+            className="w-full mt-5 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-full font-medium shadow-md hover:shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loadingStatus ? t("updatingStatus") : isParticipantCompleted ? t("editOrder") : t("done")}
+          </button>
+        ) : null}
+
        <button
   onClick={() => {
     if (!canMutateGroupOrder) {
@@ -208,7 +242,7 @@ clearStoredGroupOrderCode();
     setCheckoutOpen(true);
   }}
   disabled={!canCheckout || actionsDisabled}
-  className="w-full mt-5 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-full font-medium shadow-md hover:shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60"
+  className={`${!isHost && participant ? "mt-2" : "mt-5"} w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-full font-medium shadow-md hover:shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60`}
 >
   {t("finalizeCheckout")}
 </button>
@@ -222,7 +256,7 @@ clearStoredGroupOrderCode();
         </button>
 
         <p className="text-xs text-gray-400 mt-3">
-          {t("hostFinalizeNotice")}
+          {isParticipantCompleted ? t("completedEditNotice") : t("hostFinalizeNotice")}
         </p>
       </div>
       <div className="flex items-start gap-3 bg-sky-100/40 text-sky-900 rounded-xl px-4 py-4">

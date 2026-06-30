@@ -128,6 +128,46 @@ describe("pickup schedule helpers", () => {
     ]);
   });
 
+  it("blocks checkout slots with temporary closure before holiday and delivery hours", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-30T14:30:00+05:00"));
+
+    const branch: BranchRecord = {
+      id: "branch-1",
+      name: "Main",
+      availability: {
+        temporaryClosure: {
+          isClosed: true,
+          closedAt: "2026-06-30T14:00:00+05:00",
+          closedUntil: "2026-06-30T15:30:00+05:00",
+          reason: "Busy kitchen",
+        },
+      },
+      scheduleTimings: {
+        openingHours: [
+          { dayOfWeek: "TUESDAY", openTime: "11:00", closeTime: "22:30" },
+        ],
+        deliveryHours: [
+          { dayOfWeek: "TUESDAY", openTime: "11:00", closeTime: "22:30" },
+        ],
+        holidayOpeningHours: [
+          { date: "2026-06-30", openTime: "10:00", closeTime: "18:00" },
+        ],
+      },
+    };
+
+    expect(getBranchScheduleForDate({
+      branch,
+      dateValue: "2026-06-30",
+      scheduleType: "delivery",
+    })).toMatchObject({
+      source: "temporaryClosure",
+      schedule: { isClosed: true },
+    });
+    expect(buildDeliveryTimeSlots({ branch, dateValue: "2026-06-30" })).toEqual([]);
+    expect(isImmediateScheduleAvailable({ branch, scheduleType: "delivery" })).toBe(false);
+  });
+
   it("falls back to opening hours for delivery when delivery hours are not configured", () => {
     const branch: BranchRecord = {
       id: "branch-1",

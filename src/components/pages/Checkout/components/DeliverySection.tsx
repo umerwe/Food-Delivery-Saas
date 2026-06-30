@@ -7,6 +7,7 @@ import { DeliveryAddressSection } from '@/components/pages/Checkout/components/D
 import NotesSection from '@/components/pages/Checkout/components/NotesSection';
 import { CustomerDetailsForm } from '@/components/pages/Checkout/components/CustomerDetailsForm';
 import { PaymentMethodSection } from '@/components/pages/Checkout/components/PaymentMethodSection';
+import { Time24Picker } from '@/components/ui/time-24-picker';
 import {
   buildScheduleBreakLabels,
   buildDeliveryTimeSlots,
@@ -138,8 +139,8 @@ export function DeliverySection(props: DeliverySectionProps) {
                     isSelected
                       ? "border-orange-500 bg-orange-500 text-white shadow-md"
                       : disabled
-                        ? "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-orange-400 hover:text-orange-500"
+                        ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-400"
+                        : "border-gray-200 bg-[#FAFAF9] text-gray-700 hover:border-orange-400 hover:bg-white hover:text-orange-500"
                   }`}
                 >
                   <span className="block text-xs font-semibold uppercase">
@@ -212,7 +213,7 @@ export function DeliverySection(props: DeliverySectionProps) {
                       className={`h-[48px] rounded-[10px] border-2 text-sm font-medium transition-all ${
                         props.scheduledDeliveryValue === `${selectedDateValue}T${slot.value}`
                           ? "border-orange-500 bg-orange-500 text-white shadow-md"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-orange-400 hover:text-orange-500"
+                          : "border-gray-200 bg-[#FAFAF9] text-gray-700 hover:border-orange-400 hover:bg-white hover:text-orange-500"
                       }`}
                     >
                       {slot.label}
@@ -226,15 +227,14 @@ export function DeliverySection(props: DeliverySectionProps) {
               ) : (
                 <label className="col-span-full block max-w-[220px]">
                   <span className="sr-only">{t("deliveryTime")}</span>
-                  <input
-                    type="time"
+                  <Time24Picker
                     value={props.scheduledDeliveryValue.split("T")[1] || ""}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       props.setScheduledDeliveryValue(
-                        event.target.value ? `${selectedDateValue}T${event.target.value}` : `${selectedDateValue}T`
+                        value ? `${selectedDateValue}T${value}` : `${selectedDateValue}T`
                       )
                     }
-                    className="h-[48px] w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 outline-none transition-all focus:border-primary/50 focus:ring-2 focus:ring-primary/10"
+                    className="h-[48px] w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 outline-none transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10"
                   />
                 </label>
               )}

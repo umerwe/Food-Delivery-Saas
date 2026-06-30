@@ -8,7 +8,7 @@ type HeaderSectionProps = {
 export default function HeaderSection({ order }: HeaderSectionProps) {
   const t = useTranslations("groupOrder.lobby.header");
   const total = order?.participantCount || 0;
-  const ready = order?.participants?.filter((p) => (p.items?.length || 0) > 0)?.length || 0;
+  const ready = order?.participants?.filter((p) => String(p.status || "").toUpperCase() === "COMPLETED")?.length || 0;
 
   const percent = total ? (ready / total) * 100 : 0;
 
