@@ -152,6 +152,17 @@ interface CartQuote {
   } | null;
 }
 
+type PricingEntry = {
+  item: CartItem;
+  pricing: ReturnType<typeof getItemPricing>;
+};
+
+type CartItemDiscountDisplay = {
+  lineDiscount: number;
+  discountedLineTotal: number;
+  discountedUnitPriceWithModifiers: number;
+};
+
 interface Props {
   title?: string;
   cartItems: CartItem[];
@@ -610,6 +621,56 @@ export const getCheckoutPriceAdjustmentTotal = (
   }, 0);
 };
 
+export const getScopedItemDiscountDisplays = (
+  pricingItems: PricingEntry[],
+  quote?: CartQuote | null
+) => {
+  const applyMode = String(quote?.appliedPromotion?.applyMode || "").toUpperCase();
+  const discountAmount = Math.max(
+    0,
+    toNumber(quote?.discountAmount ?? quote?.appliedPromotion?.discountAmount, 0)
+  );
+
+  if (applyMode !== "SCOPED_ITEMS" || discountAmount <= 0) {
+    return new Map<string, CartItemDiscountDisplay>();
+  }
+
+  const eligibleItems = pricingItems.filter(({ item, pricing }) => {
+    return !isDealCartItem(item) && pricing.lineTotal > 0;
+  });
+  const eligibleTotal = eligibleItems.reduce((total, { pricing }) => total + pricing.lineTotal, 0);
+
+  if (eligibleTotal <= 0) {
+    return new Map<string, CartItemDiscountDisplay>();
+  }
+
+  const discountMap = new Map<string, CartItemDiscountDisplay>();
+  let allocatedDiscount = 0;
+
+  eligibleItems.forEach(({ item, pricing }, index) => {
+    const itemKey = String(item.id || item.menuItemId || index);
+    const isLastItem = index === eligibleItems.length - 1;
+    const proportionalDiscount = isLastItem
+      ? discountAmount - allocatedDiscount
+      : Math.round((discountAmount * pricing.lineTotal / eligibleTotal) * 100) / 100;
+    const lineDiscount = Math.min(pricing.lineTotal, Math.max(0, proportionalDiscount));
+    const discountedLineTotal = Math.max(0, pricing.lineTotal - lineDiscount);
+    const discountedUnitPriceWithModifiers = discountedLineTotal / pricing.quantity;
+
+    allocatedDiscount += lineDiscount;
+
+    if (lineDiscount > 0 && discountedLineTotal < pricing.lineTotal) {
+      discountMap.set(itemKey, {
+        lineDiscount,
+        discountedLineTotal,
+        discountedUnitPriceWithModifiers,
+      });
+    }
+  });
+
+  return discountMap;
+};
+
 export function CartSummarySection({
   title,
   cartItems,
@@ -714,6 +775,7 @@ export function CartSummarySection({
   const promotionDiscountLine = hasAppliedPromotion
     ? getAppliedPromotionDiscountLine(resolvedQuote)
     : null;
+  const scopedItemDiscountDisplays = getScopedItemDiscountDisplays(pricingItems, resolvedQuote);
   const appliedCouponCode = hasText(resolvedQuote?.couponCode)
     ? String(resolvedQuote?.couponCode).trim()
     : "";
@@ -944,6 +1006,7 @@ export function CartSummarySection({
               const includedItems = Array.isArray(item.includedItems)
                 ? item.includedItems
                 : [];
+              const itemDiscountDisplay = scopedItemDiscountDisplays.get(String(item.id || item.menuItemId || ""));
 
               return (
                 <div
@@ -1239,13 +1302,35 @@ export function CartSummarySection({
 
                       <div className="flex justify-between py-[4px]">
                         <div>
-                          <p className="text-base font-medium text-primary">
-                            {formatCurrency(lineTotal, currency)}
-                          </p>
+                          {itemDiscountDisplay ? (
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <span className="text-sm font-medium text-gray-400 line-through decoration-gray-400">
+                                {formatCurrency(lineTotal, currency)}
+                              </span>
+                              <span className="text-base font-semibold text-primary">
+                                {formatCurrency(itemDiscountDisplay.discountedLineTotal, currency)}
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-base font-medium text-primary">
+                              {formatCurrency(lineTotal, currency)}
+                            </p>
+                          )}
 
                           <div className="space-y-0.5">
                             <p className="text-[11px] text-gray-400">
-                              {t("each", { price: formatCurrency(unitPriceWithModifiers, currency) })}
+                              {itemDiscountDisplay ? (
+                                <>
+                                  {t("each", {
+                                    price: formatCurrency(itemDiscountDisplay.discountedUnitPriceWithModifiers, currency),
+                                  })}
+                                  <span className="ml-1 line-through decoration-gray-400">
+                                    {formatCurrency(unitPriceWithModifiers, currency)}
+                                  </span>
+                                </>
+                              ) : (
+                                t("each", { price: formatCurrency(unitPriceWithModifiers, currency) })
+                              )}
                             </p>
 
                             {selectedAddons.length > 0 ? (
