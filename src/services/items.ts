@@ -20,12 +20,14 @@ export const fetchMenuItems = async (endpoint: string, token?: string | null) =>
 
 export const fetchMenuItemsPage = async ({
   restaurantId,
+  branchId,
   categoryId,
   page,
   limit,
   token,
 }: {
   restaurantId: string;
+  branchId?: string | number | null;
   categoryId?: string;
   page: number;
   limit: number;
@@ -43,6 +45,10 @@ export const fetchMenuItemsPage = async ({
     params.set("categoryId", categoryId);
   }
 
+  if (branchId) {
+    params.set("branchId", String(branchId));
+  }
+
   const response = await getItems(`/v1/menu/items?${params.toString()}`, token);
 
   return {
@@ -55,10 +61,12 @@ export const fetchMenuItemsPage = async ({
 export const fetchMenuItemDetailsByIds = async ({
   itemIds,
   itemSearchTermsById = {},
+  branchId,
   token,
 }: {
   itemIds: string[];
   itemSearchTermsById?: Record<string, string[]>;
+  branchId?: string | number | null;
   token?: string | null;
 }) => {
   const uniqueIds = Array.from(
@@ -77,8 +85,14 @@ export const fetchMenuItemDetailsByIds = async ({
       let matchedItem: MenuItem | null = null;
 
       for (const searchTerm of searchTerms) {
+        const params = new URLSearchParams({ search: searchTerm });
+
+        if (branchId) {
+          params.set("branchId", String(branchId));
+        }
+
         const response = await getItems(
-          `/v1/menu/items?search=${encodeURIComponent(searchTerm)}`,
+          `/v1/menu/items?${params.toString()}`,
           token
         );
         const items = normalizeApiArray<MenuItem>(response);
@@ -106,11 +120,13 @@ export const fetchMenuItemDetailsByIds = async ({
 
 export const fetchSplitPizzaMenuItems = async ({
   restaurantId,
+  branchId,
   search,
   page,
   token,
 }: {
   restaurantId?: string | number | null;
+  branchId?: string | number | null;
   search: string;
   page: number;
   token?: string | null;
@@ -122,6 +138,10 @@ export const fetchSplitPizzaMenuItems = async ({
 
   if (restaurantId) {
     queryParams.set("restaurantId", String(restaurantId));
+  }
+
+  if (branchId) {
+    queryParams.set("branchId", String(branchId));
   }
 
   const resolvedSearch = search?.trim();

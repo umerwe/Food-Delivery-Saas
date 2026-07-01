@@ -725,17 +725,40 @@ export const getRatingInfo = (authUser: AuthRestaurantUser | null | undefined, s
 
 export const resolveAvailabilityStatus = (isOpen?: boolean | null) => (isOpen === false ? "Closed" : "Open");
 
-export const resolvePromotionBadge = (promotion?: { title?: string | null; discountType?: string | null; discountValue?: string | number | null } | null) => {
+export const resolvePromotionBadge = (promotion?: {
+  title?: string | null;
+  discountType?: string | null;
+  discountValue?: string | number | null;
+  applyMode?: string | null;
+  dealSelectionMode?: string | null;
+  dealRequiredQuantity?: string | number | null;
+  scopeCategoryRules?: unknown;
+  scopeCategoryIds?: unknown;
+} | null) => {
   if (!promotion) return "";
-  if (hasText(promotion.title)) return String(promotion.title);
-  if (promotion.discountType === "PERCENTAGE") return `${toNumber(promotion.discountValue, 0)}% OFF`;
-  if (promotion.discountType === "FLAT") {
-    return `${formatMoney(promotion.discountValue, undefined, {
+  if (
+    promotion.dealSelectionMode ||
+    promotion.dealRequiredQuantity !== undefined ||
+    Array.isArray(promotion.scopeCategoryRules) ||
+    Array.isArray(promotion.scopeCategoryIds) ||
+    promotion.discountType === "FIXED_PRICE" ||
+    (promotion.applyMode && promotion.applyMode !== "SCOPED_ITEMS")
+  ) {
+    return "";
+  }
+
+  const discountValue = toNumber(promotion.discountValue, 0);
+
+  if (hasText(promotion.title) && discountValue > 0) return String(promotion.title);
+
+  if (promotion.discountType === "PERCENTAGE" && discountValue > 0) return `${discountValue}% OFF`;
+  if (promotion.discountType === "FLAT" && discountValue > 0) {
+    return `${formatMoney(discountValue, undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })} OFF`;
   }
-  return "OFFER";
+  return "";
 };
 
 export const mergeUniqueById = <T extends { id?: string | number | null }>(prev: T[], next: T[]) => {

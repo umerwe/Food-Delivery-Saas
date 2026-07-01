@@ -34,9 +34,10 @@ import {
 import { dispatchCartChanged } from "@/lib/cart-events";
 import { resolveCustomerCurrency } from "@/lib/money";
 import {
-  addPreparationMinutesToScheduledDelivery,
+  getBranchScheduleTimeZone,
   getScheduledDateTime,
   getDateValue,
+  getScheduleOrderTimeIso,
   isImmediateScheduleAvailable,
   isPastDateValue,
   isScheduleTimeAvailable,
@@ -988,12 +989,11 @@ function CheckoutPageContent() {
         return null;
       }
 
-      date.setHours(pickupTimeValue.hours);
-      date.setMinutes(pickupTimeValue.minutes);
-      date.setSeconds(0);
-      date.setMilliseconds(0);
-
-      return date.toISOString();
+      return getScheduleOrderTimeIso({
+        dateValue,
+        timeValue: pickupTimeValue.value,
+        timeZone: getBranchScheduleTimeZone(checkoutBranch),
+      });
     } catch (err) {
       return null;
     }
@@ -1025,9 +1025,9 @@ function CheckoutPageContent() {
       return null;
     }
 
-    if (checkoutBranch) {
-      const timeValue = trimmedValue.split("T")[1]?.slice(0, 5) || "";
+    const timeValue = trimmedValue.split("T")[1]?.slice(0, 5) || "";
 
+    if (checkoutBranch) {
       if (
         !isScheduleTimeAvailable({
           branch: checkoutBranch,
@@ -1040,12 +1040,12 @@ function CheckoutPageContent() {
       }
     }
 
-    const deliveryDate = addPreparationMinutesToScheduledDelivery({
-      scheduledDeliveryValue: trimmedValue,
+    return getScheduleOrderTimeIso({
+      dateValue,
+      timeValue,
       preparationMinutes: totalPreparationMinutes,
+      timeZone: getBranchScheduleTimeZone(checkoutBranch),
     });
-
-    return (deliveryDate || scheduledDate).toISOString();
   };
 
   const setCartSchedule = async (scheduledDeliveryAt?: string | null) => {

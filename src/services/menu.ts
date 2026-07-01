@@ -92,11 +92,13 @@ export const fetchSignatureMenus = async ({
 
 export const fetchSignatureSplitPizzaItems = async ({
   restaurantId,
+  branchId,
   search,
   page,
   token,
 }: {
   restaurantId?: string | null;
+  branchId?: string | number | null;
   search: string;
   page: number;
   token?: string | null;
@@ -108,6 +110,10 @@ export const fetchSignatureSplitPizzaItems = async ({
 
   if (restaurantId) {
     queryParams.set("restaurantId", String(restaurantId));
+  }
+
+  if (branchId) {
+    queryParams.set("branchId", String(branchId));
   }
 
   const resolvedSearch = search?.trim();

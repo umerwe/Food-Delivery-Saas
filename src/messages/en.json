@@ -415,6 +415,12 @@
       "importantUpdate": "Important branch update",
       "scheduleUpdate": "Branch schedule update",
       "defaultMessage": "This branch has a schedule update. Please check the availability before placing your order.",
+      "closedTitle": "Branch is closed right now",
+      "closedBeforeOpen": "This branch is closed right now. It opens at {time}. You can schedule your order for later.",
+      "closedDuringBreak": "This branch is on break right now. It reopens at {time}. You can schedule your order for later.",
+      "closedAfterHours": "This branch is closed for today. You can schedule your order for the next available time.",
+      "closedTemporarily": "This branch is temporarily closed. You can still browse the menu and schedule your order when available.",
+      "closedGeneric": "This branch is closed right now. You can schedule your order for later.",
       "selectedBranch": "Selected branch",
       "closeNotice": "Close branch notice",
       "branch": "Branch",
@@ -654,7 +660,14 @@
     "groupOrder": {
       "joining": "Joining group order...",
       "joined": "Joined group order successfully",
-      "failedJoin": "Failed to join group order"
+      "failedJoin": "Failed to join group order",
+      "selectionSavedTitle": "Your group order selection is saved",
+      "selectionSavedDescription": "Keep adding items here. When you're finished, mark your selection done or view the lobby.",
+      "hostSelectionSavedDescription": "Keep adding items here. As host, you can return to the lobby whenever you're ready.",
+      "goToLobby": "View lobby",
+      "doneSelecting": "Done selecting",
+      "markedDone": "Your selection is marked done",
+      "failedMarkDone": "Failed to mark your selection done"
     },
     "signature": {
       "failedFetchMenus": "Failed to fetch menus",
@@ -1478,6 +1491,8 @@
     "title": "Notifications",
     "description": "Manage your restaurant alerts, updates, and customer activity.",
     "markAllAsRead": "Mark all as read",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
     "all": "All",
     "loading": "Loading notifications...",
     "empty": "No notifications found",
@@ -1593,6 +1608,8 @@
       "notFoundTitle": "Group order not found",
       "notFoundDescription": "This group order may have expired, been checked out, or the invite code is no longer valid.",
       "goToGroupOrder": "Go to Group Order",
+      "refresh": "Refresh",
+      "refreshing": "Refreshing...",
       "header": {
         "fallbackTitle": "Lobby",
         "description": "Everyone's picks for tonight's feast.",

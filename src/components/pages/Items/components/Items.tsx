@@ -100,6 +100,10 @@ export function ItemsListing({
     );
   }, [authRestaurantId, user?.restaurantId]);
 
+  const branchId = useMemo(() => {
+    return String(user?.branchId || user?.branch?.id || "");
+  }, [user?.branch?.id, user?.branchId]);
+
   const categoryIdsKey = useMemo(() => {
     return sections.map((category) => String(category?.id || "")).join("|");
   }, [sections]);
@@ -125,7 +129,7 @@ export function ItemsListing({
   }) => {
     if (!categoryId || !token || !restaurantId) return;
 
-    const requestKey = `${categoryId}:${page}`;
+    const requestKey = `${branchId}:${categoryId}:${page}`;
 
     if (inFlightRequestsRef.current.has(requestKey)) return;
 
@@ -150,6 +154,7 @@ export function ItemsListing({
 
       const { items: fetchedItems, meta } = await fetchMenuItemsPage({
         restaurantId: String(restaurantId),
+        branchId,
         categoryId: String(categoryId),
         page,
         limit: ITEMS_PAGE_LIMIT,
@@ -223,7 +228,7 @@ export function ItemsListing({
         append: false,
       });
     });
-  }, [contentSource, viewMode, activeCategoryId, token, restaurantId]);
+  }, [contentSource, viewMode, activeCategoryId, token, restaurantId, branchId]);
 
   /* ================= ONE PAGE MODE: LOAD EACH DISPLAYED CATEGORY ================= */
 
@@ -248,7 +253,7 @@ export function ItemsListing({
         });
       });
     });
-  }, [contentSource, viewMode, categoryIdsKey, token, restaurantId]);
+  }, [contentSource, viewMode, categoryIdsKey, token, restaurantId, branchId]);
 
   /* ================= PRUNE OLD CATEGORY STATES AFTER SEARCH ================= */
 

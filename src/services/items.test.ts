@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchMenuItemDetailsByIds } from "./items";
+import {
+  fetchMenuItemDetailsByIds,
+  fetchMenuItemsPage,
+  fetchSplitPizzaMenuItems,
+} from "./items";
 
 const getItemsMock = vi.hoisted(() => vi.fn());
 
@@ -72,9 +76,68 @@ describe("fetchMenuItemDetailsByIds", () => {
 
     expect(getItemsMock).toHaveBeenNthCalledWith(
       3,
-      "/v1/menu/items?search=No%20Add-Ons",
+      "/v1/menu/items?search=No+Add-Ons",
       undefined
     );
     expect(details["simple-id"]?.name).toBe("No Add-Ons");
+  });
+
+  it("passes branchId through every fallback item details search", async () => {
+    getItemsMock
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [{ id: "pizza-id", slug: "pizza-tse" }] });
+
+    await fetchMenuItemDetailsByIds({
+      itemIds: ["pizza-id"],
+      itemSearchTermsById: { "pizza-id": ["pizza-tse"] },
+      branchId: "branch-1",
+      token: "token-1",
+    });
+
+    expect(getItemsMock).toHaveBeenNthCalledWith(
+      1,
+      "/v1/menu/items?search=pizza-id&branchId=branch-1",
+      "token-1"
+    );
+    expect(getItemsMock).toHaveBeenNthCalledWith(
+      2,
+      "/v1/menu/items?search=pizza-tse&branchId=branch-1",
+      "token-1"
+    );
+  });
+
+  it("passes branchId when fetching paginated menu items", async () => {
+    getItemsMock.mockResolvedValueOnce({ data: [], meta: { page: 1 } });
+
+    await fetchMenuItemsPage({
+      restaurantId: "restaurant-1",
+      branchId: "branch-1",
+      categoryId: "category-1",
+      page: 2,
+      limit: 12,
+      token: "token-1",
+    });
+
+    expect(getItemsMock).toHaveBeenCalledWith(
+      "/v1/menu/items?restaurantId=restaurant-1&page=2&limit=12&sortBy=sortOrder&sortOrder=ASC&categoryId=category-1&branchId=branch-1",
+      "token-1"
+    );
+  });
+
+  it("passes branchId when fetching split-pizza menu items", async () => {
+    getItemsMock.mockResolvedValueOnce({ data: [], meta: { page: 1 } });
+
+    await fetchSplitPizzaMenuItems({
+      restaurantId: "restaurant-1",
+      branchId: "branch-1",
+      search: "pizza",
+      page: 3,
+      token: "token-1",
+    });
+
+    expect(getItemsMock).toHaveBeenCalledWith(
+      "/v1/menu/items?page=3&supportsSplitPizza=true&restaurantId=restaurant-1&branchId=branch-1&search=pizza",
+      "token-1"
+    );
   });
 });

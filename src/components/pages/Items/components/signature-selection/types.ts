@@ -45,6 +45,10 @@ export type MenuVariation = {
   price?: string | number;
   pickupPrice?: string | number | null;
   displayText?: string | null;
+  discountedPrice?: string | number | null;
+  happyHourDiscountedPrice?: string | number | null;
+  promotion?: ApiRecord | null;
+  happyHour?: ApiRecord | null;
   sortOrder?: number;
   isDefault?: boolean;
   isActive?: boolean;

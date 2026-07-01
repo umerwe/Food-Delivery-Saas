@@ -33,6 +33,12 @@ const shouldShowAmountLine = (value: unknown) => Math.abs(getAmountNumber(value)
 const getBreakdownKey = (line: OrderPricingBreakdownLine) =>
   String(line.key || line.label || "").toLowerCase();
 
+const isTaxBreakdownLine = (line: OrderPricingBreakdownLine) => {
+  const key = getBreakdownKey(line).replace(/[\s_-]/g, "");
+
+  return key === "tax" || key === "taxes" || key === "taxamount" || key.includes("tax");
+};
+
 const getRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === "object" && value !== null && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -99,12 +105,11 @@ export default function OrderSummary({
     : [];
   const backendBillRows = pricingBreakdown.filter((line) => {
     const key = getBreakdownKey(line);
-    return key !== "total" && key !== "payableamount" && shouldShowAmountLine(line.amount);
+    return key !== "total" && key !== "payableamount" && !isTaxBreakdownLine(line) && shouldShowAmountLine(line.amount);
   });
   const fallbackBillRows = [
     { key: "subtotal", label: t("itemTotal"), amount: order?.subtotal },
     { key: "deliveryFee", label: t("deliveryFee"), amount: order?.deliveryFee, info: true },
-    { key: "taxAmount", label: t("taxes"), amount: order?.taxAmount, info: true },
     { key: "serviceChargeAmount", label: t("serviceCharge"), amount: order?.serviceChargeAmount },
     { key: "tipAmount", label: t("tip"), amount: order?.tipAmount },
   ].filter((line) => line.key === "subtotal" || shouldShowAmountLine(line.amount));

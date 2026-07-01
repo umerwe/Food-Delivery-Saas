@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Wallet, Check } from "lucide-react";
+import { Calendar, Wallet, Check, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import useNotifications from "@/hooks/useNotifications";
 import type { NotificationItem, NotificationMeta } from "@/services/notifications";
@@ -15,6 +15,7 @@ export function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<NotificationMeta | null>(null);
@@ -90,6 +91,18 @@ const disableMarkAll = !hasNotifications || !hasUnread;
     fetchNotifications(nextPage, true);
   };
 
+  const handleRefresh = async () => {
+    if (loading || refreshing) return;
+
+    try {
+      setRefreshing(true);
+      setPage(1);
+      await fetchNotifications(1);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="bg-slate-50 min-h-screen px-4 py-4 sm:px-6 sm:py-6">
       <div className="max-w-6xl mx-auto">
@@ -105,18 +118,29 @@ const disableMarkAll = !hasNotifications || !hasUnread;
             </p>
           </div>
 
-       <button
-  disabled={disableMarkAll}
-  className={`w-full sm:w-auto text-sm px-4 py-2 rounded-md font-medium transition
-    ${
-      disableMarkAll
-        ? "bg-primary text-white cursor-not-allowed"
-        : "bg-primary hover:bg-orange-600 text-white"
-    }
-  `}
->
-  {t("markAllAsRead")}
-</button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loading || refreshing}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? t("refreshing") : t("refresh")}
+            </button>
+            <button
+              disabled={disableMarkAll}
+              className={`w-full sm:w-auto text-sm px-4 py-2 rounded-md font-medium transition
+                ${
+                  disableMarkAll
+                    ? "bg-primary text-white cursor-not-allowed"
+                    : "bg-primary hover:bg-orange-600 text-white"
+                }
+              `}
+            >
+              {t("markAllAsRead")}
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

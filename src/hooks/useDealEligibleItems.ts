@@ -107,7 +107,7 @@ export const useDealEligibleItems = ({
   deal: CustomerDeal | null;
   open: boolean;
 }) => {
-  const { token, restaurantId: authRestaurantId } = useAuth();
+  const { token, restaurantId: authRestaurantId, user } = useAuth();
   const { fetchMenuItemsPage } = useItems(token);
   const [categoryItems, setCategoryItems] = useState<CustomerDealMenuItem[]>([]);
   const [allMenuItems, setAllMenuItems] = useState<CustomerDealMenuItem[]>([]);
@@ -125,6 +125,7 @@ export const useDealEligibleItems = ({
   );
   const categoryIdsKey = categoryIds.join(":");
   const restaurantId = deal?.restaurant?.id || authRestaurantId || "";
+  const branchId = user?.branchId || user?.branch?.id || null;
   const shouldFetchAllMenuItems = deal ? isFlexibleAllItemsDeal(deal) : false;
 
   useEffect(() => {
@@ -154,6 +155,7 @@ export const useDealEligibleItems = ({
         if (shouldFetchAllMenuItems) {
           const { items } = await fetchMenuItemsPage({
             restaurantId,
+            branchId,
             page: 1,
             limit: 100,
           });
@@ -175,6 +177,7 @@ export const useDealEligibleItems = ({
           categoryIds.map((categoryId) =>
             fetchMenuItemsPage({
               restaurantId,
+              branchId,
               categoryId,
               page: 1,
               limit: 100,
@@ -212,7 +215,7 @@ export const useDealEligibleItems = ({
     return () => {
       isMounted = false;
     };
-  }, [categoryIds, categoryIdsKey, deal, fetchMenuItemsPage, open, restaurantId, shouldFetchAllMenuItems]);
+  }, [branchId, categoryIds, categoryIdsKey, deal, fetchMenuItemsPage, open, restaurantId, shouldFetchAllMenuItems]);
 
   const items = shouldFetchAllMenuItems
     ? allMenuItems

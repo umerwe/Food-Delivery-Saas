@@ -415,6 +415,12 @@
       "importantUpdate": "Wichtige Filialaktualisierung",
       "scheduleUpdate": "Aktualisierung des Filialplans",
       "defaultMessage": "Diese Filiale hat eine Zeitplanänderung. Bitte prüfen Sie die Verfügbarkeit, bevor Sie bestellen.",
+      "closedTitle": "Filiale ist derzeit geschlossen",
+      "closedBeforeOpen": "Diese Filiale ist derzeit geschlossen. Sie öffnet um {time}. Sie können Ihre Bestellung für später planen.",
+      "closedDuringBreak": "Diese Filiale macht derzeit Pause. Sie öffnet wieder um {time}. Sie können Ihre Bestellung für später planen.",
+      "closedAfterHours": "Diese Filiale ist heute geschlossen. Sie können Ihre Bestellung für den nächsten verfügbaren Zeitpunkt planen.",
+      "closedTemporarily": "Diese Filiale ist vorübergehend geschlossen. Sie können das Menü weiterhin ansehen und bestellen, sobald sie verfügbar ist.",
+      "closedGeneric": "Diese Filiale ist derzeit geschlossen. Sie können Ihre Bestellung für später planen.",
       "selectedBranch": "Ausgewählte Filiale",
       "closeNotice": "Filialhinweis schließen",
       "branch": "Filiale",
@@ -654,7 +660,14 @@
     "groupOrder": {
       "joining": "Gruppenbestellung wird beigetreten...",
       "joined": "Gruppenbestellung erfolgreich beigetreten",
-      "failedJoin": "Gruppenbestellung konnte nicht beigetreten werden"
+      "failedJoin": "Gruppenbestellung konnte nicht beigetreten werden",
+      "selectionSavedTitle": "Ihre Auswahl für die Gruppenbestellung ist gespeichert",
+      "selectionSavedDescription": "Fügen Sie hier weitere Artikel hinzu. Wenn Sie fertig sind, markieren Sie Ihre Auswahl als fertig oder öffnen Sie die Lobby.",
+      "hostSelectionSavedDescription": "Fügen Sie hier weitere Artikel hinzu. Als Gastgeber können Sie jederzeit zur Lobby zurückkehren.",
+      "goToLobby": "Lobby ansehen",
+      "doneSelecting": "Auswahl fertig",
+      "markedDone": "Ihre Auswahl ist als fertig markiert",
+      "failedMarkDone": "Ihre Auswahl konnte nicht als fertig markiert werden"
     },
     "signature": {
       "failedFetchMenus": "Menüs konnten nicht geladen werden",
@@ -1478,6 +1491,8 @@
     "title": "Benachrichtigungen",
     "description": "Verwalten Sie Restaurantbenachrichtigungen, Updates und Kundenaktivitäten.",
     "markAllAsRead": "Alle als gelesen markieren",
+    "refresh": "Aktualisieren",
+    "refreshing": "Wird aktualisiert...",
     "all": "Alle",
     "loading": "Benachrichtigungen werden geladen...",
     "empty": "Keine Benachrichtigungen gefunden",
@@ -1593,6 +1608,8 @@
       "notFoundTitle": "Gruppenbestellung nicht gefunden",
       "notFoundDescription": "Diese Gruppenbestellung ist möglicherweise abgelaufen, wurde abgeschlossen oder der Einladungscode ist nicht mehr gültig.",
       "goToGroupOrder": "Zur Gruppenbestellung",
+      "refresh": "Aktualisieren",
+      "refreshing": "Wird aktualisiert...",
       "header": {
         "fallbackTitle": "Lobby",
         "description": "Alle Auswahlen für das heutige gemeinsame Essen.",

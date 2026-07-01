@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { AuthBranch } from "@/types/auth";
+import { getBranchHoursSummary } from "@/components/pages/Items/utils/restaurant-card-utils";
 import type { HomeBranch, LandingPopup } from "@/types/home";
 
 const DISMISSED_POPUP_KEY = "deliveryway.dismissedLandingPopup";
@@ -106,7 +107,43 @@ const getPopupKey = (popup?: LandingPopup | null, branchId?: string) => {
     popup?.type || "",
     popup?.period?.fromDate || popup?.temporaryClosure?.closedAt || "",
     popup?.period?.toDate || popup?.temporaryClosure?.closedUntil || "",
+    new Date().toDateString(),
   ].join("|");
+};
+
+type RuntimeClosedPopupTranslator = (key: "closedTitle" | "closedBeforeOpen" | "closedDuringBreak" | "closedAfterHours" | "closedTemporarily" | "closedGeneric", values?: { time?: string }) => string;
+
+const buildRuntimeClosedPopup = ({
+  branch,
+  t,
+}: {
+  branch?: HomeBranch | AuthBranch | null;
+  t: RuntimeClosedPopupTranslator;
+}): LandingPopup | null => {
+  if (!branch) return null;
+
+  const summary = getBranchHoursSummary(branch);
+  const activeSummary = summary.delivery.status !== "unknown" ? summary.delivery : summary.opening;
+
+  if (activeSummary.status !== "closed") return null;
+
+  const reason = activeSummary.reason || "closed";
+  const time = activeSummary.opensAt || activeSummary.breakUntil || "";
+  const message = (() => {
+    if (reason === "before-open" && time) return t("closedBeforeOpen", { time });
+    if (reason === "break" && time) return t("closedDuringBreak", { time });
+    if (reason === "after-close") return t("closedAfterHours");
+    if (reason === "temporary-closure") return t("closedTemporarily");
+
+    return t("closedGeneric");
+  })();
+
+  return {
+    show: true,
+    type: ["BRANCH_CLOSED", reason, time].filter(Boolean).join("_"),
+    title: t("closedTitle"),
+    message,
+  };
 };
 
 const readDismissedPopupKey = () => {
@@ -135,26 +172,31 @@ export default function BranchOpeningHoursPopup({
   const t = useTranslations("home.branchOpeningHours");
   const branchId = String(branch?.id || "");
 
+  const resolvedPopup = useMemo(
+    () => popup?.show ? popup : buildRuntimeClosedPopup({ branch, t }),
+    [branch, popup, t]
+  );
+
   const popupKey = useMemo(
-    () => getPopupKey(popup, branchId),
-    [popup, branchId]
+    () => getPopupKey(resolvedPopup, branchId),
+    [resolvedPopup, branchId]
   );
 
   const [dismissedKey, setDismissedKey] = useState(readDismissedPopupKey);
 
-  const shouldShow = Boolean(popup?.show) && dismissedKey !== popupKey;
+  const shouldShow = Boolean(resolvedPopup?.show) && dismissedKey !== popupKey;
 
-  const periodLabel = formatPeriod(popup, t);
-  const label = getPopupLabel(popup?.type, t);
+  const periodLabel = formatPeriod(resolvedPopup, t);
+  const label = getPopupLabel(resolvedPopup?.type, t);
 
-  const title = popup?.title || t("scheduleUpdate");
+  const title = resolvedPopup?.title || t("scheduleUpdate");
 
   const message =
-    popup?.message ||
-    popup?.temporaryClosure?.message ||
+    resolvedPopup?.message ||
+    resolvedPopup?.temporaryClosure?.message ||
     t("defaultMessage");
 
-  const reason = popup?.temporaryClosure?.reason;
+  const reason = resolvedPopup?.temporaryClosure?.reason;
   const branchName = branch?.name || t("selectedBranch");
 
   const handleDismiss = () => {

@@ -99,12 +99,42 @@ const isPromotionObject = (value: unknown): value is PromotionInfo => {
   return Boolean(value && typeof value === "object");
 };
 
+const hasPromotionSignal = (value: unknown): value is PromotionInfo => {
+  if (!value || typeof value !== "object") return false;
+
+  const promotion = value as PromotionInfo;
+  const record = value as ApiRecord;
+
+  if (
+    record.dealSelectionMode ||
+    record.dealRequiredQuantity !== undefined ||
+    Array.isArray(record.scopeCategoryRules) ||
+    Array.isArray(record.scopeCategoryIds) ||
+    record.supportsDealIdCartPayload === true ||
+    record.supportsDealCartPayload === true ||
+    record.isDealMenuItem === true ||
+    promotion.discountType === "FIXED_PRICE" ||
+    (promotion.applyMode && promotion.applyMode !== "SCOPED_ITEMS")
+  ) {
+    return false;
+  }
+
+  const discountValue = toNumber(promotion.discountValue, 0);
+
+  return Boolean(
+    ((promotion.discountType === "PERCENTAGE" || promotion.discountType === "FLAT") && discountValue > 0) ||
+      toNumber(promotion.discountAmount, 0) > 0 ||
+      toNumber(promotion.discountedPrice, 0) > 0 ||
+      toNumber(promotion.discountedAmount, 0) > 0
+  );
+};
+
 const getPromotionInfo = (source: MenuItem | MenuVariation | ApiRecord | null | undefined): PromotionInfo | null => {
   if (isPromotionObject(source?.happyHour) && source.happyHour.isCurrentlyActive !== false) {
     return source.happyHour;
   }
 
-  return isPromotionObject(source?.promotion) ? source.promotion : null;
+  return hasPromotionSignal(source?.promotion) ? source.promotion : null;
 };
 
 const getPromotionDiscountLabel = (promotion?: PromotionInfo | null) => {
@@ -1465,7 +1495,7 @@ export function RestaurantCard({
     search: string;
     page: number;
   }) => {
-    return fetchSplitPizzaMenuItems({ restaurantId, search, page });
+    return fetchSplitPizzaMenuItems({ restaurantId, branchId, search, page });
   };
 
   const handleSplitPizzaToggle = (checked: boolean) => {
@@ -1892,7 +1922,7 @@ export function RestaurantCard({
       setOpen(false);
 
       if (groupCode) {
-        router.push("/group-order/lobby");
+        window.dispatchEvent(new Event("deliveryway:group-order:item-added"));
       }
     } catch (error) {
       toast.error(tErrors("somethingWentWrong"));

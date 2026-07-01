@@ -87,12 +87,42 @@ const isPromotionObject = (value: unknown): value is PromotionInfo => {
   return Boolean(value && typeof value === "object");
 };
 
+const hasPromotionSignal = (value: unknown): value is PromotionInfo => {
+  if (!value || typeof value !== "object") return false;
+
+  const promotion = value as PromotionInfo;
+  const record = value as ApiRecord;
+
+  if (
+    record.dealSelectionMode ||
+    record.dealRequiredQuantity !== undefined ||
+    Array.isArray(record.scopeCategoryRules) ||
+    Array.isArray(record.scopeCategoryIds) ||
+    record.supportsDealIdCartPayload === true ||
+    record.supportsDealCartPayload === true ||
+    record.isDealMenuItem === true ||
+    promotion.discountType === "FIXED_PRICE" ||
+    (promotion.applyMode && promotion.applyMode !== "SCOPED_ITEMS")
+  ) {
+    return false;
+  }
+
+  const discountValue = toNumber(promotion.discountValue, 0);
+
+  return Boolean(
+    ((promotion.discountType === "PERCENTAGE" || promotion.discountType === "FLAT") && discountValue > 0) ||
+      toNumber(promotion.discountAmount, 0) > 0 ||
+      toNumber(promotion.discountedPrice, 0) > 0 ||
+      toNumber(promotion.discountedAmount, 0) > 0
+  );
+};
+
 const getPromotionInfo = (source: ApiRecord | null | undefined): PromotionInfo | null => {
   if (isPromotionObject(source?.happyHour) && source.happyHour.isCurrentlyActive !== false) {
     return source.happyHour;
   }
 
-  return isPromotionObject(source?.promotion) ? source.promotion : null;
+  return hasPromotionSignal(source?.promotion) ? source.promotion : null;
 };
 
 const getPromotionDiscountLabel = (promotion?: PromotionInfo | null) => {
@@ -1539,8 +1569,14 @@ function ProductDetailsPageContent() {
       try {
         setPageLoading(true);
 
+        const params = new URLSearchParams({ search: searchValue });
+
+        if (branchId) {
+          params.set("branchId", branchId);
+        }
+
         const { response: res, items } = await fetchMenuItems(
-          `/v1/menu/items?search=${encodeURIComponent(searchValue)}`
+          `/v1/menu/items?${params.toString()}`
         );
 
         if (!isMounted) return;
@@ -1590,7 +1626,7 @@ function ProductDetailsPageContent() {
     return () => {
       isMounted = false;
     };
-  }, [slug, itemIdParam, token, fetchMenuItems]);
+  }, [slug, itemIdParam, token, branchId, fetchMenuItems]);
 
   useEffect(() => {
     const fetchCartItemToEdit = async () => {
@@ -1928,6 +1964,10 @@ function ProductDetailsPageContent() {
 
     if (restaurantId) {
       queryParams.set("restaurantId", String(restaurantId));
+    }
+
+    if (branchId) {
+      queryParams.set("branchId", branchId);
     }
 
     const resolvedSearch = search?.trim();
@@ -2345,7 +2385,7 @@ function ProductDetailsPageContent() {
       );
 
       if (groupCode) {
-        router.push("/group-order/lobby");
+        window.dispatchEvent(new Event("deliveryway:group-order:item-added"));
       } else if (isEditingCartItem) {
         router.push(`/checkout?type=${checkoutType}`);
       }

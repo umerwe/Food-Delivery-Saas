@@ -794,6 +794,24 @@ export function SignatureSelectionContent({
   const normalizeVariation = (raw: MenuVariation | ApiRecord | null | undefined): MenuVariation | null => {
     if (!raw?.id) return null;
     if (raw?.isActive === false) return null;
+    const rawRecord = raw as ApiRecord;
+    const happyHour = typeof rawRecord.happyHour === "object" && rawRecord.happyHour !== null && !Array.isArray(rawRecord.happyHour)
+      ? rawRecord.happyHour as ApiRecord
+      : null;
+    const promotion = typeof rawRecord.promotion === "object" && rawRecord.promotion !== null && !Array.isArray(rawRecord.promotion)
+      ? rawRecord.promotion as ApiRecord
+      : null;
+    const happyHourDiscountedPrice = typeof rawRecord.happyHourDiscountedPrice === "string" || typeof rawRecord.happyHourDiscountedPrice === "number"
+      ? rawRecord.happyHourDiscountedPrice
+      : typeof happyHour?.discountedPrice === "string" || typeof happyHour?.discountedPrice === "number"
+        ? happyHour.discountedPrice
+        : null;
+    const discountedPrice = happyHourDiscountedPrice ??
+      (typeof rawRecord.discountedPrice === "string" || typeof rawRecord.discountedPrice === "number"
+        ? rawRecord.discountedPrice
+        : typeof promotion?.discountedAmount === "string" || typeof promotion?.discountedAmount === "number"
+          ? promotion.discountedAmount
+          : null);
 
     return {
       id: String(raw.id),
@@ -802,6 +820,10 @@ export function SignatureSelectionContent({
       description: typeof raw?.description === "string" ? raw.description : "",
       price: typeof raw?.price === "string" || typeof raw?.price === "number" ? raw.price : 0,
       pickupPrice: typeof raw?.pickupPrice === "string" || typeof raw?.pickupPrice === "number" ? raw.pickupPrice : null,
+      discountedPrice,
+      happyHourDiscountedPrice,
+      promotion,
+      happyHour,
       displayText: typeof raw?.displayText === "string" ? raw.displayText : null,
       sortOrder: toNumber(raw?.sortOrder, 0),
       isDefault: Boolean(raw?.isDefault),
@@ -1627,7 +1649,7 @@ export function SignatureSelectionContent({
     search: string;
     page: number;
   }) => {
-    return fetchSignatureSplitPizzaItems({ restaurantId, search, page });
+    return fetchSignatureSplitPizzaItems({ restaurantId, branchId, search, page });
   };
 
   const openItemModal = (item: MenuItem) => {

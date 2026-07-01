@@ -274,7 +274,7 @@ export const Navbar = () => {
       const response = await get(
         `/v1/menu/items?search=${encodeURIComponent(trimmedKeyword)}&restaurantId=${encodeURIComponent(
           restaurantId
-        )}`
+        )}${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`
       )
 
       if (isSearchResponse(response) && response.success) {
@@ -354,7 +354,7 @@ export const Navbar = () => {
         clearTimeout(searchTimeoutRef.current)
       }
     }
-  }, [searchValue, searchOpen, restaurantId, authLoading])
+  }, [searchValue, searchOpen, restaurantId, branchId, authLoading])
 
   return (
     <>

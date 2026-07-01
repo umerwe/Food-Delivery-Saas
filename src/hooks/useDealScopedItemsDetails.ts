@@ -59,7 +59,8 @@ export const useDealScopedItemsDetails = ({
   items?: CustomerDealMenuItem[];
   enabled: boolean;
 }) => {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const branchId = user?.branchId || user?.branch?.id || null;
   const uniqueItemIds = useMemo(
     () => Array.from(new Set(itemIds.map((id) => id.trim()).filter(Boolean))),
     [itemIds]
@@ -83,12 +84,13 @@ export const useDealScopedItemsDetails = ({
   );
 
   const query = useQuery({
-    queryKey: queryKeys.items.dealScopedDetails(uniqueItemIds, itemSearchTermsById),
+    queryKey: queryKeys.items.dealScopedDetails(uniqueItemIds, itemSearchTermsById, branchId),
     enabled: enabled && uniqueItemIds.length > 0 && Boolean(token),
     queryFn: async () => {
       const details = await fetchMenuItemDetailsByIds({
         itemIds: uniqueItemIds,
         itemSearchTermsById,
+        branchId,
         token,
       });
       const entries = Object.entries(details)

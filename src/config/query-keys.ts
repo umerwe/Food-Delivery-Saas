@@ -24,8 +24,9 @@ export const queryKeys = {
     request: (endpoint: string) => ["items", "request", endpoint] as const,
     dealScopedDetails: (
       itemIds: string[],
-      itemSearchTermsById?: Record<string, string[]>
-    ) => ["items", "deal-scoped-details", itemIds, itemSearchTermsById ?? {}] as const,
+      itemSearchTermsById?: Record<string, string[]>,
+      branchId?: string | number | null
+    ) => ["items", "deal-scoped-details", itemIds, itemSearchTermsById ?? {}, branchId ?? ""] as const,
   },
   cart: {
     current: ["cart", "current"] as const,

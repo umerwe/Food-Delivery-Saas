@@ -24,13 +24,15 @@ export const useMenu = (token: string | null) => {
   const getSignatureSplitPizzaItems = useCallback(
     ({
       restaurantId,
+      branchId,
       search,
       page,
     }: {
       restaurantId?: string | null;
+      branchId?: string | number | null;
       search: string;
       page: number;
-    }) => fetchSignatureSplitPizzaItems({ restaurantId, search, page, token }),
+    }) => fetchSignatureSplitPizzaItems({ restaurantId, branchId, search, page, token }),
     [token]
   );
 

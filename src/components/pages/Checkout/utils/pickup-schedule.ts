@@ -1,6 +1,7 @@
 import type { BranchRecord } from "@/types/branch-selector";
 
 const DEFAULT_SLOT_INTERVAL_MINUTES = 30;
+const DEFAULT_SCHEDULE_TIME_ZONE = "Europe/Berlin";
 
 type OpeningHours = {
   dayOfWeek?: string;
@@ -160,6 +161,119 @@ export const getScheduledDateTime = (value: string) => {
   return scheduledDate;
 };
 
+const getTimeZoneName = (value: unknown) => {
+  const trimmedValue = typeof value === "string" ? value.trim() : "";
+
+  return trimmedValue || null;
+};
+
+export const getBranchScheduleTimeZone = (branch: BranchRecord | null | undefined) => {
+  const branchRecord = getRecord(branch);
+  const settings = getRecord(branch?.settings);
+  const scheduleTimings = getScheduleTimingsRecord(branch);
+
+  return getTimeZoneName(branchRecord?.timezone) ||
+    getTimeZoneName(branchRecord?.timeZone) ||
+    getTimeZoneName(settings?.timezone) ||
+    getTimeZoneName(settings?.timeZone) ||
+    getTimeZoneName(scheduleTimings?.timezone) ||
+    getTimeZoneName(scheduleTimings?.timeZone) ||
+    DEFAULT_SCHEDULE_TIME_ZONE;
+};
+
+const parseLocalScheduleDateTimeParts = (value: string) => {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+
+  if (!match) return null;
+
+  const [, year, month, day, hours, minutes] = match;
+  const parsed = {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hours: Number(hours),
+    minutes: Number(minutes),
+  };
+
+  if (
+    !Number.isFinite(parsed.year) ||
+    parsed.month < 1 ||
+    parsed.month > 12 ||
+    parsed.day < 1 ||
+    parsed.day > 31 ||
+    parsed.hours < 0 ||
+    parsed.hours > 23 ||
+    parsed.minutes < 0 ||
+    parsed.minutes > 59
+  ) {
+    return null;
+  }
+
+  return parsed;
+};
+
+const getTimeZoneOffsetMs = (date: Date, timeZone: string) => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const hour = values.hour === "24" ? "00" : values.hour;
+  const localUtcMs = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(hour),
+    Number(values.minute),
+    Number(values.second),
+  );
+
+  return localUtcMs - date.getTime();
+};
+
+export const getScheduleOrderTimeIso = ({
+  dateValue,
+  timeValue,
+  preparationMinutes = 0,
+  timeZone = DEFAULT_SCHEDULE_TIME_ZONE,
+}: {
+  dateValue: string;
+  timeValue: string;
+  preparationMinutes?: number;
+  timeZone?: string;
+}) => {
+  const parts = parseLocalScheduleDateTimeParts(`${dateValue}T${timeValue}`);
+
+  if (!parts) return null;
+
+  const safePreparationMinutes = Math.max(0, Math.floor(preparationMinutes));
+  const wallClockUtcMs = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hours,
+    parts.minutes + safePreparationMinutes,
+    0,
+    0,
+  );
+  try {
+    const firstPass = new Date(wallClockUtcMs - getTimeZoneOffsetMs(new Date(wallClockUtcMs), timeZone));
+    const secondPass = new Date(wallClockUtcMs - getTimeZoneOffsetMs(firstPass, timeZone));
+
+    if (Number.isNaN(secondPass.getTime())) return null;
+
+    return secondPass.toISOString();
+  } catch {
+    return null;
+  }
+};
+
 export const addPreparationMinutesToScheduledDelivery = ({
   scheduledDeliveryValue,
   preparationMinutes,
@@ -243,12 +357,18 @@ const getActiveTemporaryClosure = (branch: BranchRecord | null | undefined) => {
     if (!closure?.isClosed) return false;
 
     const closedUntil = closure.closedUntil ? new Date(closure.closedUntil) : null;
+    const closedAt = closure.closedAt ? new Date(closure.closedAt) : null;
+    const now = Date.now();
 
-    return !closedUntil || Number.isNaN(closedUntil.getTime()) || closedUntil.getTime() > Date.now();
+    if (closedAt && !Number.isNaN(closedAt.getTime()) && closedAt.getTime() > now) {
+      return false;
+    }
+
+    return !closedUntil || Number.isNaN(closedUntil.getTime()) || closedUntil.getTime() > now;
   }) ?? null;
 };
 
-const isTemporaryClosureActiveForDate = ({
+const getTemporaryClosureWindowForDate = ({
   branch,
   dateValue,
 }: {
@@ -257,19 +377,32 @@ const isTemporaryClosureActiveForDate = ({
 }) => {
   const closure = getActiveTemporaryClosure(branch);
 
-  if (!closure) return false;
+  if (!closure) return null;
 
   const closedAt = closure.closedAt ? new Date(closure.closedAt) : new Date();
   const closedUntil = closure.closedUntil ? new Date(closure.closedUntil) : null;
 
-  if (Number.isNaN(closedAt.getTime())) return dateValue === getTodayDateValue();
+  if (Number.isNaN(closedAt.getTime())) {
+    return dateValue === getTodayDateValue()
+      ? { start: 0, end: 24 * 60 }
+      : null;
+  }
 
   const startDateValue = getDateValue(closedAt);
   const endDateValue = closedUntil && !Number.isNaN(closedUntil.getTime())
     ? getDateValue(closedUntil)
     : startDateValue;
 
-  return dateValue >= startDateValue && dateValue <= endDateValue;
+  if (dateValue < startDateValue || dateValue > endDateValue) return null;
+
+  const start = dateValue === startDateValue
+    ? closedAt.getHours() * 60 + closedAt.getMinutes()
+    : 0;
+  const end = closedUntil && !Number.isNaN(closedUntil.getTime()) && dateValue === endDateValue
+    ? closedUntil.getHours() * 60 + closedUntil.getMinutes()
+    : 24 * 60;
+
+  return { start, end };
 };
 
 const getHolidayOpeningHours = (
@@ -345,6 +478,24 @@ const isSlotInsideBreak = ({
   return slotStart < breakEnd && slotEnd > breakStart;
 };
 
+const isSlotInsideTemporaryClosure = ({
+  branch,
+  dateValue,
+  slotStart,
+  slotEnd,
+}: {
+  branch?: BranchRecord | null;
+  dateValue: string;
+  slotStart: number;
+  slotEnd: number;
+}) => {
+  const closureWindow = getTemporaryClosureWindowForDate({ branch, dateValue });
+
+  if (!closureWindow) return false;
+
+  return slotStart < closureWindow.end && slotEnd > closureWindow.start;
+};
+
 export const getPickupScheduleForDate = ({
   branch,
   dateValue,
@@ -364,14 +515,6 @@ export const getBranchScheduleForDate = ({
   dateValue: string;
   scheduleType: "pickup" | "delivery";
 }): PickupSchedule => {
-  if (isTemporaryClosureActiveForDate({ branch, dateValue })) {
-    return {
-      schedule: { isClosed: true, date: dateValue },
-      hasOpeningHours: true,
-      source: "temporaryClosure",
-    };
-  }
-
   const scheduleTimings = getScheduleTimingsRecord(branch);
   const openingHours = normalizeArray<OpeningHours>(
     branch?.settings?.openingHours ?? scheduleTimings?.openingHours
@@ -470,7 +613,14 @@ const buildTimeSlots = ({
       (breakTime) => isSlotInsideBreak({ slotStart, slotEnd, breakTime })
     );
 
-    if (!isDuringBreak) {
+    const isDuringTemporaryClosure = isSlotInsideTemporaryClosure({
+      branch,
+      dateValue,
+      slotStart,
+      slotEnd,
+    });
+
+    if (!isDuringBreak && !isDuringTemporaryClosure) {
       const value = minutesToTime(slotStart);
 
       slots.push({
@@ -534,6 +684,8 @@ export const isImmediateScheduleAvailable = ({
   branch?: BranchRecord | null;
   scheduleType: "pickup" | "delivery";
 }) => {
+  if (getActiveTemporaryClosure(branch)) return false;
+
   const dateValue = getTodayDateValue();
   const scheduleState = getBranchScheduleForDate({
     branch,
