@@ -8,6 +8,7 @@ import NotesSection from '@/components/pages/Checkout/components/NotesSection';
 import { CustomerDetailsForm } from '@/components/pages/Checkout/components/CustomerDetailsForm';
 import { PaymentMethodSection } from '@/components/pages/Checkout/components/PaymentMethodSection';
 import { Time24Picker } from '@/components/ui/time-24-picker';
+import { useHorizontalDragScroll } from '@/components/pages/Checkout/hooks/use-horizontal-drag-scroll';
 import {
   buildScheduleBreakLabels,
   buildDeliveryTimeSlots,
@@ -15,6 +16,7 @@ import {
   getBranchScheduleForDate,
   getDateFromValue,
   getDateValue,
+  isImmediateScheduleAvailable,
   isPastDateValue,
 } from '@/components/pages/Checkout/utils/pickup-schedule';
 import type { BranchRecord } from '@/types/branch-selector';
@@ -31,6 +33,8 @@ type DeliverySectionProps = {
   setPaymentMethod: (value: string) => void;
   scheduledDeliveryValue: string;
   setScheduledDeliveryValue: (value: string) => void;
+  deliveryScheduleMode: "now" | "schedule";
+  setDeliveryScheduleMode: (value: "now" | "schedule") => void;
   selectedBranch?: BranchRecord | null;
   isGuest?: boolean;
   privacyPolicyAccepted?: boolean;
@@ -62,11 +66,27 @@ const buildUpcomingDates = () => {
 
 const getScheduledDateValue = (value: string) => value.split("T")[0] || "";
 
+const activeGradientClass =
+  "border-primary/80 bg-gradient-to-br from-primary via-orange-500 to-amber-400 text-white shadow-lg shadow-primary/25 ring-1 ring-white/40";
+const interactiveTileClass =
+  "border-primary/15 bg-gradient-to-br from-primary/10 via-white to-orange-50 text-gray-800 shadow-sm hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md hover:shadow-primary/10 hover:text-primary";
+const disabledTileClass =
+  "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-400 shadow-none";
+const horizontalRailClass =
+  "flex snap-x gap-3 overflow-x-auto pb-2 pr-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+
 export function DeliverySection(props: DeliverySectionProps) {
   const t = useTranslations("checkout");
-  const { setScheduledDeliveryValue } = props;
+  const { deliveryScheduleMode, setDeliveryScheduleMode, setScheduledDeliveryValue } = props;
   const selectedDateValue = getScheduledDateValue(props.scheduledDeliveryValue);
   const dates = useMemo(() => buildUpcomingDates(), []);
+  const immediateAvailable = useMemo(
+    () => isImmediateScheduleAvailable({
+      branch: props.selectedBranch,
+      scheduleType: "delivery",
+    }),
+    [props.selectedBranch]
+  );
   const timeSlots = useMemo(
     () => buildDeliveryTimeSlots({
       branch: props.selectedBranch,
@@ -84,6 +104,14 @@ export function DeliverySection(props: DeliverySectionProps) {
   );
   const schedule = scheduleState.schedule;
   const breakLabels = useMemo(() => buildScheduleBreakLabels(schedule), [schedule]);
+  const {
+    railRef: deliveryDateRailRef,
+    dragScrollHandlers: deliveryDateDragHandlers,
+  } = useHorizontalDragScroll<HTMLDivElement>();
+  const {
+    railRef: deliveryTimeRailRef,
+    dragScrollHandlers: deliveryTimeDragHandlers,
+  } = useHorizontalDragScroll<HTMLDivElement>();
   const scheduleLabel = useMemo(() => {
     if (!selectedDateValue || !schedule) return "";
     if (schedule.isClosed) return t("closed");
@@ -99,15 +127,63 @@ export function DeliverySection(props: DeliverySectionProps) {
     }
   }, [selectedDateValue, setScheduledDeliveryValue]);
 
+  useEffect(() => {
+    if (!immediateAvailable && deliveryScheduleMode === "now") {
+      setDeliveryScheduleMode("schedule");
+    }
+  }, [deliveryScheduleMode, immediateAvailable, setDeliveryScheduleMode]);
+
   return (
     <div className="space-y-[38px]">
       <DeliveryAddressSection {...props} />
       <section>
         <h2 className="mb-[26px] text-[24px] font-semibold text-gray-900">
-          {t("scheduledDelivery")}
+          {t("deliveryTiming")}
         </h2>
         <div className="rounded-xl bg-white px-5 py-4 shadow-sm">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={!immediateAvailable}
+              onClick={() => {
+                props.setDeliveryScheduleMode("now");
+                props.setScheduledDeliveryValue("");
+              }}
+              className={`rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
+                props.deliveryScheduleMode === "now"
+                  ? activeGradientClass
+                  : !immediateAvailable
+                    ? disabledTileClass
+                    : interactiveTileClass
+              }`}
+            >
+              <span className="block text-base font-semibold">{t("orderNow")}</span>
+              <span className={`mt-1 block text-xs leading-5 ${props.deliveryScheduleMode === "now" ? "text-white/85" : "text-gray-500"}`}>
+                {immediateAvailable ? t("orderNowDescription") : t("orderNowUnavailable")}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => props.setDeliveryScheduleMode("schedule")}
+              className={`rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
+                props.deliveryScheduleMode === "schedule"
+                  ? activeGradientClass
+                  : interactiveTileClass
+              }`}
+            >
+              <span className="block text-base font-semibold">{t("scheduleOrder")}</span>
+              <span className={`mt-1 block text-xs leading-5 ${props.deliveryScheduleMode === "schedule" ? "text-white/85" : "text-gray-500"}`}>
+                {t("scheduleOrderDescription")}
+              </span>
+            </button>
+          </div>
+
+          {props.deliveryScheduleMode === "schedule" ? (
+            <div
+              ref={deliveryDateRailRef}
+              className={`mt-5 cursor-grab active:cursor-grabbing ${horizontalRailClass}`}
+              {...deliveryDateDragHandlers}
+            >
             {dates.map((date) => {
               const nextDateValue = getDateValue(date);
               const dateScheduleState = getBranchScheduleForDate({
@@ -135,12 +211,12 @@ export function DeliverySection(props: DeliverySectionProps) {
                     const nextDate = getDateFromValue(nextDateValue);
                     props.setScheduledDeliveryValue(nextDate ? `${nextDateValue}T` : "");
                   }}
-                  className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                  className={`min-w-[92px] snap-start rounded-xl border px-3 py-3 text-left transition-all duration-200 ${
                     isSelected
-                      ? "border-orange-500 bg-orange-500 text-white shadow-md"
+                      ? activeGradientClass
                       : disabled
-                        ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-400"
-                        : "border-gray-200 bg-[#FAFAF9] text-gray-700 hover:border-orange-400 hover:bg-white hover:text-orange-500"
+                        ? disabledTileClass
+                        : interactiveTileClass
                   }`}
                 >
                   <span className="block text-xs font-semibold uppercase">
@@ -155,22 +231,23 @@ export function DeliverySection(props: DeliverySectionProps) {
                 </button>
               );
             })}
-          </div>
+            </div>
+          ) : null}
 
-          {selectedDateValue && scheduleLabel ? (
+          {props.deliveryScheduleMode === "schedule" && selectedDateValue && scheduleLabel ? (
             <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
               <Clock size={14} />
               {t("deliveryHoursForDate", { hours: scheduleLabel })}
               {scheduleState.source === "opening" ? ` ${t("usingOpeningHours")}` : ""}
             </p>
-          ) : selectedDateValue && !scheduleState.hasOpeningHours ? (
+          ) : props.deliveryScheduleMode === "schedule" && selectedDateValue && !scheduleState.hasOpeningHours ? (
             <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
               <Clock size={14} />
               {t("deliveryHoursNotConfigured")}
             </p>
           ) : null}
 
-          {selectedDateValue && breakLabels.length > 0 ? (
+          {props.deliveryScheduleMode === "schedule" && selectedDateValue && breakLabels.length > 0 ? (
             <div className="mt-3 rounded-[18px] border border-orange-100 bg-orange-50/80 p-4">
               <div className="flex items-start gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-orange-600 shadow-sm">
@@ -199,8 +276,12 @@ export function DeliverySection(props: DeliverySectionProps) {
             </div>
           ) : null}
 
-          {selectedDateValue ? (
-            <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
+          {props.deliveryScheduleMode === "schedule" && selectedDateValue ? (
+            <div
+              ref={deliveryTimeRailRef}
+              className={`mt-4 cursor-grab active:cursor-grabbing ${horizontalRailClass}`}
+              {...deliveryTimeDragHandlers}
+            >
               {scheduleState.hasOpeningHours ? (
                 timeSlots.length > 0 ? (
                   timeSlots.map((slot) => (
@@ -210,17 +291,17 @@ export function DeliverySection(props: DeliverySectionProps) {
                       onClick={() =>
                         props.setScheduledDeliveryValue(`${selectedDateValue}T${slot.value}`)
                       }
-                      className={`h-[48px] rounded-[10px] border-2 text-sm font-medium transition-all ${
+                      className={`h-[48px] min-w-[96px] snap-start rounded-[14px] border text-sm font-semibold transition-all duration-200 ${
                         props.scheduledDeliveryValue === `${selectedDateValue}T${slot.value}`
-                          ? "border-orange-500 bg-orange-500 text-white shadow-md"
-                          : "border-gray-200 bg-[#FAFAF9] text-gray-700 hover:border-orange-400 hover:bg-white hover:text-orange-500"
+                          ? activeGradientClass
+                          : interactiveTileClass
                       }`}
                     >
                       {slot.label}
                     </button>
                   ))
                 ) : (
-                  <p className="col-span-full rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                  <p className="min-w-full rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
                     {t("noDeliverySlots")}
                   </p>
                 )
@@ -241,9 +322,11 @@ export function DeliverySection(props: DeliverySectionProps) {
             </div>
           ) : null}
         </div>
-        <p className="mt-2 text-sm text-gray-500">
-          {t("scheduledDeliveryOptional")}
-        </p>
+        {props.deliveryScheduleMode === "schedule" ? (
+          <p className="mt-2 text-sm text-gray-500">
+            {t("scheduledDeliveryRequired")}
+          </p>
+        ) : null}
       </section>
       <NotesSection note={props.note} setNote={props.setNote} />
       <CustomerDetailsForm {...props} editable={props.isGuest} />

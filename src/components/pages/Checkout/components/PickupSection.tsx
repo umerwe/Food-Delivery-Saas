@@ -28,6 +28,8 @@ type PickupSectionProps = {
   setPickupDate: (value: Date | null) => void;
   pickupTime: string | null;
   setPickupTime: (value: string | null) => void;
+  pickupScheduleMode: "now" | "schedule";
+  setPickupScheduleMode: (value: "now" | "schedule") => void;
   selectedBranch?: BranchRecord | null;
 };
 

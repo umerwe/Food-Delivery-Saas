@@ -23,6 +23,7 @@ import {
   getItemImage,
   getItemPricing,
   getSelectedVariationName,
+  getTotalBeforeDiscount,
   getSplitPizzaDisplay,
   isDealCartItem,
   type CheckoutType,
@@ -136,7 +137,6 @@ export function OrderCartSidebar({
     [pricingItems]
   );
 
-  const taxes = toNumber(cartQuote?.taxAmount, 0);
   const checkoutPriceAdjustment = getCheckoutPriceAdjustmentTotal(cartItems, checkoutType);
   const hasCartQuote = Boolean(cartQuote);
   const deliveryAdjustmentFee =
@@ -151,7 +151,6 @@ export function OrderCartSidebar({
       : 0;
   const pickupFee = checkoutType === "pickup" && !hasCartQuote ? checkoutPriceAdjustment : 0;
   const selectedOrderFee = checkoutType === "pickup" ? pickupFee : deliveryFee;
-  const serviceCharge = Math.max(0, toNumber(cartQuote?.serviceChargeAmount, 0));
   const tipAmount = Math.max(0, toNumber(cartQuote?.tipAmount, 0));
   const quoteSubtotal = cartQuote ? toNumber(cartQuote.subtotal, itemTotal) : itemTotal;
   const appliedPromotion =
@@ -165,8 +164,11 @@ export function OrderCartSidebar({
   const discount = promotionDiscountLine?.amount ?? Math.max(0, toNumber(cartQuote?.discountAmount, 0));
   const loyaltyDiscount = Math.max(0, toNumber(cartQuote?.loyaltyDiscountAmount, 0));
   const walletAppliedAmount = Math.max(0, toNumber(cartQuote?.walletAppliedAmount, 0));
-  const totalBeforeDiscount =
-    quoteSubtotal + selectedOrderFee + taxes + serviceCharge + tipAmount;
+  const totalBeforeDiscount = getTotalBeforeDiscount({
+    subtotal: quoteSubtotal,
+    orderFee: selectedOrderFee,
+    tipAmount,
+  });
   const finalTotal = Math.max(
     0,
     toNumber(

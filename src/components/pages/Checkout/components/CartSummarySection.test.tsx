@@ -3,12 +3,35 @@ import { describe, expect, it } from "vitest";
 import {
   getItemPricing,
   getScopedItemDiscountDisplays,
+  getTotalBeforeDiscount,
   type CartItem,
 } from "./CartSummarySection";
 
 const getPricingEntry = (item: CartItem) => ({
   item,
   pricing: getItemPricing(item, "delivery"),
+});
+
+describe("getTotalBeforeDiscount", () => {
+  it("excludes inclusive tax and service charge from the pre-discount display total", () => {
+    expect(
+      getTotalBeforeDiscount({
+        subtotal: 1000,
+        orderFee: 0,
+        tipAmount: 0,
+      })
+    ).toBe(1000);
+  });
+
+  it("includes only subtotal, order fee, and tip before discount", () => {
+    expect(
+      getTotalBeforeDiscount({
+        subtotal: 1000,
+        orderFee: 50,
+        tipAmount: 25,
+      })
+    ).toBe(1075);
+  });
 });
 
 describe("getScopedItemDiscountDisplays", () => {

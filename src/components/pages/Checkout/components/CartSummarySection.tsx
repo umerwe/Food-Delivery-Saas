@@ -620,6 +620,16 @@ export const getCheckoutPriceAdjustmentTotal = (
   }, 0);
 };
 
+export const getTotalBeforeDiscount = ({
+  subtotal,
+  orderFee = 0,
+  tipAmount = 0,
+}: {
+  subtotal: number;
+  orderFee?: number;
+  tipAmount?: number;
+}) => subtotal + orderFee + tipAmount;
+
 export const getScopedItemDiscountDisplays = (
   pricingItems: PricingEntry[],
   quote?: CartQuote | null
@@ -735,8 +745,6 @@ export function CartSummarySection({
   const resolvedQuote = quote ?? cartQuote ?? null;
   const quoteSubtotal = toNullableNumber(resolvedQuote?.subtotal);
   const quoteDeliveryFee = toNullableNumber(resolvedQuote?.deliveryFee);
-  const quoteTaxAmount = toNullableNumber(resolvedQuote?.taxAmount);
-  const quoteServiceChargeAmount = toNullableNumber(resolvedQuote?.serviceChargeAmount) ?? 0;
   const quoteTipAmount =
     toNullableNumber(resolvedQuote?.tipAmount) ??
     Math.max(0, toNumber(appliedTipAmount, 0));
@@ -765,8 +773,6 @@ export function CartSummarySection({
       : 0;
   const pickupFee = checkoutType === "pickup" && !hasResolvedQuote ? checkoutPriceAdjustment : 0;
   const selectedOrderFee = checkoutType === "pickup" ? pickupFee : deliveryFee;
-  const taxes = quoteTaxAmount ?? 0;
-  const serviceCharge = Math.max(0, quoteServiceChargeAmount);
   const tipAmount = Math.max(0, quoteTipAmount);
 
   const appliedPromotion = resolvedQuote?.appliedPromotion ?? null;
@@ -793,13 +799,17 @@ export function CartSummarySection({
     toNumber(resolvedQuote?.walletAppliedAmount, 0)
   );
 
-  const computedTotalBeforeDiscount =
-    itemTotal + selectedOrderFee + taxes + serviceCharge + tipAmount;
+  const computedTotalBeforeDiscount = getTotalBeforeDiscount({
+    subtotal: itemTotal,
+    orderFee: selectedOrderFee,
+    tipAmount,
+  });
 
-  const totalBeforeDiscount =
-    quoteSubtotal !== null
-      ? quoteSubtotal + selectedOrderFee + taxes + serviceCharge + tipAmount
-      : computedTotalBeforeDiscount;
+  const totalBeforeDiscount = getTotalBeforeDiscount({
+    subtotal: quoteSubtotal !== null ? quoteSubtotal : itemTotal,
+    orderFee: selectedOrderFee,
+    tipAmount,
+  });
   const loyaltyPreviewDiscount =
     loyaltyDiscount > 0 || !loyaltyCanRedeem
       ? 0

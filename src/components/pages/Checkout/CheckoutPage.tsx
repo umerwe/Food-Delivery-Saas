@@ -615,6 +615,8 @@ function CheckoutPageContent() {
   const [pickupTime, setPickupTime] = useState<string | null>(null);
   const [checkoutBranch, setCheckoutBranch] = useState<BranchRecord | null>(null);
   const [scheduledDeliveryValue, setScheduledDeliveryValue] = useState("");
+  const [deliveryScheduleMode, setDeliveryScheduleMode] = useState<"now" | "schedule">("now");
+  const [pickupScheduleMode, setPickupScheduleMode] = useState<"now" | "schedule">("now");
   const checkoutPaymentMethod =
     activeTab === "delivery" && paymentMethod === "COD" ? "STRIPE" : paymentMethod;
   const deliveryAllowed = !checkoutBranch?.settings?.allowedOrderTypes?.length || branchSupportsDelivery(checkoutBranch);
@@ -948,13 +950,17 @@ function CheckoutPageContent() {
   };
 
   const getOrderTime = () => {
-    if (!pickupDate || !pickupTime) {
+    if (pickupScheduleMode === "now") {
       return isImmediateScheduleAvailable({
         branch: checkoutBranch,
         scheduleType: "pickup",
       })
         ? undefined
         : null;
+    }
+
+    if (!pickupDate || !pickupTime) {
+      return null;
     }
 
     try {
@@ -1006,13 +1012,17 @@ function CheckoutPageContent() {
 
     const trimmedValue = scheduledDeliveryValue.trim();
 
-    if (!trimmedValue) {
+    if (deliveryScheduleMode === "now") {
       return isImmediateScheduleAvailable({
         branch: checkoutBranch,
         scheduleType: "delivery",
       })
         ? undefined
         : null;
+    }
+
+    if (!trimmedValue) {
+      return null;
     }
 
     const scheduledDate = getScheduledDateTime(trimmedValue);
@@ -1424,6 +1434,8 @@ function CheckoutPageContent() {
               setPaymentMethod={setPaymentMethod}
               scheduledDeliveryValue={scheduledDeliveryValue}
               setScheduledDeliveryValue={setScheduledDeliveryValue}
+              deliveryScheduleMode={deliveryScheduleMode}
+              setDeliveryScheduleMode={setDeliveryScheduleMode}
               selectedBranch={checkoutBranch}
               totalPreparationMinutes={totalPreparationMinutes}
             />
@@ -1446,6 +1458,8 @@ function CheckoutPageContent() {
               setPickupDate={setPickupDate}
               pickupTime={pickupTime}
               setPickupTime={setPickupTime}
+              pickupScheduleMode={pickupScheduleMode}
+              setPickupScheduleMode={setPickupScheduleMode}
               selectedBranch={checkoutBranch}
             />
           )}
