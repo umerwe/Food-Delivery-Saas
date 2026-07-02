@@ -193,6 +193,27 @@ describe("checkout normalizers", () => {
     expect(normalized.lineTotal).toBe(51);
   });
 
+  it("preserves per-item cart discount contract fields", () => {
+    const normalized = normalizeCartItem({
+      id: "cart-item-1",
+      quantity: 1,
+      unitPriceWithModifiers: 10,
+      lineTotal: 10,
+      name: "Happy hour item",
+      happyHour: { id: "happy-hour-1", title: "Happy hour" },
+      promotion: null,
+      promotionDiscountAmount: 3,
+      discountedUnitPrice: 7,
+      discountedLineTotal: 7,
+    });
+
+    expect(normalized.happyHour).toEqual({ id: "happy-hour-1", title: "Happy hour" });
+    expect(normalized.promotion).toBeNull();
+    expect(normalized.promotionDiscountAmount).toBe(3);
+    expect(normalized.discountedUnitPrice).toBe(7);
+    expect(normalized.discountedLineTotal).toBe(7);
+  });
+
   it("resolves modifier names and prices from flat menu item modifiers", () => {
     const normalized = normalizeCartItem({
       id: "cart-item-1",

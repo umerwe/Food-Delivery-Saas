@@ -80,6 +80,11 @@ export type CartItem = {
   deliveryPriceAdjustment?: unknown;
   dealId?: string | null;
   deal?: ApiRecord;
+  promotion?: ApiRecord | null;
+  happyHour?: ApiRecord | null;
+  promotionDiscountAmount?: number;
+  discountedUnitPrice?: number | null;
+  discountedLineTotal?: number | null;
   includedItems?: CartIncludedItem[];
 };
 
@@ -464,6 +469,15 @@ export const normalizeCartItem = (itemInput: unknown): CartItem => {
     deliveryPriceAdjustment: menuItem.deliveryPriceAdjustment,
     dealId,
     deal,
+    promotion: Object.keys(asRecord(item.promotion)).length ? asRecord(item.promotion) : null,
+    happyHour: Object.keys(asRecord(item.happyHour)).length ? asRecord(item.happyHour) : null,
+    promotionDiscountAmount: Math.max(0, toNumber(item.promotionDiscountAmount, 0)),
+    discountedUnitPrice: item.discountedUnitPrice === null || item.discountedUnitPrice === undefined
+      ? null
+      : Math.max(0, toNumber(item.discountedUnitPrice, 0)),
+    discountedLineTotal: item.discountedLineTotal === null || item.discountedLineTotal === undefined
+      ? null
+      : Math.max(0, toNumber(item.discountedLineTotal, 0)),
     includedItems: normalizeArray<ApiRecord>(item.includedItems).map(normalizeIncludedDealItem),
   };
 };

@@ -112,6 +112,11 @@ export interface CartItem {
     imageUrl?: string;
     fixedPrice?: number | string;
   };
+  promotion?: ApiRecord | null;
+  happyHour?: ApiRecord | null;
+  promotionDiscountAmount?: number | string | null;
+  discountedUnitPrice?: number | string | null;
+  discountedLineTotal?: number | string | null;
   includedItems?: Array<{
     type?: string;
     id?: string | number;
@@ -630,30 +635,35 @@ export const getTotalBeforeDiscount = ({
   tipAmount?: number;
 }) => subtotal + orderFee + tipAmount;
 
-export const getScopedItemDiscountDisplays = (
-  pricingItems: PricingEntry[],
-  quote?: CartQuote | null
+const hasDiscountMetadata = (value: unknown) => {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length > 0;
+};
+
+const getPerItemDiscountAmount = (item: CartItem) => {
+  const directDiscount = Math.max(0, toNumber(item.promotionDiscountAmount, 0));
+
+  if (directDiscount > 0) return directDiscount;
+
+  const promotionDiscount = hasDiscountMetadata(item.promotion)
+    ? Math.max(0, toNumber(item.promotion?.discountAmount, 0))
+    : 0;
+
+  if (promotionDiscount > 0) return promotionDiscount;
+
+  return hasDiscountMetadata(item.happyHour)
+    ? Math.max(0, toNumber(item.happyHour?.discountAmount, 0))
+    : 0;
+};
+
+const addProportionalDiscountDisplays = (
+  discountMap: Map<string, CartItemDiscountDisplay>,
+  eligibleItems: PricingEntry[],
+  discountAmount: number,
 ) => {
-  const applyMode = String(quote?.appliedPromotion?.applyMode || "").toUpperCase();
-  const discountAmount = Math.max(
-    0,
-    toNumber(quote?.discountAmount ?? quote?.appliedPromotion?.discountAmount, 0)
-  );
-
-  if (applyMode !== "SCOPED_ITEMS" || discountAmount <= 0) {
-    return new Map<string, CartItemDiscountDisplay>();
-  }
-
-  const eligibleItems = pricingItems.filter(({ item, pricing }) => {
-    return !isDealCartItem(item) && pricing.lineTotal > 0;
-  });
   const eligibleTotal = eligibleItems.reduce((total, { pricing }) => total + pricing.lineTotal, 0);
 
-  if (eligibleTotal <= 0) {
-    return new Map<string, CartItemDiscountDisplay>();
-  }
+  if (eligibleTotal <= 0) return;
 
-  const discountMap = new Map<string, CartItemDiscountDisplay>();
   let allocatedDiscount = 0;
 
   eligibleItems.forEach(({ item, pricing }, index) => {
@@ -676,6 +686,71 @@ export const getScopedItemDiscountDisplays = (
       });
     }
   });
+};
+
+export const getScopedItemDiscountDisplays = (
+  pricingItems: PricingEntry[],
+  quote?: CartQuote | null
+) => {
+  const discountMap = new Map<string, CartItemDiscountDisplay>();
+  const applyMode = String(quote?.appliedPromotion?.applyMode || "").toUpperCase();
+  const quoteDiscountAmount = Math.max(
+    0,
+    toNumber(quote?.discountAmount ?? quote?.appliedPromotion?.discountAmount, 0)
+  );
+  const hasPerItemContract = pricingItems.some(({ item }) =>
+    hasDiscountMetadata(item.promotion) ||
+    hasDiscountMetadata(item.happyHour) ||
+    item.promotion === null ||
+    item.happyHour === null ||
+    item.discountedLineTotal === null ||
+    item.discountedUnitPrice === null ||
+    item.promotionDiscountAmount !== undefined
+  );
+  const perItemDiscountItems = pricingItems.filter(({ item, pricing }) => {
+    return !isDealCartItem(item) && pricing.lineTotal > 0 &&
+      (hasDiscountMetadata(item.promotion) || hasDiscountMetadata(item.happyHour));
+  });
+
+  if (perItemDiscountItems.length > 0) {
+    const perItemDiscountTotal = perItemDiscountItems.reduce((total, { item, pricing }) => {
+      return total + Math.min(pricing.lineTotal, getPerItemDiscountAmount(item));
+    }, 0);
+    const shouldUseQuoteDiscount = applyMode === "SCOPED_ITEMS" && quoteDiscountAmount > 0 &&
+      (perItemDiscountTotal > quoteDiscountAmount + 0.01 || String(quote?.appliedPromotion?.discountType || "").toUpperCase() === "FIXED_PRICE");
+
+    if (shouldUseQuoteDiscount) {
+      addProportionalDiscountDisplays(discountMap, perItemDiscountItems, quoteDiscountAmount);
+      return discountMap;
+    }
+
+    perItemDiscountItems.forEach(({ item, pricing }, index) => {
+      const lineDiscount = Math.min(pricing.lineTotal, getPerItemDiscountAmount(item));
+
+      if (lineDiscount <= 0) return;
+
+      const discountedLineTotal = Math.max(0, pricing.lineTotal - lineDiscount);
+
+      if (discountedLineTotal >= pricing.lineTotal) return;
+
+      discountMap.set(String(item.id || item.menuItemId || index), {
+        lineDiscount,
+        discountedLineTotal,
+        discountedUnitPriceWithModifiers: discountedLineTotal / pricing.quantity,
+      });
+    });
+
+    return discountMap;
+  }
+
+  if (hasPerItemContract || applyMode !== "SCOPED_ITEMS" || quoteDiscountAmount <= 0) {
+    return discountMap;
+  }
+
+  const eligibleItems = pricingItems.filter(({ item, pricing }) => {
+    return !isDealCartItem(item) && pricing.lineTotal > 0;
+  });
+  addProportionalDiscountDisplays(discountMap, eligibleItems, quoteDiscountAmount);
 
   return discountMap;
 };

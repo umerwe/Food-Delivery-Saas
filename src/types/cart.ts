@@ -41,6 +41,11 @@ export type CartItem = {
   selectedVariation?: CartSelectedVariation | null;
   selectedModifiers?: CartSelectedModifier[];
   dealId?: string | null;
+  promotion?: Record<string, unknown> | null;
+  happyHour?: Record<string, unknown> | null;
+  promotionDiscountAmount?: number;
+  discountedUnitPrice?: number | null;
+  discountedLineTotal?: number | null;
 };
 
 export type CartAppliedPromotion = {

@@ -259,6 +259,11 @@ export type CartItemRecord = ApiRecord & {
   quantity?: string | number;
   price?: string | number;
   totalPrice?: string | number;
+  promotion?: ApiRecord | null;
+  happyHour?: ApiRecord | null;
+  promotionDiscountAmount?: string | number | null;
+  discountedUnitPrice?: string | number | null;
+  discountedLineTotal?: string | number | null;
   modifiers?: Array<{ modifierId?: string | number; quantity?: string | number }>;
   menuItem?: MenuItem & {
     selectedVariation?: MenuVariation;
