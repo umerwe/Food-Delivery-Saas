@@ -138,7 +138,7 @@ export const useCart = (token: string | null): CartApi => {
       const response = await clearCustomerCart({ customerId, token });
 
       if (response && !response.error && response.success !== false) {
-        dispatchCartChanged();
+        dispatchCartChanged({ itemCount: 0 });
       }
 
       return response;

@@ -8,6 +8,7 @@ type DragState = {
   startX: number;
   startScrollLeft: number;
   didDrag: boolean;
+  isDragging: boolean;
 };
 
 export function useHorizontalDragScroll<T extends HTMLElement>() {
@@ -17,6 +18,7 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
     startX: 0,
     startScrollLeft: 0,
     didDrag: false,
+    isDragging: false,
   });
 
   const handlePointerDown = (event: PointerEvent<T>) => {
@@ -29,9 +31,8 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
       startX: event.clientX,
       startScrollLeft: rail.scrollLeft,
       didDrag: false,
+      isDragging: false,
     };
-
-    rail.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: PointerEvent<T>) => {
@@ -42,10 +43,18 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
 
     const dragDistance = event.clientX - dragState.startX;
 
-    if (Math.abs(dragDistance) > 4) {
+    if (Math.abs(dragDistance) <= 4 && !dragState.isDragging) return;
+
+    if (!dragState.isDragging) {
+      dragState.isDragging = true;
       dragState.didDrag = true;
+
+      if (!rail.hasPointerCapture(event.pointerId)) {
+        rail.setPointerCapture(event.pointerId);
+      }
     }
 
+    event.preventDefault();
     rail.scrollLeft = dragState.startScrollLeft - dragDistance;
   };
 
@@ -60,6 +69,7 @@ export function useHorizontalDragScroll<T extends HTMLElement>() {
     }
 
     dragState.pointerId = null;
+    dragState.isDragging = false;
   };
 
   const handleClickCapture = (event: MouseEvent<T>) => {

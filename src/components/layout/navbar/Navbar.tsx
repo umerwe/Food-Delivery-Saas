@@ -167,6 +167,7 @@ export const Navbar = () => {
   const navbarWrapRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const cartRefreshRequestRef = useRef(0)
 
   const router = useRouter()
   const pathname = usePathname()
@@ -293,6 +294,9 @@ export const Navbar = () => {
   }
 
   const refreshCartItemCount = useCallback(async () => {
+    const requestId = cartRefreshRequestRef.current + 1
+    cartRefreshRequestRef.current = requestId
+
     if (!userId || authLoading) {
       setCartItemCount(0)
       return
@@ -300,8 +304,13 @@ export const Navbar = () => {
 
     try {
       const { items } = await fetchCustomerCart({ customerId: userId, token })
+
+      if (cartRefreshRequestRef.current !== requestId) return
+
       setCartItemCount(items.reduce((total, item) => total + toCartQuantity(item.quantity), 0))
     } catch {
+      if (cartRefreshRequestRef.current !== requestId) return
+
       setCartItemCount(0)
     }
   }, [authLoading, token, userId])
@@ -317,6 +326,7 @@ export const Navbar = () => {
         : undefined
 
       if (typeof detail?.itemCount === "number") {
+        cartRefreshRequestRef.current += 1
         setCartItemCount(toCartQuantity(detail.itemCount))
         return
       }

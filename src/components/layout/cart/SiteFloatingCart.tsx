@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useHome } from "@/hooks/useHome";
 import { getSelectedOrderType } from "@/lib/branch-selector";
-import { CART_CHANGED_EVENT } from "@/lib/cart-events";
+import { CART_CHANGED_EVENT, type CartChangedDetail } from "@/lib/cart-events";
 import {
   getStoredCheckoutTypePreference,
   type CheckoutTypePreference,
@@ -90,9 +90,22 @@ export function SiteFloatingCart() {
   useEffect(() => {
     setStoredCheckoutType(getStoredCheckoutTypePreference());
 
-    const handleCartChanged = () => {
+    const handleCartChanged = (event: Event) => {
+      const detail = event instanceof CustomEvent
+        ? (event.detail as CartChangedDetail | undefined)
+        : undefined;
+
       setStoredCheckoutType(getStoredCheckoutTypePreference());
       refreshCart();
+
+      if (typeof detail?.itemCount === "number") {
+        const nextHasCartItems = detail.itemCount > 0;
+
+        setHasCartItems(nextHasCartItems);
+        setIsOpen(nextHasCartItems);
+        return;
+      }
+
       void refreshCartPresence({ openWhenPresent: true });
     };
 

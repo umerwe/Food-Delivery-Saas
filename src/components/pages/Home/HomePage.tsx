@@ -27,7 +27,8 @@ import { useHomeCategories, useHomePromotionalItems } from "@/hooks/useHomeCateg
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
 import { resolveCustomerCurrency } from "@/lib/money";
 import type { CustomerDeal } from "@/types/customer-deals";
-import type { HomeRestaurant } from "@/types/home";
+import type { AuthBranch } from "@/types/auth";
+import type { HomeBranch, HomeRestaurant } from "@/types/home";
 
 const getRestaurantHeroImage = (restaurant?: HomeRestaurant | null) =>
   restaurant?.coverImage ||
@@ -39,6 +40,36 @@ const getTrimmedText = (value?: string | null) => {
   const trimmedValue = value?.trim();
 
   return trimmedValue ? trimmedValue : null;
+};
+
+const mergeHomeBranch = (
+  homeBranch?: HomeBranch | null,
+  sessionBranch?: AuthBranch | null,
+): HomeBranch | AuthBranch | null => {
+  if (!homeBranch) return sessionBranch ?? null;
+  if (!sessionBranch || String(homeBranch.id || "") !== String(sessionBranch.id || "")) {
+    return homeBranch;
+  }
+
+  const sessionHomeBranch = sessionBranch as HomeBranch;
+
+  return {
+    ...sessionBranch,
+    ...homeBranch,
+    settings: {
+      ...(sessionBranch.settings ?? {}),
+      ...(homeBranch.settings ?? {}),
+    },
+    availability: {
+      ...(sessionHomeBranch.availability ?? {}),
+      ...(homeBranch.availability ?? {}),
+      temporaryClosure:
+        homeBranch.availability?.temporaryClosure ??
+        sessionHomeBranch.availability?.temporaryClosure ??
+        null,
+    },
+    scheduleTimings: homeBranch.scheduleTimings ?? sessionHomeBranch.scheduleTimings ?? null,
+  };
 };
 
 const HomePage = () => {
@@ -74,7 +105,10 @@ const HomePage = () => {
   const homeResponse = homeQuery.data;
   const homeData = homeResponse ? homeResponse.data : undefined;
   const branding = homeData?.branding ?? fallbackBranding ?? DEFAULT_BRANDING;
-  const resolvedBranch = homeData?.branch ?? user?.branch ?? null;
+  const resolvedBranch = useMemo(
+    () => mergeHomeBranch(homeData?.branch, user?.branch),
+    [homeData?.branch, user?.branch]
+  );
   const landingPopup = homeData?.landingPopup ?? null;
   const heroTitle = homeData?.restaurant?.name ?? branding.restaurantName ?? t("defaultTitle");
   const heroTagline = branding.tagline;

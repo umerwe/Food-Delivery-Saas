@@ -482,6 +482,8 @@ describe("pickup schedule helpers", () => {
   });
 
   it("rejects scheduled times outside branch pickup and delivery hours", () => {
+    vi.setSystemTime(new Date("2026-06-30T10:00:00.000Z"));
+
     const branch: BranchRecord = {
       id: "american-corner",
       name: "American Corner",

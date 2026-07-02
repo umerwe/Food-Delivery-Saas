@@ -209,8 +209,11 @@ export default function BranchOpeningHoursPopup({
   return (
     <Dialog
       open={shouldShow}
-      onOpenChange={(open) => {
-        if (!open) handleDismiss();
+      onOpenChange={() => {
+        // Keep the notice controlled by the explicit close/actions only.
+        // On live, competing modal/focus transitions can emit a transient
+        // close event right after mount, which dismissed the closed-branch
+        // popup before users could read it.
       }}
     >
       <DialogContent

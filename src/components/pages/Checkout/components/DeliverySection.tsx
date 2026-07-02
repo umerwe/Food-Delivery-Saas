@@ -67,13 +67,13 @@ const buildUpcomingDates = () => {
 const getScheduledDateValue = (value: string) => value.split("T")[0] || "";
 
 const activeGradientClass =
-  "border-primary/80 bg-gradient-to-br from-primary via-orange-500 to-amber-400 text-white shadow-lg shadow-primary/25 ring-1 ring-white/40";
+  "border-primary bg-white text-gray-950 shadow-[0_12px_34px_rgba(17,24,39,0.10)] ring-2 ring-primary/10";
 const interactiveTileClass =
-  "border-primary/15 bg-gradient-to-br from-primary/10 via-white to-orange-50 text-gray-800 shadow-sm hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md hover:shadow-primary/10 hover:text-primary";
+  "border-gray-100 bg-white text-gray-900 shadow-[0_12px_34px_rgba(17,24,39,0.08)] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_18px_42px_rgba(17,24,39,0.12)] hover:text-primary";
 const disabledTileClass =
-  "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-400 shadow-none";
+  "cursor-not-allowed border-gray-100 bg-[#F7F3EF]/70 text-gray-400 shadow-none";
 const horizontalRailClass =
-  "flex snap-x gap-3 overflow-x-auto pb-2 pr-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+  "-mx-2 flex snap-x gap-3 overflow-x-auto px-2 py-3 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 export function DeliverySection(props: DeliverySectionProps) {
   const t = useTranslations("checkout");
@@ -158,7 +158,7 @@ export function DeliverySection(props: DeliverySectionProps) {
               }`}
             >
               <span className="block text-base font-semibold">{t("orderNow")}</span>
-              <span className={`mt-1 block text-xs leading-5 ${props.deliveryScheduleMode === "now" ? "text-white/85" : "text-gray-500"}`}>
+              <span className="mt-1 block text-xs leading-5 text-gray-500">
                 {immediateAvailable ? t("orderNowDescription") : t("orderNowUnavailable")}
               </span>
             </button>
@@ -172,7 +172,7 @@ export function DeliverySection(props: DeliverySectionProps) {
               }`}
             >
               <span className="block text-base font-semibold">{t("scheduleOrder")}</span>
-              <span className={`mt-1 block text-xs leading-5 ${props.deliveryScheduleMode === "schedule" ? "text-white/85" : "text-gray-500"}`}>
+              <span className="mt-1 block text-xs leading-5 text-gray-500">
                 {t("scheduleOrderDescription")}
               </span>
             </button>
