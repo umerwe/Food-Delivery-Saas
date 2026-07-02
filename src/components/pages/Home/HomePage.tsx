@@ -28,6 +28,7 @@ import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
 import { resolveCustomerCurrency } from "@/lib/money";
 import type { CustomerDeal } from "@/types/customer-deals";
 import type { AuthBranch } from "@/types/auth";
+import type { BranchScheduleTimings, BranchSettings } from "@/types/branches";
 import type { HomeBranch, HomeRestaurant } from "@/types/home";
 
 const getRestaurantHeroImage = (restaurant?: HomeRestaurant | null) =>
@@ -40,6 +41,70 @@ const getTrimmedText = (value?: string | null) => {
   const trimmedValue = value?.trim();
 
   return trimmedValue ? trimmedValue : null;
+};
+
+const hasScheduleEntries = (value: unknown) => Array.isArray(value) && value.length > 0;
+
+const mergeScheduleField = <TValue,>(homeValue: TValue | undefined, sessionValue: TValue | undefined) => {
+  if (hasScheduleEntries(homeValue) || homeValue === undefined) {
+    return homeValue ?? sessionValue;
+  }
+
+  if (hasScheduleEntries(sessionValue)) {
+    return sessionValue;
+  }
+
+  return homeValue ?? sessionValue;
+};
+
+const mergeBranchSettings = (
+  homeSettings?: Record<string, unknown> | null,
+  sessionSettings?: BranchSettings | null,
+): BranchSettings => {
+  const mergedSettings = {
+    ...(sessionSettings ?? {}),
+    ...(homeSettings ?? {}),
+  } as BranchSettings;
+
+  mergedSettings.openingHours = mergeScheduleField(
+    homeSettings?.openingHours as BranchSettings["openingHours"] | undefined,
+    sessionSettings?.openingHours,
+  );
+  mergedSettings.deliveryHours = mergeScheduleField(
+    homeSettings?.deliveryHours as BranchSettings["deliveryHours"] | undefined,
+    sessionSettings?.deliveryHours,
+  );
+  mergedSettings.holidayOpeningHours = mergeScheduleField(
+    homeSettings?.holidayOpeningHours as BranchSettings["holidayOpeningHours"] | undefined,
+    sessionSettings?.holidayOpeningHours,
+  );
+
+  return mergedSettings;
+};
+
+const mergeScheduleTimings = (
+  homeSchedule?: BranchScheduleTimings | null,
+  sessionSchedule?: BranchScheduleTimings | null,
+) => {
+  const mergedSchedule = {
+    ...(sessionSchedule ?? {}),
+    ...(homeSchedule ?? {}),
+  } as BranchScheduleTimings;
+
+  mergedSchedule.openingHours = mergeScheduleField(
+    homeSchedule?.openingHours,
+    sessionSchedule?.openingHours,
+  );
+  mergedSchedule.deliveryHours = mergeScheduleField(
+    homeSchedule?.deliveryHours,
+    sessionSchedule?.deliveryHours,
+  );
+  mergedSchedule.holidayOpeningHours = mergeScheduleField(
+    homeSchedule?.holidayOpeningHours,
+    sessionSchedule?.holidayOpeningHours,
+  );
+
+  return Object.keys(mergedSchedule).length > 0 ? mergedSchedule : null;
 };
 
 const mergeHomeBranch = (
@@ -56,10 +121,7 @@ const mergeHomeBranch = (
   return {
     ...sessionBranch,
     ...homeBranch,
-    settings: {
-      ...(sessionBranch.settings ?? {}),
-      ...(homeBranch.settings ?? {}),
-    },
+    settings: mergeBranchSettings(homeBranch.settings, sessionBranch.settings),
     availability: {
       ...(sessionHomeBranch.availability ?? {}),
       ...(homeBranch.availability ?? {}),
@@ -68,7 +130,10 @@ const mergeHomeBranch = (
         sessionHomeBranch.availability?.temporaryClosure ??
         null,
     },
-    scheduleTimings: homeBranch.scheduleTimings ?? sessionHomeBranch.scheduleTimings ?? null,
+    scheduleTimings: mergeScheduleTimings(
+      homeBranch.scheduleTimings,
+      sessionHomeBranch.scheduleTimings,
+    ),
   };
 };
 

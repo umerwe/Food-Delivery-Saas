@@ -214,13 +214,37 @@ const getBranchSettings = (branch: unknown): BranchSettings | null => {
     typeof scheduleTimings === "object" && scheduleTimings !== null && !Array.isArray(scheduleTimings)
       ? scheduleTimings as ApiRecord
       : {};
+  const settingsScheduleRecord =
+    typeof settingsRecord.scheduleTimings === "object" && settingsRecord.scheduleTimings !== null && !Array.isArray(settingsRecord.scheduleTimings)
+      ? settingsRecord.scheduleTimings as ApiRecord
+      : {};
+  const chooseSchedule = (...candidates: unknown[]) => {
+    for (const candidate of candidates) {
+      const schedule = normalizeSchedule(candidate);
+
+      if (schedule.length > 0) return schedule;
+    }
+
+    return [];
+  };
 
   return {
     ...settingsRecord,
-    openingHours: settingsRecord.openingHours ?? normalizeSchedule(scheduleRecord.openingHours),
-    deliveryHours: settingsRecord.deliveryHours ?? normalizeSchedule(scheduleRecord.deliveryHours),
-    holidayOpeningHours:
-      settingsRecord.holidayOpeningHours ?? normalizeSchedule(scheduleRecord.holidayOpeningHours),
+    openingHours: chooseSchedule(
+      settingsRecord.openingHours,
+      settingsScheduleRecord.openingHours,
+      scheduleRecord.openingHours,
+    ),
+    deliveryHours: chooseSchedule(
+      settingsRecord.deliveryHours,
+      settingsScheduleRecord.deliveryHours,
+      scheduleRecord.deliveryHours,
+    ),
+    holidayOpeningHours: chooseSchedule(
+      settingsRecord.holidayOpeningHours,
+      settingsScheduleRecord.holidayOpeningHours,
+      scheduleRecord.holidayOpeningHours,
+    ),
   };
 };
 

@@ -113,7 +113,7 @@ const getPopupKey = (popup?: LandingPopup | null, branchId?: string) => {
 
 type RuntimeClosedPopupTranslator = (key: "closedTitle" | "closedBeforeOpen" | "closedDuringBreak" | "closedAfterHours" | "closedTemporarily" | "closedGeneric", values?: { time?: string }) => string;
 
-const buildRuntimeClosedPopup = ({
+export const buildRuntimeClosedPopup = ({
   branch,
   t,
 }: {
@@ -123,11 +123,19 @@ const buildRuntimeClosedPopup = ({
   if (!branch) return null;
 
   const summary = getBranchHoursSummary(branch);
-  const activeSummary = summary.delivery.status !== "unknown" ? summary.delivery : summary.opening;
+  const branchRecord = branch as { isOpen?: boolean | null };
+  const activeSummary = summary.opening.status === "closed"
+    ? summary.opening
+    : summary.delivery.status === "closed"
+      ? summary.delivery
+      : summary.opening;
+  const isApiClosed = branchRecord.isOpen === false;
 
-  if (activeSummary.status !== "closed") return null;
+  if (activeSummary.status !== "closed" && !isApiClosed) return null;
 
-  const reason = activeSummary.reason || "closed";
+  const reason = activeSummary.status === "closed"
+    ? activeSummary.reason || "closed"
+    : "api-closed";
   const time = activeSummary.opensAt || activeSummary.breakUntil || "";
   const message = (() => {
     if (reason === "before-open" && time) return t("closedBeforeOpen", { time });

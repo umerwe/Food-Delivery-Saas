@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveHomeRestaurantId, resolveTableReservationsEnabled } from "@/lib/home";
+import { resolveHomeBranchId, resolveHomeRestaurantId, resolveTableReservationsEnabled } from "@/lib/home";
 import type { AuthUser } from "@/types/auth";
 
 const baseUser: AuthUser = {
@@ -50,5 +50,17 @@ describe("home helpers", () => {
         },
       })
     ).toBe("restaurant-from-branch");
+  });
+
+  it("resolves branch id from nested branch when branchId is missing", () => {
+    expect(
+      resolveHomeBranchId({
+        ...baseUser,
+        branch: {
+          id: "branch-1",
+          name: "Main",
+        },
+      })
+    ).toBe("branch-1");
   });
 });

@@ -50,7 +50,7 @@ export const resolveHomeRestaurantId = (user?: AuthUser | null, authRestaurantId
 export const resolveHomeBranchId = (user?: AuthUser | null) => {
   const storedUser = getStoredHomeAuthUser();
 
-  return storedUser?.branchId ?? user?.branchId ?? "";
+  return storedUser?.branchId ?? storedUser?.branch?.id ?? user?.branchId ?? user?.branch?.id ?? "";
 };
 
 export const normalizeHomeCategories = (response: unknown): HomeCategory[] =>

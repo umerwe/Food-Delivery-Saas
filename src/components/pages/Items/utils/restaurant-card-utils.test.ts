@@ -256,6 +256,28 @@ describe("restaurant card utils", () => {
     });
   });
 
+  it("falls back to schedule timings when empty settings hours mask today's opening time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 30, 12, 0));
+
+    const summary = getBranchHoursSummary({
+      settings: {
+        openingHours: [],
+      },
+      scheduleTimings: {
+        openingHours: [
+          { dayOfWeek: "TUESDAY", openTime: "13:00", closeTime: "22:00" },
+        ],
+      },
+    });
+
+    expect(summary.opening).toMatchObject({
+      status: "closed",
+      reason: "before-open",
+      opensAt: "13:00",
+    });
+  });
+
   it("marks today's opening hours as closed during break time", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 6, 1, 15, 30));

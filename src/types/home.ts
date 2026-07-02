@@ -31,6 +31,7 @@ export type HomeBranch = {
   settings?: Record<string, unknown>;
   scheduleTimings?: BranchScheduleTimings | null;
   tableReservationsEnabled?: boolean;
+  isOpen?: boolean | null;
   availability?: {
     isTemporarilyClosed?: boolean;
     temporaryClosure?: BranchTemporaryClosure | null;
