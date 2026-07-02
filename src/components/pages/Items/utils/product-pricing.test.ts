@@ -8,11 +8,12 @@ describe("product pricing", () => {
     expect(getMenuItemBasePrice({ basePrice: "9" })).toBe(9);
   });
 
-  it("uses happy hour discounted item price for display", () => {
+  it("keeps customer-facing item display price gross when discounted fields are present", () => {
     expect(
       getMenuItemDisplayPrice({
         price: "12.50",
         happyHourDiscountedBasePrice: "9.99",
+        discountedBasePrice: "10.50",
         happyHour: {
           id: "happy-1",
           title: "Happy hour",
@@ -21,7 +22,7 @@ describe("product pricing", () => {
           isCurrentlyActive: true,
         },
       })
-    ).toBe(9.99);
+    ).toBe(12.5);
   });
 
   it("uses variation override price", () => {
@@ -33,7 +34,7 @@ describe("product pricing", () => {
     ).toBe(14);
   });
 
-  it("uses happy hour discounted variation price for display", () => {
+  it("keeps customer-facing variation display price gross when discounted fields are present", () => {
     expect(
       getVariationDisplayPrice(
         { price: 10 },
@@ -42,6 +43,7 @@ describe("product pricing", () => {
           name: "Large",
           price: 12,
           happyHourDiscountedPrice: "8.5",
+          discountedPrice: "9",
           happyHour: {
             id: "happy-variation",
             title: "Happy hour",
@@ -51,7 +53,7 @@ describe("product pricing", () => {
           },
         }
       )
-    ).toBe(8.5);
+    ).toBe(12);
   });
 
   it("falls back for pickup price", () => {

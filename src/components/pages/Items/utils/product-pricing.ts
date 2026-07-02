@@ -10,14 +10,7 @@ export const getMenuItemBasePrice = (menuItem: MenuItem | null | undefined) =>
   toNumber(menuItem?.price ?? menuItem?.basePrice, 0);
 
 export const getMenuItemDisplayPrice = (menuItem: MenuItem | null | undefined) =>
-  toNumber(
-    menuItem?.happyHourDiscountedBasePrice ??
-      menuItem?.discountedBasePrice ??
-      menuItem?.discountedPrice ??
-      menuItem?.price ??
-      menuItem?.basePrice,
-    0
-  );
+  toNumber(menuItem?.price ?? menuItem?.basePrice, 0);
 
 export const getVariationDisplayPrice = (menuItem: MenuItem | null | undefined, variation: MenuVariation | null | undefined) => {
   if (!variation) return getMenuItemDisplayPrice(menuItem);
@@ -27,14 +20,8 @@ export const getVariationDisplayPrice = (menuItem: MenuItem | null | undefined, 
   );
 
   return toNumber(
-    variation.happyHourDiscountedPrice ??
-      override?.discountedPrice ??
-      variation.discountedPrice ??
-      override?.price ??
+    override?.price ??
       variation.price ??
-      menuItem?.happyHourDiscountedBasePrice ??
-      menuItem?.discountedBasePrice ??
-      menuItem?.discountedPrice ??
       menuItem?.price ??
       menuItem?.basePrice,
     0

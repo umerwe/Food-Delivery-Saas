@@ -163,35 +163,6 @@ const getPromotionTitle = (promotion?: PromotionInfo | null) => {
   );
 };
 
-const getBackendDiscountedPriceCandidate = (
-  source: MenuItem | MenuVariation | ApiRecord | null | undefined,
-  promotion?: PromotionInfo | null,
-) => {
-  const record = (source || {}) as ApiRecord;
-  const candidates = [
-    record.happyHourDiscountedPrice,
-    record.happyHourDiscountedBasePrice,
-    record.discountedPrice,
-    record.discountedBasePrice,
-    promotion?.discountedPrice,
-    promotion?.discountedAmount,
-  ];
-
-  for (const candidate of candidates) {
-    if (candidate === undefined || candidate === null || candidate === "") {
-      continue;
-    }
-
-    const numeric = toNumber(candidate, Number.NaN);
-
-    if (Number.isFinite(numeric) && numeric >= 0) {
-      return numeric;
-    }
-  }
-
-  return null;
-};
-
 const calculatePromotionDiscount = (
   originalPrice: number,
   promotion?: PromotionInfo | null,
@@ -240,26 +211,15 @@ const getPromotionPricing = ({
     };
   }
 
-  const backendDiscountedPrice = getBackendDiscountedPriceCandidate(
-    source,
-    promotion,
-  );
-
   const calculatedDiscount = calculatePromotionDiscount(
     safeOriginalPrice,
     promotion,
   );
 
-  const calculatedFinalPrice = Math.max(
+  const finalPrice = Math.max(
     0,
     safeOriginalPrice - calculatedDiscount,
   );
-
-  const finalPrice =
-    backendDiscountedPrice !== null &&
-    backendDiscountedPrice <= safeOriginalPrice
-      ? backendDiscountedPrice
-      : calculatedFinalPrice;
 
   const discountAmount = Math.max(0, safeOriginalPrice - finalPrice);
 
