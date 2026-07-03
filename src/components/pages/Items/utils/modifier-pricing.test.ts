@@ -78,7 +78,7 @@ describe("modifier pricing", () => {
     ).toBe(75);
   });
 
-  it("prioritizes item modifierPriceOverrides over nested variation prices", () => {
+  it("prioritizes nested variation prices over item modifierPriceOverrides", () => {
     expect(
       getModifierPriceForVariation({
         item: {
@@ -105,7 +105,53 @@ describe("modifier pricing", () => {
         selectedVariationId: "small",
         modifierId: "modifier-1",
       })
-    ).toBe(0);
+    ).toBe(2);
+  });
+
+  it("uses item-level override before group modifier default", () => {
+    expect(
+      getModifierPriceForVariation({
+        item: {
+          ...baseItem,
+          modifierPriceOverrides: [
+            {
+              modifierId: "modifier-1",
+              priceDelta: "3",
+              modifier: {
+                id: "modifier-1",
+                name: "Cheese",
+                priceDelta: "5",
+              },
+            },
+          ],
+        },
+        selectedVariationId: "small",
+        modifierId: "modifier-1",
+      })
+    ).toBe(3);
+  });
+
+  it("falls back to nested modifier default when item assignment price is zero", () => {
+    expect(
+      getModifierPriceForVariation({
+        item: {
+          ...baseItem,
+          modifierPriceOverrides: [
+            {
+              modifierId: "modifier-1",
+              priceDelta: "0",
+              modifier: {
+                id: "modifier-1",
+                name: "Gyros",
+                priceDelta: "1.55",
+              },
+            },
+          ],
+        },
+        selectedVariationId: null,
+        modifierId: "modifier-1",
+      })
+    ).toBe(1.55);
   });
 
   it("uses selected variation modifierPriceOverrides from category variations", () => {

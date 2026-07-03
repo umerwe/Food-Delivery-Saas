@@ -7,8 +7,8 @@ import { DeliveryAddressSection } from '@/components/pages/Checkout/components/D
 import NotesSection from '@/components/pages/Checkout/components/NotesSection';
 import { CustomerDetailsForm } from '@/components/pages/Checkout/components/CustomerDetailsForm';
 import { PaymentMethodSection } from '@/components/pages/Checkout/components/PaymentMethodSection';
+import { ScheduleRail } from '@/components/pages/Checkout/components/ScheduleRail';
 import { Time24Picker } from '@/components/ui/time-24-picker';
-import { useHorizontalDragScroll } from '@/components/pages/Checkout/hooks/use-horizontal-drag-scroll';
 import {
   buildScheduleBreakLabels,
   buildDeliveryTimeSlots,
@@ -72,8 +72,6 @@ const interactiveTileClass =
   "border-gray-100 bg-white text-gray-900 shadow-[0_12px_34px_rgba(17,24,39,0.08)] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_18px_42px_rgba(17,24,39,0.12)] hover:text-primary";
 const disabledTileClass =
   "cursor-not-allowed border-gray-100 bg-[#F7F3EF]/70 text-gray-400 shadow-none";
-const horizontalRailClass =
-  "-mx-2 flex snap-x gap-3 overflow-x-auto px-2 py-3 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 export function DeliverySection(props: DeliverySectionProps) {
   const t = useTranslations("checkout");
@@ -104,14 +102,6 @@ export function DeliverySection(props: DeliverySectionProps) {
   );
   const schedule = scheduleState.schedule;
   const breakLabels = useMemo(() => buildScheduleBreakLabels(schedule), [schedule]);
-  const {
-    railRef: deliveryDateRailRef,
-    dragScrollHandlers: deliveryDateDragHandlers,
-  } = useHorizontalDragScroll<HTMLDivElement>();
-  const {
-    railRef: deliveryTimeRailRef,
-    dragScrollHandlers: deliveryTimeDragHandlers,
-  } = useHorizontalDragScroll<HTMLDivElement>();
   const scheduleLabel = useMemo(() => {
     if (!selectedDateValue || !schedule) return "";
     if (schedule.isClosed) return t("closed");
@@ -179,59 +169,55 @@ export function DeliverySection(props: DeliverySectionProps) {
           </div>
 
           {props.deliveryScheduleMode === "schedule" ? (
-            <div
-              ref={deliveryDateRailRef}
-              className={`mt-5 cursor-grab active:cursor-grabbing ${horizontalRailClass}`}
-              {...deliveryDateDragHandlers}
-            >
-            {dates.map((date) => {
-              const nextDateValue = getDateValue(date);
-              const dateScheduleState = getBranchScheduleForDate({
-                branch: props.selectedBranch,
-                dateValue: nextDateValue,
-                scheduleType: "delivery",
-              });
-              const availableSlots = buildDeliveryTimeSlots({
-                branch: props.selectedBranch,
-                dateValue: nextDateValue,
-              });
-              const disabled =
-                isPastDateValue(nextDateValue) ||
-                (dateScheduleState.hasOpeningHours &&
-                  (Boolean(dateScheduleState.schedule?.isClosed) ||
-                    availableSlots.length === 0));
-              const isSelected = selectedDateValue === nextDateValue;
+            <ScheduleRail ariaLabel={t("chooseDate")} className="mt-5">
+              {dates.map((date) => {
+                const nextDateValue = getDateValue(date);
+                const dateScheduleState = getBranchScheduleForDate({
+                  branch: props.selectedBranch,
+                  dateValue: nextDateValue,
+                  scheduleType: "delivery",
+                });
+                const availableSlots = buildDeliveryTimeSlots({
+                  branch: props.selectedBranch,
+                  dateValue: nextDateValue,
+                });
+                const disabled =
+                  isPastDateValue(nextDateValue) ||
+                  (dateScheduleState.hasOpeningHours &&
+                    (Boolean(dateScheduleState.schedule?.isClosed) ||
+                      availableSlots.length === 0));
+                const isSelected = selectedDateValue === nextDateValue;
 
-              return (
-                <button
-                  key={nextDateValue}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => {
-                    const nextDate = getDateFromValue(nextDateValue);
-                    props.setScheduledDeliveryValue(nextDate ? `${nextDateValue}T` : "");
-                  }}
-                  className={`min-w-[92px] snap-start rounded-xl border px-3 py-3 text-left transition-all duration-200 ${
-                    isSelected
-                      ? activeGradientClass
-                      : disabled
-                        ? disabledTileClass
-                        : interactiveTileClass
-                  }`}
-                >
-                  <span className="block text-xs font-semibold uppercase">
-                    {date.toLocaleDateString("en-US", { weekday: "short" })}
-                  </span>
-                  <span className="mt-1 block text-lg font-semibold">
-                    {date.getDate()}
-                  </span>
-                  <span className="block text-xs">
-                    {date.toLocaleDateString("en-US", { month: "short" })}
-                  </span>
-                </button>
-              );
-            })}
-            </div>
+                return (
+                  <button
+                    key={nextDateValue}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => {
+                      const nextDate = getDateFromValue(nextDateValue);
+                      props.setScheduledDeliveryValue(nextDate ? `${nextDateValue}T` : "");
+                    }}
+                    className={`min-w-[92px] snap-start rounded-xl border px-3 py-3 text-left transition-all duration-200 ${
+                      isSelected
+                        ? activeGradientClass
+                        : disabled
+                          ? disabledTileClass
+                          : interactiveTileClass
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold uppercase">
+                      {date.toLocaleDateString("en-US", { weekday: "short" })}
+                    </span>
+                    <span className="mt-1 block text-lg font-semibold">
+                      {date.getDate()}
+                    </span>
+                    <span className="block text-xs">
+                      {date.toLocaleDateString("en-US", { month: "short" })}
+                    </span>
+                  </button>
+                );
+              })}
+            </ScheduleRail>
           ) : null}
 
           {props.deliveryScheduleMode === "schedule" && selectedDateValue && scheduleLabel ? (
@@ -277,11 +263,7 @@ export function DeliverySection(props: DeliverySectionProps) {
           ) : null}
 
           {props.deliveryScheduleMode === "schedule" && selectedDateValue ? (
-            <div
-              ref={deliveryTimeRailRef}
-              className={`mt-4 cursor-grab active:cursor-grabbing ${horizontalRailClass}`}
-              {...deliveryTimeDragHandlers}
-            >
+            <ScheduleRail ariaLabel={t("deliveryTime")} className="mt-4">
               {scheduleState.hasOpeningHours ? (
                 timeSlots.length > 0 ? (
                   timeSlots.map((slot) => (
@@ -319,7 +301,7 @@ export function DeliverySection(props: DeliverySectionProps) {
                   />
                 </label>
               )}
-            </div>
+            </ScheduleRail>
           ) : null}
         </div>
         {props.deliveryScheduleMode === "schedule" ? (

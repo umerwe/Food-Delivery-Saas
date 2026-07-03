@@ -11,7 +11,7 @@ import {
   isImmediateScheduleAvailable,
   isPastDateValue,
 } from "@/components/pages/Checkout/utils/pickup-schedule";
-import { useHorizontalDragScroll } from "@/components/pages/Checkout/hooks/use-horizontal-drag-scroll";
+import { ScheduleRail } from "@/components/pages/Checkout/components/ScheduleRail";
 import { Time24Picker } from "@/components/ui/time-24-picker";
 import type { BranchRecord } from "@/types/branch-selector";
 import { useTranslations } from "next-intl";
@@ -32,8 +32,6 @@ const interactiveTileClass =
   "border-gray-100 bg-white text-gray-900 shadow-[0_12px_34px_rgba(17,24,39,0.08)] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_18px_42px_rgba(17,24,39,0.12)] hover:text-primary";
 const disabledTileClass =
   "cursor-not-allowed border-gray-100 bg-[#F7F3EF]/70 text-gray-400 shadow-none";
-const horizontalRailClass =
-  "-mx-2 flex snap-x gap-3 overflow-x-auto px-2 py-3 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 const buildUpcomingDates = () => {
   const today = new Date();
@@ -74,15 +72,6 @@ export function SelectPickupTimeSection({
     [dateValue, selectedBranch]
   );
   const hasOpeningHours = scheduleState.hasOpeningHours;
-  const {
-    railRef: pickupDateRailRef,
-    dragScrollHandlers: pickupDateDragHandlers,
-  } = useHorizontalDragScroll<HTMLDivElement>();
-  const {
-    railRef: pickupTimeRailRef,
-    dragScrollHandlers: pickupTimeDragHandlers,
-  } = useHorizontalDragScroll<HTMLDivElement>();
-
   const openingHoursLabel = useMemo(() => {
     const schedule = scheduleState.schedule;
 
@@ -164,11 +153,7 @@ export function SelectPickupTimeSection({
         </h3>
 
         <div className="rounded-xl bg-white px-5 py-4 shadow-sm">
-          <div
-            ref={pickupDateRailRef}
-            className={`cursor-grab active:cursor-grabbing ${horizontalRailClass}`}
-            {...pickupDateDragHandlers}
-          >
+          <ScheduleRail ariaLabel={t("chooseDate")}>
             {dates.map((date) => {
               const nextDateValue = getDateValue(date);
               const dateScheduleState = getPickupScheduleForDate({
@@ -215,7 +200,7 @@ export function SelectPickupTimeSection({
                 </button>
               );
             })}
-          </div>
+          </ScheduleRail>
 
           {dateValue && openingHoursLabel ? (
             <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
@@ -238,11 +223,7 @@ export function SelectPickupTimeSection({
         </h3>
 
         {hasOpeningHours ? (
-          <div
-            ref={pickupTimeRailRef}
-            className={`cursor-grab active:cursor-grabbing ${horizontalRailClass}`}
-            {...pickupTimeDragHandlers}
-          >
+          <ScheduleRail ariaLabel={t("choosePickupTime")}>
             {timeSlots.length > 0 ? (
               timeSlots.map((slot) => (
                 <button
@@ -263,7 +244,7 @@ export function SelectPickupTimeSection({
                 {t("noPickupSlots")}
               </p>
             )}
-          </div>
+          </ScheduleRail>
         ) : (
           <label className="block max-w-[220px]">
             <span className="sr-only">{t("pickupTime")}</span>

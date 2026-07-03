@@ -67,11 +67,15 @@ const formatModifierSelectionPrice = (
 ) => {
   const safeQuantity = Math.max(1, Math.floor(toNumber(quantity, 1)));
 
+  const sign = unitPrice >= 0 ? "+" : "-";
+  const absoluteUnitPrice = Math.abs(unitPrice);
+  const total = absoluteUnitPrice * safeQuantity;
+
   if (safeQuantity <= 1) {
-    return `+${formatMoney(unitPrice, currency)}`;
+    return `${sign}${formatMoney(absoluteUnitPrice, currency)}`;
   }
 
-  return `+${formatMoney(unitPrice, currency)} * ${safeQuantity} = +${formatMoney(unitPrice * safeQuantity, currency)}`;
+  return `${sign}${formatMoney(absoluteUnitPrice, currency)} * ${safeQuantity} = ${sign}${formatMoney(total, currency)}`;
 };
 
 const titleizeConstant = (value: unknown) => {
@@ -2022,7 +2026,7 @@ export function SignatureSelectionContent({
                   </span>
                 </span>
 
-                {effectivePrice > 0 ? (
+                {effectivePrice !== 0 ? (
                   <span className="shrink-0 font-semibold text-primary">
                     {formatModifierSelectionPrice(effectivePrice, 1, currency)}
                   </span>
@@ -2168,7 +2172,7 @@ export function SignatureSelectionContent({
                       </span>
                     </label>
 
-                    {toNumber(effectivePrice, 0) > 0 ? (
+                    {toNumber(effectivePrice, 0) !== 0 ? (
                       <span className="shrink-0 font-medium text-primary">
                         {formatModifierSelectionPrice(
                           effectivePrice,

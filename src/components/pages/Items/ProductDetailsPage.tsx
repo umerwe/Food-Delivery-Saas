@@ -76,11 +76,15 @@ const formatModifierSelectionPrice = (
 ) => {
   const safeQuantity = Math.max(1, Math.floor(toNumber(quantity, 1)));
 
+  const sign = unitPrice >= 0 ? "+" : "-";
+  const absoluteUnitPrice = Math.abs(unitPrice);
+  const total = absoluteUnitPrice * safeQuantity;
+
   if (safeQuantity <= 1) {
-    return `+${formatMoney(unitPrice, currency)}`;
+    return `${sign}${formatMoney(absoluteUnitPrice, currency)}`;
   }
 
-  return `+${formatMoney(unitPrice, currency)} * ${safeQuantity} = +${formatMoney(unitPrice * safeQuantity, currency)}`;
+  return `${sign}${formatMoney(absoluteUnitPrice, currency)} * ${safeQuantity} = ${sign}${formatMoney(total, currency)}`;
 };
 
 const isPromotionObject = (value: unknown): value is PromotionInfo => {
@@ -2103,7 +2107,7 @@ function ProductDetailsPageContent() {
                       </span>
                     </label>
 
-                    {effectivePrice > 0 ? (
+                    {effectivePrice !== 0 ? (
                       <span className="shrink-0 text-right font-medium text-primary">
                         {formatModifierSelectionPrice(
                           effectivePrice,
