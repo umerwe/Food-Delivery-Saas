@@ -22,6 +22,7 @@ import { formatDisplayAddress } from "@/lib/address-display";
 import { formatMoney, resolveCustomerCurrency } from "@/lib/money";
 import { canReviewOrder, type Order, type OrderItem, type OrderPricingBreakdownLine } from "@/services/orders";
 import { useTranslations } from "next-intl";
+import { isPaymentPendingStripeOrder } from "@/components/pages/Order/payment-state";
 
 const getAmountNumber = (value: unknown) => {
   const parsed = Number(value);
@@ -140,6 +141,7 @@ export default function OrderSummary({
     paymentMethod === "STRIPE" &&
     (paymentStatus === "PENDING" || paymentStatus === "FAILED");
   const deliveryAddress = formatDisplayAddress(order?.deliveryAddress);
+  const paymentPendingStripeOrder = isPaymentPendingStripeOrder(order);
 
   const formatDateTime = (value?: string | null) => {
     if (!value) return "";
@@ -197,7 +199,9 @@ export default function OrderSummary({
                   {orderDisplayId}
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-gray-600">
-                  {order.statusDescription || t("orderOverviewDescription")}
+                  {paymentPendingStripeOrder
+                    ? t("paymentPendingOverviewDescription")
+                    : order.statusDescription || t("orderOverviewDescription")}
                 </p>
               </div>
               <span className="shrink-0 rounded-full border border-white/70 bg-white px-3 py-1 text-xs font-semibold text-primary shadow-sm">
@@ -244,7 +248,7 @@ export default function OrderSummary({
               </div>
             </div>
 
-            {scheduledOrOrderTime ? (
+            {!paymentPendingStripeOrder && scheduledOrOrderTime ? (
               <div className="rounded-2xl bg-gray-50 p-3">
                 <div className="flex gap-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-primary shadow-sm">
@@ -262,7 +266,7 @@ export default function OrderSummary({
               </div>
             ) : null}
 
-            {showDeliveryOtp ? (
+            {!paymentPendingStripeOrder && showDeliveryOtp ? (
               <div className="rounded-2xl bg-gray-50 p-3">
                 <div className="flex gap-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-primary shadow-sm">
@@ -280,7 +284,7 @@ export default function OrderSummary({
               </div>
             ) : null}
 
-            {estimatedReadyAt || estimatedDeliveredAt ? (
+            {!paymentPendingStripeOrder && (estimatedReadyAt || estimatedDeliveredAt) ? (
               <div className="rounded-2xl bg-gray-50 p-3 sm:col-span-2">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {estimatedReadyAt ? (
@@ -447,9 +451,11 @@ export default function OrderSummary({
                 {t("paymentDetails")}
               </h2>
               <p className="mt-1 text-xs leading-5 text-gray-500">
-                {paymentStatus === "PENDING"
-                  ? t("paymentPendingDescription")
-                  : t("paymentDescription")}
+                {paymentPendingStripeOrder
+                  ? t("stripePaymentPendingDescription")
+                  : paymentStatus === "PENDING"
+                    ? t("paymentPendingDescription")
+                    : t("paymentDescription")}
               </p>
             </div>
 
@@ -538,7 +544,7 @@ export default function OrderSummary({
         </section>
       ) : null}
 
-      {order?.id ? (
+      {order?.id && !paymentPendingStripeOrder ? (
         <section className="space-y-3">
           <Link
             href={`/contact/chat?orderId=${order.id}`}

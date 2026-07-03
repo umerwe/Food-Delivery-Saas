@@ -10,6 +10,7 @@ export type AuthBranch = {
   tableReservationsEnabled?: boolean;
   distanceKm?: number | null;
   selectedOrderType?: BranchOrderType;
+  isOnlyBranch?: boolean;
 };
 
 export type AuthUser = {

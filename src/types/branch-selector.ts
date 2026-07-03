@@ -37,6 +37,7 @@ export type BranchRecord = {
     temporaryClosure?: BranchTemporaryClosure | null;
   } | null;
   selectedOrderType?: BranchOrderType;
+  isOnlyBranch?: boolean;
   coverImage?: string | null;
   description?: string | null;
 };

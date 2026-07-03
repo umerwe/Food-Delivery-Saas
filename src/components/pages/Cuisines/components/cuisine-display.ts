@@ -1,0 +1,75 @@
+import { formatMoney } from "@/lib/money";
+import type { MenuItem, PromotionInfo } from "@/components/pages/Items/types";
+import type { CustomerCuisine } from "@/services/cuisines";
+import { toNumber } from "@/components/pages/Items/utils/restaurant-card-utils";
+
+export const getCuisineImage = (cuisine?: CustomerCuisine | null) => {
+  const image = cuisine?.imageUrl || cuisine?.coverImage || cuisine?.bannerUrl || "";
+  return image.startsWith("http") ? image : "/categories/background_banner.png";
+};
+
+export const getCuisinePromotion = (cuisine: CustomerCuisine): PromotionInfo | null =>
+  cuisine.happyHour ?? cuisine.promotion ?? null;
+
+export const getCuisineBadge = (cuisine: CustomerCuisine, fallback: string) => {
+  const promotion = getCuisinePromotion(cuisine);
+  const discountValue = toNumber(promotion?.discountValue, 0);
+
+  if (promotion?.title?.trim()) return promotion.title;
+  if (promotion?.discountType === "PERCENTAGE" && discountValue > 0) return `${discountValue}% off`;
+  if (promotion?.discountType === "FLAT" && discountValue > 0) return "Special offer";
+  if (cuisine.happyHour) return "Happy hour";
+
+  return fallback;
+};
+
+export const getMenuItemPromotion = (item: MenuItem): PromotionInfo | null =>
+  item.happyHour ?? item.promotion ?? null;
+
+export const getMenuItemBasePrice = (item: MenuItem) =>
+  toNumber(
+    item.happyHour?.originalPrice ??
+      item.promotion?.originalPrice ??
+      item.basePrice ??
+      item.price,
+    0,
+  );
+
+export const getMenuItemFinalPrice = (item: MenuItem) => {
+  const basePrice = getMenuItemBasePrice(item);
+  const promotion = getMenuItemPromotion(item);
+  const discountValue = toNumber(promotion?.discountValue, 0);
+  const backendDiscountAmount = toNumber(promotion?.discountAmount, 0);
+  const maxDiscountAmount = toNumber(promotion?.maxDiscountAmount, 0);
+  let discountAmount = 0;
+
+  if (backendDiscountAmount > 0) {
+    discountAmount = backendDiscountAmount;
+  } else if (promotion?.discountType === "PERCENTAGE") {
+    discountAmount = (basePrice * discountValue) / 100;
+  } else if (promotion?.discountType === "FLAT") {
+    discountAmount = discountValue;
+  }
+
+  if (maxDiscountAmount > 0) {
+    discountAmount = Math.min(discountAmount, maxDiscountAmount);
+  }
+
+  return Math.max(0, basePrice - Math.min(Math.max(discountAmount, 0), basePrice));
+};
+
+export const getMenuItemPromotionBadge = (
+  item: MenuItem,
+  fallback: string,
+  currency?: string | null,
+) => {
+  const promotion = getMenuItemPromotion(item);
+  const discountValue = toNumber(promotion?.discountValue, 0);
+
+  if (!promotion) return "";
+  if (promotion.title?.trim()) return promotion.title;
+  if (promotion.discountType === "PERCENTAGE" && discountValue > 0) return `${discountValue}% off`;
+  if (promotion.discountType === "FLAT" && discountValue > 0) return `${formatMoney(discountValue, currency)} off`;
+
+  return fallback;
+};

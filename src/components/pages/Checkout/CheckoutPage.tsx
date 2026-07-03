@@ -492,8 +492,7 @@ function CheckoutPageContent() {
     resetStripePayment();
 
     if (pendingOrderId) {
-      toast.success(t("toast.orderPlaced"));
-      await clearCart();
+      toast.info(t("toast.paymentPending"));
       router.push(`/order?orderId=${pendingOrderId}`);
     }
   };
@@ -1511,7 +1510,7 @@ function CheckoutPageContent() {
 
             <h2 className="mb-2 pr-10 text-lg font-semibold">{t("completePayment")}</h2>
             <p className="mb-5 text-sm leading-6 text-gray-500">
-              You can close this and continue payment later from your order details.
+              {t("paymentPendingDescription")}
             </p>
 
             <Elements
@@ -1526,7 +1525,7 @@ function CheckoutPageContent() {
 
                   window.dispatchEvent(new Event("loyalty-updated"));
                   await clearCart();
-                  router.push(`/order?success=true&orderId=${paidOrderId}`);
+                  router.push(`/order?orderId=${paidOrderId}`);
                 }}
               />
             </Elements>
@@ -1564,7 +1563,7 @@ const OrderStripeCheckout = ({
       }
 
       if (paymentIntent?.status === "succeeded") {
-        toast.success(t("toast.paymentSuccessful"));
+        toast.success(t("toast.paymentSuccessfulPendingWebhook"));
         onSuccess();
         return;
       }

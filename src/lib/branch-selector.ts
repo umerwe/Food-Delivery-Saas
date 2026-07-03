@@ -236,6 +236,14 @@ export const normalizeBranchApiResponse = (response: unknown): BranchApiResponse
 export const getActiveBranches = (response: unknown) =>
   normalizeBranchList(response).filter((branch) => branch.isActive !== false);
 
+export const getSoleActiveBranch = (response: unknown) => {
+  const activeBranches = getActiveBranches(response);
+
+  return activeBranches.length === 1
+    ? ({ ...activeBranches[0], isOnlyBranch: true } satisfies BranchRecord)
+    : null;
+};
+
 export const getSelectedOrderType = (
   user?: Pick<AuthUser, "branch" | "selectedOrderType"> | null
 ) => user?.selectedOrderType ?? user?.branch?.selectedOrderType ?? null;
@@ -292,6 +300,25 @@ export const branchSupportsPickup = (branch: Pick<BranchRecord, "settings"> | Ne
 
 export const branchSupportsDelivery = (branch: Pick<BranchRecord, "settings"> | NearbyBranch) =>
   branch.settings?.allowedOrderTypes?.includes("DELIVERY") ?? false;
+
+export const getDefaultBranchOrderType = (
+  branch: Pick<BranchRecord, "settings"> | NearbyBranch,
+  preferredType?: BranchOrderType | null
+): BranchOrderType => {
+  if (preferredType && branch.settings?.allowedOrderTypes?.includes(preferredType)) {
+    return preferredType;
+  }
+
+  if (branchSupportsDelivery(branch)) {
+    return "DELIVERY";
+  }
+
+  if (branchSupportsPickup(branch)) {
+    return "TAKEAWAY";
+  }
+
+  return preferredType ?? "DELIVERY";
+};
 
 export function formatBranchAddress(branch: Pick<BranchRecord, "address"> | NearbyBranch) {
   return formatDisplayAddress(branch.address, {

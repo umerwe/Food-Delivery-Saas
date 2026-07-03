@@ -5,7 +5,9 @@ import {
   branchSupportsPickup,
   formatBranchAddress,
   formatBranchDistance,
+  getDefaultBranchOrderType,
   getSelectedOrderType,
+  getSoleActiveBranch,
   isBranchCurrentlyAvailable,
   nearbyBranchToBranchRecord,
   normalizeBranch,
@@ -46,6 +48,34 @@ describe("branch selector helpers", () => {
         settings: { allowedOrderTypes: ["TAKEAWAY"] },
       })
     ).toBe(false);
+  });
+
+  it("detects the sole active branch and marks it for single-branch UX", () => {
+    expect(
+      getSoleActiveBranch({
+        data: [
+          { id: "branch-1", name: "Central", isActive: true },
+          { id: "branch-2", name: "Closed", isActive: false },
+        ],
+      })
+    ).toMatchObject({ id: "branch-1", isOnlyBranch: true });
+
+    expect(
+      getSoleActiveBranch({
+        data: [
+          { id: "branch-1", name: "Central", isActive: true },
+          { id: "branch-2", name: "North", isActive: true },
+        ],
+      })
+    ).toBeNull();
+  });
+
+  it("chooses a supported default order type for automatic single-branch selection", () => {
+    expect(getDefaultBranchOrderType(nearbyBranch, "TAKEAWAY")).toBe("TAKEAWAY");
+    expect(
+      getDefaultBranchOrderType({ settings: { allowedOrderTypes: ["TAKEAWAY"] } }, "DELIVERY")
+    ).toBe("TAKEAWAY");
+    expect(getDefaultBranchOrderType({ settings: undefined }, null)).toBe("DELIVERY");
   });
 
   it("formatBranchDistance works for metres and kilometres", () => {

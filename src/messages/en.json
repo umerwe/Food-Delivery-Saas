@@ -184,6 +184,8 @@
       "offersDescription": "Unlock branch deals and menu promos whenever they are live.",
       "orderPanelEyebrow": "Start your order",
       "orderPanelTitle": "Delivery or pickup",
+      "singleBranchPanelTitle": "Ready to order?",
+      "singleBranchSchedulePanelTitle": "Order ahead from this branch",
       "deliveryPanelTitle": "Delivery",
       "pickupPanelTitle": "Pickup",
       "scheduleDeliveryPanelTitle": "Schedule Delivery",
@@ -310,7 +312,7 @@
     },
     "giftCards": {
       "label": "Gift Cards",
-      "title": "Send a meal they will actually enjoy",
+      "title": "Title",
       "description": "Choose a preset gift card or set your own amount. Guests can pay securely by card without using wallet balance.",
       "instantCheckout": "Secure Stripe checkout",
       "emailDelivery": "Sent after payment confirmation",
@@ -327,7 +329,6 @@
       "buyerEmailPlaceholder": "name@example.com",
       "buyerName": "Buyer name",
       "buyerNamePlaceholder": "Your name",
-      "title": "Title",
       "titlePlaceholder": "Birthday Gift Card",
       "message": "Message",
       "messagePlaceholder": "Add a note for the recipient",
@@ -1006,8 +1007,11 @@
       "insufficientLoyaltyPoints": "Insufficient loyalty points",
       "paymentFailed": "Payment failed",
       "paymentSuccessful": "Payment successful",
-      "paymentNotCompleted": "Payment was not completed"
-    }
+      "paymentNotCompleted": "Payment was not completed",
+      "paymentPending": "Payment pending. You can continue payment from your order details.",
+      "paymentSuccessfulPendingWebhook": "Payment confirmed. We’ll update the order as soon as Stripe confirms it."
+    },
+    "paymentPendingDescription": "Complete the card payment so Stripe can confirm the order. You can close this and continue payment later from your order details."
   },
   "orders": {
     "orderDetails": "Order Details",
@@ -1040,7 +1044,7 @@
     "refundedAmount": "Refunded amount",
     "paymentDetails": "Payment Details",
     "paymentDescription": "Payment information for this order.",
-    "paymentPendingDescription": "Your order is placed, but payment is still pending. You can complete it now or come back later.",
+    "paymentPendingDescription": "Payment is still pending.",
     "paymentMethod": "Payment method",
     "amountDue": "Amount due",
     "paymentReference": "Payment reference",
@@ -1077,7 +1081,9 @@
     "reviewUnavailableTitle": "Review not available yet",
     "reviewUnavailableDescription": "You can review this order once it has been completed.",
     "cancel": "Cancel",
-    "loadingReviewsPage": "Loading reviews page..."
+    "loadingReviewsPage": "Loading reviews page...",
+    "stripePaymentPendingDescription": "This Stripe order is not placed yet. Complete payment, then the order status will update automatically after Stripe confirmation.",
+    "paymentPendingOverviewDescription": "Payment pending — this order will be placed only after successful Stripe confirmation."
   },
   "ordersHistory": {
     "title": "Your Order History",
@@ -1491,12 +1497,15 @@
     "successNotice": {
       "title": "Order placed successfully",
       "description": "We have received your order. You can track the latest status below.",
-      "paymentPendingTitle": "Order placed, payment pending",
-      "paymentPendingDescription": "Your order has been created. Complete the Stripe payment from the payment panel to finish checkout."
+      "paymentPendingTitle": "Payment pending",
+      "paymentPendingDescription": "This Stripe order is not placed yet. Complete online payment and we will update the status automatically after confirmation."
     },
     "completePayment": "Complete payment",
     "completePaymentDescription": "This will retry the pending Stripe payment attempt for the same order.",
-    "closePaymentPopup": "Close payment popup"
+    "closePaymentPopup": "Close payment popup",
+    "paymentPendingHeading": "Complete your payment",
+    "paymentPendingStatus": "Payment pending",
+    "paymentPendingTrackingDescription": "Order tracking starts after Stripe confirms payment and the order is marked placed."
   },
   "notifications": {
     "title": "Notifications",
@@ -1867,5 +1876,35 @@
   },
   "errors": {
     "somethingWentWrong": "Something went wrong"
+  },
+  "cuisines": {
+    "eyebrow": "Cuisines",
+    "title": "Explore cuisines",
+    "description": "Browse by cuisine in a dedicated experience, separate from regular menu categories and item lists.",
+    "browseTitle": "All cuisines",
+    "browseDescription": "Search cuisines and open a dedicated cuisine page.",
+    "searchPlaceholder": "Search cuisines",
+    "empty": "No cuisines found",
+    "fallbackDescription": "Explore dishes curated for this cuisine.",
+    "detailDescription": "Explore dishes curated for this cuisine.",
+    "backToCuisines": "Back to cuisines",
+    "itemsEyebrow": "Cuisine items",
+    "itemsTitle": "Dishes in this cuisine",
+    "emptyItems": "No items found for this cuisine yet.",
+    "itemCount": "{count} items",
+    "exploreItems": "Explore items",
+    "viewCuisine": "View cuisine",
+    "menuItem": "Menu item",
+    "itemFallbackDescription": "Freshly prepared and ready to order.",
+    "badges": {
+      "cuisine": "Cuisine",
+      "promotion": "Special offer"
+    },
+    "home": {
+      "eyebrow": "Explore cuisines",
+      "title": "Order by cuisine",
+      "description": "A separate cuisine section, kept apart from regular categories and menu items.",
+      "viewAll": "View all cuisines"
+    }
   }
 }

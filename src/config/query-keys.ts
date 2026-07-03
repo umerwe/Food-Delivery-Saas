@@ -46,6 +46,11 @@ export const queryKeys = {
     helpSupport: (restaurantId?: string | null, branchId?: string | null) => ["customer-home", "help-support", restaurantId ?? "", branchId ?? ""] as const,
     faqs: (restaurantId?: string | null, branchId?: string | null) => ["customer-home", "faqs", restaurantId ?? "", branchId ?? ""] as const,
   },
+  cuisines: {
+    list: (params: Record<string, unknown>) => ["customer-cuisines", "list", params] as const,
+    items: (params: Record<string, unknown>) => ["customer-cuisines", "items", params] as const,
+    promotional: (params: Record<string, unknown>) => ["customer-cuisines", "promotional", params] as const,
+  },
   customerDeals: {
     list: (params: Record<string, unknown>) => ["customer-deals", "list", params] as const,
   },

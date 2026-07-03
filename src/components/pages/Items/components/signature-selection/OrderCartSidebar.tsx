@@ -523,28 +523,6 @@ export function OrderCartSidebar({
                             </p>
                           )}
                           <div className="space-y-0.5">
-                            <p className="text-[11px] text-gray-400">
-                              {itemDiscountDisplay ? (
-                                <>
-                                  {t("each", {
-                                    price: formatCurrency(itemDiscountDisplay.discountedUnitPriceWithModifiers, currency),
-                                  })}
-                                  <span className="ml-1 line-through decoration-gray-400">
-                                    {formatCurrency(unitPriceWithModifiers, currency)}
-                                  </span>
-                                </>
-                              ) : (
-                                t("each", { price: formatCurrency(unitPriceWithModifiers, currency) })
-                              )}
-                            </p>
-                            {selectedAddons.length > 0 ? (
-                              <p className="text-[11px] text-gray-400">
-                                {t("priceWithAddons", {
-                                  price: formatCurrency(checkoutUnitPrice, currency),
-                                  addons: formatCurrency(modifiersTotal, currency),
-                                })}
-                              </p>
-                            ) : null}
                             {itemDepositTotal > 0 ? (
                               <p className="text-[11px] text-gray-400">
                                 {t("includesDeposit", { amount: formatCurrency(itemDepositTotal, currency) })}

@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuthContext } from "@/hooks/useAuth";
+import useBranches from "@/hooks/useBranches";
 import { BranchSelectorModal } from "./BranchSelectorModal";
 import { Branch } from "@/types/branch-selector";
+import {
+  getDefaultBranchOrderType,
+  getSelectedOrderType,
+  getSoleActiveBranch,
+  persistSelectedBranch,
+} from "@/lib/branch-selector";
 
 type RequiredBranchSelectionModalProps = {
   restaurantId?: string | number | null;
@@ -18,9 +25,12 @@ export function RequiredBranchSelectionModal({
   onSelected,
 }: RequiredBranchSelectionModalProps) {
   const t = useTranslations("branchSelector");
-  const { token, user } = useAuthContext();
+  const { token, user, setUser } = useAuthContext();
+  const branchesApi = useBranches(token);
+  const fetchBranchPage = branchesApi.fetchBranchPage;
   const [open, setOpen] = useState(false);
   const [dismissedEmptyState, setDismissedEmptyState] = useState(false);
+  const [checkedKey, setCheckedKey] = useState<string | null>(null);
 
   const resolvedRestaurantId = useMemo(() => {
     return restaurantId || user?.restaurantId || user?.tenantId || null;
@@ -28,6 +38,22 @@ export function RequiredBranchSelectionModal({
 
   const shouldShow =
     !!token && !!user && !user?.branchId && !!resolvedRestaurantId;
+  const shouldCheckSingleBranch =
+    !!token &&
+    !!user &&
+    !!resolvedRestaurantId &&
+    (!user?.branchId || user?.branch?.isOnlyBranch !== true);
+  const checkKey = shouldCheckSingleBranch
+    ? `${user?.id ?? ""}:${resolvedRestaurantId ?? ""}:${user?.branchId ?? "none"}`
+    : null;
+  const isCheckingSingleBranch = shouldShow && checkedKey !== checkKey;
+
+  const buildBranchLookupUrl = useCallback(() => {
+    const baseUrl = endpoint || `/v1/branches?restaurantId=${resolvedRestaurantId}`;
+    const separator = baseUrl.includes("?") ? "&" : "?";
+
+    return `${baseUrl}${separator}page=1&limit=100`;
+  }, [endpoint, resolvedRestaurantId]);
 
   /*
    * Reset dismissal when the auth/restaurant context changes.
@@ -36,11 +62,48 @@ export function RequiredBranchSelectionModal({
    */
   useEffect(() => {
     setDismissedEmptyState(false);
+    setCheckedKey(null);
   }, [user?.id, user?.branchId, resolvedRestaurantId]);
 
   useEffect(() => {
-    setOpen(shouldShow && !dismissedEmptyState);
-  }, [shouldShow, dismissedEmptyState]);
+    if (!shouldCheckSingleBranch || !checkKey) return;
+
+    let cancelled = false;
+
+    const selectSoleBranch = async () => {
+      try {
+        const response = await fetchBranchPage(buildBranchLookupUrl());
+        const soleBranch = getSoleActiveBranch(response);
+
+        if (cancelled) return;
+
+        if (soleBranch) {
+          persistSelectedBranch(soleBranch, setUser, {
+            orderType: getDefaultBranchOrderType(soleBranch, getSelectedOrderType(user)),
+          });
+          setDismissedEmptyState(false);
+          setOpen(false);
+          onSelected?.(soleBranch);
+        }
+      } catch {
+        // Fall through to the normal selector if the lightweight pre-check fails.
+      } finally {
+        if (!cancelled) {
+          setCheckedKey(checkKey);
+        }
+      }
+    };
+
+    selectSoleBranch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [buildBranchLookupUrl, checkKey, fetchBranchPage, onSelected, setUser, shouldCheckSingleBranch, user]);
+
+  useEffect(() => {
+    setOpen(shouldShow && !dismissedEmptyState && !isCheckingSingleBranch);
+  }, [shouldShow, dismissedEmptyState, isCheckingSingleBranch]);
 
   const handleClose = () => {
     /*
@@ -58,7 +121,7 @@ export function RequiredBranchSelectionModal({
     onSelected?.(branch);
   };
 
-  if ((!shouldShow || dismissedEmptyState) && !open) return null;
+  if (((!shouldShow || dismissedEmptyState) && !open) || isCheckingSingleBranch) return null;
 
   return (
     <BranchSelectorModal

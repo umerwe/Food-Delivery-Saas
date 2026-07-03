@@ -184,6 +184,8 @@
       "offersDescription": "Nutzen Sie Filialangebote und Menüaktionen, sobald sie verfügbar sind.",
       "orderPanelEyebrow": "Bestellung starten",
       "orderPanelTitle": "Lieferung oder Abholung",
+      "singleBranchPanelTitle": "Bereit zum Bestellen?",
+      "singleBranchSchedulePanelTitle": "Bei dieser Filiale vorbestellen",
       "deliveryPanelTitle": "Lieferung",
       "pickupPanelTitle": "Abholung",
       "scheduleDeliveryPanelTitle": "Lieferung planen",
@@ -310,7 +312,7 @@
     },
     "giftCards": {
       "label": "Geschenkkarten",
-      "title": "Verschenken Sie eine Mahlzeit, die wirklich Freude macht",
+      "title": "Titel",
       "description": "Wählen Sie eine voreingestellte Geschenkkarte oder legen Sie einen eigenen Betrag fest. Gäste zahlen sicher per Karte, ohne Wallet-Guthaben zu nutzen.",
       "instantCheckout": "Sicherer Stripe-Checkout",
       "emailDelivery": "Versand nach Zahlungsbestätigung",
@@ -327,7 +329,6 @@
       "buyerEmailPlaceholder": "name@example.com",
       "buyerName": "Name des Käufers",
       "buyerNamePlaceholder": "Ihr Name",
-      "title": "Titel",
       "titlePlaceholder": "Geburtstags-Geschenkkarte",
       "message": "Nachricht",
       "messagePlaceholder": "Nachricht für den Empfänger hinzufügen",
@@ -1006,8 +1007,11 @@
       "insufficientLoyaltyPoints": "Nicht genügend Treuepunkte",
       "paymentFailed": "Zahlung fehlgeschlagen",
       "paymentSuccessful": "Zahlung erfolgreich",
-      "paymentNotCompleted": "Zahlung wurde nicht abgeschlossen"
-    }
+      "paymentNotCompleted": "Zahlung wurde nicht abgeschlossen",
+      "paymentPending": "Zahlung ausstehend. Du kannst die Zahlung über die Bestelldetails fortsetzen.",
+      "paymentSuccessfulPendingWebhook": "Zahlung bestätigt. Wir aktualisieren die Bestellung, sobald Stripe sie bestätigt."
+    },
+    "paymentPendingDescription": "Schließe die Kartenzahlung ab, damit Stripe die Bestellung bestätigen kann. Du kannst dieses Fenster schließen und später über die Bestelldetails fortfahren."
   },
   "orders": {
     "orderDetails": "Bestelldetails",
@@ -1040,7 +1044,7 @@
     "refundedAmount": "Erstatteter Betrag",
     "paymentDetails": "Zahlungsdetails",
     "paymentDescription": "Zahlungsinformationen für diese Bestellung.",
-    "paymentPendingDescription": "Ihre Bestellung wurde aufgegeben, aber die Zahlung ist noch ausstehend. Sie können sie jetzt abschließen oder später fortsetzen.",
+    "paymentPendingDescription": "Die Zahlung ist noch ausstehend.",
     "paymentMethod": "Zahlungsmethode",
     "amountDue": "Fälliger Betrag",
     "paymentReference": "Zahlungsreferenz",
@@ -1077,7 +1081,9 @@
     "reviewUnavailableTitle": "Bewertung noch nicht verfügbar",
     "reviewUnavailableDescription": "Sie können diese Bestellung bewerten, sobald sie abgeschlossen ist.",
     "cancel": "Abbrechen",
-    "loadingReviewsPage": "Bewertungsseite wird geladen..."
+    "loadingReviewsPage": "Bewertungsseite wird geladen...",
+    "stripePaymentPendingDescription": "Diese Stripe-Bestellung ist noch nicht platziert. Schließe die Zahlung ab; nach der Stripe-Bestätigung wird der Bestellstatus automatisch aktualisiert.",
+    "paymentPendingOverviewDescription": "Zahlung ausstehend — die Bestellung wird erst nach erfolgreicher Stripe-Bestätigung platziert."
   },
   "ordersHistory": {
     "title": "Ihre Bestellhistorie",
@@ -1491,12 +1497,15 @@
     "successNotice": {
       "title": "Bestellung erfolgreich aufgegeben",
       "description": "Wir haben Ihre Bestellung erhalten. Den aktuellen Status können Sie unten verfolgen.",
-      "paymentPendingTitle": "Bestellung aufgegeben, Zahlung ausstehend",
-      "paymentPendingDescription": "Ihre Bestellung wurde erstellt. Schließen Sie die Stripe-Zahlung im Zahlungsbereich ab, um den Checkout zu beenden."
+      "paymentPendingTitle": "Zahlung ausstehend",
+      "paymentPendingDescription": "Diese Stripe-Bestellung ist noch nicht platziert. Schließe die Online-Zahlung ab; danach aktualisieren wir den Status automatisch."
     },
     "completePayment": "Zahlung abschließen",
     "completePaymentDescription": "Dies startet den ausstehenden Stripe-Zahlungsversuch für dieselbe Bestellung erneut.",
-    "closePaymentPopup": "Zahlungspopup schließen"
+    "closePaymentPopup": "Zahlungspopup schließen",
+    "paymentPendingHeading": "Zahlung abschließen",
+    "paymentPendingStatus": "Zahlung ausstehend",
+    "paymentPendingTrackingDescription": "Tracking startet, sobald Stripe die Zahlung bestätigt und die Bestellung als platziert markiert wurde."
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -1867,5 +1876,35 @@
   },
   "errors": {
     "somethingWentWrong": "Etwas ist schiefgelaufen"
+  },
+  "cuisines": {
+    "eyebrow": "Küchen",
+    "title": "Küchen entdecken",
+    "description": "Stöbere nach Küche in einem eigenen Bereich – getrennt von regulären Kategorien und Artikeln.",
+    "browseTitle": "Alle Küchen",
+    "browseDescription": "Suche nach einer Küche und öffne eine eigene Küchenseite.",
+    "searchPlaceholder": "Küchen suchen",
+    "empty": "Keine Küchen gefunden",
+    "fallbackDescription": "Entdecke Gerichte aus dieser Küche.",
+    "detailDescription": "Entdecke Gerichte aus dieser Küche.",
+    "backToCuisines": "Zurück zu Küchen",
+    "itemsEyebrow": "Küchenartikel",
+    "itemsTitle": "Gerichte dieser Küche",
+    "emptyItems": "Keine Artikel für diese Küche gefunden.",
+    "itemCount": "{count} Artikel",
+    "exploreItems": "Artikel ansehen",
+    "viewCuisine": "Küche ansehen",
+    "menuItem": "Menüartikel",
+    "itemFallbackDescription": "Frisch zubereitet und bereit zum Bestellen.",
+    "badges": {
+      "cuisine": "Küche",
+      "promotion": "Angebot"
+    },
+    "home": {
+      "eyebrow": "Küchen entdecken",
+      "title": "Nach Küche bestellen",
+      "description": "Ein eigener Küchenbereich – getrennt von regulären Kategorien und Menüartikeln.",
+      "viewAll": "Alle Küchen ansehen"
+    }
   }
 }

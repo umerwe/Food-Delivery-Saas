@@ -14,6 +14,7 @@ import { CustomerDealsSection } from "@/components/pages/Home/components/Custome
 import { GiftCardsSection } from "@/components/pages/Home/components/GiftCardsSection";
 import { MobileHomeExperience } from "@/components/pages/Home/components/MobileHomeExperience";
 import { PromotionalItemsSection } from "@/components/pages/Home/components/PromotionalItemsSection";
+import { CuisineSection } from "@/components/pages/Cuisines/CuisineSection";
 
 import { DEFAULT_BRANDING } from "@/config/default-branding";
 import { useAuth } from "@/hooks/useAuth";
@@ -121,6 +122,7 @@ const mergeHomeBranch = (
   return {
     ...sessionBranch,
     ...homeBranch,
+    isOnlyBranch: sessionBranch.isOnlyBranch,
     settings: mergeBranchSettings(homeBranch.settings, sessionBranch.settings),
     availability: {
       ...(sessionHomeBranch.availability ?? {}),
@@ -215,6 +217,8 @@ const HomePage = () => {
           currency={currency}
         />
 
+        <CuisineSection />
+
         <WhyChooseUs />
         <AppPromo />
         <Stats />
@@ -236,6 +240,8 @@ const HomePage = () => {
             <FoodCategorySection />
           </section>
         ) : null}
+
+        <CuisineSection />
 
         <PromotionalItemsSection
           items={promotionalItemsQuery.data ?? []}
