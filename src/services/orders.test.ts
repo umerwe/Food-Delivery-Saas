@@ -225,6 +225,38 @@ describe("normalizeOrderDetail", () => {
     expect(order?.items?.[0]?.variationName).toBe("Small");
   });
 
+  it("preserves deal coupon metadata and item count for order details", () => {
+    const order = normalizeOrderDetail({
+      id: "order-1",
+      status: "PLACED",
+      createdAt: "2026-07-06T12:34:22.085Z",
+      itemCount: 3,
+      couponId: "coupon-1",
+      coupon: {
+        id: "coupon-1",
+        code: "DEAL-A7165991",
+        title: "222. Single Angebot",
+      },
+      items: [
+        {
+          id: "item-1",
+          menuItemName: "4. Pizza Tuna",
+          quantity: 1,
+          unitPrice: 15,
+          lineTotal: 15,
+        },
+      ],
+    });
+
+    expect(order?.itemCount).toBe(3);
+    expect(order?.couponId).toBe("coupon-1");
+    expect(order?.coupon).toEqual({
+      id: "coupon-1",
+      code: "DEAL-A7165991",
+      title: "222. Single Angebot",
+    });
+  });
+
   it("keeps legacy flat tip fields available for order details", () => {
     const order = normalizeOrderDetail({
       id: "order-1",

@@ -345,6 +345,14 @@ export const quoteCustomerCart = ({
   token?: string | null;
 }) => postCart(`/v1/cart/quote?customerId=${customerId}`, normalizeCartQuotePayload(payload), token);
 
+export const cleanUpdateCartItemPayload = (payload: CartMutationPayload): CartMutationPayload => {
+  const cleanedPayload: CartMutationPayload = { ...payload };
+
+  delete cleanedPayload.restaurantMenuId;
+
+  return cleanedPayload;
+};
+
 export const updateCustomerCartItem = ({
   cartItemId,
   payload,
@@ -353,7 +361,7 @@ export const updateCustomerCartItem = ({
   cartItemId: string;
   payload: CartMutationPayload;
   token?: string | null;
-}) => patchCart(`/v1/cart/items/${cartItemId}`, payload, token);
+}) => patchCart(`/v1/cart/items/${cartItemId}`, cleanUpdateCartItemPayload(payload), token);
 
 export const clearCustomerCart = ({ customerId, token }: { customerId: string; token?: string | null }) =>
   deleteCart(`/v1/cart?customerId=${customerId}`, token);

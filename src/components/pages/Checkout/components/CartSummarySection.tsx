@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import {
   getDisplayTotalAmount,
+  getServiceChargeLabel,
   getTipAdjustedDisplayTotalAmount,
   shouldShowPositiveAmountLine,
 } from "@/components/pages/Checkout/utils/checkout-formatters";
@@ -138,6 +139,8 @@ interface CartQuote {
   serviceChargeAmount?: number | string;
   tipAmount?: number | string;
   discountAmount?: number | string;
+  hasDiscount?: boolean;
+  totalBeforeDiscount?: number | string;
   couponCode?: string;
   walletAppliedAmount?: number | string;
   loyaltyDiscountAmount?: number | string;
@@ -635,6 +638,25 @@ export const getTotalBeforeDiscount = ({
   tipAmount?: number;
 }) => subtotal + orderFee + tipAmount;
 
+export const getServiceChargeAmountFromQuote = (quote?: CartQuote | null) => {
+  const breakdownTotal = toNullableNumber(quote?.chargeBreakdown?.totalServiceChargeAmount);
+
+  if (breakdownTotal !== null) {
+    return Math.max(0, breakdownTotal);
+  }
+
+  const directAmount = toNullableNumber(quote?.serviceChargeAmount);
+
+  if (directAmount !== null) {
+    return Math.max(0, directAmount);
+  }
+
+  return Math.max(
+    0,
+    (quote?.chargeBreakdown?.serviceCharges ?? []).reduce((total, line) => total + toNumber(line.amount, 0), 0)
+  );
+};
+
 const hasDiscountMetadata = (value: unknown) => {
   return typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length > 0;
 };
@@ -824,6 +846,13 @@ export function CartSummarySection({
     toNullableNumber(resolvedQuote?.tipAmount) ??
     Math.max(0, toNumber(appliedTipAmount, 0));
   const quotePayableAmount = resolvedQuote ? getDisplayTotalAmount(resolvedQuote) : null;
+  const serviceChargeAmount = getServiceChargeAmountFromQuote(resolvedQuote);
+  const serviceChargeLabel = getServiceChargeLabel({
+    serviceChargeType: resolvedQuote?.serviceChargeType,
+    serviceChargeValue: resolvedQuote?.serviceChargeValue,
+    serviceChargeLabel: t("totals.serviceCharge"),
+    serviceChargeWithPercentageLabel: (value) => t("totals.serviceChargeWithPercentage", { value }),
+  });
   const [tipInput, setTipInput] = useState("");
   const loyaltyPointsValue = Math.max(0, Math.floor(toNumber(loyaltyPoints, 0)));
   const loyaltyEstimatedDiscount = loyaltyPointsValue * toNumber(loyalty?.redemptionValuePerPoint, 0);
@@ -880,7 +909,8 @@ export function CartSummarySection({
     tipAmount,
   });
 
-  const totalBeforeDiscount = getTotalBeforeDiscount({
+  const backendTotalBeforeDiscount = toNullableNumber(resolvedQuote?.totalBeforeDiscount);
+  const totalBeforeDiscount = backendTotalBeforeDiscount ?? getTotalBeforeDiscount({
     subtotal: quoteSubtotal !== null ? quoteSubtotal : itemTotal,
     orderFee: selectedOrderFee,
     tipAmount,
@@ -912,8 +942,14 @@ export function CartSummarySection({
         );
   const displayedFinalTotal = Math.max(0, finalTotal - loyaltyPreviewDiscount);
 
-  const hasAnyDiscount =
-    discount > 0 || loyaltyDiscount > 0 || loyaltyPreviewDiscount > 0 || walletAppliedAmount > 0;
+  const hasActualDiscount =
+    resolvedQuote?.hasDiscount === true ||
+    discount > 0 ||
+    loyaltyDiscount > 0 ||
+    loyaltyPreviewDiscount > 0 ||
+    scopedItemDiscountDisplays.size > 0;
+  const hasAnyDiscount = hasActualDiscount || walletAppliedAmount > 0;
+  const shouldShowTotalBeforeDiscount = hasActualDiscount;
 
   const handleEditItem = (item: CartItem) => {
     const menuItemId = getMenuItemId(item);
@@ -1474,6 +1510,13 @@ export function CartSummarySection({
             </div>
           ) : null}
 
+          {shouldShowPositiveAmountLine(serviceChargeAmount) ? (
+            <div className="flex items-center justify-between">
+              <span>{serviceChargeLabel}</span>
+              <span>{formatCurrency(serviceChargeAmount, currency)}</span>
+            </div>
+          ) : null}
+
           {shouldShowPositiveAmountLine(tipAmount) ? (
             <div className="flex items-center justify-between">
               <span>{t("totals.tip")}</span>
@@ -1666,10 +1709,12 @@ export function CartSummarySection({
         ) : null}
 
         <div className="space-y-[15px]">
-          <div className="flex items-center justify-between pt-[15px] text-sm text-gray-500">
-            <span>{t("totalBeforeDiscount")}</span>
-            <span>{formatCurrency(totalBeforeDiscount, currency)}</span>
-          </div>
+          {shouldShowTotalBeforeDiscount ? (
+            <div className="flex items-center justify-between pt-[15px] text-sm text-gray-500">
+              <span>{t("totalBeforeDiscount")}</span>
+              <span>{formatCurrency(totalBeforeDiscount, currency)}</span>
+            </div>
+          ) : null}
 
           {discount > 0 ? (
             <div className="flex items-center justify-between text-sm text-green-600">

@@ -77,16 +77,25 @@ const getModifierLines = (item: OrderItem) => {
   return [...modifierNames, ...snapshotNames];
 };
 
+const getIncludedDealItemName = (item: OrderItem, fallback: string) =>
+  `${item.quantity}× ${item.menuItemName || fallback}`;
+
 export default function OrderSummary({
   title,
   order,
   onContinuePayment,
   continuingPayment,
+  onChangePaymentMethod,
+  changingPaymentMethod,
+  canSwitchPaymentMethod,
 }: {
   title?: string;
   order?: Order | null;
   onContinuePayment?: () => void;
   continuingPayment?: boolean;
+  onChangePaymentMethod?: (paymentMethod: string) => void;
+  changingPaymentMethod?: string | null;
+  canSwitchPaymentMethod?: boolean;
 }) {
   const t = useTranslations("orders");
   const orderStatusT = useTranslations("orderStatus");
@@ -140,8 +149,29 @@ export default function OrderSummary({
     Boolean(onContinuePayment && order?.id) &&
     paymentMethod === "STRIPE" &&
     (paymentStatus === "PENDING" || paymentStatus === "FAILED");
+  const fallbackPaymentMethods = ["COD", "WALLET", "STRIPE", "PAYPAL", "CARD_ON_DELIVERY"];
+  const paymentSwitchOptions = (order?.payment?.availableMethods?.length
+    ? order.payment.availableMethods
+    : order?.availablePaymentMethods?.length
+      ? order.availablePaymentMethods
+      : fallbackPaymentMethods
+  )
+    .map((method) => method.toUpperCase())
+    .filter((method, index, methods) => method && methods.indexOf(method) === index && method !== paymentMethod);
+  const showPaymentSwitcher = Boolean(canSwitchPaymentMethod && onChangePaymentMethod && paymentSwitchOptions.length > 0);
   const deliveryAddress = formatDisplayAddress(order?.deliveryAddress);
   const paymentPendingStripeOrder = isPaymentPendingStripeOrder(order);
+  const couponCode = order?.coupon?.code?.trim() || "";
+  const couponTitle = order?.coupon?.title?.trim() || "";
+  const isDealCoupon = /^DEAL-/i.test(couponCode);
+  const hasBackendDealRows = orderItems.some((item) => Boolean(item.dealId || item.includedItems?.length));
+  const shouldShowInferredDeal = Boolean(isDealCoupon && !hasBackendDealRows && orderItems.length > 0);
+  const inferredDealTotal = order?.subtotal ?? orderItems.reduce((total, item) => {
+    const fallbackTotal = getAmountNumber(item.unitPrice) * getAmountNumber(item.quantity);
+
+    return total + getAmountNumber(item.lineTotal ?? fallbackTotal);
+  }, 0);
+  const inferredDealImage = orderItems.find((item) => item.imageUrl || item.menuItem?.imageUrl);
 
   const formatDateTime = (value?: string | null) => {
     if (!value) return "";
@@ -184,6 +214,23 @@ export default function OrderSummary({
         return t("paymentStatus.unknown");
     }
   })();
+
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case "COD":
+        return t("paymentMethods.cod");
+      case "WALLET":
+        return t("paymentMethods.wallet");
+      case "STRIPE":
+        return t("paymentMethods.stripe");
+      case "PAYPAL":
+        return t("paymentMethods.paypal");
+      case "CARD_ON_DELIVERY":
+        return t("paymentMethods.cardOnDelivery");
+      default:
+        return humanizeEnum(method) || method;
+    }
+  };
 
   return (
     <div className="sticky top-10 space-y-[42.63px]">
@@ -321,57 +368,140 @@ export default function OrderSummary({
         </h2>
 
         <div className="space-y-[19px]">
-          {orderItems.map((item: OrderItem) => {
-            const modifierLines = getModifierLines(item);
-            const itemTotal = item.lineTotal ?? getAmountNumber(item.unitPrice) * getAmountNumber(item.quantity);
-
-            return (
-            <div key={item.id} className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+          {shouldShowInferredDeal ? (
+            <div className="rounded-2xl border border-primary/15 bg-white p-3 shadow-sm">
               <div className="flex items-center gap-4">
-              <div className="relative w-[76px] h-[76px] rounded-[12px] overflow-hidden">
-                <Image
-                  src={item.imageUrl || item.menuItem?.imageUrl || "/placeholder.png"}
-                  alt={item.menuItemName || t("itemFallback")}
-                  fill
-                  className="object-cover"
-                />
-              </div>
+                <div className="relative h-[76px] w-[76px] overflow-hidden rounded-[12px]">
+                  <Image
+                    src={inferredDealImage?.imageUrl || inferredDealImage?.menuItem?.imageUrl || "/placeholder.png"}
+                    alt={couponTitle || t("deal")}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
 
-              <div className="flex-1 space-y-[8px]">
-                <h4 className="text-base font-medium text-gray-900">
-                  {item.menuItemName}
-                </h4>
+                <div className="flex-1 space-y-[8px]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-primary">
+                      {t("deal")}
+                    </span>
+                    {couponCode ? (
+                      <span className="text-xs font-medium text-gray-500">
+                        {t("dealCode")}: {couponCode}
+                      </span>
+                    ) : null}
+                  </div>
 
-                <p className="text-xs text-gray-500">
-                  {[item.variationName, item.menuItem?.category?.name].filter(Boolean).join(" · ")}
-                </p>
+                  <h4 className="text-base font-medium text-gray-900">
+                    {couponTitle || t("deal")}
+                  </h4>
 
-                <div className="flex justify-between">
-                  <p className="text-base font-medium text-primary">
-                    {formatMoney(item.unitPrice, paymentCurrency)}
-                  </p>
+                  <div className="flex justify-between gap-4">
+                    <p className="text-base font-medium text-primary">
+                      {formatMoney(inferredDealTotal, paymentCurrency)}
+                    </p>
 
-                  <div className="text-sm text-gray-700">
-                    {t("quantityShort")}: {item.quantity}
+                    <div className="text-sm text-gray-700">
+                      {t("quantityShort")}: 1
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-              {modifierLines.length > 0 ? (
-                <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">
-                  <span className="font-semibold text-gray-600">{t("modifiers")}:</span>{" "}
-                  {modifierLines.join(", ")}
+
+              <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                <p className="text-xs font-semibold text-gray-600">{t("dealIncludes")}:</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {orderItems.map((item) => {
+                    const modifiers = getModifierLines(item);
+                    const itemName = getIncludedDealItemName(item, t("itemFallback"));
+                    const itemImage = item.imageUrl || item.menuItem?.imageUrl || "/placeholder.png";
+
+                    return (
+                      <div key={item.id} className="flex items-center gap-2 rounded-lg bg-white p-2 shadow-sm ring-1 ring-gray-100">
+                        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                          <Image
+                            src={itemImage}
+                            alt={item.menuItemName || t("itemFallback")}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-gray-800">
+                            {itemName}
+                          </p>
+                          {modifiers.length > 0 ? (
+                            <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                              {modifiers.join(", ")}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : null}
+              </div>
+
               <div className="mt-3 flex items-center justify-between border-t border-dashed border-gray-100 pt-3 text-sm">
                 <span className="text-gray-500">{t("lineTotal")}</span>
                 <span className="font-semibold text-gray-900">
-                  {formatMoney(itemTotal, paymentCurrency)}
+                  {formatMoney(inferredDealTotal, paymentCurrency)}
                 </span>
               </div>
             </div>
-            );
-          })}
+          ) : (
+            orderItems.map((item: OrderItem) => {
+              const modifierLines = getModifierLines(item);
+              const itemTotal = item.lineTotal ?? getAmountNumber(item.unitPrice) * getAmountNumber(item.quantity);
+
+              return (
+              <div key={item.id} className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+                <div className="flex items-center gap-4">
+                <div className="relative w-[76px] h-[76px] rounded-[12px] overflow-hidden">
+                  <Image
+                    src={item.imageUrl || item.menuItem?.imageUrl || "/placeholder.png"}
+                    alt={item.menuItemName || t("itemFallback")}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+
+                <div className="flex-1 space-y-[8px]">
+                  <h4 className="text-base font-medium text-gray-900">
+                    {item.menuItemName}
+                  </h4>
+
+                  <p className="text-xs text-gray-500">
+                    {[item.variationName, item.menuItem?.category?.name].filter(Boolean).join(" · ")}
+                  </p>
+
+                  <div className="flex justify-between">
+                    <p className="text-base font-medium text-primary">
+                      {formatMoney(item.unitPrice, paymentCurrency)}
+                    </p>
+
+                    <div className="text-sm text-gray-700">
+                      {t("quantityShort")}: {item.quantity}
+                    </div>
+                  </div>
+                </div>
+              </div>
+                {modifierLines.length > 0 ? (
+                  <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">
+                    <span className="font-semibold text-gray-600">{t("modifiers")}:</span>{" "}
+                    {modifierLines.join(", ")}
+                  </div>
+                ) : null}
+                <div className="mt-3 flex items-center justify-between border-t border-dashed border-gray-100 pt-3 text-sm">
+                  <span className="text-gray-500">{t("lineTotal")}</span>
+                  <span className="font-semibold text-gray-900">
+                    {formatMoney(itemTotal, paymentCurrency)}
+                  </span>
+                </div>
+              </div>
+              );
+            })
+          )}
         </div>
       </section>
 
@@ -530,7 +660,7 @@ export default function OrderSummary({
             <button
               type="button"
               onClick={onContinuePayment}
-              disabled={continuingPayment}
+              disabled={continuingPayment || Boolean(changingPaymentMethod)}
               className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(193,0,10,0.22)] transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {continuingPayment ? (
@@ -540,6 +670,31 @@ export default function OrderSummary({
               )}
               {paymentStatus === "FAILED" ? t("retryPayment") : t("continuePayment")}
             </button>
+          ) : null}
+
+          {showPaymentSwitcher ? (
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
+              <p className="text-sm font-semibold text-gray-900">{t("switchPaymentMethod")}</p>
+              <p className="mt-1 text-xs leading-5 text-gray-600">{t("switchPaymentMethodDescription")}</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {paymentSwitchOptions.map((method) => {
+                  const isChanging = changingPaymentMethod === method;
+
+                  return (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => onChangePaymentMethod?.(method)}
+                      disabled={Boolean(changingPaymentMethod) || continuingPayment}
+                      className="flex h-10 items-center justify-center gap-2 rounded-full border border-white bg-white px-3 text-xs font-semibold text-gray-800 shadow-sm transition hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isChanging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                      {getPaymentMethodLabel(method)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ) : null}
         </section>
       ) : null}

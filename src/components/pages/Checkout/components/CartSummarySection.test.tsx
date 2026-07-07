@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getItemPricing,
   getScopedItemDiscountDisplays,
+  getServiceChargeAmountFromQuote,
   getTotalBeforeDiscount,
   type CartItem,
 } from "./CartSummarySection";
@@ -31,6 +32,30 @@ describe("getTotalBeforeDiscount", () => {
         tipAmount: 25,
       })
     ).toBe(1075);
+  });
+});
+
+describe("getServiceChargeAmountFromQuote", () => {
+  it("reads service charge amount from direct and charge breakdown quote fields", () => {
+    expect(getServiceChargeAmountFromQuote({ serviceChargeAmount: 1.5 })).toBe(1.5);
+    expect(
+      getServiceChargeAmountFromQuote({
+        chargeBreakdown: {
+          totalServiceChargeAmount: 2.5,
+          serviceCharges: [{ label: "Service", amount: 1 }],
+        },
+      })
+    ).toBe(2.5);
+    expect(
+      getServiceChargeAmountFromQuote({
+        chargeBreakdown: {
+          serviceCharges: [
+            { label: "Service", amount: 1 },
+            { label: "Packaging", amount: 0.5 },
+          ],
+        },
+      })
+    ).toBe(1.5);
   });
 });
 

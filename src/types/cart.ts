@@ -90,6 +90,8 @@ export type CartQuote = {
   serviceChargeAmount?: number;
   tipAmount?: number;
   discountAmount?: number;
+  hasDiscount?: boolean;
+  totalBeforeDiscount?: number;
   couponCode?: string;
   loyaltyDiscountAmount?: number;
   loyaltyPointsRedeemed?: number;

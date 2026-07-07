@@ -140,6 +140,12 @@ export type OrderPricing = {
   breakdown?: OrderPricingBreakdownLine[];
 };
 
+export type OrderCoupon = {
+  id?: string | number | null;
+  code?: string | null;
+  title?: string | null;
+};
+
 export type OrderPayment = {
   selectedMethod?: string | null;
   status?: string | null;
@@ -165,6 +171,11 @@ export type Order = {
   statusDescription?: string | null;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
+  availablePaymentMethods?: string[];
+  paymentOptions?: {
+    selected?: string | null;
+    available?: string[];
+  } | null;
   orderTime?: string | null;
   isScheduled?: boolean | null;
   scheduledFor?: string | null;
@@ -178,6 +189,9 @@ export type Order = {
   discountAmount?: number | string | null;
   payableAmount?: number | string | null;
   totalAmount?: number | string | null;
+  itemCount?: number | string | null;
+  couponId?: string | number | null;
+  coupon?: OrderCoupon | null;
   items?: OrderItem[];
   itemsPreview?: OrderItem[];
   restaurant?: OrderRestaurant | null;
@@ -466,12 +480,16 @@ const normalizeOrderPayment = (value: unknown, fallback: Record<string, unknown>
   }
 
   return {
-    selectedMethod: getString(record?.selectedMethod || fallback.paymentMethod) || null,
+    selectedMethod: getString(record?.selectedMethod || getRecord(fallback.paymentOptions)?.selected || fallback.paymentMethod) || null,
     status: getString(record?.status || fallback.paymentStatus) || null,
     statusLabel: getString(record?.statusLabel) || null,
     availableMethods: Array.isArray(record?.availableMethods)
       ? record.availableMethods.map(getString).filter(Boolean)
-      : [],
+      : Array.isArray(getRecord(fallback.paymentOptions)?.available)
+        ? (getRecord(fallback.paymentOptions)?.available as unknown[]).map(getString).filter(Boolean)
+        : Array.isArray(fallback.availablePaymentMethods)
+          ? fallback.availablePaymentMethods.map(getString).filter(Boolean)
+          : [],
     canChangePaymentMethod: getBoolean(record?.canChangePaymentMethod),
     paidAt: getString(record?.paidAt || fallback.paidAt) || null,
     transactions,
@@ -483,6 +501,28 @@ const normalizeOrderPayment = (value: unknown, fallback: Record<string, unknown>
         refundTransactions: normalizeTransactions(refund.refundTransactions),
       }
       : null,
+  };
+};
+
+const normalizeOrderCoupon = (value: unknown): OrderCoupon | null => {
+  const record = getRecord(value);
+
+  if (!record) {
+    return null;
+  }
+
+  const id = getString(record.id);
+  const code = getString(record.code);
+  const title = getString(record.title || record.name);
+
+  if (!id && !code && !title) {
+    return null;
+  }
+
+  return {
+    id: id || null,
+    code: code || null,
+    title: title || null,
   };
 };
 
@@ -519,6 +559,10 @@ export const normalizeOrderDetail = (value: unknown): Order | null => {
     statusDescription: getString(record.statusDescription) || null,
     paymentStatus: getString(payment?.status || record.paymentStatus) || null,
     paymentMethod: getString(payment?.selectedMethod || record.paymentMethod) || null,
+    availablePaymentMethods: Array.isArray(record.availablePaymentMethods)
+      ? record.availablePaymentMethods.map(getString).filter(Boolean)
+      : [],
+    paymentOptions: getRecord(record.paymentOptions) as Order["paymentOptions"],
     orderTime: getString(record.orderTime) || null,
     isScheduled: getBoolean(record.isScheduled),
     scheduledFor: getString(record.scheduledFor) || null,
@@ -532,6 +576,9 @@ export const normalizeOrderDetail = (value: unknown): Order | null => {
     discountAmount: pricing?.discountAmount ?? getAmount(record.discountAmount),
     payableAmount: pricing?.payableAmount ?? getAmount(record.payableAmount),
     totalAmount: pricing?.totalAmount ?? getAmount(record.totalAmount),
+    itemCount: getAmount(record.itemCount),
+    couponId: getString(record.couponId) || null,
+    coupon: normalizeOrderCoupon(record.coupon),
     items,
     itemsPreview,
     restaurant: getRecord(record.restaurant) as OrderRestaurant | null,

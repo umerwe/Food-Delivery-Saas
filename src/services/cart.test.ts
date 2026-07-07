@@ -264,6 +264,39 @@ describe("cart service", () => {
     expect(patchCartMock.mock.calls[0][1]).not.toHaveProperty("modifiers");
   });
 
+  it("strips restaurantMenuId from customer cart item updates", async () => {
+    patchCartMock.mockResolvedValue({ success: true });
+
+    await updateCustomerCartItem({
+      cartItemId: "cart-item-1",
+      payload: {
+        quantity: 2,
+        restaurantMenuId: "menu-1",
+        modifierSelections: [
+          {
+            modifierGroupId: "group-sauces",
+            modifiers: [{ modifierId: "modifier-garlic", quantity: 1 }],
+          },
+        ],
+      },
+    });
+
+    expect(patchCartMock).toHaveBeenCalledWith(
+      "/v1/cart/items/cart-item-1",
+      {
+        quantity: 2,
+        modifierSelections: [
+          {
+            modifierGroupId: "group-sauces",
+            modifiers: [{ modifierId: "modifier-garlic", quantity: 1 }],
+          },
+        ],
+      },
+      undefined
+    );
+    expect(patchCartMock.mock.calls[0][1]).not.toHaveProperty("restaurantMenuId");
+  });
+
   it("updates grouped deal quantity with the deal endpoint", async () => {
     patchCartMock.mockResolvedValue({ success: true });
 

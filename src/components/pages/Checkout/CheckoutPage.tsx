@@ -616,8 +616,7 @@ function CheckoutPageContent() {
   const [scheduledDeliveryValue, setScheduledDeliveryValue] = useState("");
   const [deliveryScheduleMode, setDeliveryScheduleMode] = useState<"now" | "schedule">("now");
   const [pickupScheduleMode, setPickupScheduleMode] = useState<"now" | "schedule">("now");
-  const checkoutPaymentMethod =
-    activeTab === "delivery" && paymentMethod === "COD" ? "STRIPE" : paymentMethod;
+  const checkoutPaymentMethod = paymentMethod;
   const deliveryAllowed = !checkoutBranch?.settings?.allowedOrderTypes?.length || branchSupportsDelivery(checkoutBranch);
   const pickupAllowed = !checkoutBranch?.settings?.allowedOrderTypes?.length || branchSupportsPickup(checkoutBranch);
 

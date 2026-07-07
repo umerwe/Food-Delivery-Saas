@@ -23,17 +23,63 @@ export const getCuisineBadge = (cuisine: CustomerCuisine, fallback: string) => {
   return fallback;
 };
 
-export const getMenuItemPromotion = (item: MenuItem): PromotionInfo | null =>
-  item.happyHour ?? item.promotion ?? null;
+const firstPositiveNumber = (...values: unknown[]) => {
+  for (const value of values) {
+    const parsed = toNumber(value, Number.NaN);
+
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return null;
+};
+
+const getVariationOverridePrice = (item: MenuItem, variationId?: string | number | null) => {
+  if (!variationId) return null;
+
+  const override = item.variationPriceOverrides?.find((entry) => {
+    const overrideVariationId = entry.variationId ?? entry.variation?.id;
+
+    return overrideVariationId ? String(overrideVariationId) === String(variationId) : false;
+  });
+
+  return firstPositiveNumber(override?.price, override?.variation?.price);
+};
+
+const getDefaultVariation = (item: MenuItem) => {
+  const variations = item.variations?.filter((variation) => variation.isActive !== false) ?? [];
+
+  if (!variations.length) return null;
+
+  return variations.find((variation) => variation.isDefault) ?? variations[0];
+};
+
+const getVariationBasePrice = (item: MenuItem) => {
+  const variation = getDefaultVariation(item);
+
+  if (!variation) return null;
+
+  return firstPositiveNumber(
+    variation.happyHour?.originalPrice,
+    variation.promotion?.originalPrice,
+    getVariationOverridePrice(item, variation.id ?? variation.variationId),
+    variation.itemPriceOverrides?.[0]?.price,
+    variation.price,
+  );
+};
+
+export const getMenuItemPromotion = (item: MenuItem): PromotionInfo | null => {
+  const variation = getDefaultVariation(item);
+
+  return item.happyHour ?? item.promotion ?? variation?.happyHour ?? variation?.promotion ?? null;
+};
 
 export const getMenuItemBasePrice = (item: MenuItem) =>
-  toNumber(
-    item.happyHour?.originalPrice ??
-      item.promotion?.originalPrice ??
-      item.basePrice ??
-      item.price,
-    0,
-  );
+  firstPositiveNumber(
+    item.happyHour?.originalPrice,
+    item.promotion?.originalPrice,
+    item.basePrice,
+    item.price,
+  ) ?? getVariationBasePrice(item) ?? 0;
 
 export const getMenuItemFinalPrice = (item: MenuItem) => {
   const basePrice = getMenuItemBasePrice(item);

@@ -28,7 +28,7 @@ export type PaymentSession = PaymentProviderData;
 
 export type CreatePaymentAttemptPayload = {
   paymentMethod: "STRIPE" | string;
-  currency: string;
+  currency?: string;
   note?: string;
 };
 

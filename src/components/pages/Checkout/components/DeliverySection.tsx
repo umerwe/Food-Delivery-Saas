@@ -314,7 +314,6 @@ export function DeliverySection(props: DeliverySectionProps) {
       <CustomerDetailsForm {...props} editable={props.isGuest} />
       <PaymentMethodSection
         {...props}
-        allowCashOnDelivery={false}
         allowCardOnDelivery
       />
     </div>

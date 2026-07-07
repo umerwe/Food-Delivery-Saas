@@ -24,7 +24,7 @@ import {
   type OrderProgressStepKey,
 } from "@/components/pages/Order/order-status-progress";
 import { resolveCustomerCurrency } from "@/lib/money";
-import { isPaymentPendingStripeOrder, isPlacedPaidOrder } from "@/components/pages/Order/payment-state";
+import { isPaymentPendingStripeOrder, isPendingOnlinePaymentOrder, isPlacedPaidOrder } from "@/components/pages/Order/payment-state";
 
 function OrderStatusContent() {
   const t = useTranslations("orderStatus");
@@ -42,6 +42,7 @@ function OrderStatusContent() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [continuingPayment, setContinuingPayment] = useState(false);
+  const [changingPaymentMethod, setChangingPaymentMethod] = useState<string | null>(null);
   const [stripePayment, setStripePayment] = useState({
     open: false,
     clientSecret: "",
@@ -94,36 +95,59 @@ function OrderStatusContent() {
     fetchOrder();
   }, [fetchOrder]);
 
-  const handleContinuePayment = async () => {
+  const handleChangePaymentMethod = async (paymentMethod: string) => {
     if (!order?.id) return;
 
+    const normalizedPaymentMethod = paymentMethod.toUpperCase();
+
     try {
-      setContinuingPayment(true);
+      setChangingPaymentMethod(normalizedPaymentMethod);
 
       const attempt = await createOrderPaymentAttempt({
         orderId: order.id,
         payload: {
-          paymentMethod: "STRIPE",
+          paymentMethod: normalizedPaymentMethod,
           currency: resolveCustomerCurrency({
             moneyCurrency: order.transactions?.find((transaction) => transaction.currency)?.currency,
           }),
-          note: "Retry order payment",
+          note: normalizedPaymentMethod === "STRIPE" ? "Retry order payment" : "Switch order payment method",
         },
       });
 
-      if (!attempt.response || attempt.response.success === false || !attempt.clientSecret || !attempt.publishableKey) {
+      if (!attempt.response || attempt.response.success === false) {
         toast.error(attempt.response?.message || checkoutT("toast.failedInitiatePayment"));
         return;
       }
 
-      setStripePayment({
-        open: true,
-        clientSecret: attempt.clientSecret,
-        publishableKey: attempt.publishableKey,
-        orderId: order.id,
-      });
+      if (normalizedPaymentMethod === "STRIPE") {
+        if (!attempt.clientSecret || !attempt.publishableKey) {
+          toast.error(attempt.response?.message || checkoutT("toast.failedInitiatePayment"));
+          return;
+        }
+
+        setStripePayment({
+          open: true,
+          clientSecret: attempt.clientSecret,
+          publishableKey: attempt.publishableKey,
+          orderId: order.id,
+        });
+        return;
+      }
+
+      toast.success(checkoutT("toast.paymentMethodUpdated"));
+      await fetchOrder();
     } catch {
       toast.error(errorT("somethingWentWrong"));
+    } finally {
+      setChangingPaymentMethod(null);
+    }
+  };
+
+  const handleContinuePayment = async () => {
+    setContinuingPayment(true);
+
+    try {
+      await handleChangePaymentMethod("STRIPE");
     } finally {
       setContinuingPayment(false);
     }
@@ -136,6 +160,7 @@ function OrderStatusContent() {
   };
 
   const paymentPendingStripeOrder = isPaymentPendingStripeOrder(order);
+  const canSwitchPaymentMethod = isPendingOnlinePaymentOrder(order);
   const placedPaidOrder = isPlacedPaidOrder(order);
   const showSuccessNotice = !loading && order?.id && isSuccessView && placedPaidOrder;
   const showPaymentPendingNotice = !loading && order?.id && paymentPendingStripeOrder;
@@ -313,6 +338,9 @@ function OrderStatusContent() {
               order={order}
               onContinuePayment={handleContinuePayment}
               continuingPayment={continuingPayment}
+              onChangePaymentMethod={handleChangePaymentMethod}
+              changingPaymentMethod={changingPaymentMethod}
+              canSwitchPaymentMethod={canSwitchPaymentMethod}
             />
           </div>
 

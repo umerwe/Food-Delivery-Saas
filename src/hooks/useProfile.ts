@@ -7,6 +7,7 @@ import { useAuthContext } from "@/hooks/useAuth";
 import { useDomainApi } from "@/hooks/useDomainApi";
 import { useFileUpload } from "@/hooks/useFileUpload";
 import { readAuthSession, saveAuthSession } from "@/lib/auth";
+import { prepareUploadFile } from "@/lib/prepare-upload-file";
 import {
   deleteAddress as deleteProfileAddress,
   fetchAddresses as fetchProfileAddresses,
@@ -78,8 +79,9 @@ export const useProfile = (token: string | null): ProfileActions => {
 
   const uploadAvatar = useCallback(
     async (file: File) => {
-      const upload = await requestPresignedAvatarUpload(apiClient, file);
-      await uploadAvatarFile(upload, file);
+      const prepared = await prepareUploadFile(file);
+      const upload = await requestPresignedAvatarUpload(apiClient, prepared.file);
+      await uploadAvatarFile(upload, prepared.file);
       return upload.fileUrl;
     },
     [apiClient, uploadAvatarFile]

@@ -1,4 +1,7 @@
 import { uploadAvatarFile as uploadStorageFile } from "@/services/storage";
+
+export const MAX_UPLOAD_FILE_SIZE_MB = 20;
+export const MAX_UPLOAD_FILE_SIZE_BYTES = MAX_UPLOAD_FILE_SIZE_MB * 1024 * 1024;
 import type { AuthSession, AuthUser } from "@/types/auth";
 import type { ProfileFormValues } from "@/validations/profile";
 
@@ -134,6 +137,7 @@ export const requestPresignedAvatarUpload = async (
   const presigned = await api.post("/v1/storage/presigned-upload", {
     fileName: file.name,
     contentType: file.type,
+    fileSize: file.size,
   });
 
   const data = getData(presigned);
