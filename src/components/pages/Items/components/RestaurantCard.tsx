@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import useItems from "@/hooks/useItems";
 import { useCart } from "@/hooks/useCart";
 import { useAuthContext } from "@/hooks/useAuth";
+import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -558,6 +559,7 @@ export function RestaurantCard({
   const { token } = useAuthContext();
   const { fetchSplitPizzaMenuItems } = useItems(token);
   const { addCustomerCartItem, addGroupOrderItem, clearCustomerCart, fetchGroupOrders } = useCart(token);
+  const { updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
   const { user } = useAuth();
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -1861,8 +1863,15 @@ export function RestaurantCard({
         });
 
         if (isGroupOrderParticipantCompleted(currentParticipant)) {
-          toast.error(t("groupOrderCompletedCannotEdit"));
-          return;
+          const statusRes = await updateMyGroupOrderParticipantStatus({
+            orderId: String(groupOrder.id),
+            status: "ACTIVE",
+          });
+
+          if (isApiErrorResponse(statusRes)) {
+            toast.error(getApiErrorMessage(statusRes, t("groupOrderCompletedCannotEdit")));
+            return;
+          }
         }
 
         res = await addGroupOrderItem({

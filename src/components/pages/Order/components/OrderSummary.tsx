@@ -20,7 +20,7 @@ import {
 import Link from "next/link";
 import { formatDisplayAddress } from "@/lib/address-display";
 import { formatMoney, resolveCustomerCurrency } from "@/lib/money";
-import { canReviewOrder, type Order, type OrderItem, type OrderPricingBreakdownLine } from "@/services/orders";
+import { canReviewOrder, type Order, type OrderDisplayItem, type OrderItem, type OrderPricingBreakdownLine } from "@/services/orders";
 import { useTranslations } from "next-intl";
 import { isPaymentPendingStripeOrder } from "@/components/pages/Order/payment-state";
 
@@ -100,6 +100,7 @@ export default function OrderSummary({
   const t = useTranslations("orders");
   const orderStatusT = useTranslations("orderStatus");
   const orderItems = order?.items || [];
+  const backendDisplayItems = order?.displayItems || [];
   const resolvedTitle = title ?? t("orderDetails");
   const latestCharge = order?.transactions?.find((transaction) =>
     String(transaction.type || "").toUpperCase() === "CHARGE"
@@ -230,6 +231,155 @@ export default function OrderSummary({
       default:
         return humanizeEnum(method) || method;
     }
+  };
+
+  const renderItemCard = (item: OrderItem, keyPrefix = "item") => {
+    const modifierLines = getModifierLines(item);
+    const itemTotal = item.lineTotal ?? getAmountNumber(item.unitPrice) * getAmountNumber(item.quantity);
+    const isDealItem = String(item.itemType || item.type || "").toUpperCase() === "DEAL" || Boolean(item.dealId);
+
+    return (
+      <div key={`${keyPrefix}-${item.id}`} className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="relative h-[76px] w-[76px] overflow-hidden rounded-[12px] bg-gray-100">
+            <Image
+              src={item.imageUrl || item.menuItem?.imageUrl || "/placeholder.png"}
+              alt={item.menuItemName || t("itemFallback")}
+              fill
+              className="object-cover"
+            />
+          </div>
+
+          <div className="flex-1 space-y-[8px]">
+            <div className="flex flex-wrap items-center gap-2">
+              {isDealItem ? (
+                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-primary">
+                  {t("deal")}
+                </span>
+              ) : null}
+              <h4 className="text-base font-medium text-gray-900">
+                {item.menuItemName || t("itemFallback")}
+              </h4>
+            </div>
+
+            <p className="text-xs text-gray-500">
+              {[item.variationName, item.menuItem?.category?.name].filter(Boolean).join(" · ")}
+            </p>
+
+            <div className="flex justify-between gap-4">
+              <p className="text-base font-medium text-primary">
+                {formatMoney(item.unitPrice, paymentCurrency)}
+              </p>
+
+              <div className="text-sm text-gray-700">
+                {t("quantityShort")}: {item.quantity}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {modifierLines.length > 0 ? (
+          <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">
+            <span className="font-semibold text-gray-600">{t("modifiers")}:</span>{" "}
+            {modifierLines.join(", ")}
+          </div>
+        ) : null}
+        <div className="mt-3 flex items-center justify-between border-t border-dashed border-gray-100 pt-3 text-sm">
+          <span className="text-gray-500">{t("lineTotal")}</span>
+          <span className="font-semibold text-gray-900">
+            {formatMoney(itemTotal, paymentCurrency)}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDisplayItem = (displayItem: OrderDisplayItem, index: number) => {
+    const displayType = String(displayItem.type || displayItem.itemType || "").toUpperCase();
+    const isDeal = displayType === "DEAL" || Boolean(displayItem.dealId && displayItem.items?.length);
+
+    if (!isDeal) {
+      return renderItemCard(displayItem, `display-${index}`);
+    }
+
+    const includedItems = displayItem.items?.length ? displayItem.items : displayItem.includedItems || [];
+    const dealTotal = includedItems.reduce((total, item) => {
+      const fallbackTotal = getAmountNumber(item.unitPrice) * getAmountNumber(item.quantity);
+      return total + getAmountNumber(item.lineTotal ?? fallbackTotal);
+    }, getAmountNumber(displayItem.lineTotal));
+    const dealImage = includedItems.find((item) => item.imageUrl || item.menuItem?.imageUrl);
+
+    return (
+      <div key={`display-deal-${displayItem.dealId || displayItem.id || index}`} className="rounded-2xl border border-primary/15 bg-white p-3 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="relative h-[76px] w-[76px] overflow-hidden rounded-[12px] bg-gray-100">
+            <Image
+              src={displayItem.imageUrl || displayItem.menuItem?.imageUrl || dealImage?.imageUrl || dealImage?.menuItem?.imageUrl || "/placeholder.png"}
+              alt={displayItem.menuItemName || t("deal")}
+              fill
+              className="object-cover"
+            />
+          </div>
+
+          <div className="flex-1 space-y-[8px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-primary">
+                {t("deal")}
+              </span>
+              {displayItem.dealId ? (
+                <span className="text-xs font-medium text-gray-500">
+                  {t("dealCode")}: {displayItem.dealId}
+                </span>
+              ) : null}
+            </div>
+
+            <h4 className="text-base font-medium text-gray-900">
+              {displayItem.menuItemName || displayItem.name || t("deal")}
+            </h4>
+
+            <div className="flex justify-between gap-4">
+              <p className="text-base font-medium text-primary">
+                {formatMoney(dealTotal || displayItem.lineTotal, paymentCurrency)}
+              </p>
+
+              <div className="text-sm text-gray-700">
+                {t("quantityShort")}: {displayItem.quantity || 1}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {includedItems.length > 0 ? (
+          <div className="mt-3 rounded-xl bg-gray-50 p-3">
+            <p className="text-xs font-semibold text-gray-600">{t("dealIncludes")}:</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {includedItems.map((item, itemIndex) => {
+                const modifiers = getModifierLines(item);
+                const itemImage = item.imageUrl || item.menuItem?.imageUrl || "/placeholder.png";
+
+                return (
+                  <div key={`${item.id || itemIndex}`} className="flex items-center gap-2 rounded-lg bg-white p-2 shadow-sm ring-1 ring-gray-100">
+                    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                      <Image src={itemImage} alt={item.menuItemName || t("itemFallback")} fill className="object-cover" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold text-gray-800">
+                        {getIncludedDealItemName(item, t("itemFallback"))}
+                      </p>
+                      {modifiers.length > 0 ? (
+                        <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                          {modifiers.join(", ")}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   return (
@@ -368,7 +518,9 @@ export default function OrderSummary({
         </h2>
 
         <div className="space-y-[19px]">
-          {shouldShowInferredDeal ? (
+          {backendDisplayItems.length > 0 ? (
+            backendDisplayItems.map(renderDisplayItem)
+          ) : shouldShowInferredDeal ? (
             <div className="rounded-2xl border border-primary/15 bg-white p-3 shadow-sm">
               <div className="flex items-center gap-4">
                 <div className="relative h-[76px] w-[76px] overflow-hidden rounded-[12px]">
@@ -451,55 +603,7 @@ export default function OrderSummary({
             </div>
           ) : (
             orderItems.map((item: OrderItem) => {
-              const modifierLines = getModifierLines(item);
-              const itemTotal = item.lineTotal ?? getAmountNumber(item.unitPrice) * getAmountNumber(item.quantity);
-
-              return (
-              <div key={item.id} className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
-                <div className="flex items-center gap-4">
-                <div className="relative w-[76px] h-[76px] rounded-[12px] overflow-hidden">
-                  <Image
-                    src={item.imageUrl || item.menuItem?.imageUrl || "/placeholder.png"}
-                    alt={item.menuItemName || t("itemFallback")}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-
-                <div className="flex-1 space-y-[8px]">
-                  <h4 className="text-base font-medium text-gray-900">
-                    {item.menuItemName}
-                  </h4>
-
-                  <p className="text-xs text-gray-500">
-                    {[item.variationName, item.menuItem?.category?.name].filter(Boolean).join(" · ")}
-                  </p>
-
-                  <div className="flex justify-between">
-                    <p className="text-base font-medium text-primary">
-                      {formatMoney(item.unitPrice, paymentCurrency)}
-                    </p>
-
-                    <div className="text-sm text-gray-700">
-                      {t("quantityShort")}: {item.quantity}
-                    </div>
-                  </div>
-                </div>
-              </div>
-                {modifierLines.length > 0 ? (
-                  <div className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">
-                    <span className="font-semibold text-gray-600">{t("modifiers")}:</span>{" "}
-                    {modifierLines.join(", ")}
-                  </div>
-                ) : null}
-                <div className="mt-3 flex items-center justify-between border-t border-dashed border-gray-100 pt-3 text-sm">
-                  <span className="text-gray-500">{t("lineTotal")}</span>
-                  <span className="font-semibold text-gray-900">
-                    {formatMoney(itemTotal, paymentCurrency)}
-                  </span>
-                </div>
-              </div>
-              );
+              return renderItemCard(item);
             })
           )}
         </div>

@@ -176,6 +176,8 @@ export const normalizeBranch = (value: unknown): BranchRecord | null => {
     scheduleTimings: rootScheduleTimings ?? settings?.scheduleTimings ?? null,
     distanceKm: getNullableNumber(value.distanceKm),
     availability: normalizeAvailability(value.availability),
+    selectedOrderType: getString(value.selectedOrderType) as BranchOrderType | undefined,
+    isOnlyBranch: getBoolean(value.isOnlyBranch),
   };
 };
 

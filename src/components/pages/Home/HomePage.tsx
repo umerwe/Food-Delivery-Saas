@@ -122,7 +122,7 @@ const mergeHomeBranch = (
   return {
     ...sessionBranch,
     ...homeBranch,
-    isOnlyBranch: sessionBranch.isOnlyBranch,
+    isOnlyBranch: homeBranch.isOnlyBranch ?? sessionBranch.isOnlyBranch,
     settings: mergeBranchSettings(homeBranch.settings, sessionBranch.settings),
     availability: {
       ...(sessionHomeBranch.availability ?? {}),
@@ -232,6 +232,7 @@ const HomePage = () => {
             title={heroBannerTitle}
             description={heroBannerDescription}
             heroImage={heroImage}
+            branch={resolvedBranch}
           />
         ) : null}
 

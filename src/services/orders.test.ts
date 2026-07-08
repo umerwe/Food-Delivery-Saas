@@ -149,6 +149,34 @@ describe("buildReorderCartPayloads", () => {
       },
     ]);
   });
+
+  it("preserves deal snapshot sections for reorder fallback payloads", () => {
+    const payloads = buildReorderCartPayloads({
+      branchId: "branch-1",
+      order: createOrder({
+        items: [
+          {
+            id: "item-1",
+            menuItemId: "pizza-1",
+            dealId: "deal-1",
+            quantity: 1,
+            snapshotSections: [{ sectionId: "left", menuItemId: "half-1" }],
+          },
+        ],
+      }),
+    });
+
+    expect(payloads).toEqual([
+      {
+        branchId: "branch-1",
+        menuItemId: "pizza-1",
+        dealId: "deal-1",
+        quantity: 1,
+        note: "",
+        sections: [{ sectionId: "left", menuItemId: "half-1" }],
+      },
+    ]);
+  });
 });
 
 describe("normalizeOrderDetail", () => {
@@ -272,5 +300,42 @@ describe("normalizeOrderDetail", () => {
     expect(order?.tipAmount).toBe("23");
     expect(order?.pricing?.tipAmount).toBe("23");
     expect(order?.pricing?.totalAmount).toBe("63");
+  });
+
+  it("normalizes grouped display items for deal-aware order details", () => {
+    const order = normalizeOrderDetail({
+      id: "order-1",
+      status: "PLACED",
+      createdAt: "2026-07-08T09:00:00.000Z",
+      displayItems: [
+        {
+          type: "DEAL",
+          dealId: "deal-1",
+          items: [
+            {
+              id: "deal-item-1",
+              menuItemName: "Burger Deal",
+              quantity: 1,
+              snapshotModifiers: [{ name: "Cheese", quantity: 1 }],
+            },
+          ],
+        },
+        {
+          type: "ITEM",
+          id: "item-2",
+          dealId: null,
+          menuItemName: "Fries",
+          quantity: 1,
+        },
+      ],
+    });
+
+    expect(order?.displayItems?.[0]?.type).toBe("DEAL");
+    expect(order?.displayItems?.[0]?.dealId).toBe("deal-1");
+    expect(order?.displayItems?.[0]?.items?.[0]?.menuItemName).toBe("Burger Deal");
+    expect(order?.displayItems?.[0]?.items?.[0]?.snapshotModifiers).toEqual([
+      { name: "Cheese", quantity: 1 },
+    ]);
+    expect(order?.displayItems?.[1]?.menuItemName).toBe("Fries");
   });
 });

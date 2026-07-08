@@ -8,10 +8,12 @@ import { CheckCircle2, Loader2, Users } from "lucide-react";
 
 import RestaurantHeader from "@/components/pages/Items/components/RestaurantHeader";
 import { ItemsLayout } from "@/components/pages/Items/components/ItemsLayout";
+import useBranches from "@/hooks/useBranches";
 import { useGroupOrder, useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useAuth } from "@/hooks/useAuth";
+import { getDefaultBranchOrderType, getSoleActiveBranch, persistSelectedBranch } from "@/lib/branch-selector";
 import { clearStoredGroupOrderCode, getStoredGroupOrderCode, setStoredGroupOrderCode } from "@/lib/group-order";
-import type { GroupOrder, GroupOrderParticipant } from "@/types/group-order";
+import type { GroupOrderParticipant } from "@/types/group-order";
 
 function ItemsPageContent() {
   const t = useTranslations("items.groupOrder");
@@ -21,8 +23,9 @@ function ItemsPageContent() {
   const categoryId = searchParams.get("categoryId") || "";
   const codeFromUrl = searchParams.get("code") || "";
 
-  const { token, user, loading: authLoading } = useAuth();
+  const { token, user, loading: authLoading, setUser } = useAuth();
   const { order, participant, refetch: refetchGroupOrder, canMutateGroupOrder, isHost } = useGroupOrder();
+  const branchApi = useBranches(token);
   const { joinGroupOrder, searchGroupOrdersByInviteCode, updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
 
   const [joiningGroupOrder, setJoiningGroupOrder] = useState(false);
@@ -109,13 +112,41 @@ function ItemsPageContent() {
 
           toast.success(t("joined"));
         }
+
+        await refetchGroupOrder();
       } finally {
         setJoiningGroupOrder(false);
       }
     };
 
     processGroupOrderInvite();
-  }, [token, user?.id, codeFromUrl]);
+  }, [token, user?.id, codeFromUrl, refetchGroupOrder]);
+
+  useEffect(() => {
+    const autoSelectSoleBranch = async () => {
+      if (!token || !user || user.branchId || user.branch?.id || !user.restaurantId) return;
+
+      const inviteCode = codeFromUrl || getStoredGroupOrderCode();
+      if (!inviteCode) return;
+
+      try {
+        const response = await branchApi.fetchBranchPage(
+          `/v1/branches?restaurantId=${encodeURIComponent(user.restaurantId)}&page=1&limit=2`
+        );
+        const soleBranch = getSoleActiveBranch(response);
+
+        if (!soleBranch) return;
+
+        persistSelectedBranch(soleBranch, setUser, {
+          orderType: getDefaultBranchOrderType(soleBranch, user.selectedOrderType),
+        });
+      } catch {
+        // Branch selection remains user-driven if automatic single-branch lookup fails.
+      }
+    };
+
+    autoSelectSoleBranch();
+  }, [branchApi.fetchBranchPage, codeFromUrl, setUser, token, user]);
 
   useEffect(() => {
     const handleGroupOrderItemAdded = () => setHasAddedGroupOrderItem(true);
@@ -147,7 +178,7 @@ function ItemsPageContent() {
 
       toast.success(t("markedDone"));
       await refetchGroupOrder();
-      router.push("/group-order/lobby");
+      router.push(`/group-order/lobby?groupOrderId=${encodeURIComponent(String(order.id))}`);
     } catch {
       toast.error(t("failedMarkDone"));
     } finally {
@@ -164,7 +195,7 @@ function ItemsPageContent() {
       ) : null}
 
       {showGroupOrderLobbyCta ? (
-        <div className="sticky top-3 z-30 mx-4 mt-4 overflow-hidden rounded-3xl border border-emerald-200/80 bg-white/95 shadow-[0_18px_55px_rgba(15,118,110,0.16)] backdrop-blur md:mx-10">
+        <div className="relative mx-4 mt-4 overflow-hidden rounded-3xl border border-emerald-200/80 bg-white/95 shadow-[0_18px_55px_rgba(15,118,110,0.16)] backdrop-blur md:mx-10">
           <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
@@ -180,7 +211,7 @@ function ItemsPageContent() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <button
                 type="button"
-                onClick={() => router.push("/group-order/lobby")}
+                onClick={() => router.push(order?.id ? `/group-order/lobby?groupOrderId=${encodeURIComponent(String(order.id))}` : "/group-order/lobby")}
                 className="inline-flex items-center justify-center rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-800 transition hover:-translate-y-0.5 hover:border-primary/30 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2"
               >
                 {t("goToLobby")}

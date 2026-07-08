@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Time24Picker } from "@/components/ui/time-24-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -10,17 +9,34 @@ import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useAuth } from "@/hooks/useAuth";
 import { useCheckout } from "@/hooks/useCheckout";
 import { BranchSelect } from "@/components/ui/BranchSelect";
-import { CalendarDays, Clock3, Loader2, MapPin, PencilLine, RotateCcw, X } from "lucide-react";
+import { Clock, Loader2, MapPin, PauseCircle, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { resolveGroupOrderDeliveryAddressId, setStoredGroupOrderCode } from "@/lib/group-order";
 import { formatDisplayAddress } from "@/lib/address-display";
 import { getBackendErrorMessage, hasBackendError } from "@/components/pages/Checkout/utils/checkout-normalizers";
+import { ScheduleRail } from "@/components/pages/Checkout/components/ScheduleRail";
+import {
+  buildDeliveryTimeSlots,
+  buildPickupTimeSlots,
+  buildScheduleBreakLabels,
+  formatPickupTimeLabel,
+  getBranchScheduleForDate,
+  getBranchScheduleTimeZone,
+  getDateFromValue,
+  getDateValue,
+  getScheduleOrderTimeIso,
+  isImmediateScheduleAvailable,
+  isPastDateValue,
+  isScheduleTimeAvailable,
+} from "@/components/pages/Checkout/utils/pickup-schedule";
+import { normalizeBranch } from "@/lib/branch-selector";
 import { fetchAddresses as fetchProfileAddresses, type AddressRecord } from "@/services/profile";
 import type { CreateGroupOrderPayload, GroupOrderType } from "@/types/group-order";
 import type { BranchRecord } from "@/types/branch-selector";
 
 type GroupOrderModalProps = { open: boolean; onClose: () => void };
+type ScheduleMode = "now" | "schedule";
 
 const padDatePart = (value: number) => String(value).padStart(2, "0");
 
@@ -43,10 +59,33 @@ const getLocalScheduleDate = (date: string, time: string) => {
   return Number.isNaN(scheduleDate.getTime()) ? null : scheduleDate;
 };
 
-const isPastDateValue = (value: string) => Boolean(value) && value < getCurrentSchedule().date;
+const getScheduleType = (orderType: GroupOrderType) =>
+  orderType === "DELIVERY" ? "delivery" : "pickup";
+
+const buildUpcomingDates = () => {
+  const today = new Date();
+
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: 14 }, (_, index) => {
+    const date = new Date(today);
+
+    date.setDate(today.getDate() + index);
+
+    return date;
+  });
+};
+
+const activeTileClass =
+  "border-primary bg-white text-gray-950 shadow-[0_12px_34px_rgba(17,24,39,0.10)] ring-2 ring-primary/10";
+const interactiveTileClass =
+  "border-gray-100 bg-white text-gray-900 shadow-[0_12px_34px_rgba(17,24,39,0.08)] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_18px_42px_rgba(17,24,39,0.12)] hover:text-primary";
+const disabledTileClass =
+  "cursor-not-allowed border-gray-100 bg-[#F7F3EF]/70 text-gray-400 shadow-none";
 
 export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
   const t = useTranslations("groupOrder.modal");
+  const checkoutT = useTranslations("checkout");
   const commonT = useTranslations("common");
   const errorT = useTranslations("errors");
   const { user, token } = useAuth();
@@ -54,16 +93,16 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
   const { get } = useCheckout(token);
   const router = useRouter();
   const initialSchedule = useMemo(() => getCurrentSchedule(), []);
+  const scheduleDates = useMemo(() => buildUpcomingDates(), []);
   const [selectedBranch, setSelectedBranch] = useState<BranchRecord | null>(null);
   const [date, setDate] = useState(initialSchedule.date);
-  const [time, setTime] = useState(initialSchedule.time);
-  const [scheduleEditorOpen, setScheduleEditorOpen] = useState(false);
+  const [time, setTime] = useState("");
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("now");
   const [note, setNote] = useState("");
   const [orderType, setOrderType] = useState<GroupOrderType>("DINE_IN");
   const [deliveryAddresses, setDeliveryAddresses] = useState<AddressRecord[]>([]);
   const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState("");
   const [loadingDeliveryAddresses, setLoadingDeliveryAddresses] = useState(false);
-  const todayDate = getCurrentSchedule().date;
 
   const loadDeliveryAddresses = useCallback(async () => {
     try {
@@ -98,8 +137,8 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
 
     const currentSchedule = getCurrentSchedule();
     setDate(currentSchedule.date);
-    setTime(currentSchedule.time);
-    setScheduleEditorOpen(false);
+    setTime("");
+    setScheduleMode("now");
   }, [open]);
 
   useEffect(() => {
@@ -108,12 +147,37 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
     void loadDeliveryAddresses();
   }, [loadDeliveryAddresses, open, orderType]);
 
+  const activeBranch = useMemo(
+    () => selectedBranch ?? normalizeBranch(user?.branch),
+    [selectedBranch, user?.branch]
+  );
+  const scheduleType = getScheduleType(orderType);
+  const immediateAvailable = useMemo(
+    () => isImmediateScheduleAvailable({ branch: activeBranch, scheduleType }),
+    [activeBranch, scheduleType]
+  );
+  const scheduleState = useMemo(
+    () => getBranchScheduleForDate({ branch: activeBranch, dateValue: date, scheduleType }),
+    [activeBranch, date, scheduleType]
+  );
+  const timeSlots = useMemo(
+    () => scheduleType === "delivery"
+      ? buildDeliveryTimeSlots({ branch: activeBranch, dateValue: date })
+      : buildPickupTimeSlots({ branch: activeBranch, dateValue: date }),
+    [activeBranch, date, scheduleType]
+  );
+  const breakLabels = useMemo(
+    () => buildScheduleBreakLabels(scheduleState.schedule),
+    [scheduleState.schedule]
+  );
   const selectedScheduleDate = useMemo(
-    () => getLocalScheduleDate(date, time),
+    () => (date && time ? getLocalScheduleDate(date, time) : null),
     [date, time]
   );
 
-  const selectedScheduleLabel = selectedScheduleDate
+  const selectedScheduleLabel = scheduleMode === "now"
+    ? checkoutT("orderNow")
+    : selectedScheduleDate
       ? new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium",
         timeStyle: "short",
@@ -121,25 +185,78 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
       }).format(selectedScheduleDate)
     : t("selectDateTime");
 
-  const resetScheduleToNow = () => {
-    const currentSchedule = getCurrentSchedule();
-    setDate(currentSchedule.date);
-    setTime(currentSchedule.time);
-  };
+  const scheduleHoursLabel = useMemo(() => {
+    const schedule = scheduleState.schedule;
+
+    if (!date || !schedule) return "";
+    if (schedule.isClosed) return checkoutT("closed");
+
+    return `${formatPickupTimeLabel(schedule.openTime || "")} - ${formatPickupTimeLabel(
+      schedule.closeTime || ""
+    )}`;
+  }, [checkoutT, date, scheduleState.schedule]);
+
+  useEffect(() => {
+    if (!immediateAvailable && scheduleMode === "now") {
+      setScheduleMode("schedule");
+    }
+  }, [immediateAvailable, scheduleMode]);
+
+  useEffect(() => {
+    if (time && scheduleState.hasOpeningHours && !timeSlots.some((slot) => slot.value === time)) {
+      setTime("");
+    }
+  }, [scheduleState.hasOpeningHours, time, timeSlots]);
 
   if (!open) return null;
 
   const handleSubmit = async () => {
     try {
-      const branchId = user?.branchId || selectedBranch?.id;
+      const branchId = activeBranch?.id || user?.branchId;
 
       if (!branchId) return toast.error(t("selectBranch"));
-      if (!date || !time || !selectedScheduleDate) {
-        return toast.error(t("selectDateTime"));
-      }
 
-      if (isPastDateValue(date)) {
-        return toast.error(errorT("reservationPastDate"));
+      let orderTime: string | null = null;
+
+      if (scheduleMode === "now") {
+        if (!isImmediateScheduleAvailable({ branch: activeBranch, scheduleType })) {
+          return toast.error(
+            orderType === "DELIVERY"
+              ? t("instantDeliveryUnavailable")
+              : t("instantPickupUnavailable")
+          );
+        }
+      } else {
+        if (!date || !time || !selectedScheduleDate) {
+          return toast.error(t("selectDateTime"));
+        }
+
+        if (isPastDateValue(date)) {
+          return toast.error(errorT("reservationPastDate"));
+        }
+
+        const dateValue = getDateValue(selectedScheduleDate);
+
+        if (
+          !isScheduleTimeAvailable({
+            branch: activeBranch,
+            dateValue,
+            timeValue: time,
+            scheduleType,
+          })
+        ) {
+          return toast.error(
+            orderType === "DELIVERY"
+              ? t("scheduledDeliveryUnavailable")
+              : t("scheduledPickupUnavailable")
+          );
+        }
+
+        orderTime = getScheduleOrderTimeIso({
+          dateValue,
+          timeValue: time,
+          timeZone: getBranchScheduleTimeZone(activeBranch),
+        });
       }
 
       let deliveryAddressId = "";
@@ -160,7 +277,6 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
         return toast.error(t("selectDeliveryAddress"));
       }
 
-      const orderTime = selectedScheduleDate.toISOString();
       const payload: CreateGroupOrderPayload = {
         branchId,
         orderType,
@@ -313,79 +429,199 @@ export function GroupOrderModal({ open, onClose }: GroupOrderModalProps) {
 
           {/* DATE + TIME */}
           <div className="rounded-[22px] border border-gray-100 bg-[#FAFAF9] p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <CalendarDays className="h-5 w-5" />
-                </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">
+                {orderType === "DELIVERY" ? checkoutT("deliveryTiming") : checkoutT("pickupTiming")}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-gray-500">
+                {selectedScheduleLabel}
+              </p>
+            </div>
 
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {t("scheduleTitle")}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-gray-500">
-                    {t("scheduleSubtitle")}
-                  </p>
-                  <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full border border-primary/10 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">
-                    <Clock3 className="h-4 w-4 shrink-0 text-primary" />
-                    <span className="truncate">{selectedScheduleLabel}</span>
-                  </div>
-                </div>
-              </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={!immediateAvailable}
+                onClick={() => {
+                  setScheduleMode("now");
+                  setTime("");
+                }}
+                className={`rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
+                  scheduleMode === "now"
+                    ? activeTileClass
+                    : !immediateAvailable
+                      ? disabledTileClass
+                      : interactiveTileClass
+                }`}
+              >
+                <span className="block text-base font-semibold">{checkoutT("orderNow")}</span>
+                <span className="mt-1 block text-xs leading-5 text-gray-500">
+                  {immediateAvailable
+                    ? orderType === "DELIVERY"
+                      ? checkoutT("orderNowDescription")
+                      : checkoutT("pickupNowDescription")
+                    : orderType === "DELIVERY"
+                      ? checkoutT("orderNowUnavailable")
+                      : checkoutT("pickupNowUnavailable")}
+                </span>
+              </button>
 
               <button
                 type="button"
-                onClick={() => setScheduleEditorOpen((current) => !current)}
-                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary/30 hover:text-primary"
+                onClick={() => setScheduleMode("schedule")}
+                className={`rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
+                  scheduleMode === "schedule" ? activeTileClass : interactiveTileClass
+                }`}
               >
-                <PencilLine className="h-4 w-4" />
-                {t("editSchedule")}
+                <span className="block text-base font-semibold">{checkoutT("scheduleOrder")}</span>
+                <span className="mt-1 block text-xs leading-5 text-gray-500">
+                  {orderType === "DELIVERY"
+                    ? checkoutT("scheduleOrderDescription")
+                    : checkoutT("schedulePickupDescription")}
+                </span>
               </button>
             </div>
 
-            {scheduleEditorOpen ? (
-              <div className="mt-4 rounded-[18px] border border-white bg-white p-3 shadow-[0_12px_24px_rgba(15,23,42,0.06)]">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="text-sm text-gray-600">{t("date")}</label>
-                    <Input
-                      type="date"
-                      value={date}
-                      min={todayDate}
-                      onChange={(e) => {
-                        const nextDate = e.target.value;
+            {scheduleMode === "schedule" ? (
+              <>
+                <ScheduleRail ariaLabel={checkoutT("chooseDate")} className="mt-5">
+                  {scheduleDates.map((scheduleDate) => {
+                    const nextDateValue = getDateValue(scheduleDate);
+                    const dateScheduleState = getBranchScheduleForDate({
+                      branch: activeBranch,
+                      dateValue: nextDateValue,
+                      scheduleType,
+                    });
+                    const availableSlots = scheduleType === "delivery"
+                      ? buildDeliveryTimeSlots({ branch: activeBranch, dateValue: nextDateValue })
+                      : buildPickupTimeSlots({ branch: activeBranch, dateValue: nextDateValue });
+                    const disabled =
+                      isPastDateValue(nextDateValue) ||
+                      (dateScheduleState.hasOpeningHours &&
+                        (Boolean(dateScheduleState.schedule?.isClosed) ||
+                          availableSlots.length === 0));
+                    const isSelected = date === nextDateValue;
 
-                        if (isPastDateValue(nextDate)) {
-                          toast.error(errorT("reservationPastDate"));
-                          setDate(todayDate);
-                          return;
-                        }
+                    return (
+                      <button
+                        key={nextDateValue}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => {
+                          const nextDate = getDateFromValue(nextDateValue);
 
-                        setDate(nextDate);
-                      }}
-                      className="mt-1 h-12 rounded-full border border-gray-200 bg-[#FAFAF9]"
-                    />
+                          if (!nextDate) return;
+
+                          setDate(nextDateValue);
+                          setTime("");
+                        }}
+                        className={`min-w-[92px] snap-start rounded-xl border px-3 py-3 text-left transition-all duration-200 ${
+                          isSelected
+                            ? activeTileClass
+                            : disabled
+                              ? disabledTileClass
+                              : interactiveTileClass
+                        }`}
+                      >
+                        <span className="block text-xs font-semibold uppercase">
+                          {scheduleDate.toLocaleDateString("en-US", { weekday: "short" })}
+                        </span>
+                        <span className="mt-1 block text-lg font-semibold">
+                          {scheduleDate.getDate()}
+                        </span>
+                        <span className="block text-xs">
+                          {scheduleDate.toLocaleDateString("en-US", { month: "short" })}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </ScheduleRail>
+
+                {date && scheduleHoursLabel ? (
+                  <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                    <Clock size={14} />
+                    {scheduleType === "delivery"
+                      ? checkoutT("deliveryHoursForDate", { hours: scheduleHoursLabel })
+                      : checkoutT("pickupHours", { hours: scheduleHoursLabel })}
+                    {scheduleType === "delivery" && scheduleState.source === "opening"
+                      ? ` ${checkoutT("usingOpeningHours")}`
+                      : ""}
+                  </p>
+                ) : date && !scheduleState.hasOpeningHours ? (
+                  <p className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                    <Clock size={14} />
+                    {scheduleType === "delivery"
+                      ? checkoutT("deliveryHoursNotConfigured")
+                      : checkoutT("pickupHoursNotConfigured")}
+                  </p>
+                ) : null}
+
+                {scheduleType === "delivery" && breakLabels.length > 0 ? (
+                  <div className="mt-3 rounded-[18px] border border-orange-100 bg-orange-50/80 p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-orange-600 shadow-sm">
+                        <PauseCircle size={18} aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {checkoutT("deliveryBreakHoursTitle")}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-gray-600">
+                          {checkoutT("deliveryBreakHoursDescription")}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {breakLabels.map((breakLabel) => (
+                            <span
+                              key={`${breakLabel.label}-${breakLabel.note || ""}`}
+                              className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm ring-1 ring-orange-100"
+                            >
+                              {checkoutT("deliveryBreakTime", { time: breakLabel.label })}
+                              {breakLabel.note ? ` · ${breakLabel.note}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                ) : null}
 
-                  <div>
-                    <label className="text-sm text-gray-600">{t("time")}</label>
-                    <Time24Picker
-                      value={time}
-                      onChange={setTime}
-                      className="mt-1 h-12 rounded-full border border-gray-200 bg-[#FAFAF9] px-4 text-sm font-medium text-gray-700"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={resetScheduleToNow}
-                  className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-gray-100 px-3 text-xs font-semibold text-gray-600 transition hover:bg-primary/10 hover:text-primary"
+                <ScheduleRail
+                  ariaLabel={scheduleType === "delivery" ? checkoutT("deliveryTime") : checkoutT("choosePickupTime")}
+                  className="mt-4"
                 >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  {t("resetToNow")}
-                </button>
-              </div>
+                  {scheduleState.hasOpeningHours ? (
+                    timeSlots.length > 0 ? (
+                      timeSlots.map((slot) => (
+                        <button
+                          key={slot.value}
+                          type="button"
+                          onClick={() => setTime(slot.value)}
+                          className={`h-[48px] min-w-[96px] snap-start rounded-[14px] border text-sm font-semibold transition-all duration-200 ${
+                            time === slot.value ? activeTileClass : interactiveTileClass
+                          }`}
+                        >
+                          {slot.label}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="min-w-full rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                        {scheduleType === "delivery" ? checkoutT("noDeliverySlots") : checkoutT("noPickupSlots")}
+                      </p>
+                    )
+                  ) : (
+                    <label className="block max-w-[220px]">
+                      <span className="sr-only">
+                        {scheduleType === "delivery" ? checkoutT("deliveryTime") : checkoutT("pickupTime")}
+                      </span>
+                      <Time24Picker
+                        value={time}
+                        onChange={setTime}
+                        className="h-[48px] w-full rounded-[10px] border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 outline-none transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10"
+                      />
+                    </label>
+                  )}
+                </ScheduleRail>
+              </>
             ) : null}
           </div>
 

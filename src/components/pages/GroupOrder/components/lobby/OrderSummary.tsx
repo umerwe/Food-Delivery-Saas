@@ -1,8 +1,7 @@
 "use client";
 
-import { Info, Loader2, LogOut, XCircle } from "lucide-react";
-import Image from "next/image";
-import { useState } from "react";
+import { Coins, Info, Loader2, LogOut, RefreshCw, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -13,24 +12,46 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useGroupOrder, useGroupOrderApi } from "@/hooks/useGroupOrder";
+import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useAuth } from "@/hooks/useAuth";
 import { clearStoredGroupOrderCode } from "@/lib/group-order";
+import { PaymentMethodSection } from "@/components/pages/Checkout/components/PaymentMethodSection";
+import { isImmediateScheduleAvailable } from "@/components/pages/Checkout/utils/pickup-schedule";
 import { getBackendErrorMessage, hasBackendError } from "@/components/pages/Checkout/utils/checkout-normalizers";
-import type { CheckoutGroupOrderPayload, GroupOrder, GroupOrderPaymentMethod, GroupOrderSuccessData } from "@/types/group-order";
+import { fetchCustomerLoyaltyPoints, type LoyaltySummary } from "@/services/loyalty";
+import type { CheckoutGroupOrderPayload, GroupOrder, GroupOrderParticipant, GroupOrderPaymentMethod, GroupOrderSuccessData } from "@/types/group-order";
 
 type OrderSummaryProps = {
   order: GroupOrder;
+  canCheckout: boolean;
+  canMutateGroupOrder: boolean;
+  isHost: boolean;
+  isParticipantCompleted: boolean;
+  participant: GroupOrderParticipant | undefined;
   onSuccess: (data: GroupOrderSuccessData) => void;
+  onParticipantStatusChange: (participantId: string | number, status: GroupOrderParticipant["status"]) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
 };
 
-export function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
+export function OrderSummary({
+  order,
+  canCheckout,
+  canMutateGroupOrder,
+  isHost,
+  isParticipantCompleted,
+  participant,
+  onSuccess,
+  onParticipantStatusChange,
+  onRefresh,
+  refreshing,
+}: OrderSummaryProps) {
   const t = useTranslations("groupOrder.lobby.summary");
+  const checkoutT = useTranslations("checkout");
   const cartT = useTranslations("cart");
   const errorT = useTranslations("errors");
   const summary = order?.summary;
   const { token } = useAuth();
-  const { canCheckout, canMutateGroupOrder, isHost, isParticipantCompleted, participant, refetch } = useGroupOrder();
   const { cancelGroupOrder, checkoutGroupOrder, leaveGroupOrder, updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
 
   const [noteOpen, setNoteOpen] = useState(false);
@@ -38,30 +59,79 @@ export function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
   const [note, setNote] = useState("");
   const [coupon, setCoupon] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<GroupOrderPaymentMethod>("COD");
+  const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
+  const [loyaltyPoints, setLoyaltyPoints] = useState("");
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
 
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [loadingCancel, setLoadingCancel] = useState(false);
   const [loadingLeave, setLoadingLeave] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState(false);
   const actionsDisabled = !canMutateGroupOrder || loadingCancel || loadingCheckout || loadingLeave || loadingStatus;
+  const isDeliveryOrder = String(order?.orderType || "").toUpperCase() === "DELIVERY";
+  const normalizedOrderType = String(order?.orderType || "").toUpperCase();
+  const scheduleType = normalizedOrderType === "DELIVERY" ? "delivery" : "pickup";
+  const isScheduledGroupOrder = Boolean(order?.isScheduled || summary?.isScheduled);
+  const immediateCheckoutUnavailable = Boolean(
+    !isScheduledGroupOrder &&
+    order?.branch &&
+    !isImmediateScheduleAvailable({ branch: order.branch, scheduleType })
+  );
+  const checkoutDisabled = !canCheckout || actionsDisabled || immediateCheckoutUnavailable;
+  const normalizedLoyaltyPoints = Math.max(0, Math.floor(Number(loyaltyPoints) || 0));
+  const loyaltyCanRedeem = Boolean(
+    loyalty &&
+    normalizedLoyaltyPoints >= Math.max(0, loyalty.minimumRedeemPoints) &&
+    normalizedLoyaltyPoints <= Math.max(0, loyalty.availablePoints)
+  );
+  const loyaltyEstimatedDiscount = loyalty
+    ? normalizedLoyaltyPoints * Math.max(0, loyalty.redemptionValuePerPoint)
+    : 0;
+
+  useEffect(() => {
+    if (!checkoutOpen || !token) return;
+
+    let active = true;
+
+    const loadLoyalty = async () => {
+      try {
+        setLoadingLoyalty(true);
+        const { loyalty: nextLoyalty } = await fetchCustomerLoyaltyPoints(token);
+        if (active) setLoyalty(nextLoyalty);
+      } catch {
+        if (active) setLoyalty(null);
+      } finally {
+        if (active) setLoadingLoyalty(false);
+      }
+    };
+
+    void loadLoyalty();
+
+    return () => {
+      active = false;
+    };
+  }, [checkoutOpen, token]);
 
   const handleParticipantStatusToggle = async () => {
     if (isHost || !participant || !canMutateGroupOrder) return;
 
     const nextStatus = isParticipantCompleted ? "ACTIVE" : "COMPLETED";
+    const previousStatus = participant.status;
 
     try {
       setLoadingStatus(true);
+      onParticipantStatusChange(participant.id, nextStatus);
       const res = await updateMyGroupOrderParticipantStatus({ orderId: order.id, status: nextStatus });
 
       if (hasBackendError(res)) {
+        onParticipantStatusChange(participant.id, previousStatus);
         toast.error(getBackendErrorMessage(res, t("failedUpdateStatus")));
         return;
       }
 
       toast.success(nextStatus === "COMPLETED" ? t("markedDone") : t("editingEnabled"));
-      await refetch();
     } catch (err) {
+      onParticipantStatusChange(participant.id, previousStatus);
       toast.error(err instanceof Error ? err.message : t("failedUpdateStatus"));
     } finally {
       setLoadingStatus(false);
@@ -121,11 +191,29 @@ export function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
   try {
     setLoadingCheckout(true);
 
+    if (normalizedLoyaltyPoints > 0) {
+      if (!loyalty) {
+        toast.error(checkoutT("toast.loyaltyUnavailable"));
+        return;
+      }
+
+      if (normalizedLoyaltyPoints < loyalty.minimumRedeemPoints) {
+        toast.error(checkoutT("toast.minimumLoyaltyPoints", { points: loyalty.minimumRedeemPoints }));
+        return;
+      }
+
+      if (normalizedLoyaltyPoints > loyalty.availablePoints) {
+        toast.error(checkoutT("toast.insufficientLoyaltyPoints"));
+        return;
+      }
+    }
+
     const payload: CheckoutGroupOrderPayload = {
       paymentMethod,
-      orderTime: order?.orderTime,
       customerNote: note || "",
       couponCode: coupon || "",
+      ...(isScheduledGroupOrder && order?.orderTime ? { orderTime: order.orderTime } : {}),
+      ...(normalizedLoyaltyPoints > 0 ? { loyaltyPoints: normalizedLoyaltyPoints } : {}),
     };
 
     const res = await checkoutGroupOrder({ orderId: order.id, payload });
@@ -137,6 +225,7 @@ export function OrderSummary({ order, onSuccess }: OrderSummaryProps) {
     }
 
     toast.success(t("orderPlaced"));
+    window.dispatchEvent(new Event("loyalty-updated"));
     setCheckoutOpen(false);
 onSuccess((res?.data || {}) as GroupOrderSuccessData);
 clearStoredGroupOrderCode();
@@ -156,9 +245,21 @@ clearStoredGroupOrderCode();
 
         {/* TOP ROW */}
         <div className="flex justify-between items-center mb-5">
-          <h2 className="font-semibold text-gray-900 text-lg">
-            {t("title")}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-gray-900 text-lg">
+              {t("title")}
+            </h2>
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              aria-label={refreshing ? t("refreshing") : t("refresh")}
+              title={refreshing ? t("refreshing") : t("refresh")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition hover:border-primary/30 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+          </div>
 
           {/* LEAVE BUTTON */}
        {isHost && canMutateGroupOrder ? (
@@ -206,6 +307,18 @@ clearStoredGroupOrderCode();
             <span>{t("platformFee")}</span>
             <span>$1.50</span>
           </div>
+          {Number(summary?.tipAmount || 0) > 0 ? (
+            <div className="flex justify-between">
+              <span>{cartT("tip")}</span>
+              <span>${Number(summary?.tipAmount || 0).toFixed(2)}</span>
+            </div>
+          ) : null}
+          {Number(summary?.loyaltyDiscountAmount || 0) > 0 ? (
+            <div className="flex justify-between text-green-700">
+              <span>{cartT("loyaltyDiscount")}</span>
+              <span>- ${Number(summary?.loyaltyDiscountAmount || 0).toFixed(2)}</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="border-t my-5" />
@@ -239,13 +352,25 @@ clearStoredGroupOrderCode();
       toast.error(t("onlyHostCanFinalize"));
       return;
     }
+
+    if (immediateCheckoutUnavailable) {
+      toast.error(t("instantCheckoutUnavailable"));
+      return;
+    }
+
     setCheckoutOpen(true);
   }}
-  disabled={!canCheckout || actionsDisabled}
+  disabled={checkoutDisabled}
   className={`${!isHost && participant ? "mt-2" : "mt-5"} w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 rounded-full font-medium shadow-md hover:shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60`}
 >
   {t("finalizeCheckout")}
 </button>
+
+        {immediateCheckoutUnavailable ? (
+          <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-700">
+            {t("instantCheckoutUnavailable")}
+          </p>
+        ) : null}
 
         {/* NOTE BUTTON */}
         <button
@@ -266,24 +391,8 @@ clearStoredGroupOrderCode();
         </p>
       </div>
 
-      {/* OFFER */}
-      <div className="relative rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition">
-        <Image
-          src="https://images.unsplash.com/photo-1604908176997-125f25cc6f3d"
-          alt={t("offerImageAlt")}
-          width={400}
-          height={200}
-          className="object-cover"
-        />
-
-        <div className="absolute inset-0 bg-black/50 p-4 flex flex-col justify-end">
-          <span className="text-xs bg-orange-500 text-white px-2 py-1 w-fit rounded">
-            {t("offer")}
-          </span>
-          <p className="text-white font-semibold mt-2">
-            {t("offerText")}
-          </p>
-        </div>
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 text-sm leading-6 text-gray-600 shadow-sm">
+        {t("helpfulText")}
       </div>
 
       {/* NOTE MODAL */}
@@ -317,11 +426,11 @@ clearStoredGroupOrderCode();
   </DialogContent>
 </Dialog>
 
-      {/* CHECKOUT MODAL */}
+    {/* CHECKOUT MODAL */}
     <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-  <DialogContent className="rounded-3xl bg-[#f7f7f7] p-6 max-w-md border-none">
+  <DialogContent className="flex max-h-[min(92dvh,900px)] max-w-[min(96vw,920px)] flex-col overflow-hidden rounded-3xl border-none bg-[#f7f7f7] p-0">
 
-    <DialogHeader>
+    <DialogHeader className="shrink-0 border-b border-gray-100 bg-white px-6 py-5">
       <DialogTitle className="text-xl font-semibold text-gray-900">
         {t("checkoutDetails")}
       </DialogTitle>
@@ -330,26 +439,63 @@ clearStoredGroupOrderCode();
       </p>
     </DialogHeader>
 
-    {/* PAYMENT */}
-    <div className="mt-5">
-      <p className="text-sm font-medium text-gray-700 mb-2">
-        {t("paymentMethod")}
-      </p>
+    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
 
-      <div className="grid grid-cols-2 gap-3">
-        {(["COD", "PAYPAL", "STRIPE"] as GroupOrderPaymentMethod[]).map((method) => (
-          <button
-            key={method}
-            onClick={() => setPaymentMethod(method as GroupOrderPaymentMethod)}
-            className={`rounded-full py-2 text-sm font-medium transition border ${
-              paymentMethod === method
-                ? "bg-primary text-white border-primary"
-                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100"
-            }`}
-          >
-            {t(`paymentMethods.${method}`)}
-          </button>
-        ))}
+    <div className="rounded-2xl bg-white p-4 shadow-sm">
+      <PaymentMethodSection
+        paymentMethod={paymentMethod}
+        setPaymentMethod={(value) => setPaymentMethod(value as GroupOrderPaymentMethod)}
+        cashLabel={isDeliveryOrder ? t("paymentMethods.COD") : checkoutT("cash")}
+        allowCardOnDelivery={isDeliveryOrder}
+      />
+    </div>
+
+
+    <div className="mt-5 rounded-2xl border border-primary/10 bg-[linear-gradient(135deg,rgba(206,24,27,0.07),rgba(17,24,39,0.03))] p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Coins size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-950">{t("loyaltyTitle")}</p>
+          <p className="mt-1 text-xs leading-5 text-gray-500">
+            {loadingLoyalty
+              ? t("loyaltyLoading")
+              : loyalty
+                ? t("loyaltyAvailable", {
+                    points: Math.max(0, Math.round(loyalty.availablePoints)),
+                    minimum: Math.max(0, Math.round(loyalty.minimumRedeemPoints)),
+                  })
+                : t("loyaltyUnavailable")}
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="number"
+              min="0"
+              value={loyaltyPoints}
+              onChange={(event) => setLoyaltyPoints(event.target.value)}
+              disabled={loadingLoyalty || !loyalty}
+              placeholder={t("loyaltyPlaceholder")}
+              className="h-11 flex-1 rounded-full border border-gray-200 bg-white px-4 text-sm outline-none transition focus:border-primary/40 focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            {normalizedLoyaltyPoints > 0 ? (
+              <button
+                type="button"
+                onClick={() => setLoyaltyPoints("")}
+                className="h-11 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 transition hover:border-primary/30 hover:text-primary"
+              >
+                {t("loyaltyClear")}
+              </button>
+            ) : null}
+          </div>
+          {normalizedLoyaltyPoints > 0 ? (
+            <p className={`mt-2 text-xs font-medium ${loyaltyCanRedeem ? "text-green-700" : "text-amber-700"}`}>
+              {loyaltyCanRedeem
+                ? t("loyaltyEstimatedDiscount", { amount: `$${loyaltyEstimatedDiscount.toFixed(2)}` })
+                : t("loyaltyRequirements")}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
 
@@ -366,17 +512,21 @@ clearStoredGroupOrderCode();
       />
     </div>
 
+    </div>
+
     {/* SUBMIT */}
+    <div className="shrink-0 border-t border-gray-100 bg-white px-6 py-4">
     <button
       onClick={handleCheckout}
       disabled={loadingCheckout}
-      className="w-full mt-6 bg-primary text-white py-3 rounded-full flex items-center justify-center gap-2 font-medium hover:opacity-90 transition"
+      className="flex w-full items-center justify-center gap-2 rounded-full bg-primary py-3 font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {loadingCheckout && (
         <Loader2 className="w-4 h-4 animate-spin" />
       )}
       {t("confirmOrder")}
     </button>
+    </div>
 
   </DialogContent>
 </Dialog>

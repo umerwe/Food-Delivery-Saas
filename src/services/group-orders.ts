@@ -36,12 +36,40 @@ export const normalizeGroupOrderList = (response: ApiResult): GroupOrder[] => {
   return candidate as GroupOrder[];
 };
 
+export const normalizeGroupOrderDetail = (response: ApiResult): GroupOrder | null => {
+  const data = response.data;
+  const dataRecord = getRecord(data);
+  const nestedData = getRecord(dataRecord?.data);
+  const nestedGroupOrder = getRecord(dataRecord?.groupOrder);
+
+  const candidate = nestedGroupOrder || nestedData || dataRecord;
+
+  return candidate?.id !== undefined && candidate?.id !== null
+    ? (candidate as GroupOrder)
+    : null;
+};
+
 export const fetchGroupOrders = async (token?: string | null) => {
   const response = await getGroupOrders("/v1/group-orders", token);
 
   return {
     response,
     groupOrders: response?.error ? [] : normalizeGroupOrderList(response),
+  };
+};
+
+export const fetchGroupOrderById = async ({
+  orderId,
+  token,
+}: {
+  orderId: string | number;
+  token?: string | null;
+}) => {
+  const response = await getGroupOrders(`/v1/group-orders/${orderId}`, token);
+
+  return {
+    response,
+    groupOrder: response?.error ? null : normalizeGroupOrderDetail(response),
   };
 };
 

@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Coffee,
   Heart,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -30,6 +31,7 @@ import { LanguageSelector } from "@/components/layout/navbar/LanguageSelector"
 import { useCustomerCoupons } from "@/hooks/useCustomerCoupons"
 import { useHome } from "@/hooks/useHome"
 import { CART_CHANGED_EVENT, type CartChangedDetail } from "@/lib/cart-events"
+import { getStoredGroupOrderCode } from "@/lib/group-order"
 import { resolveHomeBranchId, resolveHomeRestaurantId, resolveTableReservationsEnabled } from "@/lib/home"
 import { formatMoney, resolveCustomerCurrency } from "@/lib/money"
 import { fetchCustomerCart } from "@/services/cart"
@@ -162,6 +164,7 @@ export const Navbar = () => {
   const [searchResults, setSearchResults] = useState<MenuItem[]>([])
   const [searchMeta, setSearchMeta] = useState<SearchResponse["meta"] | null>(null)
   const [cartItemCount, setCartItemCount] = useState(0)
+  const [activeGroupOrderCode, setActiveGroupOrderCode] = useState("")
 
   const dropdownRef = useRef<HTMLDivElement | null>(null)
   const navbarWrapRef = useRef<HTMLDivElement | null>(null)
@@ -320,6 +323,21 @@ export const Navbar = () => {
   }, [refreshCartItemCount])
 
   useEffect(() => {
+    const refreshActiveGroupOrderCode = () => {
+      setActiveGroupOrderCode(getStoredGroupOrderCode())
+    }
+
+    refreshActiveGroupOrderCode()
+    window.addEventListener("storage", refreshActiveGroupOrderCode)
+    window.addEventListener("deliveryway:group-order:item-added", refreshActiveGroupOrderCode)
+
+    return () => {
+      window.removeEventListener("storage", refreshActiveGroupOrderCode)
+      window.removeEventListener("deliveryway:group-order:item-added", refreshActiveGroupOrderCode)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleCartChanged = (event: Event) => {
       const detail = event instanceof CustomEvent
         ? (event.detail as CartChangedDetail | undefined)
@@ -422,14 +440,25 @@ export const Navbar = () => {
               {/* Search */}
               <button
                 onClick={handleToggleSearch}
-                className="flex h-11 w-[180px] items-center gap-2 rounded-full bg-[#F7F7F8] px-4 text-left text-sm font-semibold text-[#7A8088] transition-colors hover:bg-[#F1F2F4] hover:text-primary 2xl:w-[240px]"
+                aria-label={tNav("searchFood")}
+                title={tNav("searchFood")}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F7F7F8] text-[#7A8088] transition-colors hover:bg-[#F1F2F4] hover:text-primary"
               >
                 <Search size={18} className="shrink-0 text-primary" />
-                <span className="truncate">{tNav("searchFood")}</span>
               </button>
 
               <BranchSwitcher presentation="navbar" />
               <LanguageSelector className="h-11 rounded-full border-none bg-[#F7F7F8] px-4 text-[#20242A] shadow-none hover:bg-[#F1F2F4]" />
+
+              {activeGroupOrderCode ? (
+                <Link
+                  href="/group-order/lobby"
+                  className="relative flex h-11 shrink-0 items-center gap-2 rounded-full bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                >
+                  <Users size={17} />
+                  <span>{tNav("activeGroupOrder")}</span>
+                </Link>
+              ) : null}
 
               <Link
                 href="/checkout"
@@ -809,10 +838,20 @@ export const Navbar = () => {
                 setMobileOpen(false)
                 setTimeout(() => setSearchOpen(true), 150)
               }}
-              className="flex items-center gap-3"
+              aria-label={tNav("searchFood")}
+              title={tNav("searchFood")}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-50 text-primary"
             >
-              <Search /> {tNav("searchFood")}
+              <Search />
             </button>
+
+            <BranchSwitcher presentation="navbar" className="w-full justify-between" />
+
+            {activeGroupOrderCode ? (
+              <Link href="/group-order/lobby" className="flex items-center gap-3 text-emerald-700">
+                <Users size={20} /> {tNav("activeGroupOrder")}
+              </Link>
+            ) : null}
 
             <Link
               href={tableReservationsEnabled ? "/reservetable" : "#"}

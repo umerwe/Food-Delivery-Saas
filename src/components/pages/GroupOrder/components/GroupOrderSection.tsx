@@ -1,18 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, UsersRound, Utensils, Share2 } from "lucide-react";
+import { ArrowRight, Loader2, UsersRound, Utensils, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import { GroupOrderModal } from "@/components/pages/GroupOrder/components/GroupOrderModal";
-import { getStoredGroupOrderCode } from "@/lib/group-order";
+import { useAuth } from "@/hooks/useAuth";
+import { useGroupOrderApi } from "@/hooks/useGroupOrder";
+import { getBackendErrorMessage, hasBackendError } from "@/components/pages/Checkout/utils/checkout-normalizers";
+import { getStoredGroupOrderCode, setStoredGroupOrderCode } from "@/lib/group-order";
 
 export function GroupOrderSection() {
   const t = useTranslations("groupOrder.landing");
   const router = useRouter();
+  const { token } = useAuth();
+  const { joinGroupOrder } = useGroupOrderApi(token);
 
   const [open, setOpen] = useState(false);
   const [groupOrderCode, setGroupOrderCode] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
 
   const hasActiveGroupOrder = useMemo(() => {
     return Boolean(groupOrderCode && groupOrderCode.trim());
@@ -42,6 +50,40 @@ export function GroupOrderSection() {
     }
 
     setOpen(true);
+  };
+
+  const handleJoinWithCode = async () => {
+    const code = joinCode.trim();
+
+    if (!code) {
+      toast.error(t("joinCodeRequired"));
+      return;
+    }
+
+    setStoredGroupOrderCode(code);
+    setGroupOrderCode(code);
+
+    if (!token) {
+      router.push(`/login?code=${encodeURIComponent(code)}`);
+      return;
+    }
+
+    try {
+      setJoining(true);
+      const res = await joinGroupOrder({ inviteCode: code });
+
+      if (hasBackendError(res)) {
+        toast.error(getBackendErrorMessage(res, t("failedJoin")));
+        return;
+      }
+
+      toast.success(t("joined"));
+      router.push(`/items?code=${encodeURIComponent(code)}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("failedJoin"));
+    } finally {
+      setJoining(false);
+    }
   };
 
   return (
@@ -116,6 +158,34 @@ export function GroupOrderSection() {
               {t("activeDetected")}
             </p>
           ) : null}
+
+          <div className="mt-6 max-w-xl rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
+            <p className="text-sm font-semibold text-gray-950">{t("joinWithCodeTitle")}</p>
+            <p className="mt-1 text-xs leading-5 text-gray-500">{t("joinWithCodeDescription")}</p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <input
+                value={joinCode}
+                onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleJoinWithCode();
+                  }
+                }}
+                placeholder={t("joinCodePlaceholder")}
+                className="h-12 min-w-0 flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-4 text-sm font-semibold uppercase tracking-[0.2em] text-gray-900 outline-none transition focus:border-primary/40 focus:bg-white focus:ring-4 focus:ring-primary/10"
+              />
+              <button
+                type="button"
+                onClick={handleJoinWithCode}
+                disabled={joining}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-gray-950 px-5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+              >
+                {joining ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {joining ? t("joining") : t("joinGroupOrder")}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* RIGHT VISUAL */}

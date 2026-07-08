@@ -8,6 +8,7 @@ import TestimonialsSection from "@/components/pages/Items/components/Testimonial
 import useItems from "@/hooks/useItems";
 import { useCart } from "@/hooks/useCart";
 import { useAuthContext } from "@/hooks/useAuth";
+import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useHome } from "@/hooks/useHome";
 import { useCustomerReviews } from "@/hooks/useCustomerReviews";
 import { findCurrentGroupOrderParticipant, isGroupOrderParticipantCompleted, getStoredGroupOrderCode } from "@/lib/group-order";
@@ -857,6 +858,7 @@ function ProductDetailsPageContent() {
     fetchGroupOrders,
     updateCustomerCartItem,
   } = useCart(token);
+  const { updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
   const router = useRouter();
 
   const [item, setItem] = useState<MenuItem | null>(null);
@@ -2292,8 +2294,15 @@ function ProductDetailsPageContent() {
         });
 
         if (isGroupOrderParticipantCompleted(currentParticipant)) {
-          toast.error(t("groupOrderCompletedCannotEdit"));
-          return;
+          const statusRes = await updateMyGroupOrderParticipantStatus({
+            orderId: String(groupOrder.id),
+            status: "ACTIVE",
+          });
+
+          if (!statusRes || statusRes.success === false || statusRes.error) {
+            toast.error(getApiErrorMessage(statusRes, t("groupOrderCompletedCannotEdit")));
+            return;
+          }
         }
 
         const groupPayload = buildPatchCartPayload();

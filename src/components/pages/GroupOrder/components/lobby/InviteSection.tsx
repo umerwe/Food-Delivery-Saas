@@ -14,6 +14,7 @@ type InviteSectionProps = {
 export default function InviteSection({ order }: InviteSectionProps) {
   const t = useTranslations("groupOrder.lobby.invite");
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const handleCopy = async () => {
     const link = buildGroupOrderInviteLink({ origin: window.location.origin, inviteCode: order?.inviteCode });
@@ -21,6 +22,15 @@ export default function InviteSection({ order }: InviteSectionProps) {
     setCopied(true);
     toast.success(t("linkCopied"));
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyCode = async () => {
+    if (!order?.inviteCode) return;
+
+    await navigator.clipboard.writeText(String(order.inviteCode));
+    setCodeCopied(true);
+    toast.success(t("codeCopied"));
+    setTimeout(() => setCodeCopied(false), 2000);
   };
 
   return (
@@ -63,6 +73,21 @@ export default function InviteSection({ order }: InviteSectionProps) {
           </button>
 
         </div>
+        {order?.inviteCode ? (
+          <div className="mt-3 flex flex-col items-center justify-center gap-2 sm:flex-row">
+            <span className="rounded-full bg-white px-4 py-2 text-sm font-semibold tracking-[0.18em] text-gray-800 shadow-sm">
+              {order.inviteCode}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyCode}
+              className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-white px-4 py-2 text-sm font-semibold text-orange-500 transition hover:bg-orange-50"
+            >
+              {codeCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {codeCopied ? t("copied") : t("copyCode")}
+            </button>
+          </div>
+        ) : null}
       </center>
     </div>
   );

@@ -19,6 +19,7 @@ import {
   getSelectedOrderType,
   isBranchCurrentlyAvailable,
   nearbyBranchToBranchRecord,
+  normalizeBranch,
   persistSelectedBranch,
 } from "@/lib/branch-selector";
 import {
@@ -27,7 +28,9 @@ import {
   setStoredCheckoutTypePreference,
 } from "@/lib/checkout-type-preference";
 import { isRemoteHttpsImageUrl, resolveHttpsImageUrl } from "@/lib/image-fallback";
+import type { AuthBranch } from "@/types/auth";
 import type { BranchOrderType, NearbyBranch } from "@/types/branches";
+import type { HomeBranch } from "@/types/home";
 
 type HeroSectionProps = {
   restaurantName?: string;
@@ -35,6 +38,7 @@ type HeroSectionProps = {
   title?: string;
   description?: string;
   heroImage?: string | null;
+  branch?: AuthBranch | HomeBranch | null;
 };
 
 type BranchSearchMode = "delivery" | "pickup";
@@ -46,6 +50,7 @@ export const HeroSection = ({
   title,
   description,
   heroImage = "/hero.png",
+  branch,
 }: HeroSectionProps) => {
   const t = useTranslations("home.hero");
   const router = useRouter();
@@ -74,9 +79,9 @@ export const HeroSection = ({
     { enabled: showResults }
   );
 
-  const selectedBranch = user?.branch ?? null;
+  const selectedBranch = useMemo(() => normalizeBranch(branch ?? user?.branch), [branch, user?.branch]);
   const isSingleBranchRestaurant = Boolean(selectedBranch?.isOnlyBranch);
-  const selectedOrderType = getSelectedOrderType(user);
+  const selectedOrderType = getSelectedOrderType(user) ?? selectedBranch?.selectedOrderType ?? null;
   const selectedOrderLabel = selectedOrderType === "TAKEAWAY" ? "Pickup" : selectedOrderType === "DELIVERY" ? "Delivery" : "";
   const isSelectedBranchAvailable = selectedBranch ? isBranchCurrentlyAvailable(selectedBranch) : true;
   const orderPanelTitle = mode === "delivery"

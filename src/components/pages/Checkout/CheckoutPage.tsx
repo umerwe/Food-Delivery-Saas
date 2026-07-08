@@ -497,11 +497,13 @@ function CheckoutPageContent() {
     }
   };
 
-  const fetchCart = async () => {
+  const fetchCart = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!customerId) return;
 
     try {
-      setLoadingCart(true);
+      if (!silent) {
+        setLoadingCart(true);
+      }
 
       const res = await get(`/v1/cart?customerId=${customerId}`);
 
@@ -538,7 +540,9 @@ function CheckoutPageContent() {
         err instanceof Error ? err.message : t("toast.failedFetchCart")
       );
     } finally {
-      setLoadingCart(false);
+      if (!silent) {
+        setLoadingCart(false);
+      }
     }
   };
 
@@ -816,7 +820,10 @@ function CheckoutPageContent() {
       dispatchCartChanged({
         itemCount: Math.max(0, getCartItemCount(previousCartItems) - currentQty + newQty),
       });
-      await fetchCart();
+
+      if (!syncCartFromResponse(res)) {
+        void fetchCart({ silent: true });
+      }
     } catch (err) {
       setCartItems(previousCartItems);
       reportBackendError(

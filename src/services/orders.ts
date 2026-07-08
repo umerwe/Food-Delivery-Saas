@@ -21,6 +21,8 @@ export type OrderMenuItem = {
 
 export type OrderItem = {
   id: string | number;
+  type?: string | null;
+  itemType?: "DEAL" | "ITEM" | string | null;
   menuItemId?: string | number | null;
   menuItemName?: string | null;
   name?: string | null;
@@ -38,11 +40,19 @@ export type OrderItem = {
   note?: string | null;
   snapshotModifiers?: unknown[];
   snapshotSections?: unknown[];
+  sections?: unknown[];
+  splitPizza?: unknown;
+  selectedSections?: unknown[];
   modifiers?: OrderModifierInput[];
   modifierSelections?: OrderModifierSelectionInput[];
   selectedModifiers?: OrderModifierInput[];
   includedItems?: OrderItem[];
   menuItem?: OrderMenuItem | null;
+};
+
+export type OrderDisplayItem = OrderItem & {
+  type?: "DEAL" | "ITEM" | string | null;
+  items?: OrderItem[];
 };
 
 export type OrderModifierInput = {
@@ -194,6 +204,7 @@ export type Order = {
   coupon?: OrderCoupon | null;
   items?: OrderItem[];
   itemsPreview?: OrderItem[];
+  displayItems?: OrderDisplayItem[];
   restaurant?: OrderRestaurant | null;
   branch?: OrderBranch | null;
   deliveryAddress?: OrderDeliveryAddress | null;
@@ -233,6 +244,9 @@ export type ReorderPayload = {
   branchId: string | number;
   modifiers?: Array<{ modifierId: string; quantity: number }>;
   modifierSelections?: CartModifierSelectionInput[];
+  sections?: unknown[];
+  splitPizza?: unknown;
+  selectedSections?: unknown[];
   note?: string;
 };
 
@@ -378,6 +392,8 @@ const normalizeOrderItem = (value: unknown): OrderItem | null => {
 
   return {
     id,
+    type: getString(record.type) || null,
+    itemType: getString(record.itemType || record.type) || null,
     menuItemId: getString(record.menuItemId || menuItem?.id) || null,
     menuItemName: menuItemName || null,
     name: getString(record.name) || null,
@@ -395,6 +411,9 @@ const normalizeOrderItem = (value: unknown): OrderItem | null => {
     note: getString(record.note) || null,
     snapshotModifiers: Array.isArray(record.snapshotModifiers) ? record.snapshotModifiers : [],
     snapshotSections: Array.isArray(record.snapshotSections) ? record.snapshotSections : [],
+    sections: Array.isArray(record.sections) ? record.sections : [],
+    splitPizza: record.splitPizza,
+    selectedSections: Array.isArray(record.selectedSections) ? record.selectedSections : [],
     modifiers: Array.isArray(record.modifiers) ? record.modifiers as OrderModifierInput[] : [],
     modifierSelections: Array.isArray(record.modifierSelections)
       ? record.modifierSelections as OrderModifierSelectionInput[]
@@ -421,6 +440,31 @@ const normalizeOrderItem = (value: unknown): OrderItem | null => {
 const normalizeOrderItems = (value: unknown): OrderItem[] =>
   Array.isArray(value)
     ? value.map(normalizeOrderItem).filter((item): item is OrderItem => Boolean(item))
+    : [];
+
+const normalizeOrderDisplayItem = (value: unknown): OrderDisplayItem | null => {
+  const record = getRecord(value);
+
+  if (!record) return null;
+
+  const normalizedItem = normalizeOrderItem({
+    ...record,
+    id: record.id || record.dealId || record.menuItemId || record.menuItemName || record.type,
+    itemType: record.itemType || record.type,
+  });
+
+  if (!normalizedItem) return null;
+
+  return {
+    ...normalizedItem,
+    type: getString(record.type || record.itemType) || normalizedItem.itemType || null,
+    items: normalizeOrderItems(record.items),
+  };
+};
+
+const normalizeOrderDisplayItems = (value: unknown): OrderDisplayItem[] =>
+  Array.isArray(value)
+    ? value.map(normalizeOrderDisplayItem).filter((item): item is OrderDisplayItem => Boolean(item))
     : [];
 
 const normalizePricingBreakdown = (value: unknown): OrderPricingBreakdownLine[] =>
@@ -544,6 +588,7 @@ export const normalizeOrderDetail = (value: unknown): Order | null => {
   const fulfillment = getRecord(record.fulfillment);
   const items = normalizeOrderItems(record.items);
   const itemsPreview = normalizeOrderItems(record.itemsPreview);
+  const displayItems = normalizeOrderDisplayItems(record.displayItems);
   const deliveryAddress = normalizeDeliveryAddress(fulfillment?.deliveryAddress ?? record.deliveryAddress);
   const transactions = payment?.transactions?.length
     ? payment.transactions
@@ -581,6 +626,7 @@ export const normalizeOrderDetail = (value: unknown): Order | null => {
     coupon: normalizeOrderCoupon(record.coupon),
     items,
     itemsPreview,
+    displayItems,
     restaurant: getRecord(record.restaurant) as OrderRestaurant | null,
     branch: getRecord(record.branch) as OrderBranch | null,
     deliveryAddress,
@@ -718,6 +764,10 @@ const buildItemReorderPayload = ({
     ...(item.note ? { note: item.note } : { note: "" }),
     ...(modifierSelections.length > 0 ? { modifierSelections } : {}),
     ...(modifiers.length > 0 ? { modifiers } : {}),
+    ...(item.snapshotSections?.length ? { sections: item.snapshotSections } : {}),
+    ...(item.sections?.length ? { sections: item.sections } : {}),
+    ...(item.selectedSections?.length ? { selectedSections: item.selectedSections } : {}),
+    ...(item.splitPizza ? { splitPizza: item.splitPizza } : {}),
   };
 };
 
