@@ -12,7 +12,7 @@ import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { findCurrentGroupOrderParticipant, getStoredGroupOrderCode, getStoredGroupOrderId, isGroupOrderParticipantCompleted, setStoredGroupOrderId } from "@/lib/group-order";
+import { clearStoredGroupOrderCode, findCurrentGroupOrderParticipant, getStoredGroupOrderCode, getStoredGroupOrderId, isGroupOrderParticipantCompleted, setStoredGroupOrderId } from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney } from "@/lib/money";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import { FavoriteHeartButton } from "@/components/common/favorites/FavoriteHeartButton";
@@ -559,7 +559,7 @@ export function RestaurantCard({
   const { token } = useAuthContext();
   const { fetchSplitPizzaMenuItems } = useItems(token);
   const { addCustomerCartItem, addGroupOrderItem, clearCustomerCart, fetchGroupOrders } = useCart(token);
-  const { fetchGroupOrderById, searchGroupOrdersByInviteCode, updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
+  const { fetchGroupOrderById, searchGroupOrdersByInviteCode } = useGroupOrderApi(token);
   const { user } = useAuth();
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -1802,6 +1802,7 @@ export function RestaurantCard({
 
       const groupCode = getStoredGroupOrderCode();
       const groupOrderId = getStoredGroupOrderId();
+      let addedToGroupOrder = false;
 
       if (!groupCode && !groupOrderId && !customerId) {
         toast.error(t("customerNotFound"));
@@ -1879,21 +1880,15 @@ export function RestaurantCard({
         });
 
         if (isGroupOrderParticipantCompleted(currentParticipant)) {
-          const statusRes = await updateMyGroupOrderParticipantStatus({
-            orderId: String(groupOrder.id),
-            status: "ACTIVE",
+          clearStoredGroupOrderCode();
+          res = await addCartItemWithBranchRetry(basePayload);
+        } else {
+          res = await addGroupOrderItem({
+            groupOrderId: String(groupOrder.id),
+            payload: basePayload,
           });
-
-          if (isApiErrorResponse(statusRes)) {
-            toast.error(getApiErrorMessage(statusRes, t("groupOrderCompletedCannotEdit")));
-            return;
-          }
+          addedToGroupOrder = true;
         }
-
-        res = await addGroupOrderItem({
-          groupOrderId: String(groupOrder.id),
-          payload: basePayload,
-        });
       } else {
         res = await addCartItemWithBranchRetry(basePayload);
       }
@@ -1903,14 +1898,14 @@ export function RestaurantCard({
         return;
       }
 
-      toast.success(groupCode || groupOrderId ? t("addedToGroupOrder") : t("addedToCart"));
+      toast.success(addedToGroupOrder ? t("addedToGroupOrder") : t("addedToCart"));
 
       setAnimateCart(true);
       setTimeout(() => setAnimateCart(false), 700);
 
       setOpen(false);
 
-      if (groupCode || groupOrderId) {
+      if (addedToGroupOrder) {
         window.dispatchEvent(new Event("deliveryway:group-order:item-added"));
       }
     } catch (error) {

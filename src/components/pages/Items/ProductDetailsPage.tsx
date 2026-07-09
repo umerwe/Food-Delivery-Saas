@@ -11,7 +11,7 @@ import { useAuthContext } from "@/hooks/useAuth";
 import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useHome } from "@/hooks/useHome";
 import { useCustomerReviews } from "@/hooks/useCustomerReviews";
-import { findCurrentGroupOrderParticipant, isGroupOrderParticipantCompleted, getStoredGroupOrderCode, getStoredGroupOrderId, setStoredGroupOrderId } from "@/lib/group-order";
+import { clearStoredGroupOrderCode, findCurrentGroupOrderParticipant, isGroupOrderParticipantCompleted, getStoredGroupOrderCode, getStoredGroupOrderId, setStoredGroupOrderId } from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney, resolveCustomerCurrency } from "@/lib/money";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -858,7 +858,7 @@ function ProductDetailsPageContent() {
     fetchGroupOrders,
     updateCustomerCartItem,
   } = useCart(token);
-  const { fetchGroupOrderById, searchGroupOrdersByInviteCode, updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
+  const { fetchGroupOrderById, searchGroupOrdersByInviteCode } = useGroupOrderApi(token);
   const router = useRouter();
 
   const [item, setItem] = useState<MenuItem | null>(null);
@@ -2269,6 +2269,7 @@ function ProductDetailsPageContent() {
 
       const groupCode = getStoredGroupOrderCode();
       const groupOrderId = getStoredGroupOrderId();
+      let addedToGroupOrder = false;
 
       let res: ApiRecord | null = null;
 
@@ -2310,24 +2311,39 @@ function ProductDetailsPageContent() {
         });
 
         if (isGroupOrderParticipantCompleted(currentParticipant)) {
-          const statusRes = await updateMyGroupOrderParticipantStatus({
-            orderId: String(groupOrder.id),
-            status: "ACTIVE",
-          });
+          clearStoredGroupOrderCode();
 
-          if (!statusRes || statusRes.success === false || statusRes.error) {
-            toast.error(getApiErrorMessage(statusRes, t("groupOrderCompletedCannotEdit")));
+          if (!customerId) {
+            toast.error(t("customerNotFound"));
             return;
           }
+
+          if (!branchId && !isEditingCartItem) {
+            toast.error(t("selectBranchFirst"));
+            return;
+          }
+
+          if (isEditingCartItem) {
+            res = await updateCustomerCartItem({
+              cartItemId,
+              payload: buildPatchCartPayload(),
+            });
+          } else {
+            res = await addCustomerCartItem({
+              customerId,
+              payload: buildCreateCartPayload(),
+            });
+          }
+        } else {
+          const groupPayload = buildPatchCartPayload();
+          groupPayload.menuItemId = item.id;
+
+          res = await addGroupOrderItem({
+            groupOrderId: String(groupOrder.id),
+            payload: groupPayload,
+          });
+          addedToGroupOrder = true;
         }
-
-        const groupPayload = buildPatchCartPayload();
-        groupPayload.menuItemId = item.id;
-
-        res = await addGroupOrderItem({
-          groupOrderId: String(groupOrder.id),
-          payload: groupPayload,
-        });
       } else {
         if (!customerId) {
           toast.error(t("customerNotFound"));
@@ -2353,7 +2369,7 @@ function ProductDetailsPageContent() {
       }
 
       if (
-        !groupCode &&
+        !addedToGroupOrder &&
         !isEditingCartItem &&
         isCartBranchConflict(res)
       ) {
@@ -2369,12 +2385,12 @@ function ProductDetailsPageContent() {
       toast.success(
         isEditingCartItem
           ? t("cartItemUpdated")
-          : groupCode
+          : addedToGroupOrder
           ? t("addedToGroupOrder")
           : t("addedToCart")
       );
 
-      if (groupCode) {
+      if (addedToGroupOrder) {
         window.dispatchEvent(new Event("deliveryway:group-order:item-added"));
       } else if (isEditingCartItem) {
         router.push(`/checkout?type=${checkoutType}`);

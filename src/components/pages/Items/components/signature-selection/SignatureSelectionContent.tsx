@@ -26,8 +26,8 @@ import { setStoredRestaurantMenuId } from "@/lib/timed-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { formatMoney as formatDisplayMoney, resolveCustomerCurrency } from "@/lib/money";
 import { getSignatureMenuViewMode, setSignatureMenuViewMode } from "@/lib/view-preferences";
-import { getStoredGroupOrderCode, getStoredGroupOrderId, setStoredGroupOrderId } from "@/lib/group-order";
-import { getStoredGroupOrderCode, getStoredGroupOrderId, setStoredGroupOrderId } from "@/lib/group-order";
+import { clearStoredGroupOrderCode, findCurrentGroupOrderParticipant, getStoredGroupOrderCode, getStoredGroupOrderId, isGroupOrderParticipantCompleted, setStoredGroupOrderId } from "@/lib/group-order";
+import { clearStoredGroupOrderCode, findCurrentGroupOrderParticipant, getStoredGroupOrderCode, getStoredGroupOrderId, isGroupOrderParticipantCompleted, setStoredGroupOrderId } from "@/lib/group-order";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuRecord, MenuVariation, Modifier, ModifierGroup, ModifierLink, ProductCardData, RawModifierLink, SelectedModifier, SelectedModifiersMap, SplitPizzaSelection, VariationPriceOverride } from "./types";
@@ -1771,6 +1771,7 @@ export function SignatureSelectionContent({
 
       const groupCode = getStoredGroupOrderCode();
       const groupOrderId = getStoredGroupOrderId();
+      let addedToGroupOrder = false;
 
       const addCartItem = async () => {
         if (!groupCode && !groupOrderId) {
@@ -1807,15 +1808,28 @@ export function SignatureSelectionContent({
 
         setStoredGroupOrderId(String(groupOrder.id));
 
-        return addGroupOrderItem({
+        const currentParticipant = findCurrentGroupOrderParticipant({
+          order: groupOrder,
+          userId: customerId,
+        });
+
+        if (isGroupOrderParticipantCompleted(currentParticipant)) {
+          clearStoredGroupOrderCode();
+          return addCustomerCartItem({ customerId, payload });
+        }
+
+        const response = await addGroupOrderItem({
           groupOrderId: String(groupOrder.id),
           payload,
         });
+        addedToGroupOrder = true;
+
+        return response;
       };
 
       let res = await addCartItem();
 
-      if (!groupCode && !groupOrderId && isBranchCartConflictResponse(res)) {
+      if (!addedToGroupOrder && isBranchCartConflictResponse(res)) {
         toast.info(tSignature("cartBranchConflict"));
 
         const clearCartRes = await clearCustomerCart({ customerId });
@@ -1835,8 +1849,8 @@ export function SignatureSelectionContent({
         return;
       }
 
-      toast.success(groupCode || groupOrderId ? tProduct("addedToGroupOrder") : tProduct("addedToCart"));
-      if (groupCode || groupOrderId) {
+      toast.success(addedToGroupOrder ? tProduct("addedToGroupOrder") : tProduct("addedToCart"));
+      if (addedToGroupOrder) {
         window.dispatchEvent(new Event("deliveryway:group-order:item-added"));
       }
       setModalOpen(false);
