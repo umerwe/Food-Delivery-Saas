@@ -12,7 +12,7 @@ import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { findCurrentGroupOrderParticipant, getStoredGroupOrderCode, isGroupOrderParticipantCompleted } from "@/lib/group-order";
+import { findCurrentGroupOrderParticipant, getStoredGroupOrderCode, getStoredGroupOrderId, isGroupOrderParticipantCompleted, setStoredGroupOrderId } from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney } from "@/lib/money";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import { FavoriteHeartButton } from "@/components/common/favorites/FavoriteHeartButton";
@@ -559,7 +559,7 @@ export function RestaurantCard({
   const { token } = useAuthContext();
   const { fetchSplitPizzaMenuItems } = useItems(token);
   const { addCustomerCartItem, addGroupOrderItem, clearCustomerCart, fetchGroupOrders } = useCart(token);
-  const { updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
+  const { fetchGroupOrderById, searchGroupOrdersByInviteCode, updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
   const { user } = useAuth();
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -1801,13 +1801,14 @@ export function RestaurantCard({
       }
 
       const groupCode = getStoredGroupOrderCode();
+      const groupOrderId = getStoredGroupOrderId();
 
-      if (!groupCode && !customerId) {
+      if (!groupCode && !groupOrderId && !customerId) {
         toast.error(t("customerNotFound"));
         return;
       }
 
-      if (!groupCode && !branchId) {
+      if (!groupCode && !groupOrderId && !branchId) {
         toast.error(t("selectBranch"));
         return;
       }
@@ -1845,17 +1846,32 @@ export function RestaurantCard({
 
       let res: ApiRecord | null = null;
 
-      if (groupCode) {
-        const { response: groupOrdersRes, groupOrders } = await fetchGroupOrders();
+      if (groupCode || groupOrderId) {
+        let groupOrder: ApiRecord | null = null;
 
-        const groupOrder = groupOrders.find(
-          (order: ApiRecord) => order?.inviteCode === groupCode,
-        );
+        if (groupOrderId) {
+          const { groupOrder: directGroupOrder } = await fetchGroupOrderById({ orderId: groupOrderId });
+          groupOrder = directGroupOrder as ApiRecord | null;
+        }
+
+        if (!groupOrder && groupCode) {
+          const { groupOrder: searchedGroupOrder } = await searchGroupOrdersByInviteCode({ inviteCode: groupCode });
+          groupOrder = searchedGroupOrder as ApiRecord | null;
+        }
+
+        if (!groupOrder && groupCode) {
+          const { groupOrders } = await fetchGroupOrders();
+
+          groupOrder = groupOrders.find(
+            (order: ApiRecord) => order?.inviteCode === groupCode,
+          ) || null;
+        }
 
         if (!groupOrder) {
           toast.error(t("invalidGroupOrder"));
           return;
         }
+        setStoredGroupOrderId(String(groupOrder.id));
 
         const currentParticipant = findCurrentGroupOrderParticipant({
           order: groupOrder,
@@ -1887,14 +1903,14 @@ export function RestaurantCard({
         return;
       }
 
-      toast.success(groupCode ? t("addedToGroupOrder") : t("addedToCart"));
+      toast.success(groupCode || groupOrderId ? t("addedToGroupOrder") : t("addedToCart"));
 
       setAnimateCart(true);
       setTimeout(() => setAnimateCart(false), 700);
 
       setOpen(false);
 
-      if (groupCode) {
+      if (groupCode || groupOrderId) {
         window.dispatchEvent(new Event("deliveryway:group-order:item-added"));
       }
     } catch (error) {
@@ -1910,9 +1926,10 @@ export function RestaurantCard({
     if (loading) return;
 
     const groupCode = getStoredGroupOrderCode();
+    const groupOrderId = getStoredGroupOrderId();
 
     if (!hasOptions) {
-      if (!groupCode && !branchId) {
+      if (!groupCode && !groupOrderId && !branchId) {
         toast.error(t("selectBranchFirst"));
         return;
       }

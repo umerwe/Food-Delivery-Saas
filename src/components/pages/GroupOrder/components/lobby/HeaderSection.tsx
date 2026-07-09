@@ -1,10 +1,14 @@
 import { CalendarClock, MapPin, Store } from "lucide-react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatDisplayAddress } from "@/lib/address-display";
+import { GroupOrderScheduleDialog } from "@/components/pages/GroupOrder/components/lobby/GroupOrderScheduleDialog";
 import type { GroupOrder } from "@/types/group-order";
 
 type HeaderSectionProps = {
   order: GroupOrder;
+  canEditSchedule?: boolean;
+  onScheduleUpdated?: (orderTime: string | null) => void;
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -15,8 +19,12 @@ const formatDateTime = (value?: string | null) => {
   if (Number.isNaN(date.getTime())) return "";
 
   return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
   }).format(date);
 };
 
@@ -30,8 +38,9 @@ const getOrderTypeLabelKey = (orderType?: string) => {
   return "orderTypes.fallback";
 };
 
-export default function HeaderSection({ order }: HeaderSectionProps) {
+export default function HeaderSection({ order, canEditSchedule = false, onScheduleUpdated }: HeaderSectionProps) {
   const t = useTranslations("groupOrder.lobby.header");
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const participants = order?.participants ?? [];
   const total = order?.participantCount || participants.length || 0;
   const ready = participants.filter((p) => {
@@ -84,6 +93,15 @@ export default function HeaderSection({ order }: HeaderSectionProps) {
           <p className="mt-2 text-sm font-semibold text-gray-900">
             {scheduledAt ? t("scheduledFor", { date: scheduledAt }) : t("instantOrder")}
           </p>
+          {canEditSchedule ? (
+            <button
+              type="button"
+              onClick={() => setScheduleOpen(true)}
+              className="mt-3 inline-flex rounded-full border border-primary/15 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:border-primary/30 hover:bg-primary/10"
+            >
+              Edit schedule
+            </button>
+          ) : null}
           {expiresAt ? (
             <p className="mt-1 text-xs text-gray-500">{t("expiresAt", { date: expiresAt })}</p>
           ) : null}
@@ -115,6 +133,14 @@ export default function HeaderSection({ order }: HeaderSectionProps) {
           ) : null}
         </div>
       </div>
+      {canEditSchedule ? (
+        <GroupOrderScheduleDialog
+          order={order}
+          open={scheduleOpen}
+          onOpenChange={setScheduleOpen}
+          onSaved={(orderTime) => onScheduleUpdated?.(orderTime)}
+        />
+      ) : null}
     </div>
   );
 }

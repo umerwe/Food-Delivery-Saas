@@ -11,7 +11,7 @@ import { useAuthContext } from "@/hooks/useAuth";
 import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useHome } from "@/hooks/useHome";
 import { useCustomerReviews } from "@/hooks/useCustomerReviews";
-import { findCurrentGroupOrderParticipant, isGroupOrderParticipantCompleted, getStoredGroupOrderCode } from "@/lib/group-order";
+import { findCurrentGroupOrderParticipant, isGroupOrderParticipantCompleted, getStoredGroupOrderCode, getStoredGroupOrderId, setStoredGroupOrderId } from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney, resolveCustomerCurrency } from "@/lib/money";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -858,7 +858,7 @@ function ProductDetailsPageContent() {
     fetchGroupOrders,
     updateCustomerCartItem,
   } = useCart(token);
-  const { updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
+  const { fetchGroupOrderById, searchGroupOrdersByInviteCode, updateMyGroupOrderParticipantStatus } = useGroupOrderApi(token);
   const router = useRouter();
 
   const [item, setItem] = useState<MenuItem | null>(null);
@@ -2268,25 +2268,41 @@ function ProductDetailsPageContent() {
       }
 
       const groupCode = getStoredGroupOrderCode();
+      const groupOrderId = getStoredGroupOrderId();
 
       let res: ApiRecord | null = null;
 
-      if (groupCode) {
-        const { response: groupOrdersRes, groupOrders } = await fetchGroupOrders();
+      if (groupCode || groupOrderId) {
+        let groupOrder: ApiRecord | null = null;
 
-        if (!groupOrdersRes || groupOrdersRes.error) {
-          toast.error(t("failedFetchGroupOrder"));
-          return;
+        if (groupOrderId) {
+          const { groupOrder: directGroupOrder } = await fetchGroupOrderById({ orderId: groupOrderId });
+          groupOrder = directGroupOrder as ApiRecord | null;
         }
 
-        const groupOrder = groupOrders.find(
-          (order: ApiRecord) => order?.inviteCode === groupCode
-        );
+        if (!groupOrder && groupCode) {
+          const { groupOrder: searchedGroupOrder } = await searchGroupOrdersByInviteCode({ inviteCode: groupCode });
+          groupOrder = searchedGroupOrder as ApiRecord | null;
+        }
+
+        if (!groupOrder && groupCode) {
+          const { response: groupOrdersRes, groupOrders } = await fetchGroupOrders();
+
+          if (!groupOrdersRes || groupOrdersRes.error) {
+            toast.error(t("failedFetchGroupOrder"));
+            return;
+          }
+
+          groupOrder = groupOrders.find(
+            (order: ApiRecord) => order?.inviteCode === groupCode
+          ) || null;
+        }
 
         if (!groupOrder) {
           toast.error(t("invalidGroupOrder"));
           return;
         }
+        setStoredGroupOrderId(String(groupOrder.id));
 
         const currentParticipant = findCurrentGroupOrderParticipant({
           order: groupOrder,

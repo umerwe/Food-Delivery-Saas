@@ -84,6 +84,21 @@ export function GroupOrderLobbyPage() {
     } : currentOrder);
   };
 
+  const updateOrderSchedule = (orderTime: string | null) => {
+    updateOrder((currentOrder) => currentOrder ? {
+      ...currentOrder,
+      orderTime,
+      isScheduled: Boolean(orderTime),
+      summary: currentOrder.summary ? {
+        ...currentOrder.summary,
+        orderTime,
+        isScheduled: Boolean(orderTime),
+      } : currentOrder.summary,
+    } : currentOrder);
+
+    void refetch();
+  };
+
   const handleRefresh = async () => {
     if (refreshing) return;
 
@@ -209,7 +224,11 @@ export function GroupOrderLobbyPage() {
       <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]">
         {/* LEFT */}
         <div className="space-y-5">
-          <HeaderSection order={order} />
+          <HeaderSection
+            order={order}
+            canEditSchedule={isHost && canMutateGroupOrder}
+            onScheduleUpdated={updateOrderSchedule}
+          />
 
           {order?.participants?.map((participant: GroupOrderParticipant) => (
             <UserCard

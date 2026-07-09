@@ -7,7 +7,7 @@ import { queryKeys } from "@/config/query-keys";
 import { useAuth } from "@/hooks/useAuth";
 import { useDomainApi } from "@/hooks/useDomainApi";
 import { getDefaultBranchOrderType, persistSelectedBranch } from "@/lib/branch-selector";
-import { canMutateGroupOrder, canParticipantEditGroupOrderItems, clearStoredGroupOrderCode, getStoredGroupOrderCode, isClosedGroupOrder, isGroupOrderParticipantCompleted, setStoredGroupOrderCode } from "@/lib/group-order";
+import { canMutateGroupOrder, canParticipantEditGroupOrderItems, clearStoredGroupOrderCode, getStoredGroupOrderCode, getStoredGroupOrderId, isClosedGroupOrder, isGroupOrderParticipantCompleted, setStoredGroupOrderCode, setStoredGroupOrderId } from "@/lib/group-order";
 import {
   cancelGroupOrder,
   checkoutGroupOrder,
@@ -23,6 +23,7 @@ import {
   postGroupOrders,
   searchGroupOrdersByInviteCode,
   updateGroupOrderItemQuantity,
+  updateGroupOrderSchedule,
   updateMyGroupOrderParticipantStatus,
 } from "@/services/group-orders";
 import type { ApiResult } from "@/services/http";
@@ -87,6 +88,12 @@ export const useGroupOrderApi = (token: string | null) => {
     [token]
   );
 
+  const updateSchedule = useCallback(
+    ({ orderId, orderTime }: { orderId: string | number; orderTime: string | null }) =>
+      updateGroupOrderSchedule({ orderId, orderTime, token }),
+    [token]
+  );
+
   const deleteItem = useCallback(
     ({ orderId, itemId }: { orderId: string | number; itemId: string | number }) =>
       deleteGroupOrderItem({ orderId, itemId, token }),
@@ -111,10 +118,11 @@ export const useGroupOrderApi = (token: string | null) => {
       joinGroupOrder: joinOrder,
       checkoutGroupOrder: checkoutOrder,
       updateGroupOrderItemQuantity: updateItemQuantity,
+      updateGroupOrderSchedule: updateSchedule,
       deleteGroupOrderItem: deleteItem,
       updateMyGroupOrderParticipantStatus: updateMyParticipantStatus,
     }),
-    [api, addGroupOrder, cancelOrder, checkoutOrder, deleteItem, findGroupOrderByInviteCode, getGroupOrderById, joinOrder, leaveOrder, listGroupOrders, updateItemQuantity, updateMyParticipantStatus]
+    [api, addGroupOrder, cancelOrder, checkoutOrder, deleteItem, findGroupOrderByInviteCode, getGroupOrderById, joinOrder, leaveOrder, listGroupOrders, updateItemQuantity, updateMyParticipantStatus, updateSchedule]
   );
 };
 
@@ -154,12 +162,19 @@ export function useGroupOrder(): UseGroupOrderResult {
         setLoading(true);
       }
 
-      const groupOrderId = typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("groupOrderId") || ""
-        : "";
+      const searchParams = typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search)
+        : null;
+      const groupOrderId = searchParams?.get("groupOrderId") || "";
+      const codeFromUrl = searchParams?.get("code") || "";
+      const storedGroupOrderId = getStoredGroupOrderId();
       const currentGroupOrderId = orderRef.current?.id ? String(orderRef.current.id) : "";
-      const directGroupOrderId = groupOrderId || currentGroupOrderId;
-      const code = getStoredGroupOrderCode();
+      const directGroupOrderId = groupOrderId || currentGroupOrderId || storedGroupOrderId;
+      const code = codeFromUrl || getStoredGroupOrderCode();
+
+      if (codeFromUrl) {
+        setStoredGroupOrderCode(codeFromUrl);
+      }
 
       if (!directGroupOrderId && !code) {
         orderRef.current = null;
@@ -190,6 +205,9 @@ export function useGroupOrder(): UseGroupOrderResult {
 
       if (groupOrder.inviteCode) {
         setStoredGroupOrderCode(groupOrder.inviteCode);
+      }
+      if (groupOrder.id) {
+        setStoredGroupOrderId(groupOrder.id);
       }
 
       persistGroupOrderBranch(groupOrder);

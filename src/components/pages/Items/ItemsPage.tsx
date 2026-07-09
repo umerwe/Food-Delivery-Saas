@@ -12,8 +12,8 @@ import useBranches from "@/hooks/useBranches";
 import { useGroupOrder, useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useAuth } from "@/hooks/useAuth";
 import { getDefaultBranchOrderType, getSoleActiveBranch, persistSelectedBranch } from "@/lib/branch-selector";
-import { clearStoredGroupOrderCode, getStoredGroupOrderCode, setStoredGroupOrderCode } from "@/lib/group-order";
-import type { GroupOrderParticipant } from "@/types/group-order";
+import { clearStoredGroupOrderCode, getStoredGroupOrderCode, setStoredGroupOrderCode, setStoredGroupOrderId } from "@/lib/group-order";
+import type { GroupOrder, GroupOrderParticipant } from "@/types/group-order";
 
 function ItemsPageContent() {
   const t = useTranslations("items.groupOrder");
@@ -34,25 +34,25 @@ function ItemsPageContent() {
 
   const handledInviteCodeRef = useRef<string | null>(null);
 
-  const isUserAlreadyInOrder = async (code: string) => {
+  const findJoinedGroupOrder = async (code: string): Promise<GroupOrder | null> => {
     try {
       const { response: res, groupOrder: order } = await searchGroupOrdersByInviteCode({ inviteCode: code });
 
       if (!res || res.error) {
-        return false;
+        return null;
       }
 
-      if (!order) return false;
+      if (!order) return null;
 
-      if (order.hostUserId === user?.id) return true;
+      if (order.hostUserId === user?.id) return order;
 
       const exists = order.participants?.some(
         (participant: GroupOrderParticipant) => participant.userId === user?.id
       );
 
-      return Boolean(exists);
+      return exists ? order : null;
     } catch {
-      return false;
+      return null;
     }
   };
 
@@ -100,9 +100,9 @@ function ItemsPageContent() {
 
         setStoredGroupOrderCode(inviteCode);
 
-        const alreadyIn = await isUserAlreadyInOrder(inviteCode);
+        let joinedOrder = await findJoinedGroupOrder(inviteCode);
 
-        if (!alreadyIn) {
+        if (!joinedOrder) {
           const joined = await handleJoinGroupOrder(inviteCode);
 
           if (!joined) {
@@ -110,10 +110,15 @@ function ItemsPageContent() {
             return;
           }
 
-          toast.success(t("joined"));
+          joinedOrder = await findJoinedGroupOrder(inviteCode);
+        }
+
+        if (joinedOrder?.id) {
+          setStoredGroupOrderId(joinedOrder.id);
         }
 
         await refetchGroupOrder();
+        toast.success(t("joined"));
       } finally {
         setJoiningGroupOrder(false);
       }

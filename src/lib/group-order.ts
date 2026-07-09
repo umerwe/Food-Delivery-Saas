@@ -3,6 +3,7 @@ import type { AddressRecord } from "@/services/profile";
 import type { GroupOrder, GroupOrderParticipant, GroupOrderStatus } from "@/types/group-order";
 
 export const GROUP_ORDER_CODE_KEY = "***";
+export const GROUP_ORDER_ID_KEY = "deliveryway:group-order-id";
 
 export const GROUP_ORDER_CLOSED_STATUSES: GroupOrderStatus[] = [
   "CHECKED_OUT",
@@ -17,12 +18,19 @@ export const GROUP_ORDER_MUTABLE_STATUSES: GroupOrderStatus[] = [
 
 export const getStoredGroupOrderCode = () => safeGetLocalStorageItem(GROUP_ORDER_CODE_KEY) || "";
 
+export const getStoredGroupOrderId = () => safeGetLocalStorageItem(GROUP_ORDER_ID_KEY) || "";
+
 export const setStoredGroupOrderCode = (inviteCode: string) => {
   safeSetLocalStorageItem(GROUP_ORDER_CODE_KEY, inviteCode);
 };
 
+export const setStoredGroupOrderId = (orderId: string | number) => {
+  safeSetLocalStorageItem(GROUP_ORDER_ID_KEY, String(orderId));
+};
+
 export const clearStoredGroupOrderCode = () => {
   safeRemoveLocalStorageItem(GROUP_ORDER_CODE_KEY);
+  safeRemoveLocalStorageItem(GROUP_ORDER_ID_KEY);
 };
 
 export const isClosedGroupOrder = (order: GroupOrder | null | undefined) => {

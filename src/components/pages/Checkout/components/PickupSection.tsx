@@ -1,4 +1,3 @@
-import AddressSection from "@/components/pages/Checkout/components/AddressSection"
 import { CustomerDetailsForm } from "@/components/pages/Checkout/components/CustomerDetailsForm"
 import { SelectPickupTimeSection } from "@/components/pages/Checkout/components/TimeSection"
 import NotesSection from "@/components/pages/Checkout/components/NotesSection"
@@ -38,9 +37,8 @@ export function PickupSection(props: PickupSectionProps) {
 
   return (
     <div className="space-y-[38px]">
-      <AddressSection {...props} />
-      <NotesSection {...props} />
       <SelectPickupTimeSection {...props} />
+      <NotesSection {...props} />
       <CustomerDetailsForm {...props} editable={props.isGuest} />
       <PaymentMethodSection {...props} cashLabel={t("cash")} />
     </div>

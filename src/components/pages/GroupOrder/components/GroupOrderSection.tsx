@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Loader2, UsersRound, Utensils, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -144,14 +145,23 @@ export function GroupOrderSection() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handlePrimaryAction}
-            className="mt-8 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-primary px-7 text-base font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_18px_36px_rgba(220,38,38,0.28)]"
-          >
-            {hasActiveGroupOrder ? t("viewLobby") : t("startGroupOrder")}
-            <ArrowRight size={18} />
-          </button>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={handlePrimaryAction}
+              className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-primary px-7 text-base font-semibold text-white shadow-[0_14px_30px_rgba(220,38,38,0.22)] transition hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-[0_18px_36px_rgba(220,38,38,0.28)]"
+            >
+              {hasActiveGroupOrder ? t("viewLobby") : t("startGroupOrder")}
+              <ArrowRight size={18} />
+            </button>
+
+            <Link
+              href="/group-order/ongoing"
+              className="inline-flex h-14 items-center justify-center rounded-full border border-primary/15 bg-white px-7 text-base font-semibold text-primary shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/5 hover:shadow-md"
+            >
+              View ongoing group orders
+            </Link>
+          </div>
 
           {hasActiveGroupOrder ? (
             <p className="mt-3 text-sm text-gray-500">

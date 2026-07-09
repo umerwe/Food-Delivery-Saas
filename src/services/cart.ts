@@ -411,11 +411,19 @@ export const deleteCustomerCartDeal = ({
 }) => deleteCart(`/v1/cart/deals/${dealId}?customerId=${customerId}`, token);
 
 export const fetchGroupOrders = async (token?: string | null) => {
-  const response = await getCart("/v1/group-orders", token);
+  const openResponse = await getCart("/v1/group-orders?status=OPEN", token);
+  const lockedResponse = await getCart("/v1/group-orders?status=LOCKED", token);
+  const groupOrders = [
+    ...normalizeApiList<ApiRecord>(openResponse),
+    ...normalizeApiList<ApiRecord>(lockedResponse),
+  ].filter((order, index, orders) => {
+    const id = String(order?.id || "");
+    return id && orders.findIndex((item) => String(item?.id || "") === id) === index;
+  });
 
   return {
-    response,
-    groupOrders: normalizeApiList<ApiRecord>(response),
+    response: openResponse?.error && lockedResponse?.error ? openResponse : openResponse?.error ? lockedResponse : openResponse,
+    groupOrders,
   };
 };
 

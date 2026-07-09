@@ -303,10 +303,13 @@ export default function OrderSummary({
     }
 
     const includedItems = displayItem.items?.length ? displayItem.items : displayItem.includedItems || [];
-    const dealTotal = includedItems.reduce((total, item) => {
-      const fallbackTotal = getAmountNumber(item.unitPrice) * getAmountNumber(item.quantity);
-      return total + getAmountNumber(item.lineTotal ?? fallbackTotal);
-    }, getAmountNumber(displayItem.lineTotal));
+    const dealLineTotal = getAmountNumber(displayItem.lineTotal);
+    const dealTotal = dealLineTotal > 0
+      ? dealLineTotal
+      : includedItems.reduce((total, item) => {
+        const fallbackTotal = getAmountNumber(item.unitPrice) * getAmountNumber(item.quantity);
+        return total + getAmountNumber(item.lineTotal ?? fallbackTotal);
+      }, 0);
     const dealImage = includedItems.find((item) => item.imageUrl || item.menuItem?.imageUrl);
 
     return (
