@@ -8,21 +8,32 @@ import OrderSuccess from "@/components/pages/GroupOrder/components/Success/Order
 import { useGroupOrder } from "@/hooks/useGroupOrder";
 import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { useAuth } from "@/hooks/useAuth";
+import { useHome } from "@/hooks/useHome";
+import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
+import { resolveCustomerCurrency } from "@/lib/money";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { getBackendErrorMessage, hasBackendError } from "@/components/pages/Checkout/utils/checkout-normalizers";
+import {
+  getBackendErrorMessage,
+  hasBackendError,
+} from "@/components/pages/Checkout/utils/checkout-normalizers";
 import { setStoredGroupOrderCode } from "@/lib/group-order";
-import type { GroupOrderParticipant, GroupOrderSuccessData } from "@/types/group-order";
+import type {
+  GroupOrderParticipant,
+  GroupOrderSuccessData,
+} from "@/types/group-order";
 
 export function GroupOrderLobbyPage() {
   const t = useTranslations("groupOrder.lobby");
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, user, restaurantId } = useAuth();
   const { joinGroupOrder } = useGroupOrderApi(token);
-  const [successData, setSuccessData] = useState<GroupOrderSuccessData | null>(null);
+  const [successData, setSuccessData] = useState<GroupOrderSuccessData | null>(
+    null,
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
@@ -41,60 +52,112 @@ export function GroupOrderLobbyPage() {
     participant: currentUserParticipant,
   } = useGroupOrder();
 
-  const updateParticipantStatus = (participantId: string | number, status: GroupOrderParticipant["status"]) => {
-    updateOrder((currentOrder) => currentOrder ? {
-      ...currentOrder,
-      participants: currentOrder.participants?.map((participant) => (
-        String(participant.id) === String(participantId)
-          ? { ...participant, status }
-          : participant
-      )),
-    } : currentOrder);
+  const summaryRestaurantId =
+    typeof order?.summary === "object" &&
+    order.summary !== null &&
+    "restaurantId" in order.summary
+      ? String(order.summary.restaurantId || "")
+      : "";
+  const homeRestaurantId = resolveHomeRestaurantId(
+    user,
+    restaurantId || String(order?.restaurant?.id || summaryRestaurantId || ""),
+  );
+  const homeBranchId = resolveHomeBranchId(user);
+  const homeQuery = useHome(
+    homeRestaurantId,
+    homeBranchId || String(order?.branch?.id || ""),
+    Boolean(homeRestaurantId),
+  );
+  const currency = resolveCustomerCurrency({
+    moneyCurrency: order?.summary?.currency,
+    configCurrency: homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant || order?.restaurant,
+  });
+
+  const updateParticipantStatus = (
+    participantId: string | number,
+    status: GroupOrderParticipant["status"],
+  ) => {
+    updateOrder((currentOrder) =>
+      currentOrder
+        ? {
+            ...currentOrder,
+            participants: currentOrder.participants?.map((participant) =>
+              String(participant.id) === String(participantId)
+                ? { ...participant, status }
+                : participant,
+            ),
+          }
+        : currentOrder,
+    );
   };
 
-  const updateParticipantItemQuantity = (participantId: string | number, itemId: string | number, quantity: number) => {
-    updateOrder((currentOrder) => currentOrder ? {
-      ...currentOrder,
-      participants: currentOrder.participants?.map((participant) => (
-        String(participant.id) === String(participantId)
-          ? {
-              ...participant,
-              items: participant.items?.map((item) => (
-                String(item.id) === String(itemId)
-                  ? { ...item, quantity }
-                  : item
-              )),
-            }
-          : participant
-      )),
-    } : currentOrder);
+  const updateParticipantItemQuantity = (
+    participantId: string | number,
+    itemId: string | number,
+    quantity: number,
+  ) => {
+    updateOrder((currentOrder) =>
+      currentOrder
+        ? {
+            ...currentOrder,
+            participants: currentOrder.participants?.map((participant) =>
+              String(participant.id) === String(participantId)
+                ? {
+                    ...participant,
+                    items: participant.items?.map((item) =>
+                      String(item.id) === String(itemId)
+                        ? { ...item, quantity }
+                        : item,
+                    ),
+                  }
+                : participant,
+            ),
+          }
+        : currentOrder,
+    );
   };
 
-  const removeParticipantItem = (participantId: string | number, itemId: string | number) => {
-    updateOrder((currentOrder) => currentOrder ? {
-      ...currentOrder,
-      participants: currentOrder.participants?.map((participant) => (
-        String(participant.id) === String(participantId)
-          ? {
-              ...participant,
-              items: participant.items?.filter((item) => String(item.id) !== String(itemId)),
-            }
-          : participant
-      )),
-    } : currentOrder);
+  const removeParticipantItem = (
+    participantId: string | number,
+    itemId: string | number,
+  ) => {
+    updateOrder((currentOrder) =>
+      currentOrder
+        ? {
+            ...currentOrder,
+            participants: currentOrder.participants?.map((participant) =>
+              String(participant.id) === String(participantId)
+                ? {
+                    ...participant,
+                    items: participant.items?.filter(
+                      (item) => String(item.id) !== String(itemId),
+                    ),
+                  }
+                : participant,
+            ),
+          }
+        : currentOrder,
+    );
   };
 
   const updateOrderSchedule = (orderTime: string | null) => {
-    updateOrder((currentOrder) => currentOrder ? {
-      ...currentOrder,
-      orderTime,
-      isScheduled: Boolean(orderTime),
-      summary: currentOrder.summary ? {
-        ...currentOrder.summary,
-        orderTime,
-        isScheduled: Boolean(orderTime),
-      } : currentOrder.summary,
-    } : currentOrder);
+    updateOrder((currentOrder) =>
+      currentOrder
+        ? {
+            ...currentOrder,
+            orderTime,
+            isScheduled: Boolean(orderTime),
+            summary: currentOrder.summary
+              ? {
+                  ...currentOrder.summary,
+                  orderTime,
+                  isScheduled: Boolean(orderTime),
+                }
+              : currentOrder.summary,
+          }
+        : currentOrder,
+    );
 
     void refetch();
   };
@@ -160,9 +223,7 @@ export function GroupOrderLobbyPage() {
           </p>
 
           <p className="mt-1 text-xs text-gray-500">
-            {redirecting
-              ? t("redirecting")
-              : t("preparing")}
+            {redirecting ? t("redirecting") : t("preparing")}
           </p>
         </div>
       </div>
@@ -182,11 +243,15 @@ export function GroupOrderLobbyPage() {
           </p>
 
           <div className="mt-5 rounded-2xl border border-gray-100 bg-gray-50 p-3 text-left">
-            <p className="text-sm font-semibold text-gray-900">{t("joinWithCodeTitle")}</p>
+            <p className="text-sm font-semibold text-gray-900">
+              {t("joinWithCodeTitle")}
+            </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input
                 value={joinCode}
-                onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+                onChange={(event) =>
+                  setJoinCode(event.target.value.toUpperCase())
+                }
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -236,9 +301,14 @@ export function GroupOrderLobbyPage() {
               participant={participant}
               orderId={order?.id}
               isHost={participant.isHost}
-              canEdit={canEditItems && String(participant.userId || "") === String(currentUserParticipant?.userId || "")}
+              canEdit={
+                canEditItems &&
+                String(participant.userId || "") ===
+                  String(currentUserParticipant?.userId || "")
+              }
               onItemQuantityChange={updateParticipantItemQuantity}
               onItemRemove={removeParticipantItem}
+              currency={currency}
             />
           ))}
 
@@ -257,6 +327,7 @@ export function GroupOrderLobbyPage() {
           onParticipantStatusChange={updateParticipantStatus}
           onRefresh={handleRefresh}
           refreshing={refreshing}
+          currency={currency}
         />
       </div>
     </div>

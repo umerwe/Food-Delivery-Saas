@@ -797,7 +797,9 @@
     "failedAddDealItem": "Failed to add deal item to cart",
     "failedRefreshQuote": "Failed to refresh cart quote",
     "dealItemsAdded": "Deal items added to cart",
-    "failedAddDeal": "Failed to add deal to cart"
+    "failedAddDeal": "Failed to add deal to cart",
+    "transactionFee": "Transaction fee",
+    "tax": "Tax"
   },
   "checkout": {
     "delivery": "Delivery",
@@ -1754,7 +1756,8 @@
         "markedDone": "Your selection is marked done",
         "editingEnabled": "You can edit your order again",
         "failedUpdateStatus": "Failed to update group order status",
-        "completedEditNotice": "Your selection is marked done. Click Edit Order if you need to change your items."
+        "completedEditNotice": "Your selection is marked done. Click Edit Order if you need to change your items.",
+        "includedTax": "Tax (included)"
       }
     },
     "success": {
@@ -1794,7 +1797,13 @@
       "noParticipants": "No participant details returned.",
       "couponTitle": "Coupon / discount",
       "discountApplied": "Discount applied",
-      "total": "Total"
+      "total": "Total",
+      "serviceCharge": "Service charge",
+      "transactionFee": "Transaction fee",
+      "tip": "Tip",
+      "loyaltyDiscount": "Loyalty discount",
+      "walletApplied": "Wallet applied",
+      "includedTax": "Tax (included)"
     }
   },
   "branchSelector": {

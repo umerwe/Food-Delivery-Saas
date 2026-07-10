@@ -797,7 +797,9 @@
     "failedAddDealItem": "Angebotsartikel konnte nicht zum Warenkorb hinzugefügt werden",
     "failedRefreshQuote": "Warenkorbangebot konnte nicht aktualisiert werden",
     "dealItemsAdded": "Angebotsartikel zum Warenkorb hinzugefügt",
-    "failedAddDeal": "Angebot konnte nicht zum Warenkorb hinzugefügt werden"
+    "failedAddDeal": "Angebot konnte nicht zum Warenkorb hinzugefügt werden",
+    "transactionFee": "Transaktionsgebühr",
+    "tax": "Tax"
   },
   "checkout": {
     "delivery": "Lieferung",
@@ -1754,7 +1756,8 @@
         "markedDone": "Ihre Auswahl ist als fertig markiert",
         "editingEnabled": "Sie können Ihre Bestellung wieder bearbeiten",
         "failedUpdateStatus": "Status der Gruppenbestellung konnte nicht aktualisiert werden",
-        "completedEditNotice": "Ihre Auswahl ist als fertig markiert. Klicken Sie auf Bestellung bearbeiten, wenn Sie Ihre Artikel ändern müssen."
+        "completedEditNotice": "Ihre Auswahl ist als fertig markiert. Klicken Sie auf Bestellung bearbeiten, wenn Sie Ihre Artikel ändern müssen.",
+        "includedTax": "Steuer (enthalten)"
       }
     },
     "success": {
@@ -1794,7 +1797,13 @@
       "noParticipants": "Keine Teilnehmerdetails zurückgegeben.",
       "couponTitle": "Gutschein / Rabatt",
       "discountApplied": "Rabatt angewendet",
-      "total": "Gesamt"
+      "total": "Gesamt",
+      "serviceCharge": "Servicegebühr",
+      "transactionFee": "Transaktionsgebühr",
+      "tip": "Trinkgeld",
+      "loyaltyDiscount": "Treuerabatt",
+      "walletApplied": "Wallet angewendet",
+      "includedTax": "Steuer (enthalten)"
     }
   },
   "branchSelector": {

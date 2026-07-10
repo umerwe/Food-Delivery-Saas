@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  fetchMenuCategoriesPage,
   fetchMenuItemDetailsByIds,
   fetchMenuItemsPage,
   fetchSplitPizzaMenuItems,
@@ -23,18 +24,16 @@ describe("fetchMenuItemDetailsByIds", () => {
   });
 
   it("falls back to scoped item slug when id search does not return the item", async () => {
-    getItemsMock
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: "pizza-id",
-            slug: "pizza-tse",
-            name: "Pizza Tse",
-            modifierGroups: [{ id: "group-1", minSelect: 1 }],
-          },
-        ],
-      });
+    getItemsMock.mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({
+      data: [
+        {
+          id: "pizza-id",
+          slug: "pizza-tse",
+          name: "Pizza Tse",
+          modifierGroups: [{ id: "group-1", minSelect: 1 }],
+        },
+      ],
+    });
 
     const details = await fetchMenuItemDetailsByIds({
       itemIds: ["pizza-id"],
@@ -47,12 +46,12 @@ describe("fetchMenuItemDetailsByIds", () => {
     expect(getItemsMock).toHaveBeenNthCalledWith(
       1,
       "/v1/menu/items?search=pizza-id",
-      "token-1"
+      "token-1",
     );
     expect(getItemsMock).toHaveBeenNthCalledWith(
       2,
       "/v1/menu/items?search=pizza-tse",
-      "token-1"
+      "token-1",
     );
     expect(details["pizza-id"]?.modifierGroups).toEqual([
       { id: "group-1", minSelect: 1 },
@@ -77,7 +76,7 @@ describe("fetchMenuItemDetailsByIds", () => {
     expect(getItemsMock).toHaveBeenNthCalledWith(
       3,
       "/v1/menu/items?search=No+Add-Ons",
-      undefined
+      undefined,
     );
     expect(details["simple-id"]?.name).toBe("No Add-Ons");
   });
@@ -97,12 +96,12 @@ describe("fetchMenuItemDetailsByIds", () => {
     expect(getItemsMock).toHaveBeenNthCalledWith(
       1,
       "/v1/menu/items?search=pizza-id&branchId=branch-1",
-      "token-1"
+      "token-1",
     );
     expect(getItemsMock).toHaveBeenNthCalledWith(
       2,
       "/v1/menu/items?search=pizza-tse&branchId=branch-1",
-      "token-1"
+      "token-1",
     );
   });
 
@@ -119,8 +118,8 @@ describe("fetchMenuItemDetailsByIds", () => {
     });
 
     expect(getItemsMock).toHaveBeenCalledWith(
-      "/v1/menu/items?restaurantId=restaurant-1&page=2&limit=12&sortBy=sortOrder&sortOrder=ASC&categoryId=category-1&branchId=branch-1",
-      "token-1"
+      "/v1/menu/items?restaurantId=restaurant-1&page=2&limit=12&sortBy=sortOrder&sortOrder=DESC&categoryId=category-1&branchId=branch-1",
+      "token-1",
     );
   });
 
@@ -137,7 +136,22 @@ describe("fetchMenuItemDetailsByIds", () => {
 
     expect(getItemsMock).toHaveBeenCalledWith(
       "/v1/menu/items?page=3&supportsSplitPizza=true&restaurantId=restaurant-1&branchId=branch-1&search=pizza",
-      "token-1"
+      "token-1",
+    );
+  });
+  it("fetches menu categories on items page with descending sort order", async () => {
+    getItemsMock.mockResolvedValueOnce({ data: [], meta: { page: 1 } });
+
+    await fetchMenuCategoriesPage({
+      restaurantId: "restaurant-1",
+      page: 1,
+      limit: 50,
+      token: "token-1",
+    });
+
+    expect(getItemsMock).toHaveBeenCalledWith(
+      "/v1/menu/categories?restaurantId=restaurant-1&page=1&limit=50&sortBy=sortOrder&sortOrder=DESC",
+      "token-1",
     );
   });
 });

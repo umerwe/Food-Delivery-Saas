@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import Image from "next/image"
+import Image from "next/image";
 import {
   Search,
   ShoppingBag,
@@ -15,116 +15,124 @@ import {
   Coffee,
   Heart,
   Users,
-} from "lucide-react"
-import Link from "next/link"
-import { useCallback, useEffect, useRef, useState } from "react"
-import { toast } from "sonner"
-import { usePathname, useRouter } from "next/navigation"
-import { useTranslations } from "next-intl"
-import { useAuthContext } from "@/hooks/useAuth"
-import { useAuth } from "@/hooks/useAuth"
-import useMenu from "@/hooks/useMenu"
-import { BranchSwitcher } from "@/components/common/branch-selector/BranchSwitcher"
-import { BrandLogo } from "@/components/common/BrandLogo"
-import { CouponPerkBanner } from "@/components/layout/navbar/CouponPerkBanner"
-import { LanguageSelector } from "@/components/layout/navbar/LanguageSelector"
-import { useCustomerCoupons } from "@/hooks/useCustomerCoupons"
-import { useHome } from "@/hooks/useHome"
-import { CART_CHANGED_EVENT, type CartChangedDetail } from "@/lib/cart-events"
-import { getStoredGroupOrderCode } from "@/lib/group-order"
-import { resolveHomeBranchId, resolveHomeRestaurantId, resolveTableReservationsEnabled } from "@/lib/home"
-import { formatMoney, resolveCustomerCurrency } from "@/lib/money"
-import { fetchCustomerCart } from "@/services/cart"
+} from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useAuthContext } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import useMenu from "@/hooks/useMenu";
+import { BranchSwitcher } from "@/components/common/branch-selector/BranchSwitcher";
+import { BrandLogo } from "@/components/common/BrandLogo";
+import { CouponPerkBanner } from "@/components/layout/navbar/CouponPerkBanner";
+import { LanguageSelector } from "@/components/layout/navbar/LanguageSelector";
+import { useCustomerCoupons } from "@/hooks/useCustomerCoupons";
+import { useHome } from "@/hooks/useHome";
+import { CART_CHANGED_EVENT, type CartChangedDetail } from "@/lib/cart-events";
+import {
+  GROUP_ORDER_LOBBY_CHANGED_EVENT,
+  getStoredGroupOrderCode,
+  getStoredGroupOrderLobbyId,
+} from "@/lib/group-order";
+import {
+  resolveHomeBranchId,
+  resolveHomeRestaurantId,
+  resolveTableReservationsEnabled,
+} from "@/lib/home";
+import { formatMoney, resolveCustomerCurrency } from "@/lib/money";
+import { fetchCustomerCart } from "@/services/cart";
 
 type MenuItem = {
-  id: string
-  restaurantId: string
-  categoryId: string
-  name: string
-  slug: string
-  description: string
-  imageUrl: string
-  sku: string
-  basePrice: string
-  prepTimeMinutes: number
-  dietaryFlags: string[]
-  allergenFlags: string[]
-  isActive: boolean
-  deletedAt: string | null
-  createdAt: string
-  updatedAt: string
+  id: string;
+  restaurantId: string;
+  categoryId: string;
+  name: string;
+  slug: string;
+  description: string;
+  imageUrl: string;
+  sku: string;
+  basePrice: string;
+  prepTimeMinutes: number;
+  dietaryFlags: string[];
+  allergenFlags: string[];
+  isActive: boolean;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
   restaurant?: {
-    id: string
-    name: string
-    slug: string
-    logoUrl?: string
-    coverImage?: string | null
-  }
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl?: string;
+    coverImage?: string | null;
+  };
   category?: {
-    id: string
-    name: string
-    slug: string
-    imageUrl?: string
-  }
+    id: string;
+    name: string;
+    slug: string;
+    imageUrl?: string;
+  };
   menuLinks?: Array<{
-    id: string
-    restaurantMenuId: string
-    menuItemId: string
-    sortOrder: number
-    isActive: boolean
-    createdAt: string
-    updatedAt: string
+    id: string;
+    restaurantMenuId: string;
+    menuItemId: string;
+    sortOrder: number;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
     restaurantMenu?: {
-      id: string
-      name: string
-      slug: string
-      isActive: boolean
-    }
-  }>
-  variations?: unknown[]
-  modifierLinks?: unknown[]
+      id: string;
+      name: string;
+      slug: string;
+      isActive: boolean;
+    };
+  }>;
+  variations?: unknown[];
+  modifierLinks?: unknown[];
   _count?: {
-    variations: number
-    modifierLinks: number
-    menuLinks: number
-  }
-}
+    variations: number;
+    modifierLinks: number;
+    menuLinks: number;
+  };
+};
 
 type SearchResponse = {
-  success: boolean
-  data: MenuItem[]
-  message?: string
+  success: boolean;
+  data: MenuItem[];
+  message?: string;
   meta?: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-    hasNext: boolean
-    hasPrevious: boolean
-  }
-}
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
+};
 
 const isSearchResponse = (value: unknown): value is SearchResponse =>
-  typeof value === "object" && value !== null && "success" in value
+  typeof value === "object" && value !== null && "success" in value;
 
 const NAV_LINKS = [
   { href: "/", labelKey: "home" },
   { href: "/items", labelKey: "items" },
   { href: "/group-order", labelKey: "groupOrder" },
   { href: "/reservetable", labelKey: "reservations" },
-] as const
+] as const;
 
 const toCartQuantity = (value: unknown) => {
-  const quantity = Number(value)
-  return Number.isFinite(quantity) ? Math.max(0, Math.floor(quantity)) : 0
-}
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? Math.max(0, Math.floor(quantity)) : 0;
+};
 
 export const Navbar = () => {
-  const { user, logout } = useAuthContext()
-  const { token, loading: authLoading, restaurantId } = useAuth()
-  const { get } = useMenu(token)
-  const homeRestaurantId = resolveHomeRestaurantId(user, restaurantId)
-  const branchId = resolveHomeBranchId(user)
+  const { user, logout } = useAuthContext();
+  const { token, loading: authLoading, restaurantId } = useAuth();
+  const { get } = useMenu(token);
+  const homeRestaurantId = resolveHomeRestaurantId(user, restaurantId);
+  const branchId = resolveHomeBranchId(user);
   const homeQuery = useHome(
     homeRestaurantId,
     branchId,
@@ -135,254 +143,274 @@ export const Navbar = () => {
       refetchOnMount: "always",
       refetchOnReconnect: "always",
       refetchOnWindowFocus: "always",
-    }
-  )
+    },
+  );
   const couponsQuery = useCustomerCoupons({
     restaurantId: homeRestaurantId,
     branchId,
-  })
+  });
 
-  const isAuth = !!user
-  const userId = user?.id
-  const userName = `${user?.profile?.firstName || ""} ${user?.profile?.lastName || ""}`.trim()
+  const isAuth = !!user;
+  const userId = user?.id;
+  const userName =
+    `${user?.profile?.firstName || ""} ${user?.profile?.lastName || ""}`.trim();
   const tableReservationsEnabled = resolveTableReservationsEnabled(
     homeQuery.data?.data.branch,
-    user?.branch
-  )
-  const restaurantLogoUrl = homeQuery.data?.data.restaurant?.logoUrl ?? null
+    user?.branch,
+  );
+  const restaurantLogoUrl = homeQuery.data?.data.restaurant?.logoUrl ?? null;
   const currency = resolveCustomerCurrency({
     configCurrency: homeQuery.data?.data.config?.currency,
     restaurant: homeQuery.data?.data.restaurant,
-  })
+  });
 
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchValue, setSearchValue] = useState("")
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [searchResults, setSearchResults] = useState<MenuItem[]>([])
-  const [searchMeta, setSearchMeta] = useState<SearchResponse["meta"] | null>(null)
-  const [cartItemCount, setCartItemCount] = useState(0)
-  const [activeGroupOrderCode, setActiveGroupOrderCode] = useState("")
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<MenuItem[]>([]);
+  const [searchMeta, setSearchMeta] = useState<SearchResponse["meta"] | null>(
+    null,
+  );
+  const [cartItemCount, setCartItemCount] = useState(0);
+  const [activeGroupOrderCode, setActiveGroupOrderCode] = useState("");
+  const [activeGroupOrderLobbyId, setActiveGroupOrderLobbyId] = useState("");
 
-  const dropdownRef = useRef<HTMLDivElement | null>(null)
-  const navbarWrapRef = useRef<HTMLDivElement | null>(null)
-  const searchInputRef = useRef<HTMLInputElement | null>(null)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const cartRefreshRequestRef = useRef(0)
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const navbarWrapRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const cartRefreshRequestRef = useRef(0);
 
-  const router = useRouter()
-  const pathname = usePathname()
-  const tNav = useTranslations("navigation")
-  const tCommon = useTranslations("common")
-  const hideOnMobileHome = pathname === "/"
+  const router = useRouter();
+  const pathname = usePathname();
+  const tNav = useTranslations("navigation");
+  const tCommon = useTranslations("common");
+  const hideOnMobileHome = pathname === "/";
 
   const isNavLinkActive = (href: string) => {
-    if (href === "/") return pathname === "/"
-    return pathname === href || pathname.startsWith(`${href}/`)
-  }
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   const isNavLinkDisabled = (href: string) =>
-    href === "/reservetable" && !tableReservationsEnabled
+    href === "/reservetable" && !tableReservationsEnabled;
 
   const getSafeImageSrc = (src?: string | null) => {
-    if (!src || typeof src !== "string") return "/placeholder-food.png"
+    if (!src || typeof src !== "string") return "/placeholder-food.png";
 
-    const trimmed = src.trim()
-    if (!trimmed) return "/placeholder-food.png"
+    const trimmed = src.trim();
+    if (!trimmed) return "/placeholder-food.png";
 
-    if (trimmed.startsWith("/")) return trimmed
+    if (trimmed.startsWith("/")) return trimmed;
 
     try {
-      const parsed = new URL(trimmed)
+      const parsed = new URL(trimmed);
       if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-        return trimmed
+        return trimmed;
       }
-      return "/placeholder-food.png"
+      return "/placeholder-food.png";
     } catch {
-      return "/placeholder-food.png"
+      return "/placeholder-food.png";
     }
-  }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node
+      const target = event.target as Node;
 
       if (dropdownRef.current && !dropdownRef.current.contains(target)) {
-        setDropdownOpen(false)
+        setDropdownOpen(false);
       }
 
       if (navbarWrapRef.current && !navbarWrapRef.current.contains(target)) {
-        setSearchOpen(false)
+        setSearchOpen(false);
       }
-    }
+    };
 
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (searchOpen) {
       const timer = setTimeout(() => {
-        searchInputRef.current?.focus()
-      }, 120)
+        searchInputRef.current?.focus();
+      }, 120);
 
-      return () => clearTimeout(timer)
+      return () => clearTimeout(timer);
     }
-  }, [searchOpen])
+  }, [searchOpen]);
 
   const handleLogout = () => {
-    logout()
-    toast.success(tNav("logoutSuccess"))
-    setDropdownOpen(false)
-    router.push("/auth/login")
-  }
+    logout();
+    toast.success(tNav("logoutSuccess"));
+    setDropdownOpen(false);
+    router.push("/auth/login");
+  };
 
   const clearSearchState = () => {
-    setSearchValue("")
-    setSearchResults([])
-    setSearchMeta(null)
-    setSearchLoading(false)
-  }
+    setSearchValue("");
+    setSearchResults([]);
+    setSearchMeta(null);
+    setSearchLoading(false);
+  };
 
   const handleToggleSearch = () => {
     setSearchOpen((prev) => {
-      const next = !prev
+      const next = !prev;
       if (!next) {
-        clearSearchState()
+        clearSearchState();
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   const handleSearchItemClick = (item: MenuItem) => {
-    setSearchOpen(false)
-    clearSearchState()
-    router.push(`/items/details?itemId=${item.id}&slug=${item.slug}`)
-  }
+    setSearchOpen(false);
+    clearSearchState();
+    router.push(`/items/details?itemId=${item.id}&slug=${item.slug}`);
+  };
 
   const fetchMenuItems = async (keyword: string) => {
-    const trimmedKeyword = keyword.trim()
+    const trimmedKeyword = keyword.trim();
 
     if (!trimmedKeyword || !restaurantId || authLoading) {
-      setSearchResults([])
-      setSearchMeta(null)
-      setSearchLoading(false)
-      return
+      setSearchResults([]);
+      setSearchMeta(null);
+      setSearchLoading(false);
+      return;
     }
 
     try {
-      setSearchLoading(true)
+      setSearchLoading(true);
 
       const response = await get(
         `/v1/menu/items?search=${encodeURIComponent(trimmedKeyword)}&restaurantId=${encodeURIComponent(
-          restaurantId
-        )}${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`
-      )
+          restaurantId,
+        )}${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`,
+      );
 
       if (isSearchResponse(response) && response.success) {
-        setSearchResults(Array.isArray(response.data) ? response.data : [])
-        setSearchMeta(response.meta || null)
+        setSearchResults(Array.isArray(response.data) ? response.data : []);
+        setSearchMeta(response.meta || null);
       } else {
-        setSearchResults([])
-        setSearchMeta(null)
+        setSearchResults([]);
+        setSearchMeta(null);
       }
     } catch {
-      setSearchResults([])
-      setSearchMeta(null)
+      setSearchResults([]);
+      setSearchMeta(null);
     } finally {
-      setSearchLoading(false)
+      setSearchLoading(false);
     }
-  }
+  };
 
   const refreshCartItemCount = useCallback(async () => {
-    const requestId = cartRefreshRequestRef.current + 1
-    cartRefreshRequestRef.current = requestId
+    const requestId = cartRefreshRequestRef.current + 1;
+    cartRefreshRequestRef.current = requestId;
 
     if (!userId || authLoading) {
-      setCartItemCount(0)
-      return
+      setCartItemCount(0);
+      return;
     }
 
     try {
-      const { items } = await fetchCustomerCart({ customerId: userId, token })
+      const { items } = await fetchCustomerCart({ customerId: userId, token });
 
-      if (cartRefreshRequestRef.current !== requestId) return
+      if (cartRefreshRequestRef.current !== requestId) return;
 
-      setCartItemCount(items.reduce((total, item) => total + toCartQuantity(item.quantity), 0))
+      setCartItemCount(
+        items.reduce((total, item) => total + toCartQuantity(item.quantity), 0),
+      );
     } catch {
-      if (cartRefreshRequestRef.current !== requestId) return
+      if (cartRefreshRequestRef.current !== requestId) return;
 
-      setCartItemCount(0)
+      setCartItemCount(0);
     }
-  }, [authLoading, token, userId])
+  }, [authLoading, token, userId]);
 
   useEffect(() => {
-    refreshCartItemCount()
-  }, [refreshCartItemCount])
+    refreshCartItemCount();
+  }, [refreshCartItemCount]);
 
   useEffect(() => {
     const refreshActiveGroupOrderCode = () => {
-      setActiveGroupOrderCode(getStoredGroupOrderCode())
-    }
+      setActiveGroupOrderCode(getStoredGroupOrderCode());
+    };
 
-    refreshActiveGroupOrderCode()
-    window.addEventListener("storage", refreshActiveGroupOrderCode)
-    window.addEventListener("deliveryway:group-order:item-added", refreshActiveGroupOrderCode)
+    refreshActiveGroupOrderCode();
+    window.addEventListener("storage", refreshActiveGroupOrderCode);
+    window.addEventListener(
+      "deliveryway:group-order:item-added",
+      refreshActiveGroupOrderCode,
+    );
 
     return () => {
-      window.removeEventListener("storage", refreshActiveGroupOrderCode)
-      window.removeEventListener("deliveryway:group-order:item-added", refreshActiveGroupOrderCode)
-    }
-  }, [])
+      window.removeEventListener("storage", refreshActiveGroupOrderCode);
+      window.removeEventListener(
+        "deliveryway:group-order:item-added",
+        refreshActiveGroupOrderCode,
+      );
+    };
+  }, []);
+
+  const activeGroupOrderHref = activeGroupOrderLobbyId
+    ? `/group-order/lobby?groupOrderId=${encodeURIComponent(activeGroupOrderLobbyId)}`
+    : "/group-order/lobby";
+  const showActiveGroupOrderLink = Boolean(
+    activeGroupOrderCode || activeGroupOrderLobbyId,
+  );
 
   useEffect(() => {
     const handleCartChanged = (event: Event) => {
-      const detail = event instanceof CustomEvent
-        ? (event.detail as CartChangedDetail | undefined)
-        : undefined
+      const detail =
+        event instanceof CustomEvent
+          ? (event.detail as CartChangedDetail | undefined)
+          : undefined;
 
       if (typeof detail?.itemCount === "number") {
-        cartRefreshRequestRef.current += 1
-        setCartItemCount(toCartQuantity(detail.itemCount))
-        return
+        cartRefreshRequestRef.current += 1;
+        setCartItemCount(toCartQuantity(detail.itemCount));
+        return;
       }
 
-      refreshCartItemCount()
-    }
+      refreshCartItemCount();
+    };
 
-    window.addEventListener(CART_CHANGED_EVENT, handleCartChanged)
+    window.addEventListener(CART_CHANGED_EVENT, handleCartChanged);
 
     return () => {
-      window.removeEventListener(CART_CHANGED_EVENT, handleCartChanged)
-    }
-  }, [refreshCartItemCount])
+      window.removeEventListener(CART_CHANGED_EVENT, handleCartChanged);
+    };
+  }, [refreshCartItemCount]);
 
   useEffect(() => {
-    if (!searchOpen) return
+    if (!searchOpen) return;
 
     if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
+      clearTimeout(searchTimeoutRef.current);
     }
 
     if (!searchValue.trim()) {
-      setSearchResults([])
-      setSearchMeta(null)
-      setSearchLoading(false)
-      return
+      setSearchResults([]);
+      setSearchMeta(null);
+      setSearchLoading(false);
+      return;
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      fetchMenuItems(searchValue)
-    }, 400)
+      fetchMenuItems(searchValue);
+    }, 400);
 
     return () => {
       if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
+        clearTimeout(searchTimeoutRef.current);
       }
-    }
-  }, [searchValue, searchOpen, restaurantId, branchId, authLoading])
+    };
+  }, [searchValue, searchOpen, restaurantId, branchId, authLoading]);
 
   return (
     <>
@@ -408,8 +436,8 @@ export const Navbar = () => {
           <div className="hidden min-w-0 flex-1 items-center justify-between gap-4 xl:flex">
             <div className="flex min-w-0 items-center gap-8 text-sm font-semibold text-[#20242A]">
               {NAV_LINKS.map((item) => {
-                const isActive = isNavLinkActive(item.href)
-                const isDisabled = isNavLinkDisabled(item.href)
+                const isActive = isNavLinkActive(item.href);
+                const isDisabled = isNavLinkDisabled(item.href);
 
                 return (
                   <Link
@@ -419,20 +447,20 @@ export const Navbar = () => {
                     tabIndex={isDisabled ? -1 : undefined}
                     onClick={(event) => {
                       if (isDisabled) {
-                        event.preventDefault()
+                        event.preventDefault();
                       }
                     }}
                     className={`relative whitespace-nowrap py-2 transition-colors after:absolute after:left-1/2 after:-bottom-1 after:h-[3px] after:-translate-x-1/2 after:rounded-full after:transition-all ${
                       isDisabled
                         ? "pointer-events-none cursor-not-allowed text-gray-300 after:w-0 after:bg-transparent"
                         : isActive
-                        ? "text-primary after:w-6 after:bg-primary"
-                        : "hover:text-primary after:w-0 after:bg-transparent"
+                          ? "text-primary after:w-6 after:bg-primary"
+                          : "hover:text-primary after:w-0 after:bg-transparent"
                     }`}
                   >
                     {tNav(item.labelKey)}
                   </Link>
-                )
+                );
               })}
             </div>
 
@@ -450,9 +478,9 @@ export const Navbar = () => {
               <BranchSwitcher presentation="navbar" />
               <LanguageSelector className="h-11 rounded-full border-none bg-[#F7F7F8] px-4 text-[#20242A] shadow-none hover:bg-[#F1F2F4]" />
 
-              {activeGroupOrderCode ? (
+              {showActiveGroupOrderLink ? (
                 <Link
-                  href="/group-order/lobby"
+                  href={activeGroupOrderHref}
                   className="relative flex h-11 shrink-0 items-center gap-2 rounded-full bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                 >
                   <Users size={17} />
@@ -491,147 +519,165 @@ export const Navbar = () => {
                         className="object-cover"
                       />
                     </span>
-                    <span className="truncate text-sm font-semibold">{userName || tNav("user")}</span>
-                    <ChevronDown size={15} className="shrink-0 text-[#7A8088]" />
+                    <span className="truncate text-sm font-semibold">
+                      {userName || tNav("user")}
+                    </span>
+                    <ChevronDown
+                      size={15}
+                      className="shrink-0 text-[#7A8088]"
+                    />
                   </button>
 
-                {dropdownOpen && (
-                  <div
-                    style={{ zIndex: "99999" }}
-                    className="absolute right-0 mt-3 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-[#F1E6D9] bg-white shadow-[0_16px_42px_rgba(56,40,24,0.14)]"
-                  >
+                  {dropdownOpen && (
                     <div
-                      className="relative flex min-h-[92px] items-center gap-3 border-b border-[#E8C990] bg-[#FBF5EC] bg-cover bg-center px-6 py-4"
-                      style={{ backgroundImage: "url('/profile-dropdown-bg.svg')" }}
+                      style={{ zIndex: "99999" }}
+                      className="absolute right-0 mt-3 w-[320px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-[#F1E6D9] bg-white shadow-[0_16px_42px_rgba(56,40,24,0.14)]"
                     >
-                      <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-[0_7px_18px_rgba(49,34,20,0.16)]">
-                        <Image
-                          src={
-                            user?.profile?.avatarUrl?.startsWith("http")
-                              ? user.profile.avatarUrl
-                              : "/profile-user.png"
-                          }
-                          alt={userName || tNav("user")}
-                          fill
-                          className="object-cover"
-                        />
-                      </span>
+                      <div
+                        className="relative flex min-h-[92px] items-center gap-3 border-b border-[#E8C990] bg-[#FBF5EC] bg-cover bg-center px-6 py-4"
+                        style={{
+                          backgroundImage: "url('/profile-dropdown-bg.svg')",
+                        }}
+                      >
+                        <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-white bg-white shadow-[0_7px_18px_rgba(49,34,20,0.16)]">
+                          <Image
+                            src={
+                              user?.profile?.avatarUrl?.startsWith("http")
+                                ? user.profile.avatarUrl
+                                : "/profile-user.png"
+                            }
+                            alt={userName || tNav("user")}
+                            fill
+                            className="object-cover"
+                          />
+                        </span>
 
-                      <div className="min-w-0">
-                        <p className="truncate text-[15px] font-semibold leading-5 text-[#1D1712]">
-                          {userName || tNav("user")}
-                        </p>
-                        <p className="mt-0.5 truncate text-[12px] leading-5 text-[#7F7167]">
-                          {user?.email}
-                        </p>
+                        <div className="min-w-0">
+                          <p className="truncate text-[15px] font-semibold leading-5 text-[#1D1712]">
+                            {userName || tNav("user")}
+                          </p>
+                          <p className="mt-0.5 truncate text-[12px] leading-5 text-[#7F7167]">
+                            {user?.email}
+                          </p>
+                        </div>
+
+                        <div className="absolute -bottom-[7px] left-0 right-0 flex items-center justify-center text-[#D8A95D]">
+                          <span className="h-px w-[47%] bg-[#E8C990]" />
+                          <span className="mx-1 h-2 w-2 rotate-45 rounded-[1px] border border-[#D8A95D] bg-white" />
+                          <span className="h-px w-[47%] bg-[#E8C990]" />
+                        </div>
                       </div>
 
-                      <div className="absolute -bottom-[7px] left-0 right-0 flex items-center justify-center text-[#D8A95D]">
-                        <span className="h-px w-[47%] bg-[#E8C990]" />
-                        <span className="mx-1 h-2 w-2 rotate-45 rounded-[1px] border border-[#D8A95D] bg-white" />
-                        <span className="h-px w-[47%] bg-[#E8C990]" />
+                      <div className="space-y-2 px-5 py-4">
+                        <Link
+                          href="/profile"
+                          onClick={() => setDropdownOpen(false)}
+                          className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
+                            <User size={17} strokeWidth={1.8} />
+                          </span>
+                          <span className="text-sm font-medium leading-5">
+                            {tNav("myProfile")}
+                          </span>
+                        </Link>
+
+                        <Link
+                          href="/orders-history"
+                          onClick={() => setDropdownOpen(false)}
+                          className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
+                            <ShoppingBag size={17} strokeWidth={1.8} />
+                          </span>
+                          <span className="text-sm font-medium leading-5">
+                            {tNav("myOrders")}
+                          </span>
+                        </Link>
+
+                        <Link
+                          href="/favourites"
+                          onClick={() => setDropdownOpen(false)}
+                          className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
+                            <Heart size={17} strokeWidth={1.8} />
+                          </span>
+                          <span className="text-sm font-medium leading-5">
+                            {tNav("myFavourites")}
+                          </span>
+                        </Link>
+
+                        <Link
+                          href="/reservations"
+                          onClick={() => setDropdownOpen(false)}
+                          className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
+                            <CalendarDays size={17} strokeWidth={1.8} />
+                          </span>
+                          <span className="text-sm font-medium leading-5">
+                            {tNav("myReservations")}
+                          </span>
+                        </Link>
+
+                        <Link
+                          href="/notifications"
+                          onClick={() => setDropdownOpen(false)}
+                          className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
+                            <Bell size={17} strokeWidth={1.8} />
+                          </span>
+                          <span className="text-sm font-medium leading-5">
+                            {tNav("notifications")}
+                          </span>
+                        </Link>
+
+                        <Link
+                          href="/contact"
+                          onClick={() => setDropdownOpen(false)}
+                          className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
+                            <HelpCircle size={17} strokeWidth={1.8} />
+                          </span>
+                          <span className="text-sm font-medium leading-5">
+                            {tNav("helpCenter")}
+                          </span>
+                        </Link>
+                      </div>
+
+                      <div className="px-3 pb-3">
+                        <button
+                          onClick={handleLogout}
+                          className="flex min-h-11 w-full items-center gap-3 rounded-xl bg-[#FCF7F6] px-5 text-left text-primary transition-colors hover:bg-[#FCEEEE]"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F7EDED] text-primary ring-1 ring-[#F1DEDE]">
+                            <LogOut size={17} strokeWidth={1.8} />
+                          </span>
+                          <span className="text-sm font-medium leading-5">
+                            {tNav("logout")}
+                          </span>
+                        </button>
                       </div>
                     </div>
-
-                    <div className="space-y-2 px-5 py-4">
-                      <Link
-                        href="/profile"
-                        onClick={() => setDropdownOpen(false)}
-                        className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
-                          <User size={17} strokeWidth={1.8} />
-                        </span>
-                        <span className="text-sm font-medium leading-5">{tNav("myProfile")}</span>
-                      </Link>
-
-                      <Link
-                        href="/orders-history"
-                        onClick={() => setDropdownOpen(false)}
-                        className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
-                          <ShoppingBag size={17} strokeWidth={1.8} />
-                        </span>
-                        <span className="text-sm font-medium leading-5">{tNav("myOrders")}</span>
-                      </Link>
-
-                      <Link
-                        href="/favourites"
-                        onClick={() => setDropdownOpen(false)}
-                        className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
-                          <Heart size={17} strokeWidth={1.8} />
-                        </span>
-                        <span className="text-sm font-medium leading-5">{tNav("myFavourites")}</span>
-                      </Link>
-
-                      <Link
-                        href="/reservations"
-                        onClick={() => setDropdownOpen(false)}
-                        className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
-                          <CalendarDays size={17} strokeWidth={1.8} />
-                        </span>
-                        <span className="text-sm font-medium leading-5">{tNav("myReservations")}</span>
-                      </Link>
-
-                      <Link
-                        href="/notifications"
-                        onClick={() => setDropdownOpen(false)}
-                        className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
-                          <Bell size={17} strokeWidth={1.8} />
-                        </span>
-                        <span className="text-sm font-medium leading-5">{tNav("notifications")}</span>
-                      </Link>
-
-                      <Link
-                        href="/contact"
-                        onClick={() => setDropdownOpen(false)}
-                        className="group flex min-h-9 items-center gap-3 rounded-xl text-[#1D1712] transition-colors hover:text-primary"
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F8F4EF] text-primary shadow-[0_7px_16px_rgba(42,27,14,0.07)] ring-1 ring-[#F1EAE2]">
-                          <HelpCircle size={17} strokeWidth={1.8} />
-                        </span>
-                        <span className="text-sm font-medium leading-5">{tNav("helpCenter")}</span>
-                      </Link>
-                    </div>
-
-                    <div className="px-3 pb-3">
-                      <button
-                        onClick={handleLogout}
-                        className="flex min-h-11 w-full items-center gap-3 rounded-xl bg-[#FCF7F6] px-5 text-left text-primary transition-colors hover:bg-[#FCEEEE]"
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F7EDED] text-primary ring-1 ring-[#F1DEDE]">
-                          <LogOut size={17} strokeWidth={1.8} />
-                        </span>
-                        <span className="text-sm font-medium leading-5">{tNav("logout")}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Link
-                href="/auth/login"
-                className="flex h-11 items-center gap-2 rounded-full bg-[#F7F7F8] px-4 text-sm font-semibold text-primary transition-colors hover:bg-[#F1F2F4]"
-              >
-                <User size={18} />
-                {tNav("login")}
-              </Link>
-            )}
+                  )}
+                </div>
+              ) : (
+                <Link
+                  href="/auth/login"
+                  className="flex h-11 items-center gap-2 rounded-full bg-[#F7F7F8] px-4 text-sm font-semibold text-primary transition-colors hover:bg-[#F1F2F4]"
+                >
+                  <User size={18} />
+                  {tNav("login")}
+                </Link>
+              )}
             </div>
           </div>
 
           {/* MOBILE BUTTON */}
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="xl:hidden"
-          >
+          <button onClick={() => setMobileOpen(true)} className="xl:hidden">
             <Menu />
           </button>
         </nav>
@@ -667,8 +713,8 @@ export const Navbar = () => {
 
               <button
                 onClick={() => {
-                  setSearchOpen(false)
-                  clearSearchState()
+                  setSearchOpen(false);
+                  clearSearchState();
                 }}
                 className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
               >
@@ -735,7 +781,9 @@ export const Navbar = () => {
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                           {item.prepTimeMinutes ? (
                             <span className="rounded-full bg-gray-100 px-2.5 py-1">
-                              {tNav("minutesShort", { count: item.prepTimeMinutes })}
+                              {tNav("minutesShort", {
+                                count: item.prepTimeMinutes,
+                              })}
                             </span>
                           ) : null}
 
@@ -793,17 +841,14 @@ export const Navbar = () => {
       {mobileOpen && (
         <div className="fixed inset-0 bg-black/40 z-50">
           <div className="fixed right-0 top-0 h-full w-[280px] bg-white p-6 shadow-lg flex flex-col gap-6">
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="self-end"
-            >
+            <button onClick={() => setMobileOpen(false)} className="self-end">
               <X />
             </button>
 
             <div className="flex flex-col gap-2">
               {NAV_LINKS.map((item) => {
-                const isActive = isNavLinkActive(item.href)
-                const isDisabled = isNavLinkDisabled(item.href)
+                const isActive = isNavLinkActive(item.href);
+                const isDisabled = isNavLinkDisabled(item.href);
 
                 return (
                   <Link
@@ -813,11 +858,11 @@ export const Navbar = () => {
                     tabIndex={isDisabled ? -1 : undefined}
                     onClick={(event) => {
                       if (isDisabled) {
-                        event.preventDefault()
-                        return
+                        event.preventDefault();
+                        return;
                       }
 
-                      setMobileOpen(false)
+                      setMobileOpen(false);
                     }}
                     className={`rounded-2xl px-4 py-3 text-sm font-semibold transition-colors ${
                       isDisabled
@@ -829,14 +874,14 @@ export const Navbar = () => {
                   >
                     {tNav(item.labelKey)}
                   </Link>
-                )
+                );
               })}
             </div>
 
             <button
               onClick={() => {
-                setMobileOpen(false)
-                setTimeout(() => setSearchOpen(true), 150)
+                setMobileOpen(false);
+                setTimeout(() => setSearchOpen(true), 150);
               }}
               aria-label={tNav("searchFood")}
               title={tNav("searchFood")}
@@ -845,10 +890,16 @@ export const Navbar = () => {
               <Search />
             </button>
 
-            <BranchSwitcher presentation="navbar" className="w-full justify-between" />
+            <BranchSwitcher
+              presentation="navbar"
+              className="w-full justify-between"
+            />
 
-            {activeGroupOrderCode ? (
-              <Link href="/group-order/lobby" className="flex items-center gap-3 text-emerald-700">
+            {showActiveGroupOrderLink ? (
+              <Link
+                href={activeGroupOrderHref}
+                className="flex items-center gap-3 text-emerald-700"
+              >
                 <Users size={20} /> {tNav("activeGroupOrder")}
               </Link>
             ) : null}
@@ -858,7 +909,7 @@ export const Navbar = () => {
               aria-disabled={!tableReservationsEnabled}
               onClick={(event) => {
                 if (!tableReservationsEnabled) {
-                  event.preventDefault()
+                  event.preventDefault();
                 }
               }}
               className={`flex items-center gap-3 text-primary ${
@@ -891,5 +942,5 @@ export const Navbar = () => {
         </div>
       )}
     </>
-  )
-}
+  );
+};

@@ -7,10 +7,14 @@ import {
   clearStoredGroupOrderCode,
   findCurrentGroupOrderParticipant,
   getStoredGroupOrderCode,
+  getStoredGroupOrderLobbyId,
+  isStoredGroupOrderCompleted,
   isClosedGroupOrder,
   isGroupOrderParticipantCompleted,
+  markStoredGroupOrderCompleted,
   resolveGroupOrderDeliveryAddressId,
   setStoredGroupOrderCode,
+  unmarkStoredGroupOrderCompleted,
 } from "./group-order";
 
 const storage = new Map<string, string>();
@@ -47,6 +51,24 @@ describe("group order helpers", () => {
     expect(getStoredGroupOrderCode()).toBe("");
   });
 
+  it("remembers completed group orders by id and invite code", () => {
+    markStoredGroupOrderCompleted({ orderId: "group-1", inviteCode: "ABC123" });
+
+    expect(isStoredGroupOrderCompleted({ orderId: "group-1" })).toBe(true);
+    expect(getStoredGroupOrderLobbyId()).toBe("group-1");
+    expect(isStoredGroupOrderCompleted({ inviteCode: "ABC123" })).toBe(true);
+    expect(
+      isStoredGroupOrderCompleted({ orderId: "group-2", inviteCode: "XYZ" }),
+    ).toBe(false);
+
+    unmarkStoredGroupOrderCompleted({
+      orderId: "group-1",
+      inviteCode: "ABC123",
+    });
+    expect(isStoredGroupOrderCompleted({ orderId: "group-1" })).toBe(false);
+    expect(isStoredGroupOrderCompleted({ inviteCode: "ABC123" })).toBe(false);
+  });
+
   it("detects closed group order statuses", () => {
     expect(isClosedGroupOrder({ id: "1", status: "CHECKED_OUT" })).toBe(true);
     expect(isClosedGroupOrder({ id: "1", status: "open" })).toBe(false);
@@ -68,29 +90,58 @@ describe("group order helpers", () => {
         { id: "p2", userId: "user-2", status: "ACTIVE" },
       ],
     };
-    const completedParticipant = findCurrentGroupOrderParticipant({ order, userId: "user-1" });
-    const activeParticipant = findCurrentGroupOrderParticipant({ order, userId: "user-2" });
+    const completedParticipant = findCurrentGroupOrderParticipant({
+      order,
+      userId: "user-1",
+    });
+    const activeParticipant = findCurrentGroupOrderParticipant({
+      order,
+      userId: "user-2",
+    });
 
     expect(isGroupOrderParticipantCompleted(completedParticipant)).toBe(true);
-    expect(canParticipantEditGroupOrderItems({ order, participant: completedParticipant })).toBe(false);
-    expect(canParticipantEditGroupOrderItems({ order, participant: activeParticipant })).toBe(true);
+    expect(
+      canParticipantEditGroupOrderItems({
+        order,
+        participant: completedParticipant,
+      }),
+    ).toBe(false);
+    expect(
+      canParticipantEditGroupOrderItems({
+        order,
+        participant: activeParticipant,
+      }),
+    ).toBe(true);
+  });
+
+  it("finds the current group order participant from nested user payloads", () => {
+    const order = {
+      id: "1",
+      participants: [
+        { id: "participant-1", user: { id: "user-1" }, status: "COMPLETED" },
+      ],
+    };
+
+    expect(
+      findCurrentGroupOrderParticipant({ order, userId: "user-1" })?.id,
+    ).toBe("participant-1");
   });
 
   it("builds invite links without changing the route", () => {
-    expect(buildGroupOrderInviteLink({ origin: "https://demo.test", inviteCode: "ABC123" })).toBe(
-      "https://demo.test/items?code=ABC123"
-    );
+    expect(
+      buildGroupOrderInviteLink({
+        origin: "https://demo.test",
+        inviteCode: "ABC123",
+      }),
+    ).toBe("https://demo.test/items?code=ABC123");
   });
 
   it("prefers the selected delivery address when it still exists", () => {
     expect(
       resolveGroupOrderDeliveryAddressId({
         selectedAddressId: "address-2",
-        addresses: [
-          { id: "address-1", isDefault: true },
-          { id: "address-2" },
-        ],
-      })
+        addresses: [{ id: "address-1", isDefault: true }, { id: "address-2" }],
+      }),
     ).toBe("address-2");
   });
 
@@ -98,11 +149,8 @@ describe("group order helpers", () => {
     expect(
       resolveGroupOrderDeliveryAddressId({
         selectedAddressId: "",
-        addresses: [
-          { id: "address-1" },
-          { id: "address-2", isDefault: true },
-        ],
-      })
+        addresses: [{ id: "address-1" }, { id: "address-2", isDefault: true }],
+      }),
     ).toBe("address-2");
   });
 });

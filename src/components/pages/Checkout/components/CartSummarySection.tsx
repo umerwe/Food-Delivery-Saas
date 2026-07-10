@@ -54,7 +54,21 @@ interface CartSection {
   pickupPrice?: number | string;
   pickupUnitPrice?: number | string;
   selectedVariation?: ApiRecord | null;
-  menuItem?: ApiRecord & { selectedVariation?: ApiRecord; pickupPrice?: number | string; unitPrice?: number | string; name?: string; slug?: string; imageUrl?: string; category?: ApiRecord; variationPriceOverrides?: unknown[]; variations?: unknown[]; depositAmount?: number | string; takeawayPriceAdjustment?: number | string; deliveryPriceAdjustment?: number | string; pricing?: ApiRecord };
+  menuItem?: ApiRecord & {
+    selectedVariation?: ApiRecord;
+    pickupPrice?: number | string;
+    unitPrice?: number | string;
+    name?: string;
+    slug?: string;
+    imageUrl?: string;
+    category?: ApiRecord;
+    variationPriceOverrides?: unknown[];
+    variations?: unknown[];
+    depositAmount?: number | string;
+    takeawayPriceAdjustment?: number | string;
+    deliveryPriceAdjustment?: number | string;
+    pricing?: ApiRecord;
+  };
   name?: string;
 }
 
@@ -67,7 +81,12 @@ type CartSectionRecord = ApiRecord & {
   pickupPrice?: number | string;
   pickupUnitPrice?: number | string;
   selectedVariation?: ApiRecord | null;
-  menuItem?: ApiRecord & { selectedVariation?: ApiRecord; unitPrice?: number | string; pickupPrice?: number | string; name?: string };
+  menuItem?: ApiRecord & {
+    selectedVariation?: ApiRecord;
+    unitPrice?: number | string;
+    pickupPrice?: number | string;
+    name?: string;
+  };
   name?: string;
 };
 
@@ -93,7 +112,20 @@ export interface CartItem {
   selectedModifiers?: CartAddon[];
   note?: string;
 
-  menuItem?: ApiRecord & { selectedVariation?: ApiRecord; pickupPrice?: number | string; unitPrice?: number | string; name?: string; slug?: string; imageUrl?: string; category?: ApiRecord; variationPriceOverrides?: unknown[]; variations?: unknown[]; depositAmount?: number | string; takeawayPriceAdjustment?: number | string; deliveryPriceAdjustment?: number | string };
+  menuItem?: ApiRecord & {
+    selectedVariation?: ApiRecord;
+    pickupPrice?: number | string;
+    unitPrice?: number | string;
+    name?: string;
+    slug?: string;
+    imageUrl?: string;
+    category?: ApiRecord;
+    variationPriceOverrides?: unknown[];
+    variations?: unknown[];
+    depositAmount?: number | string;
+    takeawayPriceAdjustment?: number | string;
+    deliveryPriceAdjustment?: number | string;
+  };
   variationId?: string | number;
   selectedSections?: CartSection[];
   sections?: CartSection[];
@@ -131,6 +163,8 @@ export interface CartItem {
 }
 
 interface CartQuote {
+  currency?: string | null;
+  pricing?: { currency?: string | null } | null;
   subtotal?: number | string;
   taxAmount?: number | string;
   deliveryFee?: number | string;
@@ -278,7 +312,12 @@ const getItemSlug = (item: CartItem) => {
 };
 
 export const getItemImage = (item: CartItem) => {
-  return item.img || item?.deal?.imageUrl || item?.menuItem?.imageUrl || "/placeholder.png";
+  return (
+    item.img ||
+    item?.deal?.imageUrl ||
+    item?.menuItem?.imageUrl ||
+    "/placeholder.png"
+  );
 };
 
 export const isDealCartItem = (item: CartItem) =>
@@ -304,20 +343,29 @@ const getVariationId = (item: CartItem) => {
   );
 };
 
-const findSelectedVariationOverride = (item: CartItem): CartSectionRecord | null => {
+const findSelectedVariationOverride = (
+  item: CartItem,
+): CartSectionRecord | null => {
   const variationId = getVariationId(item);
   const menuItem = getMenuItem(item);
 
   if (!variationId) return null;
 
-  const overrides = normalizeArray<ApiRecord>(menuItem?.variationPriceOverrides);
+  const overrides = normalizeArray<ApiRecord>(
+    menuItem?.variationPriceOverrides,
+  );
 
   return (
     overrides.find((override: ApiRecord) => {
-      const variation = typeof override?.variation === "object" && override.variation !== null ? override.variation as ApiRecord : null;
+      const variation =
+        typeof override?.variation === "object" && override.variation !== null
+          ? (override.variation as ApiRecord)
+          : null;
 
-      return String(override?.variationId || variation?.id || "") ===
-        String(variationId);
+      return (
+        String(override?.variationId || variation?.id || "") ===
+        String(variationId)
+      );
     }) || null
   );
 };
@@ -330,7 +378,13 @@ const findSelectedVariation = (item: CartItem): CartSectionRecord | null => {
 
   const variations = [
     ...normalizeArray<ApiRecord>(menuItem?.variations),
-    ...normalizeArray<ApiRecord>(typeof menuItem?.category === "object" && menuItem.category !== null && "variations" in menuItem.category ? menuItem.category.variations : undefined),
+    ...normalizeArray<ApiRecord>(
+      typeof menuItem?.category === "object" &&
+        menuItem.category !== null &&
+        "variations" in menuItem.category
+        ? menuItem.category.variations
+        : undefined,
+    ),
   ];
 
   return (
@@ -346,9 +400,9 @@ const getBaseUnitPrice = (item: CartItem, checkoutType: CheckoutType) => {
   if (selectedSections.length > 0) {
     const highestSectionPrice = Math.max(
       ...selectedSections.map((section) =>
-        getSplitSectionCheckoutPrice(section, checkoutType)
+        getSplitSectionCheckoutPrice(section, checkoutType),
       ),
-      0
+      0,
     );
 
     if (highestSectionPrice > 0) {
@@ -361,7 +415,7 @@ const getBaseUnitPrice = (item: CartItem, checkoutType: CheckoutType) => {
       item.unitPrice ??
       item.menuItem?.unitPrice ??
       item.price,
-    0
+    0,
   );
 };
 
@@ -370,7 +424,8 @@ const getDepositUnitAmount = (item: CartItem) => {
 };
 
 const getSelectedSections = (item: CartItem): CartSection[] => {
-  const sections = normalizeArray<CartSectionRecord>(item.selectedSections).length
+  const sections = normalizeArray<CartSectionRecord>(item.selectedSections)
+    .length
     ? normalizeArray<CartSectionRecord>(item.selectedSections)
     : normalizeArray<CartSectionRecord>(item.sections);
 
@@ -379,10 +434,7 @@ const getSelectedSections = (item: CartItem): CartSection[] => {
       slot: String(section?.slot || "").toUpperCase(),
       menuItemId: section?.menuItemId,
       menuItemName:
-        section?.menuItemName ||
-        section?.menuItem?.name ||
-        section?.name ||
-        "",
+        section?.menuItemName || section?.menuItem?.name || section?.name || "",
       unitPrice:
         section?.unitPrice ??
         section?.price ??
@@ -440,9 +492,7 @@ const getSplitSectionPickupPrice = (section?: CartSection) => {
 
 const isPickupPricingModeEnabled = (section?: CartSection) => {
   const candidateMode = String(
-    section?.menuItem?.pricingMode ??
-      section?.menuItem?.pricing?.mode ??
-      ""
+    section?.menuItem?.pricingMode ?? section?.menuItem?.pricing?.mode ?? "",
   ).trim();
 
   return candidateMode.toUpperCase() === "MULTIPLE";
@@ -450,13 +500,17 @@ const isPickupPricingModeEnabled = (section?: CartSection) => {
 
 const getSplitSectionCheckoutPrice = (
   section: CartSection,
-  checkoutType: CheckoutType
+  checkoutType: CheckoutType,
 ) => {
   const deliveryPrice = getSplitSectionDeliveryPrice(section);
   const explicitPickupPrice = getSplitSectionPickupPrice(section);
   const hasMultiplePricing = isPickupPricingModeEnabled(section);
-  const deliveryAdjustment = toNumber(section.menuItem?.deliveryPriceAdjustment ?? 0);
-  const pickupAdjustment = toNumber(section.menuItem?.takeawayPriceAdjustment ?? 0);
+  const deliveryAdjustment = toNumber(
+    section.menuItem?.deliveryPriceAdjustment ?? 0,
+  );
+  const pickupAdjustment = toNumber(
+    section.menuItem?.takeawayPriceAdjustment ?? 0,
+  );
 
   if (checkoutType === "delivery") {
     if (hasMultiplePricing && deliveryAdjustment > 0) {
@@ -487,9 +541,11 @@ type SplitLabels = {
 const getSplitHalfLabel = (
   slot: string | undefined,
   fallback: string,
-  labels: SplitLabels
+  labels: SplitLabels,
 ) => {
-  const normalizedSlot = String(slot || "").trim().toUpperCase();
+  const normalizedSlot = String(slot || "")
+    .trim()
+    .toUpperCase();
 
   if (normalizedSlot === "LEFT") return labels.leftHalf;
   if (normalizedSlot === "RIGHT") return labels.rightHalf;
@@ -501,13 +557,16 @@ const getSplitHalfLabel = (
     .toLowerCase()} half`;
 };
 
-const getSplitSectionName = (section: CartSection | undefined, fallback: string) => {
+const getSplitSectionName = (
+  section: CartSection | undefined,
+  fallback: string,
+) => {
   return (
     String(
       section?.menuItemName ||
         section?.menuItem?.name ||
         section?.name ||
-        fallback
+        fallback,
     ).trim() || fallback
   );
 };
@@ -516,10 +575,12 @@ export const getSplitPizzaDisplay = (
   item: CartItem,
   selectedSections: CartSection[],
   labels: SplitLabels,
-  checkoutType: CheckoutType
+  checkoutType: CheckoutType,
 ) => {
   const currentMenuItemId = String(getMenuItemId(item) || "");
-  const currentItemName = String(item?.name || item?.menuItem?.name || "").trim();
+  const currentItemName = String(
+    item?.name || item?.menuItem?.name || "",
+  ).trim();
 
   const normalizedSections = selectedSections.map((section, index) => {
     const sectionName = getSplitSectionName(section, labels.selectedItem);
@@ -536,7 +597,11 @@ export const getSplitPizzaDisplay = (
     return {
       ...section,
       index,
-      label: getSplitHalfLabel(section?.slot, `${labels.half} ${index + 1}`, labels),
+      label: getSplitHalfLabel(
+        section?.slot,
+        `${labels.half} ${index + 1}`,
+        labels,
+      ),
       displayName: sectionName,
       price: checkoutPrice,
       deliveryPrice,
@@ -548,12 +613,14 @@ export const getSplitPizzaDisplay = (
   });
 
   const currentSectionIndex = normalizedSections.findIndex(
-    (section) => section.isCurrentItem
+    (section) => section.isCurrentItem,
   );
 
   const otherHalfSections =
     currentSectionIndex >= 0
-      ? normalizedSections.filter((section) => section.index !== currentSectionIndex)
+      ? normalizedSections.filter(
+          (section) => section.index !== currentSectionIndex,
+        )
       : normalizedSections.length > 1
         ? normalizedSections.slice(1)
         : [];
@@ -580,19 +647,22 @@ export const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
   // Keep backend/cart pricing as the source of truth. Pickup price is added
   // separately below instead of replacing the item/variation unit price.
   const checkoutUnitPrice = toNumber(
-    item.unitPrice ?? item.itemUnitPrice ?? item.menuItem?.unitPrice ?? item.price,
-    baseUnitPrice
+    item.unitPrice ??
+      item.itemUnitPrice ??
+      item.menuItem?.unitPrice ??
+      item.price,
+    baseUnitPrice,
   );
 
   const unitPriceWithModifiers = toNumber(
     item.unitPriceWithModifiers,
-    checkoutUnitPrice + modifiersTotal
+    checkoutUnitPrice + modifiersTotal,
   );
 
   const depositUnitAmount = getDepositUnitAmount(item);
   const depositTotal = toNumber(
     item.depositTotal,
-    depositUnitAmount * quantity
+    depositUnitAmount * quantity,
   );
 
   const itemSubtotal = getCartItemLineTotal(item);
@@ -615,14 +685,16 @@ export const getItemPricing = (item: CartItem, checkoutType: CheckoutType) => {
 
 export const getCheckoutPriceAdjustmentTotal = (
   cartItems: CartItem[],
-  checkoutType: CheckoutType
+  checkoutType: CheckoutType,
 ) => {
   return cartItems.reduce((total, item) => {
     const quantity = Math.max(1, toNumber(item.quantity, 1));
     const adjustment =
       checkoutType === "pickup"
-        ? item.takeawayPriceAdjustment ?? item.menuItem?.takeawayPriceAdjustment
-        : item.deliveryPriceAdjustment ?? item.menuItem?.deliveryPriceAdjustment;
+        ? (item.takeawayPriceAdjustment ??
+          item.menuItem?.takeawayPriceAdjustment)
+        : (item.deliveryPriceAdjustment ??
+          item.menuItem?.deliveryPriceAdjustment);
 
     return total + Math.max(0, toNumber(adjustment, 0)) * quantity;
   }, 0);
@@ -639,7 +711,9 @@ export const getTotalBeforeDiscount = ({
 }) => subtotal + orderFee + tipAmount;
 
 export const getServiceChargeAmountFromQuote = (quote?: CartQuote | null) => {
-  const breakdownTotal = toNullableNumber(quote?.chargeBreakdown?.totalServiceChargeAmount);
+  const breakdownTotal = toNullableNumber(
+    quote?.chargeBreakdown?.totalServiceChargeAmount,
+  );
 
   if (breakdownTotal !== null) {
     return Math.max(0, breakdownTotal);
@@ -653,12 +727,20 @@ export const getServiceChargeAmountFromQuote = (quote?: CartQuote | null) => {
 
   return Math.max(
     0,
-    (quote?.chargeBreakdown?.serviceCharges ?? []).reduce((total, line) => total + toNumber(line.amount, 0), 0)
+    (quote?.chargeBreakdown?.serviceCharges ?? []).reduce(
+      (total, line) => total + toNumber(line.amount, 0),
+      0,
+    ),
   );
 };
 
 const hasDiscountMetadata = (value: unknown) => {
-  return typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length > 0;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length > 0
+  );
 };
 
 const getPerItemDiscountAmount = (item: CartItem) => {
@@ -682,7 +764,10 @@ const addProportionalDiscountDisplays = (
   eligibleItems: PricingEntry[],
   discountAmount: number,
 ) => {
-  const eligibleTotal = eligibleItems.reduce((total, { pricing }) => total + pricing.lineTotal, 0);
+  const eligibleTotal = eligibleItems.reduce(
+    (total, { pricing }) => total + pricing.lineTotal,
+    0,
+  );
 
   if (eligibleTotal <= 0) return;
 
@@ -693,10 +778,16 @@ const addProportionalDiscountDisplays = (
     const isLastItem = index === eligibleItems.length - 1;
     const proportionalDiscount = isLastItem
       ? discountAmount - allocatedDiscount
-      : Math.round((discountAmount * pricing.lineTotal / eligibleTotal) * 100) / 100;
-    const lineDiscount = Math.min(pricing.lineTotal, Math.max(0, proportionalDiscount));
+      : Math.round(
+          ((discountAmount * pricing.lineTotal) / eligibleTotal) * 100,
+        ) / 100;
+    const lineDiscount = Math.min(
+      pricing.lineTotal,
+      Math.max(0, proportionalDiscount),
+    );
     const discountedLineTotal = Math.max(0, pricing.lineTotal - lineDiscount);
-    const discountedUnitPriceWithModifiers = discountedLineTotal / pricing.quantity;
+    const discountedUnitPriceWithModifiers =
+      discountedLineTotal / pricing.quantity;
 
     allocatedDiscount += lineDiscount;
 
@@ -712,42 +803,68 @@ const addProportionalDiscountDisplays = (
 
 export const getScopedItemDiscountDisplays = (
   pricingItems: PricingEntry[],
-  quote?: CartQuote | null
+  quote?: CartQuote | null,
 ) => {
   const discountMap = new Map<string, CartItemDiscountDisplay>();
-  const applyMode = String(quote?.appliedPromotion?.applyMode || "").toUpperCase();
+  const applyMode = String(
+    quote?.appliedPromotion?.applyMode || "",
+  ).toUpperCase();
   const quoteDiscountAmount = Math.max(
     0,
-    toNumber(quote?.discountAmount ?? quote?.appliedPromotion?.discountAmount, 0)
+    toNumber(
+      quote?.discountAmount ?? quote?.appliedPromotion?.discountAmount,
+      0,
+    ),
   );
-  const hasPerItemContract = pricingItems.some(({ item }) =>
-    hasDiscountMetadata(item.promotion) ||
-    hasDiscountMetadata(item.happyHour) ||
-    item.promotion === null ||
-    item.happyHour === null ||
-    item.discountedLineTotal === null ||
-    item.discountedUnitPrice === null ||
-    item.promotionDiscountAmount !== undefined
+  const hasPerItemContract = pricingItems.some(
+    ({ item }) =>
+      hasDiscountMetadata(item.promotion) ||
+      hasDiscountMetadata(item.happyHour) ||
+      item.promotion === null ||
+      item.happyHour === null ||
+      item.discountedLineTotal === null ||
+      item.discountedUnitPrice === null ||
+      item.promotionDiscountAmount !== undefined,
   );
   const perItemDiscountItems = pricingItems.filter(({ item, pricing }) => {
-    return !isDealCartItem(item) && pricing.lineTotal > 0 &&
-      (hasDiscountMetadata(item.promotion) || hasDiscountMetadata(item.happyHour));
+    return (
+      !isDealCartItem(item) &&
+      pricing.lineTotal > 0 &&
+      (hasDiscountMetadata(item.promotion) ||
+        hasDiscountMetadata(item.happyHour))
+    );
   });
 
   if (perItemDiscountItems.length > 0) {
-    const perItemDiscountTotal = perItemDiscountItems.reduce((total, { item, pricing }) => {
-      return total + Math.min(pricing.lineTotal, getPerItemDiscountAmount(item));
-    }, 0);
-    const shouldUseQuoteDiscount = applyMode === "SCOPED_ITEMS" && quoteDiscountAmount > 0 &&
-      (perItemDiscountTotal > quoteDiscountAmount + 0.01 || String(quote?.appliedPromotion?.discountType || "").toUpperCase() === "FIXED_PRICE");
+    const perItemDiscountTotal = perItemDiscountItems.reduce(
+      (total, { item, pricing }) => {
+        return (
+          total + Math.min(pricing.lineTotal, getPerItemDiscountAmount(item))
+        );
+      },
+      0,
+    );
+    const shouldUseQuoteDiscount =
+      applyMode === "SCOPED_ITEMS" &&
+      quoteDiscountAmount > 0 &&
+      (perItemDiscountTotal > quoteDiscountAmount + 0.01 ||
+        String(quote?.appliedPromotion?.discountType || "").toUpperCase() ===
+          "FIXED_PRICE");
 
     if (shouldUseQuoteDiscount) {
-      addProportionalDiscountDisplays(discountMap, perItemDiscountItems, quoteDiscountAmount);
+      addProportionalDiscountDisplays(
+        discountMap,
+        perItemDiscountItems,
+        quoteDiscountAmount,
+      );
       return discountMap;
     }
 
     perItemDiscountItems.forEach(({ item, pricing }, index) => {
-      const lineDiscount = Math.min(pricing.lineTotal, getPerItemDiscountAmount(item));
+      const lineDiscount = Math.min(
+        pricing.lineTotal,
+        getPerItemDiscountAmount(item),
+      );
 
       if (lineDiscount <= 0) return;
 
@@ -758,21 +875,30 @@ export const getScopedItemDiscountDisplays = (
       discountMap.set(String(item.id || item.menuItemId || index), {
         lineDiscount,
         discountedLineTotal,
-        discountedUnitPriceWithModifiers: discountedLineTotal / pricing.quantity,
+        discountedUnitPriceWithModifiers:
+          discountedLineTotal / pricing.quantity,
       });
     });
 
     return discountMap;
   }
 
-  if (hasPerItemContract || applyMode !== "SCOPED_ITEMS" || quoteDiscountAmount <= 0) {
+  if (
+    hasPerItemContract ||
+    applyMode !== "SCOPED_ITEMS" ||
+    quoteDiscountAmount <= 0
+  ) {
     return discountMap;
   }
 
   const eligibleItems = pricingItems.filter(({ item, pricing }) => {
     return !isDealCartItem(item) && pricing.lineTotal > 0;
   });
-  addProportionalDiscountDisplays(discountMap, eligibleItems, quoteDiscountAmount);
+  addProportionalDiscountDisplays(
+    discountMap,
+    eligibleItems,
+    quoteDiscountAmount,
+  );
 
   return discountMap;
 };
@@ -845,17 +971,24 @@ export function CartSummarySection({
   const quoteTipAmount =
     toNullableNumber(resolvedQuote?.tipAmount) ??
     Math.max(0, toNumber(appliedTipAmount, 0));
-  const quotePayableAmount = resolvedQuote ? getDisplayTotalAmount(resolvedQuote) : null;
+  const quotePayableAmount = resolvedQuote
+    ? getDisplayTotalAmount(resolvedQuote)
+    : null;
   const serviceChargeAmount = getServiceChargeAmountFromQuote(resolvedQuote);
   const serviceChargeLabel = getServiceChargeLabel({
     serviceChargeType: resolvedQuote?.serviceChargeType,
     serviceChargeValue: resolvedQuote?.serviceChargeValue,
     serviceChargeLabel: t("totals.serviceCharge"),
-    serviceChargeWithPercentageLabel: (value) => t("totals.serviceChargeWithPercentage", { value }),
+    serviceChargeWithPercentageLabel: (value) =>
+      t("totals.serviceChargeWithPercentage", { value }),
   });
   const [tipInput, setTipInput] = useState("");
-  const loyaltyPointsValue = Math.max(0, Math.floor(toNumber(loyaltyPoints, 0)));
-  const loyaltyEstimatedDiscount = loyaltyPointsValue * toNumber(loyalty?.redemptionValuePerPoint, 0);
+  const loyaltyPointsValue = Math.max(
+    0,
+    Math.floor(toNumber(loyaltyPoints, 0)),
+  );
+  const loyaltyEstimatedDiscount =
+    loyaltyPointsValue * toNumber(loyalty?.redemptionValuePerPoint, 0);
   const loyaltyCanRedeem =
     Boolean(loyalty) &&
     loyaltyPointsValue >= toNumber(loyalty?.minimumRedeemPoints, 0) &&
@@ -865,26 +998,39 @@ export function CartSummarySection({
     setTipInput(quoteTipAmount > 0 ? String(quoteTipAmount) : "");
   }, [quoteTipAmount]);
 
-  const checkoutPriceAdjustment = getCheckoutPriceAdjustmentTotal(cartItems, checkoutType);
+  const checkoutPriceAdjustment = getCheckoutPriceAdjustmentTotal(
+    cartItems,
+    checkoutType,
+  );
   const hasResolvedQuote = Boolean(resolvedQuote);
   const deliveryAdjustmentFee =
     checkoutType === "delivery" ? checkoutPriceAdjustment : 0;
   const deliveryFee =
     checkoutType === "delivery"
       ? hasResolvedQuote
-        ? quoteDeliveryFee ?? 0
-        : deliveryAdjustmentFee > 0 ? deliveryAdjustmentFee : quoteDeliveryFee ?? 0
+        ? (quoteDeliveryFee ?? 0)
+        : deliveryAdjustmentFee > 0
+          ? deliveryAdjustmentFee
+          : (quoteDeliveryFee ?? 0)
       : 0;
-  const pickupFee = checkoutType === "pickup" && !hasResolvedQuote ? checkoutPriceAdjustment : 0;
+  const pickupFee =
+    checkoutType === "pickup" && !hasResolvedQuote
+      ? checkoutPriceAdjustment
+      : 0;
   const selectedOrderFee = checkoutType === "pickup" ? pickupFee : deliveryFee;
   const tipAmount = Math.max(0, quoteTipAmount);
 
   const appliedPromotion = resolvedQuote?.appliedPromotion ?? null;
-  const hasAppliedPromotion = Boolean(appliedPromotion?.id || appliedPromotion?.title);
+  const hasAppliedPromotion = Boolean(
+    appliedPromotion?.id || appliedPromotion?.title,
+  );
   const promotionDiscountLine = hasAppliedPromotion
     ? getAppliedPromotionDiscountLine(resolvedQuote)
     : null;
-  const scopedItemDiscountDisplays = getScopedItemDiscountDisplays(pricingItems, resolvedQuote);
+  const scopedItemDiscountDisplays = getScopedItemDiscountDisplays(
+    pricingItems,
+    resolvedQuote,
+  );
   const appliedCouponCode = hasText(resolvedQuote?.couponCode)
     ? String(resolvedQuote?.couponCode).trim()
     : "";
@@ -895,12 +1041,12 @@ export function CartSummarySection({
 
   const loyaltyDiscount = Math.max(
     0,
-    toNumber(resolvedQuote?.loyaltyDiscountAmount, 0)
+    toNumber(resolvedQuote?.loyaltyDiscountAmount, 0),
   );
 
   const walletAppliedAmount = Math.max(
     0,
-    toNumber(resolvedQuote?.walletAppliedAmount, 0)
+    toNumber(resolvedQuote?.walletAppliedAmount, 0),
   );
 
   const computedTotalBeforeDiscount = getTotalBeforeDiscount({
@@ -909,20 +1055,31 @@ export function CartSummarySection({
     tipAmount,
   });
 
-  const backendTotalBeforeDiscount = toNullableNumber(resolvedQuote?.totalBeforeDiscount);
-  const totalBeforeDiscount = backendTotalBeforeDiscount ?? getTotalBeforeDiscount({
-    subtotal: quoteSubtotal !== null ? quoteSubtotal : itemTotal,
-    orderFee: selectedOrderFee,
-    tipAmount,
-  });
+  const backendTotalBeforeDiscount = toNullableNumber(
+    resolvedQuote?.totalBeforeDiscount,
+  );
+  const totalBeforeDiscount =
+    backendTotalBeforeDiscount ??
+    getTotalBeforeDiscount({
+      subtotal: quoteSubtotal !== null ? quoteSubtotal : itemTotal,
+      orderFee: selectedOrderFee,
+      tipAmount,
+    });
   const loyaltyPreviewDiscount =
     loyaltyDiscount > 0 || !loyaltyCanRedeem
       ? 0
-      : Math.min(Math.max(0, loyaltyEstimatedDiscount), totalBeforeDiscount - discount);
+      : Math.min(
+          Math.max(0, loyaltyEstimatedDiscount),
+          totalBeforeDiscount - discount,
+        );
 
   const totalWithoutTip = Math.max(
     0,
-    totalBeforeDiscount - tipAmount - discount - loyaltyDiscount - walletAppliedAmount
+    totalBeforeDiscount -
+      tipAmount -
+      discount -
+      loyaltyDiscount -
+      walletAppliedAmount,
   );
   const quotedFinalTotal =
     quotePayableAmount !== null
@@ -938,7 +1095,10 @@ export function CartSummarySection({
       ? Math.max(0, quotedFinalTotal)
       : Math.max(
           0,
-          totalBeforeDiscount - discount - loyaltyDiscount - walletAppliedAmount
+          totalBeforeDiscount -
+            discount -
+            loyaltyDiscount -
+            walletAppliedAmount,
         );
   const displayedFinalTotal = Math.max(0, finalTotal - loyaltyPreviewDiscount);
 
@@ -986,7 +1146,9 @@ export function CartSummarySection({
       <section className="space-y-[20.37px]">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[20px] font-medium text-gray-900">{resolvedTitle}</h2>
+            <h2 className="text-[20px] font-medium text-gray-900">
+              {resolvedTitle}
+            </h2>
             <p className="mt-1 text-xs capitalize text-gray-400">
               {checkoutType === "pickup"
                 ? t("pickupPricingApplied")
@@ -1023,7 +1185,9 @@ export function CartSummarySection({
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Loader2 size={20} className="animate-spin" />
             </div>
-            <p className="mt-3 text-sm font-medium text-gray-700">{t("loadingCart")}</p>
+            <p className="mt-3 text-sm font-medium text-gray-700">
+              {t("loadingCart")}
+            </p>
           </div>
         ) : cartItems.length === 0 ? (
           <div
@@ -1059,18 +1223,23 @@ export function CartSummarySection({
                 {backendError.timestamp ? (
                   <div className="mt-2 flex flex-wrap justify-center gap-2 text-[11px] text-red-700/80">
                     <span className="rounded-full bg-white/70 px-2 py-1">
-                      {new Date(backendError.timestamp).toLocaleString("en-US", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                        hourCycle: "h23",
-                      })}
+                      {new Date(backendError.timestamp).toLocaleString(
+                        "en-US",
+                        {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          hourCycle: "h23",
+                        },
+                      )}
                     </span>
                   </div>
                 ) : null}
               </div>
             ) : (
               <>
-                <p className="text-sm font-medium text-gray-700">{t("yourCartIsEmpty")}</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {t("yourCartIsEmpty")}
+                </p>
                 <p className="mt-1 text-xs text-gray-400">
                   {t("emptyCartDescription")}
                 </p>
@@ -1121,12 +1290,14 @@ export function CartSummarySection({
                 item,
                 selectedSections,
                 splitLabels,
-                checkoutType
+                checkoutType,
               );
               const includedItems = Array.isArray(item.includedItems)
                 ? item.includedItems
                 : [];
-              const itemDiscountDisplay = scopedItemDiscountDisplays.get(String(item.id || item.menuItemId || ""));
+              const itemDiscountDisplay = scopedItemDiscountDisplays.get(
+                String(item.id || item.menuItemId || ""),
+              );
 
               return (
                 <div
@@ -1183,7 +1354,6 @@ export function CartSummarySection({
                             {t("size")}: {String(selectedVariationName)}
                           </p>
                         ) : null}
-
                       </div>
 
                       {isDealItem && includedItems.length > 0 ? (
@@ -1198,13 +1368,15 @@ export function CartSummarySection({
                                 String(
                                   includedItem.menuItem?.name ||
                                     includedItem.name ||
-                                    ""
+                                    "",
                                 ).trim() || t("includedItemFallback");
                               const includedQuantity = Math.max(
                                 1,
-                                toNumber(includedItem.quantity, 1)
+                                toNumber(includedItem.quantity, 1),
                               );
-                              const includedModifiers = Array.isArray(includedItem.selectedModifiers)
+                              const includedModifiers = Array.isArray(
+                                includedItem.selectedModifiers,
+                              )
                                 ? includedItem.selectedModifiers
                                 : [];
                               const includedKey =
@@ -1228,34 +1400,45 @@ export function CartSummarySection({
 
                                   {includedModifiers.length > 0 ? (
                                     <div className="space-y-0.5 pl-2">
-                                      {includedModifiers.map((modifier, modifierIndex) => {
-                                        const modifierKey =
-                                          modifier.id ||
-                                          modifier.modifierId ||
-                                          `${includedKey}-modifier-${modifierIndex}`;
-                                        const modifierQuantity = Math.max(
-                                          1,
-                                          toNumber(modifier.quantity, 1)
-                                        );
-                                        const modifierTotal = toNumber(modifier.total, 0);
+                                      {includedModifiers.map(
+                                        (modifier, modifierIndex) => {
+                                          const modifierKey =
+                                            modifier.id ||
+                                            modifier.modifierId ||
+                                            `${includedKey}-modifier-${modifierIndex}`;
+                                          const modifierQuantity = Math.max(
+                                            1,
+                                            toNumber(modifier.quantity, 1),
+                                          );
+                                          const modifierTotal = toNumber(
+                                            modifier.total,
+                                            0,
+                                          );
 
-                                        return (
-                                          <div
-                                            key={String(modifierKey)}
-                                            className="flex items-center justify-between gap-3 text-[11px] text-gray-500"
-                                          >
-                                            <span className="min-w-0 truncate">
-                                              {modifier.name}
-                                              {modifierQuantity > 1 ? ` × ${modifierQuantity}` : ""}
-                                            </span>
-                                            {modifierTotal > 0 ? (
-                                              <span className="shrink-0 font-medium text-gray-600">
-                                                +{formatCurrency(modifierTotal, currency)}
+                                          return (
+                                            <div
+                                              key={String(modifierKey)}
+                                              className="flex items-center justify-between gap-3 text-[11px] text-gray-500"
+                                            >
+                                              <span className="min-w-0 truncate">
+                                                {modifier.name}
+                                                {modifierQuantity > 1
+                                                  ? ` × ${modifierQuantity}`
+                                                  : ""}
                                               </span>
-                                            ) : null}
-                                          </div>
-                                        );
-                                      })}
+                                              {modifierTotal > 0 ? (
+                                                <span className="shrink-0 font-medium text-gray-600">
+                                                  +
+                                                  {formatCurrency(
+                                                    modifierTotal,
+                                                    currency,
+                                                  )}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                          );
+                                        },
+                                      )}
                                     </div>
                                   ) : null}
                                 </div>
@@ -1298,12 +1481,15 @@ export function CartSummarySection({
                                       {section.checkoutPrice > 0 ? (
                                         <div className="shrink-0 text-right">
                                           <p className="font-semibold text-primary">
-                                            {formatCurrency(section.checkoutPrice, currency)}
+                                            {formatCurrency(
+                                              section.checkoutPrice,
+                                              currency,
+                                            )}
                                           </p>
                                         </div>
                                       ) : null}
                                     </div>
-                                  )
+                                  ),
                                 )}
                               </div>
                             </div>
@@ -1314,7 +1500,7 @@ export function CartSummarySection({
                               const isOtherHalf =
                                 splitPizzaDisplay.otherHalfSections.some(
                                   (otherSection) =>
-                                    otherSection.index === section.index
+                                    otherSection.index === section.index,
                                 );
 
                               return (
@@ -1330,7 +1516,6 @@ export function CartSummarySection({
                                         {section.label}:
                                       </span>{" "}
                                       {section.displayName}
-
                                       {isOtherHalf ? (
                                         <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                                           {t("otherHalf")}
@@ -1342,7 +1527,10 @@ export function CartSummarySection({
                                   {section.checkoutPrice > 0 ? (
                                     <div className="shrink-0 text-right">
                                       <p className="font-medium text-gray-800">
-                                        {formatCurrency(section.checkoutPrice, currency)}
+                                        {formatCurrency(
+                                          section.checkoutPrice,
+                                          currency,
+                                        )}
                                       </p>
                                     </div>
                                   ) : null}
@@ -1368,7 +1556,8 @@ export function CartSummarySection({
                           <div className="space-y-1">
                             {selectedAddons.map((addon, index) => {
                               const addonName =
-                                String(addon.name || "").trim() || t("addonFallback");
+                                String(addon.name || "").trim() ||
+                                t("addonFallback");
 
                               const addonQty = getAddonQuantity(addon);
                               const addonTotal = getAddonTotal(addon);
@@ -1428,7 +1617,10 @@ export function CartSummarySection({
                                 {formatCurrency(lineTotal, currency)}
                               </span>
                               <span className="text-base font-semibold text-primary">
-                                {formatCurrency(itemDiscountDisplay.discountedLineTotal, currency)}
+                                {formatCurrency(
+                                  itemDiscountDisplay.discountedLineTotal,
+                                  currency,
+                                )}
                               </span>
                             </div>
                           ) : (
@@ -1440,7 +1632,12 @@ export function CartSummarySection({
                           <div className="space-y-0.5">
                             {depositTotal > 0 ? (
                               <p className="text-[11px] text-gray-400">
-                                {t("includesDeposit", { amount: formatCurrency(depositTotal, currency) })}
+                                {t("includesDeposit", {
+                                  amount: formatCurrency(
+                                    depositTotal,
+                                    currency,
+                                  ),
+                                })}
                               </p>
                             ) : null}
                           </div>
@@ -1449,7 +1646,9 @@ export function CartSummarySection({
                         <div className="flex items-center gap-[12px]">
                           <button
                             type="button"
-                            onClick={() => updateQuantity(String(item.id), "dec")}
+                            onClick={() =>
+                              updateQuantity(String(item.id), "dec")
+                            }
                             className="flex h-[20px] w-[20px] items-center justify-center rounded-sm border border-gray-900 text-gray-900 transition-colors hover:border-primary hover:text-primary"
                           >
                             <Minus size={13} strokeWidth={3} />
@@ -1461,7 +1660,9 @@ export function CartSummarySection({
 
                           <button
                             type="button"
-                            onClick={() => updateQuantity(String(item.id), "inc")}
+                            onClick={() =>
+                              updateQuantity(String(item.id), "inc")
+                            }
                             className="flex h-[20px] w-[20px] items-center justify-center rounded-sm border border-gray-900 text-gray-900 transition-colors hover:border-primary hover:text-primary"
                           >
                             <Plus size={13} strokeWidth={3} />
@@ -1502,7 +1703,9 @@ export function CartSummarySection({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 <span>
-                  {checkoutType === "pickup" ? t("pickupPrice") : t("deliveryFee")}
+                  {checkoutType === "pickup"
+                    ? t("pickupPrice")
+                    : t("deliveryFee")}
                 </span>
                 <Info size={16} />
               </div>
@@ -1572,7 +1775,9 @@ export function CartSummarySection({
                 role="status"
                 className="mt-2 text-xs font-medium text-green-700"
               >
-                {t("tip.applied", { amount: formatCurrency(tipAmount, currency) })}
+                {t("tip.applied", {
+                  amount: formatCurrency(tipAmount, currency),
+                })}
               </p>
             ) : null}
           </div>
@@ -1604,9 +1809,7 @@ export function CartSummarySection({
               <div className="flex items-center gap-2">
                 <TicketPercent width={16} height={16} />
                 <span>
-                  {hasAppliedPromotion
-                    ? t("appliedDeal")
-                    : t("couponApplied")}
+                  {hasAppliedPromotion ? t("appliedDeal") : t("couponApplied")}
                 </span>
               </div>
 
@@ -1660,8 +1863,18 @@ export function CartSummarySection({
                         ? t("loyalty.loading")
                         : loyalty
                           ? t("loyalty.available", {
-                              points: Math.max(0, Math.round(toNumber(loyalty.availablePoints, 0))),
-                              minimum: Math.max(0, Math.round(toNumber(loyalty.minimumRedeemPoints, 0))),
+                              points: Math.max(
+                                0,
+                                Math.round(
+                                  toNumber(loyalty.availablePoints, 0),
+                                ),
+                              ),
+                              minimum: Math.max(
+                                0,
+                                Math.round(
+                                  toNumber(loyalty.minimumRedeemPoints, 0),
+                                ),
+                              ),
                             })
                           : t("loyalty.unavailable")}
                     </p>
@@ -1690,10 +1903,15 @@ export function CartSummarySection({
                 </div>
 
                 {loyaltyPointsValue > 0 ? (
-                  <p className={`mt-2 text-xs font-medium ${loyaltyCanRedeem ? "text-green-700" : "text-amber-700"}`}>
+                  <p
+                    className={`mt-2 text-xs font-medium ${loyaltyCanRedeem ? "text-green-700" : "text-amber-700"}`}
+                  >
                     {loyaltyCanRedeem
                       ? t("loyalty.estimatedDiscount", {
-                          amount: formatCurrency(loyaltyEstimatedDiscount, currency),
+                          amount: formatCurrency(
+                            loyaltyEstimatedDiscount,
+                            currency,
+                          ),
                         })
                       : t("loyalty.requirements")}
                   </p>
@@ -1763,10 +1981,10 @@ export function CartSummarySection({
               {loyaltyPreviewDiscount > 0
                 ? t("totals.estimatedPayableAmount")
                 : quotedFinalTotal !== null
-                ? t("totals.payableAmount")
-                : walletAppliedAmount > 0
-                  ? t("payableTotal")
-                  : t("total")}
+                  ? t("totals.payableAmount")
+                  : walletAppliedAmount > 0
+                    ? t("payableTotal")
+                    : t("total")}
             </span>
             <span className="flex flex-col items-end leading-none">
               {loyaltyPreviewDiscount > 0 ? (

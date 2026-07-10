@@ -1,15 +1,12 @@
 import type { BranchRecord } from "@/types/branch-selector";
 
-export type GroupOrderStatus = "OPEN" | "LOCKED" | "CHECKED_OUT" | "CANCELLED" | "EXPIRED" | string;
-export type GroupOrderParticipantStatus = "ACTIVE" | "PENDING" | "COMPLETED" | string;
+export type GroupOrderStatus =
+  "OPEN" | "LOCKED" | "CHECKED_OUT" | "CANCELLED" | "EXPIRED" | string;
+export type GroupOrderParticipantStatus =
+  "ACTIVE" | "PENDING" | "COMPLETED" | string;
 export type GroupOrderType = "DINE_IN" | "TAKEAWAY" | "DELIVERY" | string;
 export type GroupOrderPaymentMethod =
-  | "COD"
-  | "CARD_ON_DELIVERY"
-  | "PAYPAL"
-  | "STRIPE"
-  | "WALLET"
-  | string;
+  "COD" | "CARD_ON_DELIVERY" | "PAYPAL" | "STRIPE" | "WALLET" | string;
 
 export type GroupOrderUser = {
   id?: string | number | null;
@@ -107,12 +104,38 @@ export type GroupOrderSummary = {
   itemCount?: number;
   orderTime?: string | null;
   isScheduled?: boolean | null;
+  currency?: string | null;
   subtotal?: number;
+  taxAmount?: number;
   deliveryFee?: number;
+  serviceChargeType?: string | null;
+  serviceChargeValue?: number | string | null;
+  serviceChargeAmount?: number;
+  transactionFeeAmount?: number;
   tipAmount?: number;
+  discountAmount?: number;
+  walletAppliedAmount?: number;
   loyaltyDiscountAmount?: number;
   loyaltyPointsRedeemed?: number;
   totalAmount?: number;
+  payableAmount?: number;
+  chargeBreakdown?: {
+    totalTaxAmount?: number | string | null;
+    totalServiceChargeAmount?: number | string | null;
+    totalTransactionFeeAmount?: number | string | null;
+    serviceCharges?: Array<{
+      label?: string | null;
+      type?: string | null;
+      value?: number | string | null;
+      amount?: number | string | null;
+    }>;
+    transactionFees?: Array<{
+      label?: string | null;
+      type?: string | null;
+      value?: number | string | null;
+      amount?: number | string | null;
+    }>;
+  } | null;
 };
 
 export type GroupOrder = {
@@ -147,7 +170,6 @@ export type CheckoutGroupOrderPayload = {
   orderTime?: string | null;
   customerNote: string;
   couponCode: string;
-  loyaltyPoints?: number;
 };
 
 export type GroupOrderSuccessModifier = GroupOrderSelectedOption & {
@@ -169,6 +191,8 @@ export type GroupOrderSuccessItem = {
   menuItemName?: string | null;
   name?: string | null;
   menuItem?: GroupOrderMenuItem | null;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
   variationId?: string | number | null;
   variationName?: string | null;
   unitPrice?: number | string | null;
@@ -183,10 +207,18 @@ export type GroupOrderSuccessItem = {
 };
 
 export type GroupOrderSuccessPricing = {
+  currency?: string | null;
   subtotal?: number | string | null;
   taxAmount?: number | string | null;
   deliveryFee?: number | string | null;
+  serviceChargeType?: string | null;
+  serviceChargeValue?: number | string | null;
+  serviceChargeAmount?: number | string | null;
+  transactionFeeAmount?: number | string | null;
+  tipAmount?: number | string | null;
   discountAmount?: number | string | null;
+  walletAppliedAmount?: number | string | null;
+  loyaltyDiscountAmount?: number | string | null;
   totalAmount?: number | string | null;
   payableAmount?: number | string | null;
 };
@@ -211,12 +243,20 @@ export type GroupOrderSuccessData = {
     orderType?: string | null;
     paymentMethod?: string | null;
     paymentStatus?: string | null;
+    currency?: string | null;
     payment?: GroupOrderSuccessPayment | null;
     status?: string | null;
     subtotal?: number | string | null;
     taxAmount?: number | string | null;
     deliveryFee?: number | string | null;
+    serviceChargeType?: string | null;
+    serviceChargeValue?: number | string | null;
+    serviceChargeAmount?: number | string | null;
+    transactionFeeAmount?: number | string | null;
+    tipAmount?: number | string | null;
     discountAmount?: number | string | null;
+    walletAppliedAmount?: number | string | null;
+    loyaltyDiscountAmount?: number | string | null;
     payableAmount?: number | string | null;
     totalAmount?: number | string | null;
     orderTime?: string | null;
@@ -229,6 +269,7 @@ export type GroupOrderSuccessData = {
   session?: {
     finalOrder?: {
       id?: string | number | null;
+      currency?: string | null;
       totalAmount?: number | string | null;
     } | null;
     finalOrderId?: string | number | null;
@@ -239,7 +280,10 @@ export type GroupOrderSuccessData = {
 
 export type UseGroupOrderResult = {
   order: GroupOrder | null;
-  updateOrder: (updater: GroupOrder | null | ((order: GroupOrder | null) => GroupOrder | null)) => void;
+  updateOrder: (
+    updater:
+      GroupOrder | null | ((order: GroupOrder | null) => GroupOrder | null),
+  ) => void;
   loading: boolean;
   redirecting: boolean;
   refetch: () => Promise<void>;

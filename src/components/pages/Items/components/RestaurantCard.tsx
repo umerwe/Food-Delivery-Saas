@@ -12,12 +12,41 @@ import { useGroupOrderApi } from "@/hooks/useGroupOrder";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { clearStoredGroupOrderCode, findCurrentGroupOrderParticipant, getStoredGroupOrderCode, getStoredGroupOrderId, isGroupOrderParticipantCompleted, setStoredGroupOrderId } from "@/lib/group-order";
+import {
+  clearStoredGroupOrderCode,
+  findCurrentGroupOrderParticipant,
+  getStoredGroupOrderCode,
+  getStoredGroupOrderId,
+  isGroupOrderParticipantCompleted,
+  isStoredGroupOrderCompleted,
+  markStoredGroupOrderCompleted,
+  setStoredGroupOrderId,
+} from "@/lib/group-order";
 import { formatMoney as formatDisplayMoney } from "@/lib/money";
 import { AsyncSelect } from "@/components/ui/AsyncSelect";
 import { FavoriteHeartButton } from "@/components/common/favorites/FavoriteHeartButton";
-import type { ApiRecord, CartPayload, ItemPriceOverride, MenuItem, MenuVariation, Modifier, ModifierGroup, ModifierLink, SelectedModifiersMap, PromotionInfo, PromotionPricing, RawModifierLink, SelectedModifier, VariationPriceOverride } from "@/components/pages/Items/types";
-import { hasText, formatPrice, getSplitPizzaPricingVariation, toNumber } from "@/components/pages/Items/utils/restaurant-card-utils";
+import type {
+  ApiRecord,
+  CartPayload,
+  ItemPriceOverride,
+  MenuItem,
+  MenuVariation,
+  Modifier,
+  ModifierGroup,
+  ModifierLink,
+  SelectedModifiersMap,
+  PromotionInfo,
+  PromotionPricing,
+  RawModifierLink,
+  SelectedModifier,
+  VariationPriceOverride,
+} from "@/components/pages/Items/types";
+import {
+  hasText,
+  formatPrice,
+  getSplitPizzaPricingVariation,
+  toNumber,
+} from "@/components/pages/Items/utils/restaurant-card-utils";
 import { getModifierPriceForVariation } from "@/components/pages/Items/utils/modifier-pricing";
 import {
   buildModifierSelections,
@@ -25,14 +54,28 @@ import {
   validateModifierSelections,
 } from "@/components/pages/Items/utils/modifier-selections";
 
-
 const getApiResponseMessage = (res: ApiRecord | null | undefined) => {
   const errorValue = res?.error;
   const dataValue = res?.data;
-  const errorRecord = typeof errorValue === "object" && errorValue !== null && !Array.isArray(errorValue) ? errorValue as ApiRecord : null;
-  const dataRecord = typeof dataValue === "object" && dataValue !== null && !Array.isArray(dataValue) ? dataValue as ApiRecord : null;
+  const errorRecord =
+    typeof errorValue === "object" &&
+    errorValue !== null &&
+    !Array.isArray(errorValue)
+      ? (errorValue as ApiRecord)
+      : null;
+  const dataRecord =
+    typeof dataValue === "object" &&
+    dataValue !== null &&
+    !Array.isArray(dataValue)
+      ? (dataValue as ApiRecord)
+      : null;
   const dataErrorValue = dataRecord?.error;
-  const dataErrorRecord = typeof dataErrorValue === "object" && dataErrorValue !== null && !Array.isArray(dataErrorValue) ? dataErrorValue as ApiRecord : null;
+  const dataErrorRecord =
+    typeof dataErrorValue === "object" &&
+    dataErrorValue !== null &&
+    !Array.isArray(dataErrorValue)
+      ? (dataErrorValue as ApiRecord)
+      : null;
 
   return [
     res?.message,
@@ -52,7 +95,10 @@ const isApiErrorResponse = (res: ApiRecord | null | undefined) => {
   return !res || res?.success === false || Boolean(res?.error);
 };
 
-const getApiErrorMessage = (res: ApiRecord | null | undefined, fallback = "Something went wrong") => {
+const getApiErrorMessage = (
+  res: ApiRecord | null | undefined,
+  fallback = "Something went wrong",
+) => {
   return getApiResponseMessage(res) || fallback;
 };
 
@@ -85,7 +131,7 @@ const formatMoney = (value: unknown, currency?: string | null) =>
 const formatModifierSelectionPrice = (
   unitPrice: number,
   quantity: number,
-  currency?: string | null
+  currency?: string | null,
 ) => {
   const safeQuantity = Math.max(1, Math.floor(toNumber(quantity, 1)));
 
@@ -127,15 +173,22 @@ const hasPromotionSignal = (value: unknown): value is PromotionInfo => {
   const discountValue = toNumber(promotion.discountValue, 0);
 
   return Boolean(
-    ((promotion.discountType === "PERCENTAGE" || promotion.discountType === "FLAT") && discountValue > 0) ||
-      toNumber(promotion.discountAmount, 0) > 0 ||
-      toNumber(promotion.discountedPrice, 0) > 0 ||
-      toNumber(promotion.discountedAmount, 0) > 0
+    ((promotion.discountType === "PERCENTAGE" ||
+      promotion.discountType === "FLAT") &&
+      discountValue > 0) ||
+    toNumber(promotion.discountAmount, 0) > 0 ||
+    toNumber(promotion.discountedPrice, 0) > 0 ||
+    toNumber(promotion.discountedAmount, 0) > 0,
   );
 };
 
-const getPromotionInfo = (source: MenuItem | MenuVariation | ApiRecord | null | undefined): PromotionInfo | null => {
-  if (isPromotionObject(source?.happyHour) && source.happyHour.isCurrentlyActive !== false) {
+const getPromotionInfo = (
+  source: MenuItem | MenuVariation | ApiRecord | null | undefined,
+): PromotionInfo | null => {
+  if (
+    isPromotionObject(source?.happyHour) &&
+    source.happyHour.isCurrentlyActive !== false
+  ) {
     return source.happyHour;
   }
 
@@ -221,10 +274,7 @@ const getPromotionPricing = ({
     promotion,
   );
 
-  const finalPrice = Math.max(
-    0,
-    safeOriginalPrice - calculatedDiscount,
-  );
+  const finalPrice = Math.max(0, safeOriginalPrice - calculatedDiscount);
 
   const discountAmount = Math.max(0, safeOriginalPrice - finalPrice);
 
@@ -238,7 +288,10 @@ const getPromotionPricing = ({
   };
 };
 
-const getPromotionSourceForPrice = (menuItem: MenuItem | null, variation?: MenuVariation | null) => {
+const getPromotionSourceForPrice = (
+  menuItem: MenuItem | null,
+  variation?: MenuVariation | null,
+) => {
   if (getPromotionInfo(variation)) return variation;
   if (getPromotionInfo(menuItem)) return menuItem;
   return variation || menuItem;
@@ -258,7 +311,7 @@ function PromotionBadge({
 
   const label = getPromotionDiscountLabel(promotion)?.replace(
     formatMoney(toNumber(promotion.discountValue, 0)),
-    formatMoney(toNumber(promotion.discountValue, 0), currency)
+    formatMoney(toNumber(promotion.discountValue, 0), currency),
   );
 
   return (
@@ -285,7 +338,9 @@ function PromotionPrice({
 }) {
   if (!pricing.hasDiscount) {
     return (
-      <span className={className}>{formatMoney(pricing.originalPrice, currency)}</span>
+      <span className={className}>
+        {formatMoney(pricing.originalPrice, currency)}
+      </span>
     );
   }
 
@@ -363,8 +418,13 @@ const getProductLabels = (item: MenuItem | null) => {
 const getAllergenTemplateMap = (item: MenuItem | null) => {
   const settings = getTenantSettings(item) as ApiRecord;
 
-  const customerApp = typeof settings.customerApp === "object" && settings.customerApp !== null ? settings.customerApp as ApiRecord : {};
-  const templates = (customerApp.allergenAdditiveTemplates || settings.allergenAdditiveTemplates || {}) as ApiRecord;
+  const customerApp =
+    typeof settings.customerApp === "object" && settings.customerApp !== null
+      ? (settings.customerApp as ApiRecord)
+      : {};
+  const templates = (customerApp.allergenAdditiveTemplates ||
+    settings.allergenAdditiveTemplates ||
+    {}) as ApiRecord;
 
   const allergens = normalizeArray<ApiRecord>(templates?.allergens);
   const additives = normalizeArray<ApiRecord>(templates?.additives);
@@ -558,8 +618,14 @@ export function RestaurantCard({
   const router = useRouter();
   const { token } = useAuthContext();
   const { fetchSplitPizzaMenuItems } = useItems(token);
-  const { addCustomerCartItem, addGroupOrderItem, clearCustomerCart, fetchGroupOrders } = useCart(token);
-  const { fetchGroupOrderById, searchGroupOrdersByInviteCode } = useGroupOrderApi(token);
+  const {
+    addCustomerCartItem,
+    addGroupOrderItem,
+    clearCustomerCart,
+    fetchGroupOrders,
+  } = useCart(token);
+  const { fetchGroupOrderById, searchGroupOrdersByInviteCode } =
+    useGroupOrderApi(token);
   const { user } = useAuth();
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -582,10 +648,7 @@ export function RestaurantCard({
   const customerId = user?.id;
   const branchId = user?.branchId;
   const restaurantId =
-    item?.restaurantId ||
-    item?.restaurant?.id ||
-    user?.restaurantId ||
-    "";
+    item?.restaurantId || item?.restaurant?.id || user?.restaurantId || "";
 
   const itemSupportsSplitPizza = Boolean(item?.supportsSplitPizza);
 
@@ -607,21 +670,37 @@ export function RestaurantCard({
 
       const normalized: MenuVariation = {
         id,
-        categoryId: typeof raw?.categoryId === "string" ? raw.categoryId : undefined,
+        categoryId:
+          typeof raw?.categoryId === "string" ? raw.categoryId : undefined,
         name: String(raw?.name || ""),
-        description: typeof raw?.description === "string" ? raw.description : "",
-        price: typeof raw?.price === "string" || typeof raw?.price === "number" ? raw.price : raw?.itemPriceOverrides?.[0]?.price ?? 0,
+        description:
+          typeof raw?.description === "string" ? raw.description : "",
+        price:
+          typeof raw?.price === "string" || typeof raw?.price === "number"
+            ? raw.price
+            : (raw?.itemPriceOverrides?.[0]?.price ?? 0),
         displayText:
-          typeof raw?.displayText === "string" ? raw.displayText : raw?.itemPriceOverrides?.[0]?.displayText ?? null,
+          typeof raw?.displayText === "string"
+            ? raw.displayText
+            : (raw?.itemPriceOverrides?.[0]?.displayText ?? null),
         discountedPrice:
-          raw?.happyHourDiscountedPrice ?? raw?.discountedPrice ?? raw?.happyHour?.discountedPrice ?? raw?.promotion?.discountedAmount ?? null,
-        happyHourDiscountedPrice: raw?.happyHourDiscountedPrice ?? raw?.happyHour?.discountedPrice ?? null,
+          raw?.happyHourDiscountedPrice ??
+          raw?.discountedPrice ??
+          raw?.happyHour?.discountedPrice ??
+          raw?.promotion?.discountedAmount ??
+          null,
+        happyHourDiscountedPrice:
+          raw?.happyHourDiscountedPrice ??
+          raw?.happyHour?.discountedPrice ??
+          null,
         promotion: getPromotionInfo(raw),
         happyHour: raw?.happyHour ?? null,
         sortOrder: toNumber(raw?.sortOrder, 0),
         isDefault: Boolean(raw?.isDefault),
         isActive: raw?.isActive !== false,
-        modifierPriceOverrides: normalizeArray<VariationPriceOverride>(raw?.modifierPriceOverrides),
+        modifierPriceOverrides: normalizeArray<VariationPriceOverride>(
+          raw?.modifierPriceOverrides,
+        ),
       };
 
       if (!deduped.has(id)) {
@@ -632,10 +711,14 @@ export function RestaurantCard({
     return sortBySortOrder(Array.from(deduped.values()));
   };
 
-  const getNormalizedModifiersFromGroup = (group: ModifierGroup | ApiRecord | null | undefined): Modifier[] => {
+  const getNormalizedModifiersFromGroup = (
+    group: ModifierGroup | ApiRecord | null | undefined,
+  ): Modifier[] => {
     const directModifiers = normalizeArray<Modifier>(group?.modifiers);
 
-    const fromModifierLinks = normalizeArray<RawModifierLink>(group?.modifierLinks)
+    const fromModifierLinks = normalizeArray<RawModifierLink>(
+      group?.modifierLinks,
+    )
       .map((link) => link?.modifier)
       .filter((modifier): modifier is Modifier => Boolean(modifier));
 
@@ -650,16 +733,34 @@ export function RestaurantCard({
 
       const normalized: Modifier = {
         id,
-        modifierGroupId: typeof raw?.modifierGroupId === "string" ? raw.modifierGroupId : undefined,
-        restaurantId: typeof raw?.restaurantId === "string" ? raw.restaurantId : undefined,
+        modifierGroupId:
+          typeof raw?.modifierGroupId === "string"
+            ? raw.modifierGroupId
+            : undefined,
+        restaurantId:
+          typeof raw?.restaurantId === "string" ? raw.restaurantId : undefined,
         name: String(raw?.name || ""),
-        displayText: typeof raw?.displayText === "string" ? raw.displayText : typeof (raw as ApiRecord).label === "string" ? (raw as ApiRecord).label as string : null,
-        description: typeof raw?.description === "string" ? raw.description : "",
-        priceDelta: typeof raw?.priceDelta === "string" || typeof raw?.priceDelta === "number" ? raw.priceDelta : 0,
+        displayText:
+          typeof raw?.displayText === "string"
+            ? raw.displayText
+            : typeof (raw as ApiRecord).label === "string"
+              ? ((raw as ApiRecord).label as string)
+              : null,
+        description:
+          typeof raw?.description === "string" ? raw.description : "",
+        priceDelta:
+          typeof raw?.priceDelta === "string" ||
+          typeof raw?.priceDelta === "number"
+            ? raw.priceDelta
+            : 0,
         sortOrder: toNumber(raw?.sortOrder, 0),
         isActive: raw?.isActive !== false,
-        itemPriceOverrides: normalizeArray<ItemPriceOverride>(raw?.itemPriceOverrides),
-        variationPriceOverrides: normalizeArray<VariationPriceOverride>(raw?.variationPriceOverrides),
+        itemPriceOverrides: normalizeArray<ItemPriceOverride>(
+          raw?.itemPriceOverrides,
+        ),
+        variationPriceOverrides: normalizeArray<VariationPriceOverride>(
+          raw?.variationPriceOverrides,
+        ),
       };
 
       if (!deduped.has(id)) {
@@ -670,7 +771,9 @@ export function RestaurantCard({
     return sortBySortOrder(Array.from(deduped.values()));
   };
 
-  const normalizeGroup = (group: ModifierGroup | ApiRecord | null | undefined): ModifierGroup | null => {
+  const normalizeGroup = (
+    group: ModifierGroup | ApiRecord | null | undefined,
+  ): ModifierGroup | null => {
     if (!group?.id) return null;
     if (group?.isActive === false) return null;
     const modifiers = getNormalizedModifiersFromGroup(group);
@@ -681,18 +784,26 @@ export function RestaurantCard({
       group?.selectionType === "SINGLE" || isSingleSelectionGroup
         ? "SINGLE"
         : "MULTIPLE";
-    const maxSelect = selectionType === "SINGLE"
-      ? 1
-      : Math.max(minSelect, rawMaxSelect > 0 ? rawMaxSelect : modifiers.length);
+    const maxSelect =
+      selectionType === "SINGLE"
+        ? 1
+        : Math.max(
+            minSelect,
+            rawMaxSelect > 0 ? rawMaxSelect : modifiers.length,
+          );
 
     return {
       id: String(group.id),
       name: String(group?.name || ""),
-      description: typeof group?.description === "string" ? group.description : "",
+      description:
+        typeof group?.description === "string" ? group.description : "",
       selectionType,
       minSelect,
       maxSelect,
-      isRequired: typeof group?.isRequired === "boolean" ? group.isRequired : minSelect > 0,
+      isRequired:
+        typeof group?.isRequired === "boolean"
+          ? group.isRequired
+          : minSelect > 0,
       sortOrder: toNumber(group?.sortOrder, 0),
       isActive: group?.isActive !== false,
       modifiers,
@@ -702,22 +813,41 @@ export function RestaurantCard({
     };
   };
 
-  const normalizeStandaloneModifier = (raw: Modifier | ApiRecord | null | undefined): Modifier | null => {
+  const normalizeStandaloneModifier = (
+    raw: Modifier | ApiRecord | null | undefined,
+  ): Modifier | null => {
     if (!raw?.id) return null;
     if (raw?.isActive === false) return null;
 
     return {
       id: String(raw.id),
-      modifierGroupId: typeof raw?.modifierGroupId === "string" ? raw.modifierGroupId : undefined,
-      restaurantId: typeof raw?.restaurantId === "string" ? raw.restaurantId : undefined,
+      modifierGroupId:
+        typeof raw?.modifierGroupId === "string"
+          ? raw.modifierGroupId
+          : undefined,
+      restaurantId:
+        typeof raw?.restaurantId === "string" ? raw.restaurantId : undefined,
       name: String(raw?.name || ""),
-      displayText: typeof raw?.displayText === "string" ? raw.displayText : typeof (raw as ApiRecord).label === "string" ? (raw as ApiRecord).label as string : null,
+      displayText:
+        typeof raw?.displayText === "string"
+          ? raw.displayText
+          : typeof (raw as ApiRecord).label === "string"
+            ? ((raw as ApiRecord).label as string)
+            : null,
       description: typeof raw?.description === "string" ? raw.description : "",
-      priceDelta: typeof raw?.priceDelta === "string" || typeof raw?.priceDelta === "number" ? raw.priceDelta : 0,
+      priceDelta:
+        typeof raw?.priceDelta === "string" ||
+        typeof raw?.priceDelta === "number"
+          ? raw.priceDelta
+          : 0,
       sortOrder: toNumber(raw?.sortOrder, 0),
       isActive: raw?.isActive !== false,
-      itemPriceOverrides: normalizeArray<ItemPriceOverride>(raw?.itemPriceOverrides),
-      variationPriceOverrides: normalizeArray<VariationPriceOverride>(raw?.variationPriceOverrides),
+      itemPriceOverrides: normalizeArray<ItemPriceOverride>(
+        raw?.itemPriceOverrides,
+      ),
+      variationPriceOverrides: normalizeArray<VariationPriceOverride>(
+        raw?.variationPriceOverrides,
+      ),
     };
   };
 
@@ -768,37 +898,39 @@ export function RestaurantCard({
     }
 
     if (Array.isArray(menuItem?.modifierPriceOverrides)) {
-      menuItem.modifierPriceOverrides.forEach((override: VariationPriceOverride) => {
-        const overrideRecord = override as ApiRecord;
-        const rawModifier: Modifier = override?.modifier || {
-          id: String(override?.modifierId ?? ""),
-          name: String(overrideRecord.name ?? "Modifier"),
-          priceDelta: override?.priceDelta ?? 0,
-        };
+      menuItem.modifierPriceOverrides.forEach(
+        (override: VariationPriceOverride) => {
+          const overrideRecord = override as ApiRecord;
+          const rawModifier: Modifier = override?.modifier || {
+            id: String(override?.modifierId ?? ""),
+            name: String(overrideRecord.name ?? "Modifier"),
+            priceDelta: override?.priceDelta ?? 0,
+          };
 
-        const normalized = normalizeStandaloneModifier({
-          ...rawModifier,
-          itemPriceOverrides: [
-            ...(Array.isArray(rawModifier?.itemPriceOverrides)
-              ? rawModifier.itemPriceOverrides
-              : []),
-            {
-              id: override?.id,
-              menuItemId: override?.menuItemId ?? menuItem?.id,
-              modifierId: override?.modifierId ?? rawModifier?.id,
-              price: override?.price,
-              priceDelta: override?.priceDelta,
-            },
-          ],
-          variationPriceOverrides: Array.isArray(
-            rawModifier?.variationPriceOverrides,
-          )
-            ? rawModifier.variationPriceOverrides
-            : [],
-        });
+          const normalized = normalizeStandaloneModifier({
+            ...rawModifier,
+            itemPriceOverrides: [
+              ...(Array.isArray(rawModifier?.itemPriceOverrides)
+                ? rawModifier.itemPriceOverrides
+                : []),
+              {
+                id: override?.id,
+                menuItemId: override?.menuItemId ?? menuItem?.id,
+                modifierId: override?.modifierId ?? rawModifier?.id,
+                price: override?.price,
+                priceDelta: override?.priceDelta,
+              },
+            ],
+            variationPriceOverrides: Array.isArray(
+              rawModifier?.variationPriceOverrides,
+            )
+              ? rawModifier.variationPriceOverrides
+              : [],
+          });
 
-        addModifier(normalized);
-      });
+          addModifier(normalized);
+        },
+      );
     }
 
     return sortBySortOrder(Array.from(deduped.values()));
@@ -829,7 +961,9 @@ export function RestaurantCard({
       ? menuItem.modifierGroups
       : [];
 
-    const rawNestedCategoryGroups = Array.isArray(menuItem?.category?.modifierGroups)
+    const rawNestedCategoryGroups = Array.isArray(
+      menuItem?.category?.modifierGroups,
+    )
       ? menuItem.category.modifierGroups
       : [];
 
@@ -856,7 +990,10 @@ export function RestaurantCard({
 
     const normalizedDirectLinks: ModifierLink[] = combinedRawLinks
       .map((link: ModifierLink | ApiRecord, index: number) => {
-        const normalizedGroup = normalizeGroup((link as ModifierLink | ApiRecord).modifierGroup as ModifierGroup | ApiRecord | undefined);
+        const normalizedGroup = normalizeGroup(
+          (link as ModifierLink | ApiRecord).modifierGroup as
+            ModifierGroup | ApiRecord | undefined,
+        );
         if (!normalizedGroup) return null;
 
         return {
@@ -1006,7 +1143,11 @@ export function RestaurantCard({
   const groupedModifierLinks = useMemo(() => {
     return visibleModifierLinks.filter((link) => {
       const groupId = String(link?.modifierGroup?.id || "");
-      return groupId && groupId !== ADDONS_GROUP_ID && !groupId.startsWith("standalone-modifiers-");
+      return (
+        groupId &&
+        groupId !== ADDONS_GROUP_ID &&
+        !groupId.startsWith("standalone-modifiers-")
+      );
     });
   }, [visibleModifierLinks]);
 
@@ -1042,7 +1183,10 @@ export function RestaurantCard({
     };
   }, [item]);
 
-  const selectedAddons: SelectedModifier[] = selectedModifiers[ADDONS_GROUP_ID] || [];
+  const selectedAddons: SelectedModifier[] =
+    selectedModifiers[ADDONS_GROUP_ID] || [];
+  const selectedAddonsQuantity =
+    getModifierGroupSelectedQuantity(selectedAddons);
 
   const addonSelectionLabel = useMemo(() => {
     const { minSelect, maxSelect } = addonSelectionRules;
@@ -1120,9 +1264,9 @@ export function RestaurantCard({
   useEffect(() => {
     queueMicrotask(() => {
       setQty((prev) => {
-      const minQuantity = itemQuantityRules.minQuantity;
-      const maxQuantity = itemQuantityRules.maxQuantity;
-      const nextQuantity = Math.max(minQuantity, prev);
+        const minQuantity = itemQuantityRules.minQuantity;
+        const maxQuantity = itemQuantityRules.maxQuantity;
+        const nextQuantity = Math.max(minQuantity, prev);
 
         return maxQuantity ? Math.min(maxQuantity, nextQuantity) : nextQuantity;
       });
@@ -1131,7 +1275,9 @@ export function RestaurantCard({
 
   useEffect(() => {
     const validAddonIds = new Set(itemAddons.map((addon) => String(addon.id)));
-    const validGroupIds = new Set(groupedModifierGroups.map((group) => String(group?.id || "")));
+    const validGroupIds = new Set(
+      groupedModifierGroups.map((group) => String(group?.id || "")),
+    );
 
     queueMicrotask(() => {
       setSelectedModifiers((prev): SelectedModifiersMap => {
@@ -1149,11 +1295,17 @@ export function RestaurantCard({
         for (const [groupId, modifiers] of Object.entries(prev)) {
           if (!validGroupIds.has(groupId)) continue;
 
-          const group = groupedModifierGroups.find((entry) => String(entry?.id || "") === groupId);
-          const validModifierIds = new Set(
-            normalizeArray<Modifier>(group?.modifiers).map((modifier) => String(modifier?.id || "")),
+          const group = groupedModifierGroups.find(
+            (entry) => String(entry?.id || "") === groupId,
           );
-          const nextModifiers = modifiers.filter((modifier) => validModifierIds.has(String(modifier?.id || "")));
+          const validModifierIds = new Set(
+            normalizeArray<Modifier>(group?.modifiers).map((modifier) =>
+              String(modifier?.id || ""),
+            ),
+          );
+          const nextModifiers = modifiers.filter((modifier) =>
+            validModifierIds.has(String(modifier?.id || "")),
+          );
 
           if (nextModifiers.length) {
             next[groupId] = nextModifiers;
@@ -1169,6 +1321,11 @@ export function RestaurantCard({
     setSelectedModifiers((prev) => {
       const current = prev[ADDONS_GROUP_ID] || [];
       const isSelected = current.some((addon) => addon.id === modifier.id);
+      const selectedQuantity = getModifierGroupSelectedQuantity(current);
+      const selectedAddon = current.find((addon) => addon.id === modifier.id);
+      const selectedAddonQuantity = selectedAddon
+        ? Math.max(1, Math.floor(toNumber(selectedAddon.selectedQuantity, 1)))
+        : 0;
       const { minSelect, maxSelect } = addonSelectionRules;
       const itemName = item?.name || t("thisItem");
       const isSingleAddonSelection = maxSelect === 1;
@@ -1187,7 +1344,10 @@ export function RestaurantCard({
       }
 
       if (isSelected) {
-        if (minSelect > 0 && current.length <= minSelect) {
+        if (
+          minSelect > 0 &&
+          selectedQuantity - selectedAddonQuantity < minSelect
+        ) {
           toast.error(t("minimumAddons", { itemName, count: minSelect }));
           return prev;
         }
@@ -1204,7 +1364,7 @@ export function RestaurantCard({
         return next;
       }
 
-      if (maxSelect && current.length >= maxSelect) {
+      if (maxSelect && selectedQuantity >= maxSelect) {
         toast.error(t("maximumAddons", { itemName, count: maxSelect }));
         return prev;
       }
@@ -1222,14 +1382,20 @@ export function RestaurantCard({
     });
   };
 
-  const handleGroupedModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
+  const handleGroupedModifierToggle = (
+    group: ModifierGroup,
+    modifier: Modifier,
+  ) => {
     const groupId = String(group.id);
-    const { minSelect, maxSelect, isRequired, selectionType } = getGroupValidation(group);
+    const { minSelect, maxSelect, isRequired, selectionType } =
+      getGroupValidation(group);
     const itemName = item?.name || t("thisItem");
 
     setSelectedModifiers((prev) => {
       const current = prev[groupId] || [];
-      const isSelected = current.some((selected) => selected.id === modifier.id);
+      const isSelected = current.some(
+        (selected) => selected.id === modifier.id,
+      );
       const selectedQuantity = getModifierGroupSelectedQuantity(current);
 
       if (selectionType === "SINGLE" || maxSelect === 1) {
@@ -1247,14 +1413,17 @@ export function RestaurantCard({
 
       if (isSelected) {
         const modifierQuantity =
-          current.find((selected) => selected.id === modifier.id)?.selectedQuantity || 1;
+          current.find((selected) => selected.id === modifier.id)
+            ?.selectedQuantity || 1;
 
         if (minSelect > 0 && selectedQuantity - modifierQuantity < minSelect) {
           toast.error(t("minimumAddons", { itemName, count: minSelect }));
           return prev;
         }
 
-        const nextModifiers = current.filter((selected) => selected.id !== modifier.id);
+        const nextModifiers = current.filter(
+          (selected) => selected.id !== modifier.id,
+        );
         const next = { ...prev };
 
         if (nextModifiers.length) {
@@ -1298,7 +1467,9 @@ export function RestaurantCard({
 
     setSelectedModifiers((prev) => {
       const current = prev[groupId] || [];
-      const currentModifier = current.find((selected) => selected.id === modifier.id);
+      const currentModifier = current.find(
+        (selected) => selected.id === modifier.id,
+      );
 
       if (!currentModifier) {
         return prev;
@@ -1311,19 +1482,32 @@ export function RestaurantCard({
       const otherSelectedQuantity = current.reduce((total, selected) => {
         if (selected.id === modifier.id) return total;
 
-        return total + Math.max(1, Math.floor(toNumber(selected.selectedQuantity, 1)));
+        return (
+          total +
+          Math.max(1, Math.floor(toNumber(selected.selectedQuantity, 1)))
+        );
       }, 0);
       const maxAllowedQuantity =
         maxSelect && maxSelect > 0
           ? Math.max(1, maxSelect - otherSelectedQuantity)
           : normalizedNextQuantity;
 
-      if (maxSelect && otherSelectedQuantity + normalizedNextQuantity > maxSelect) {
-        toast.error(t("maximumAddons", { itemName: item?.name || t("thisItem"), count: maxSelect }));
+      if (
+        maxSelect &&
+        otherSelectedQuantity + normalizedNextQuantity > maxSelect
+      ) {
+        toast.error(
+          t("maximumAddons", {
+            itemName: item?.name || t("thisItem"),
+            count: maxSelect,
+          }),
+        );
       }
 
       const minAllowedQuantity =
-        minSelect > otherSelectedQuantity ? minSelect - otherSelectedQuantity : 1;
+        minSelect > otherSelectedQuantity
+          ? minSelect - otherSelectedQuantity
+          : 1;
       const clampedQuantity = Math.max(
         minAllowedQuantity,
         Math.min(normalizedNextQuantity, maxAllowedQuantity),
@@ -1340,10 +1524,75 @@ export function RestaurantCard({
     });
   };
 
+  const handleAddonQuantityChange = (
+    modifier: Modifier,
+    nextQuantity: number,
+  ) => {
+    const { minSelect, maxSelect } = addonSelectionRules;
+
+    if (maxSelect === 1) {
+      return;
+    }
+
+    setSelectedModifiers((prev) => {
+      const current = prev[ADDONS_GROUP_ID] || [];
+      const selectedAddon = current.find((addon) => addon.id === modifier.id);
+
+      if (!selectedAddon) return prev;
+
+      const normalizedNextQuantity = Math.max(
+        1,
+        Math.floor(Number.isFinite(nextQuantity) ? nextQuantity : 1),
+      );
+      const otherSelectedQuantity = current.reduce((total, addon) => {
+        if (addon.id === modifier.id) return total;
+
+        return (
+          total + Math.max(1, Math.floor(toNumber(addon.selectedQuantity, 1)))
+        );
+      }, 0);
+
+      const maxAllowedQuantity =
+        maxSelect && maxSelect > 0
+          ? Math.max(1, maxSelect - otherSelectedQuantity)
+          : normalizedNextQuantity;
+
+      if (
+        maxSelect &&
+        otherSelectedQuantity + normalizedNextQuantity > maxSelect
+      ) {
+        toast.error(
+          t("maximumAddons", {
+            itemName: item?.name || t("thisItem"),
+            count: maxSelect,
+          }),
+        );
+      }
+
+      const minAllowedQuantity =
+        minSelect > otherSelectedQuantity
+          ? minSelect - otherSelectedQuantity
+          : 1;
+      const clampedQuantity = Math.max(
+        minAllowedQuantity,
+        Math.min(normalizedNextQuantity, maxAllowedQuantity),
+      );
+
+      return {
+        ...prev,
+        [ADDONS_GROUP_ID]: current.map((selected) =>
+          selected.id === modifier.id
+            ? { ...selected, selectedQuantity: clampedQuantity }
+            : selected,
+        ),
+      };
+    });
+  };
+
   const validateAddonSelections = () => {
     if (!itemAddons.length) return true;
 
-    const selectedCount = selectedAddons.length;
+    const selectedCount = selectedAddonsQuantity;
     const { minSelect, maxSelect } = addonSelectionRules;
     const itemName = item?.name || t("thisItem");
 
@@ -1365,7 +1614,10 @@ export function RestaurantCard({
       .flat()
       .map((modifier: SelectedModifier) => ({
         modifierId: modifier.id,
-        quantity: Math.max(1, Math.floor(toNumber(modifier.selectedQuantity, 1))),
+        quantity: Math.max(
+          1,
+          Math.floor(toNumber(modifier.selectedQuantity, 1)),
+        ),
       }));
   };
 
@@ -1383,7 +1635,11 @@ export function RestaurantCard({
           variation,
         );
 
-        return acc + modifierPrice * Math.max(1, Math.floor(toNumber(modifier.selectedQuantity, 1)));
+        return (
+          acc +
+          modifierPrice *
+            Math.max(1, Math.floor(toNumber(modifier.selectedQuantity, 1)))
+        );
       }, 0);
   };
 
@@ -1427,11 +1683,9 @@ export function RestaurantCard({
     originalPrice: splitPizzaResolvedItemPrice,
   });
 
-  const modifiersTotal = Number(getModifiersTotal(
-    selectedModifiers,
-    item,
-    selectedVariation,
-  ));
+  const modifiersTotal = Number(
+    getModifiersTotal(selectedModifiers, item, selectedVariation),
+  );
 
   const splitPizzaBasePrice =
     splitPizzaEnabled && splitPizzaItem
@@ -1485,15 +1739,18 @@ export function RestaurantCard({
       const group = link.modifierGroup;
       const groupId = String(group?.id || "");
       const selectedInGroup = selectedModifiers[groupId] || [];
-      const selectedQuantity = getModifierGroupSelectedQuantity(selectedInGroup);
-      const { maxSelect, isRequired, selectionType } = getGroupValidation(group);
+      const selectedQuantity =
+        getModifierGroupSelectedQuantity(selectedInGroup);
+      const { maxSelect, isRequired, selectionType } =
+        getGroupValidation(group);
       const groupModifiers = normalizeArray<Modifier>(group?.modifiers).filter(
         (modifier) => modifier?.isActive !== false,
       );
 
       if (!groupModifiers.length) return null;
 
-      const inputType = selectionType === "SINGLE" || maxSelect === 1 ? "radio" : "checkbox";
+      const inputType =
+        selectionType === "SINGLE" || maxSelect === 1 ? "radio" : "checkbox";
       const groupSelectionLabel =
         maxSelect && maxSelect > 0
           ? `Min ${Math.max(0, toNumber(group?.minSelect, 0))} · Max ${maxSelect}`
@@ -1538,9 +1795,14 @@ export function RestaurantCard({
                 Math.floor(toNumber(selectedModifier?.selectedQuantity, 1)),
               );
               const disableBecauseMaxReached =
-                inputType !== "radio" && !checked && !!maxSelect && selectedQuantity >= maxSelect;
+                inputType !== "radio" &&
+                !checked &&
+                !!maxSelect &&
+                selectedQuantity >= maxSelect;
               const showQuantitySelector = checked && inputType === "checkbox";
-              const disableIncrement = Boolean(maxSelect && selectedQuantity >= maxSelect);
+              const disableIncrement = Boolean(
+                maxSelect && selectedQuantity >= maxSelect,
+              );
               const effectivePrice = getModifierEffectivePrice(
                 modifier,
                 item,
@@ -1565,7 +1827,9 @@ export function RestaurantCard({
                         name={`modifier-group-${item?.id}-${groupId}`}
                         checked={checked}
                         disabled={disableBecauseMaxReached}
-                        onChange={() => handleGroupedModifierToggle(group, modifier)}
+                        onChange={() =>
+                          handleGroupedModifierToggle(group, modifier)
+                        }
                         className="mt-1 accent-[var(--primary)]"
                       />
 
@@ -1651,7 +1915,7 @@ export function RestaurantCard({
     if (!itemAddons.length) return null;
 
     const { maxSelect } = addonSelectionRules;
-    const selectedCount = selectedAddons.length;
+    const selectedCount = selectedAddonsQuantity;
     const inputType = maxSelect === 1 ? "radio" : "checkbox";
 
     return (
@@ -1680,20 +1944,34 @@ export function RestaurantCard({
             const checked = selectedAddons.some(
               (selected) => selected.id === modifier.id,
             );
+            const selectedModifier = selectedAddons.find(
+              (selected) => selected.id === modifier.id,
+            );
+            const selectedModifierQuantity = Math.max(
+              1,
+              Math.floor(toNumber(selectedModifier?.selectedQuantity, 1)),
+            );
 
             const disableBecauseMaxReached =
-              inputType !== "radio" && !checked && !!maxSelect && selectedCount >= maxSelect;
+              inputType !== "radio" &&
+              !checked &&
+              !!maxSelect &&
+              selectedCount >= maxSelect;
 
             const effectivePrice = getModifierEffectivePrice(
               modifier,
               item,
               selectedVariation,
             );
+            const showQuantitySelector = checked && inputType === "checkbox";
+            const disableIncrement = Boolean(
+              maxSelect && selectedCount >= maxSelect,
+            );
 
             return (
-              <label
+              <div
                 key={modifier.id}
-                className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl border px-3 py-3 text-sm transition ${
+                className={`rounded-xl border px-3 py-3 text-sm transition ${
                   disableBecauseMaxReached
                     ? "cursor-not-allowed border-gray-100 bg-gray-100 opacity-70"
                     : checked
@@ -1701,35 +1979,85 @@ export function RestaurantCard({
                       : "border-gray-100 bg-gray-50 hover:border-primary/25 hover:bg-white"
                 }`}
               >
-                <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
-                  <input
-                    type={inputType}
-                    name={`item-addons-${item?.id || "item"}`}
-                    checked={checked}
-                    disabled={disableBecauseMaxReached}
-                    onChange={() => handleAddonToggle(modifier)}
-                    className="mt-1 accent-[var(--primary)]"
-                  />
+                <label className="flex cursor-pointer items-start justify-between gap-3">
+                  <span className="flex min-w-0 flex-1 items-start gap-2 text-gray-800">
+                    <input
+                      type={inputType}
+                      name={`item-addons-${item?.id || "item"}`}
+                      checked={checked}
+                      disabled={disableBecauseMaxReached}
+                      onChange={() => handleAddonToggle(modifier)}
+                      className="mt-1 accent-[var(--primary)]"
+                    />
 
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium text-gray-900">
-                      {modifier.displayText || modifier.name}
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-gray-900">
+                        {modifier.displayText || modifier.name}
+                      </span>
+
+                      {modifier.description ? (
+                        <span className="mt-1 block text-xs leading-relaxed text-gray-500">
+                          {modifier.description}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+
+                  {effectivePrice !== 0 ? (
+                    <span className="shrink-0 font-semibold text-primary">
+                      {formatModifierSelectionPrice(
+                        effectivePrice,
+                        selectedModifierQuantity,
+                        currency,
+                      )}
+                    </span>
+                  ) : null}
+                </label>
+
+                {showQuantitySelector ? (
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-full border border-primary/10 bg-white/90 px-2 py-1.5 shadow-sm">
+                    <span className="pl-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      Qty
                     </span>
 
-                    {modifier.description ? (
-                      <span className="mt-1 block text-xs leading-relaxed text-gray-500">
-                        {modifier.description}
-                      </span>
-                    ) : null}
-                  </span>
-                </span>
+                    <div className="flex items-center rounded-full bg-gray-100 p-0.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleAddonQuantityChange(
+                            modifier,
+                            selectedModifierQuantity - 1,
+                          )
+                        }
+                        disabled={selectedModifierQuantity <= 1}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                        aria-label={`Decrease ${modifier.displayText || modifier.name} quantity`}
+                      >
+                        <Minus size={14} />
+                      </button>
 
-                {effectivePrice !== 0 ? (
-                  <span className="shrink-0 font-semibold text-primary">
-                    +${effectivePrice.toFixed(2)}
-                  </span>
+                      <span className="min-w-8 text-center text-sm font-bold text-gray-900">
+                        {selectedModifierQuantity}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleAddonQuantityChange(
+                            modifier,
+                            selectedModifierQuantity + 1,
+                          )
+                        }
+                        disabled={disableIncrement}
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
+                        aria-label={`Increase ${modifier.displayText || modifier.name} quantity`}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
                 ) : null}
-              </label>
+              </div>
             );
           })}
         </div>
@@ -1737,7 +2065,9 @@ export function RestaurantCard({
     );
   };
 
-  const addCartItemWithBranchRetry = async (payload: CartPayload & Record<string, unknown>) => {
+  const addCartItemWithBranchRetry = async (
+    payload: CartPayload & Record<string, unknown>,
+  ) => {
     if (!customerId) {
       return {
         success: false,
@@ -1750,7 +2080,10 @@ export function RestaurantCard({
       branchId,
     };
 
-    const firstRes = await addCustomerCartItem({ customerId, payload: cartPayload });
+    const firstRes = await addCustomerCartItem({
+      customerId,
+      payload: cartPayload,
+    });
 
     if (!isCartBranchConflictResponse(firstRes)) {
       return firstRes;
@@ -1761,10 +2094,7 @@ export function RestaurantCard({
     if (isApiErrorResponse(clearRes)) {
       return {
         success: false,
-        error: getApiErrorMessage(
-          clearRes,
-          t("clearPreviousBranchCartFailed"),
-        ),
+        error: getApiErrorMessage(clearRes, t("clearPreviousBranchCartFailed")),
       };
     }
 
@@ -1782,10 +2112,15 @@ export function RestaurantCard({
         return;
       }
 
-      const groupedValidation = validateModifierSelections(groupedModifierGroups, selectedModifiers);
+      const groupedValidation = validateModifierSelections(
+        groupedModifierGroups,
+        selectedModifiers,
+      );
 
       if (!groupedValidation.isValid) {
-        toast.error(Object.values(groupedValidation.errors)[0] || t("failedAddToCart"));
+        toast.error(
+          Object.values(groupedValidation.errors)[0] || t("failedAddToCart"),
+        );
         return;
       }
 
@@ -1803,6 +2138,10 @@ export function RestaurantCard({
       const groupCode = getStoredGroupOrderCode();
       const groupOrderId = getStoredGroupOrderId();
       let addedToGroupOrder = false;
+      const storedGroupOrderCompleted = isStoredGroupOrderCompleted({
+        orderId: groupOrderId,
+        inviteCode: groupCode,
+      });
 
       if (!groupCode && !groupOrderId && !customerId) {
         toast.error(t("customerNotFound"));
@@ -1836,7 +2175,10 @@ export function RestaurantCard({
       };
 
       if (groupedModifierGroups.length > 0) {
-        basePayload.modifierSelections = buildModifierSelections(groupedModifierGroups, selectedModifiers);
+        basePayload.modifierSelections = buildModifierSelections(
+          groupedModifierGroups,
+          selectedModifiers,
+        );
       } else {
         basePayload.modifiers = buildModifiersPayload(selectedModifiers);
       }
@@ -1847,25 +2189,33 @@ export function RestaurantCard({
 
       let res: ApiRecord | null = null;
 
-      if (groupCode || groupOrderId) {
+      if (storedGroupOrderCompleted) {
+        clearStoredGroupOrderCode();
+      }
+
+      if (!storedGroupOrderCompleted && (groupCode || groupOrderId)) {
         let groupOrder: ApiRecord | null = null;
 
         if (groupOrderId) {
-          const { groupOrder: directGroupOrder } = await fetchGroupOrderById({ orderId: groupOrderId });
+          const { groupOrder: directGroupOrder } = await fetchGroupOrderById({
+            orderId: groupOrderId,
+          });
           groupOrder = directGroupOrder as ApiRecord | null;
         }
 
         if (!groupOrder && groupCode) {
-          const { groupOrder: searchedGroupOrder } = await searchGroupOrdersByInviteCode({ inviteCode: groupCode });
+          const { groupOrder: searchedGroupOrder } =
+            await searchGroupOrdersByInviteCode({ inviteCode: groupCode });
           groupOrder = searchedGroupOrder as ApiRecord | null;
         }
 
         if (!groupOrder && groupCode) {
           const { groupOrders } = await fetchGroupOrders();
 
-          groupOrder = groupOrders.find(
-            (order: ApiRecord) => order?.inviteCode === groupCode,
-          ) || null;
+          groupOrder =
+            groupOrders.find(
+              (order: ApiRecord) => order?.inviteCode === groupCode,
+            ) || null;
         }
 
         if (!groupOrder) {
@@ -1880,6 +2230,10 @@ export function RestaurantCard({
         });
 
         if (isGroupOrderParticipantCompleted(currentParticipant)) {
+          markStoredGroupOrderCompleted({
+            orderId: groupOrder.id as string | number | null,
+            inviteCode: groupOrder.inviteCode as string | number | null,
+          });
           clearStoredGroupOrderCode();
           res = await addCartItemWithBranchRetry(basePayload);
         } else {
@@ -1898,7 +2252,9 @@ export function RestaurantCard({
         return;
       }
 
-      toast.success(addedToGroupOrder ? t("addedToGroupOrder") : t("addedToCart"));
+      toast.success(
+        addedToGroupOrder ? t("addedToGroupOrder") : t("addedToCart"),
+      );
 
       setAnimateCart(true);
       setTimeout(() => setAnimateCart(false), 700);
@@ -1922,9 +2278,21 @@ export function RestaurantCard({
 
     const groupCode = getStoredGroupOrderCode();
     const groupOrderId = getStoredGroupOrderId();
+    const storedGroupOrderCompleted = isStoredGroupOrderCompleted({
+      orderId: groupOrderId,
+      inviteCode: groupCode,
+    });
+
+    if (storedGroupOrderCompleted) {
+      clearStoredGroupOrderCode();
+    }
+
+    const hasActiveGroupContext = Boolean(
+      !storedGroupOrderCompleted && (groupCode || groupOrderId),
+    );
 
     if (!hasOptions) {
-      if (!groupCode && !groupOrderId && !branchId) {
+      if (!hasActiveGroupContext && !branchId) {
         toast.error(t("selectBranchFirst"));
         return;
       }
@@ -1998,7 +2366,10 @@ export function RestaurantCard({
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-gray-900">
-                <PromotionPrice pricing={cardPromotionPricing} currency={currency} />
+                <PromotionPrice
+                  pricing={cardPromotionPricing}
+                  currency={currency}
+                />
               </p>
 
               {cardPromotionPricing.hasPromotion ? (
@@ -2012,7 +2383,8 @@ export function RestaurantCard({
 
             {cardPromotionPricing.hasDiscount ? (
               <p className="mt-1 text-[11px] font-medium text-green-700">
-                Save {formatMoney(cardPromotionPricing.discountAmount, currency)}
+                Save{" "}
+                {formatMoney(cardPromotionPricing.discountAmount, currency)}
               </p>
             ) : null}
 
@@ -2372,7 +2744,7 @@ export function RestaurantCard({
                     loading ||
                     Boolean(
                       itemQuantityRules.maxQuantity &&
-                        qty >= itemQuantityRules.maxQuantity,
+                      qty >= itemQuantityRules.maxQuantity,
                     )
                   }
                 >

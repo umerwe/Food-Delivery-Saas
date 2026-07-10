@@ -1,6 +1,13 @@
 import { createDomainApiService } from "@/services/domain-api";
-import { normalizeApiArray, normalizeApiMeta } from "@/components/pages/Items/utils/restaurant-card-utils";
-import type { ApiMeta, ItemsCategory, MenuItem } from "@/components/pages/Items/types";
+import {
+  normalizeApiArray,
+  normalizeApiMeta,
+} from "@/components/pages/Items/utils/restaurant-card-utils";
+import type {
+  ApiMeta,
+  ItemsCategory,
+  MenuItem,
+} from "@/components/pages/Items/types";
 
 const itemsService = createDomainApiService();
 
@@ -9,7 +16,10 @@ export const postItems = itemsService.post;
 export const patchItems = itemsService.patch;
 export const deleteItems = itemsService.del;
 
-export const fetchMenuItems = async (endpoint: string, token?: string | null) => {
+export const fetchMenuItems = async (
+  endpoint: string,
+  token?: string | null,
+) => {
   const response = await getItems(endpoint, token);
 
   return {
@@ -38,7 +48,7 @@ export const fetchMenuItemsPage = async ({
     page: String(page),
     limit: String(limit),
     sortBy: "sortOrder",
-    sortOrder: "ASC",
+    sortOrder: "DESC",
   });
 
   if (categoryId) {
@@ -70,7 +80,7 @@ export const fetchMenuItemDetailsByIds = async ({
   token?: string | null;
 }) => {
   const uniqueIds = Array.from(
-    new Set(itemIds.map((id) => id.trim()).filter(Boolean))
+    new Set(itemIds.map((id) => id.trim()).filter(Boolean)),
   );
 
   const responses = await Promise.all(
@@ -79,8 +89,8 @@ export const fetchMenuItemDetailsByIds = async ({
         new Set(
           [itemId, ...(itemSearchTermsById[itemId] ?? [])]
             .map((term) => term.trim())
-            .filter(Boolean)
-        )
+            .filter(Boolean),
+        ),
       );
       let matchedItem: MenuItem | null = null;
 
@@ -93,15 +103,21 @@ export const fetchMenuItemDetailsByIds = async ({
 
         const response = await getItems(
           `/v1/menu/items?${params.toString()}`,
-          token
+          token,
         );
         const items = normalizeApiArray<MenuItem>(response);
         const normalizedSearchTerm = searchTerm.toLowerCase();
 
         matchedItem =
           items.find((item) => String(item?.id || "") === itemId) ||
-          items.find((item) => String(item?.slug || "").toLowerCase() === normalizedSearchTerm) ||
-          items.find((item) => String(item?.name || "").toLowerCase() === normalizedSearchTerm) ||
+          items.find(
+            (item) =>
+              String(item?.slug || "").toLowerCase() === normalizedSearchTerm,
+          ) ||
+          items.find(
+            (item) =>
+              String(item?.name || "").toLowerCase() === normalizedSearchTerm,
+          ) ||
           null;
 
         if (matchedItem) {
@@ -110,11 +126,13 @@ export const fetchMenuItemDetailsByIds = async ({
       }
 
       return [itemId, matchedItem] as const;
-    })
+    }),
   );
 
   return Object.fromEntries(
-    responses.filter((entry): entry is readonly [string, MenuItem] => entry[1] !== null)
+    responses.filter(
+      (entry): entry is readonly [string, MenuItem] => entry[1] !== null,
+    ),
   );
 };
 
@@ -150,10 +168,15 @@ export const fetchSplitPizzaMenuItems = async ({
     queryParams.set("search", resolvedSearch);
   }
 
-  const response = await getItems(`/v1/menu/items?${queryParams.toString()}`, token);
+  const response = await getItems(
+    `/v1/menu/items?${queryParams.toString()}`,
+    token,
+  );
 
   return {
-    data: normalizeApiArray<MenuItem>(response).filter((menuItem) => Boolean(menuItem?.id)),
+    data: normalizeApiArray<MenuItem>(response).filter((menuItem) =>
+      Boolean(menuItem?.id),
+    ),
     meta: normalizeApiMeta(response),
   };
 };
@@ -176,14 +199,17 @@ export const fetchMenuCategoriesPage = async ({
     page: String(page),
     limit: String(limit),
     sortBy: "sortOrder",
-    sortOrder: "ASC",
+    sortOrder: "DESC",
   });
 
   if (search) {
     params.set("search", search);
   }
 
-  const response = await getItems(`/v1/menu/categories?${params.toString()}`, token);
+  const response = await getItems(
+    `/v1/menu/categories?${params.toString()}`,
+    token,
+  );
 
   return {
     response,

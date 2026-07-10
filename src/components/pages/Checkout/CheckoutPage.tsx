@@ -20,12 +20,35 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
-import type { ApiRecord, BackendErrorState, CartItem } from "@/components/pages/Checkout/utils/checkout-normalizers";
-import { asRecord, getBackendErrorCode, getBackendErrorMessage, getBackendErrorMeta, hasBackendError, normalizeCartItem, normalizeCartQuote, normalizeCartResponse, recalculateCartItemQuantity, toNumber } from "@/components/pages/Checkout/utils/checkout-normalizers";
+import type {
+  ApiRecord,
+  BackendErrorState,
+  CartItem,
+} from "@/components/pages/Checkout/utils/checkout-normalizers";
+import {
+  asRecord,
+  getBackendErrorCode,
+  getBackendErrorMessage,
+  getBackendErrorMeta,
+  hasBackendError,
+  normalizeCartItem,
+  normalizeCartQuote,
+  normalizeCartResponse,
+  recalculateCartItemQuantity,
+  toNumber,
+} from "@/components/pages/Checkout/utils/checkout-normalizers";
 import type { BranchRecord } from "@/types/branch-selector";
 import { useTranslations } from "next-intl";
-import { normalizeCheckoutTipAmount, type CheckoutAddressValues } from "@/validations/checkout";
-import { branchSupportsDelivery, branchSupportsPickup, getSelectedOrderType, normalizeBranch } from "@/lib/branch-selector";
+import {
+  normalizeCheckoutTipAmount,
+  type CheckoutAddressValues,
+} from "@/validations/checkout";
+import {
+  branchSupportsDelivery,
+  branchSupportsPickup,
+  getSelectedOrderType,
+  normalizeBranch,
+} from "@/lib/branch-selector";
 import {
   getStoredCheckoutTypePreference,
   setStoredCheckoutTypePreference,
@@ -63,16 +86,23 @@ type GuestPrivacyPolicy = {
   policyLink: string;
 };
 
+const getRecordString = (record: ApiRecord | null | undefined, key: string) => {
+  const value = record?.[key];
+
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+};
+
 const getCartItemCount = (items: CartItem[]) =>
-  items.reduce((total, item) => total + Math.max(1, toNumber(item.quantity, 1)), 0);
+  items.reduce(
+    (total, item) => total + Math.max(1, toNumber(item.quantity, 1)),
+    0,
+  );
 
 const getCheckoutOrderType = (checkoutType: string) =>
   checkoutType === "pickup" ? "TAKEAWAY" : "DELIVERY";
 
 const normalizePickupTimeValue = (value: string) => {
-  const [time, modifier] = value.includes(" ")
-    ? value.split(" ")
-    : [value, ""];
+  const [time, modifier] = value.includes(" ") ? value.split(" ") : [value, ""];
   let [hours, minutes] = time.split(":").map(Number);
 
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
@@ -95,15 +125,17 @@ const normalizePickupTimeValue = (value: string) => {
 };
 
 const isMeaningfulCartText = (value: unknown) =>
-  typeof value === "string" && value.trim() !== "" && value.trim() !== "Untitled Item";
+  typeof value === "string" &&
+  value.trim() !== "" &&
+  value.trim() !== "Untitled Item";
 
 const hasVariationDetails = (value: unknown) => {
   const variation = asRecord(value);
 
   return Boolean(
     isMeaningfulCartText(variation.displayText) ||
-      isMeaningfulCartText(variation.name) ||
-      variation.id
+    isMeaningfulCartText(variation.name) ||
+    variation.id,
   );
 };
 
@@ -112,7 +144,7 @@ const hasModifierDetails = (value: unknown) => {
 
   return Boolean(
     isMeaningfulCartText(modifier.name) &&
-      String(modifier.name).trim() !== "Add-on"
+    String(modifier.name).trim() !== "Add-on",
   );
 };
 
@@ -121,7 +153,7 @@ const hasDisplayableModifierDetails = (items: CartItem["selectedModifiers"]) =>
 
 const getMergedCartMenuItem = (
   currentItem: CartItem,
-  incomingItem: CartItem
+  incomingItem: CartItem,
 ) => {
   const incomingMenuItem = asRecord(incomingItem.menuItem);
   const currentMenuItem = asRecord(currentItem.menuItem);
@@ -152,41 +184,52 @@ const getMergedCartMenuItem = (
 
 const mergeCartItemsWithExistingDetails = (
   currentItems: CartItem[],
-  incomingItems: CartItem[]
+  incomingItems: CartItem[],
 ) => {
   if (!currentItems.length || !incomingItems.length) return incomingItems;
 
   const currentById = new Map(
     currentItems
       .filter((item) => item.id !== undefined && item.id !== null)
-      .map((item) => [String(item.id), item])
+      .map((item) => [String(item.id), item]),
   );
 
   return incomingItems.map((incomingItem) => {
-    const currentItem = incomingItem.id !== undefined && incomingItem.id !== null
-      ? currentById.get(String(incomingItem.id))
-      : undefined;
+    const currentItem =
+      incomingItem.id !== undefined && incomingItem.id !== null
+        ? currentById.get(String(incomingItem.id))
+        : undefined;
 
     if (!currentItem) return incomingItem;
 
     const hasIncomingModifiers =
       incomingItem.selectedModifiers.length > 0 &&
-      (
-        !currentItem.selectedModifiers.length ||
-        hasDisplayableModifierDetails(incomingItem.selectedModifiers)
-      );
+      (!currentItem.selectedModifiers.length ||
+        hasDisplayableModifierDetails(incomingItem.selectedModifiers));
     const hasIncomingSections = incomingItem.selectedSections.length > 0;
-    const hasIncomingIncludedItems = Boolean(incomingItem.includedItems?.length);
+    const hasIncomingIncludedItems = Boolean(
+      incomingItem.includedItems?.length,
+    );
     const mergedMenuItem = getMergedCartMenuItem(currentItem, incomingItem);
 
     return {
       ...currentItem,
       ...incomingItem,
-      name: isMeaningfulCartText(incomingItem.name) ? incomingItem.name : currentItem.name,
-      desc: isMeaningfulCartText(incomingItem.desc) ? incomingItem.desc : currentItem.desc,
-      img: isMeaningfulCartText(incomingItem.img) ? incomingItem.img : currentItem.img,
-      slug: isMeaningfulCartText(incomingItem.slug) ? incomingItem.slug : currentItem.slug,
-      selectedVariationName: isMeaningfulCartText(incomingItem.selectedVariationName)
+      name: isMeaningfulCartText(incomingItem.name)
+        ? incomingItem.name
+        : currentItem.name,
+      desc: isMeaningfulCartText(incomingItem.desc)
+        ? incomingItem.desc
+        : currentItem.desc,
+      img: isMeaningfulCartText(incomingItem.img)
+        ? incomingItem.img
+        : currentItem.img,
+      slug: isMeaningfulCartText(incomingItem.slug)
+        ? incomingItem.slug
+        : currentItem.slug,
+      selectedVariationName: isMeaningfulCartText(
+        incomingItem.selectedVariationName,
+      )
         ? incomingItem.selectedVariationName
         : currentItem.selectedVariationName,
       selectedVariation: hasVariationDetails(incomingItem.selectedVariation)
@@ -199,9 +242,15 @@ const mergeCartItemsWithExistingDetails = (
       selectedSections: hasIncomingSections
         ? incomingItem.selectedSections
         : currentItem.selectedSections,
-      sections: hasIncomingSections ? incomingItem.sections : currentItem.sections,
-      includedItems: hasIncomingIncludedItems ? incomingItem.includedItems : currentItem.includedItems,
-      menuItem: Object.keys(mergedMenuItem).length ? mergedMenuItem : incomingItem.menuItem,
+      sections: hasIncomingSections
+        ? incomingItem.sections
+        : currentItem.sections,
+      includedItems: hasIncomingIncludedItems
+        ? incomingItem.includedItems
+        : currentItem.includedItems,
+      menuItem: Object.keys(mergedMenuItem).length
+        ? mergedMenuItem
+        : incomingItem.menuItem,
     };
   });
 };
@@ -209,18 +258,25 @@ const mergeCartItemsWithExistingDetails = (
 const isGuestUser = (user: ReturnType<typeof useAuthContext>["user"]) =>
   user?.isGuest === true || String(user?.role || "").toUpperCase() === "GUEST";
 
-const getCheckoutRestaurantId = (user: ReturnType<typeof useAuthContext>["user"]) =>
-  user?.restaurantId || user?.branch?.restaurantId || user?.tenantId || "";
+const getCheckoutRestaurantId = (
+  user: ReturnType<typeof useAuthContext>["user"],
+) => user?.restaurantId || user?.branch?.restaurantId || user?.tenantId || "";
 
-const normalizeGuestPrivacyPolicy = (value: unknown, restaurantId: string): GuestPrivacyPolicy => {
+const normalizeGuestPrivacyPolicy = (
+  value: unknown,
+  restaurantId: string,
+): GuestPrivacyPolicy => {
   const record = asRecord(value);
-  const title = typeof record.title === "string" && record.title.trim()
-    ? record.title.trim()
-    : "Privacy Policy";
-  const content = typeof record.content === "string" ? record.content.trim() : "";
-  const policyLink = typeof record.policyLink === "string" && record.policyLink.trim()
-    ? record.policyLink.trim()
-    : `/api/v1/public-content/privacy-policy?restaurantId=${encodeURIComponent(restaurantId)}`;
+  const title =
+    typeof record.title === "string" && record.title.trim()
+      ? record.title.trim()
+      : "Privacy Policy";
+  const content =
+    typeof record.content === "string" ? record.content.trim() : "";
+  const policyLink =
+    typeof record.policyLink === "string" && record.policyLink.trim()
+      ? record.policyLink.trim()
+      : `/api/v1/public-content/privacy-policy?restaurantId=${encodeURIComponent(restaurantId)}`;
 
   return {
     title,
@@ -260,12 +316,14 @@ const getGuestDeliveryAddressPayload = (address: CheckoutAddressValues) => {
 const hasGuestDeliveryAddress = (address: CheckoutAddressValues) => {
   const trimmed = trimAddress(address);
 
-  return Boolean(trimmed.street && trimmed.postalCode && trimmed.city && trimmed.country);
+  return Boolean(
+    trimmed.street && trimmed.postalCode && trimmed.city && trimmed.country,
+  );
 };
 
 const getGuestContactPayload = (
   customer: { name: string; phone: string; email: string },
-  privacyPolicyAccepted: boolean
+  privacyPolicyAccepted: boolean,
 ) => {
   return {
     email: customer.email.trim(),
@@ -274,12 +332,20 @@ const getGuestContactPayload = (
   };
 };
 
-const hasGuestContact = (customer: { name: string; phone: string; email: string }) => {
+const hasGuestContact = (customer: {
+  name: string;
+  phone: string;
+  email: string;
+}) => {
   return Boolean(customer.email.trim() && customer.phone.trim());
 };
 
 const getCartPreparationMinutes = (items: CartItem[]) =>
-  items.reduce((total, item) => total + Math.max(0, Math.floor(toNumber(item.prepTimeMinutes, 0))), 0);
+  items.reduce(
+    (total, item) =>
+      total + Math.max(0, Math.floor(toNumber(item.prepTimeMinutes, 0))),
+    0,
+  );
 
 const getCheckoutQuoteSignature = ({
   activeTab,
@@ -315,9 +381,11 @@ function CheckoutPageContent() {
     useState<CheckoutTypePreference | null>(null);
   const [hasLoadedCheckoutTypePreference, setHasLoadedCheckoutTypePreference] =
     useState(false);
-  const userCheckoutType = getSelectedOrderType(user) === "TAKEAWAY" ? "pickup" : "delivery";
+  const userCheckoutType =
+    getSelectedOrderType(user) === "TAKEAWAY" ? "pickup" : "delivery";
   const preferredCheckoutType = storedCheckoutType ?? userCheckoutType;
-  const activeTab = type === "pickup" || type === "delivery" ? type : preferredCheckoutType;
+  const activeTab =
+    type === "pickup" || type === "delivery" ? type : preferredCheckoutType;
   const isGuest = isGuestUser(user);
   const restaurantId = getCheckoutRestaurantId(user);
 
@@ -336,22 +404,27 @@ function CheckoutPageContent() {
     checkoutCustomerCart,
     removeCoupon: removeCheckoutCoupon,
   } = useCheckout(token);
-  const { updateCustomerCart, updateCustomerCartOrderType, quoteCustomerCart } = useCart(token);
+  const { updateCustomerCart, updateCustomerCartOrderType, quoteCustomerCart } =
+    useCart(token);
   const { fetchLoyalty } = useLoyalty(token);
   const checkoutBranchId = user?.branchId || user?.branch?.id || null;
   const homeQuery = useHome(
     restaurantId,
     checkoutBranchId,
-    Boolean(restaurantId && checkoutBranchId)
+    Boolean(restaurantId && checkoutBranchId),
   );
   const homeBranch = useMemo(
     () => normalizeBranch(homeQuery.data?.data.branch),
-    [homeQuery.data?.data.branch]
+    [homeQuery.data?.data.branch],
   );
   const homeBranchWithLandingPopup = useMemo(() => {
     const landingPopup = homeQuery.data?.data.landingPopup;
 
-    if (!homeBranch || landingPopup?.type !== "TEMPORARY_CLOSURE" || !landingPopup.temporaryClosure) {
+    if (
+      !homeBranch ||
+      landingPopup?.type !== "TEMPORARY_CLOSURE" ||
+      !landingPopup.temporaryClosure
+    ) {
       return homeBranch;
     }
 
@@ -369,17 +442,20 @@ function CheckoutPageContent() {
       },
     };
   }, [homeBranch, homeQuery.data?.data.landingPopup]);
-  const currency = resolveCustomerCurrency({
-    configCurrency: homeQuery.data?.data.config?.currency,
-    restaurant: homeQuery.data?.data.restaurant,
-  });
-
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartQuote, setCartQuote] = useState<ApiRecord | null>(null);
+  const cartQuotePricing = asRecord(cartQuote?.pricing);
+  const currency = resolveCustomerCurrency({
+    configCurrency:
+      getRecordString(cartQuote, "currency") ||
+      getRecordString(cartQuotePricing, "currency") ||
+      homeQuery.data?.data.config?.currency,
+    restaurant: homeQuery.data?.data.restaurant,
+  });
   const [appliedTipAmount, setAppliedTipAmount] = useState(0);
   const [loadingCart, setLoadingCart] = useState(true);
   const [backendError, setBackendError] = useState<BackendErrorState | null>(
-    null
+    null,
   );
   const [loyalty, setLoyalty] = useState<LoyaltySummary | null>(null);
   const [loyaltyPoints, setLoyaltyPoints] = useState("");
@@ -388,13 +464,17 @@ function CheckoutPageContent() {
   const lastQuoteSignatureRef = useRef("");
   const totalPreparationMinutes = useMemo(
     () => getCartPreparationMinutes(cartItems),
-    [cartItems]
+    [cartItems],
   );
 
   const router = useRouter();
   const customerId = user?.id;
 
-  const reportBackendError = (context: string, res: unknown, fallback: string) => {
+  const reportBackendError = (
+    context: string,
+    res: unknown,
+    fallback: string,
+  ) => {
     const meta = getBackendErrorMeta(res);
     const message = getBackendErrorMessage(res, fallback);
 
@@ -402,7 +482,8 @@ function CheckoutPageContent() {
       context,
       message,
       code: getBackendErrorCode(res),
-      timestamp: typeof meta?.timestamp === "string" ? meta.timestamp : undefined,
+      timestamp:
+        typeof meta?.timestamp === "string" ? meta.timestamp : undefined,
     });
 
     toast.error(message);
@@ -430,7 +511,7 @@ function CheckoutPageContent() {
     if (items.length) {
       const nextItems = items.map((item) => normalizeCartItem(item));
       setCartItems((currentItems) =>
-        mergeCartItemsWithExistingDetails(currentItems, nextItems)
+        mergeCartItemsWithExistingDetails(currentItems, nextItems),
       );
     }
 
@@ -440,12 +521,12 @@ function CheckoutPageContent() {
 
     setCartQuote(quote);
     setAppliedTipAmount((previousTipAmount) =>
-      Math.max(0, toNumber(quote.tipAmount, previousTipAmount))
+      Math.max(0, toNumber(quote.tipAmount, previousTipAmount)),
     );
     setCouponCode(
       typeof quote.couponCode === "string" && quote.couponCode.trim()
         ? quote.couponCode.trim()
-        : ""
+        : "",
     );
     setCouponDiscount(Math.max(0, toNumber(quote.discountAmount, 0)));
 
@@ -463,7 +544,13 @@ function CheckoutPageContent() {
     });
   };
 
-  const [stripePayment, setStripePayment] = useState<{ open: boolean; clientSecret: string; publishableKey: string; paymentId: string; orderId: string | number }>({
+  const [stripePayment, setStripePayment] = useState<{
+    open: boolean;
+    clientSecret: string;
+    publishableKey: string;
+    paymentId: string;
+    orderId: string | number;
+  }>({
     open: false,
     clientSecret: "",
     publishableKey: "",
@@ -513,7 +600,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.failedFetchCart"),
           res,
-          t("toast.failedFetchCart")
+          t("toast.failedFetchCart"),
         );
         return;
       }
@@ -526,18 +613,18 @@ function CheckoutPageContent() {
       setCouponCode(
         typeof quote?.couponCode === "string" && quote.couponCode.trim()
           ? quote.couponCode.trim()
-          : ""
+          : "",
       );
       setCouponDiscount(Math.max(0, toNumber(quote?.discountAmount, 0)));
       setAppliedTipAmount((previousTipAmount) =>
-        quote ? Math.max(0, toNumber(quote.tipAmount, 0)) : previousTipAmount
+        quote ? Math.max(0, toNumber(quote.tipAmount, 0)) : previousTipAmount,
       );
       clearBackendError();
     } catch (err) {
       reportBackendError(
         t("toast.failedFetchCart"),
         err,
-        err instanceof Error ? err.message : t("toast.failedFetchCart")
+        err instanceof Error ? err.message : t("toast.failedFetchCart"),
       );
     } finally {
       if (!silent) {
@@ -616,13 +703,23 @@ function CheckoutPageContent() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [pickupDate, setPickupDate] = useState<Date | null>(null);
   const [pickupTime, setPickupTime] = useState<string | null>(null);
-  const [checkoutBranch, setCheckoutBranch] = useState<BranchRecord | null>(null);
+  const [checkoutBranch, setCheckoutBranch] = useState<BranchRecord | null>(
+    null,
+  );
   const [scheduledDeliveryValue, setScheduledDeliveryValue] = useState("");
-  const [deliveryScheduleMode, setDeliveryScheduleMode] = useState<"now" | "schedule">("now");
-  const [pickupScheduleMode, setPickupScheduleMode] = useState<"now" | "schedule">("now");
+  const [deliveryScheduleMode, setDeliveryScheduleMode] = useState<
+    "now" | "schedule"
+  >("now");
+  const [pickupScheduleMode, setPickupScheduleMode] = useState<
+    "now" | "schedule"
+  >("now");
   const checkoutPaymentMethod = paymentMethod;
-  const deliveryAllowed = !checkoutBranch?.settings?.allowedOrderTypes?.length || branchSupportsDelivery(checkoutBranch);
-  const pickupAllowed = !checkoutBranch?.settings?.allowedOrderTypes?.length || branchSupportsPickup(checkoutBranch);
+  const deliveryAllowed =
+    !checkoutBranch?.settings?.allowedOrderTypes?.length ||
+    branchSupportsDelivery(checkoutBranch);
+  const pickupAllowed =
+    !checkoutBranch?.settings?.allowedOrderTypes?.length ||
+    branchSupportsPickup(checkoutBranch);
 
   useEffect(() => {
     if (!user) return;
@@ -653,22 +750,26 @@ function CheckoutPageContent() {
         setPrivacyPolicyLoading(true);
 
         const res = await get(
-          `/v1/public-content/privacy-policy?restaurantId=${encodeURIComponent(restaurantId)}`
+          `/v1/public-content/privacy-policy?restaurantId=${encodeURIComponent(restaurantId)}`,
         );
 
         if (!isMounted) return;
 
         if (hasBackendError(res)) {
           setGuestPrivacyPolicy(
-            normalizeGuestPrivacyPolicy(undefined, restaurantId)
+            normalizeGuestPrivacyPolicy(undefined, restaurantId),
           );
           return;
         }
 
-        setGuestPrivacyPolicy(normalizeGuestPrivacyPolicy(res?.data, restaurantId));
+        setGuestPrivacyPolicy(
+          normalizeGuestPrivacyPolicy(res?.data, restaurantId),
+        );
       } catch (error) {
         if (!isMounted) return;
-        setGuestPrivacyPolicy(normalizeGuestPrivacyPolicy(undefined, restaurantId));
+        setGuestPrivacyPolicy(
+          normalizeGuestPrivacyPolicy(undefined, restaurantId),
+        );
       } finally {
         if (isMounted) {
           setPrivacyPolicyLoading(false);
@@ -710,7 +811,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.quoteFailed"),
           orderTypeRes,
-          t("toast.quoteFailed")
+          t("toast.quoteFailed"),
         );
         return;
       }
@@ -719,8 +820,13 @@ function CheckoutPageContent() {
 
       const payload: Record<string, unknown> = {};
 
-      if (activeTab === "delivery" && isGuest && hasGuestDeliveryAddress(guestDeliveryAddress)) {
-        payload.guestDeliveryAddress = getGuestDeliveryAddressPayload(guestDeliveryAddress);
+      if (
+        activeTab === "delivery" &&
+        isGuest &&
+        hasGuestDeliveryAddress(guestDeliveryAddress)
+      ) {
+        payload.guestDeliveryAddress =
+          getGuestDeliveryAddressPayload(guestDeliveryAddress);
       }
 
       if (activeTab === "delivery" && !isGuest && selectedAddress) {
@@ -746,7 +852,16 @@ function CheckoutPageContent() {
     }, 450);
 
     return () => window.clearTimeout(quoteTimer);
-  }, [activeTab, customerId, guestDeliveryAddress, isGuest, loadingCart, quoteCustomerCart, selectedAddress, updateCustomerCartOrderType]);
+  }, [
+    activeTab,
+    customerId,
+    guestDeliveryAddress,
+    isGuest,
+    loadingCart,
+    quoteCustomerCart,
+    selectedAddress,
+    updateCustomerCartOrderType,
+  ]);
 
   useEffect(() => {
     if (!checkoutBranchId) {
@@ -794,15 +909,17 @@ function CheckoutPageContent() {
         if (String(item.id) !== id) return item;
 
         return recalculateCartItemQuantity(item, newQty);
-      })
+      }),
     );
 
     try {
       const isDealRow = String(currentItem.type || "").toUpperCase() === "DEAL";
-      const dealId = typeof currentItem.dealId === "string" ? currentItem.dealId : "";
-      const endpoint = isDealRow && dealId
-        ? `/v1/cart/deals/${dealId}?customerId=${customerId}`
-        : `/v1/cart/items/${id}?customerId=${customerId}`;
+      const dealId =
+        typeof currentItem.dealId === "string" ? currentItem.dealId : "";
+      const endpoint =
+        isDealRow && dealId
+          ? `/v1/cart/deals/${dealId}?customerId=${customerId}`
+          : `/v1/cart/items/${id}?customerId=${customerId}`;
       const res = await patch(endpoint, {
         quantity: newQty,
       });
@@ -812,13 +929,16 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.failedUpdateQuantity"),
           res,
-          t("toast.failedUpdateQuantity")
+          t("toast.failedUpdateQuantity"),
         );
         return;
       }
 
       dispatchCartChanged({
-        itemCount: Math.max(0, getCartItemCount(previousCartItems) - currentQty + newQty),
+        itemCount: Math.max(
+          0,
+          getCartItemCount(previousCartItems) - currentQty + newQty,
+        ),
       });
 
       if (!syncCartFromResponse(res)) {
@@ -829,7 +949,7 @@ function CheckoutPageContent() {
       reportBackendError(
         t("toast.failedUpdateQuantity"),
         err,
-        err instanceof Error ? err.message : t("toast.failedUpdateQuantity")
+        err instanceof Error ? err.message : t("toast.failedUpdateQuantity"),
       );
     }
   };
@@ -838,14 +958,16 @@ function CheckoutPageContent() {
     const previousCartItems = cartItems;
     const currentItem = cartItems.find((item) => String(item.id) === id);
     const isDealRow = String(currentItem?.type || "").toUpperCase() === "DEAL";
-    const dealId = typeof currentItem?.dealId === "string" ? currentItem.dealId : "";
+    const dealId =
+      typeof currentItem?.dealId === "string" ? currentItem.dealId : "";
 
     try {
       setCartItems((prev) => prev.filter((item) => String(item.id) !== id));
 
-      const endpoint = isDealRow && dealId
-        ? `/v1/cart/deals/${dealId}?customerId=${customerId}`
-        : `/v1/cart/items/${id}?customerId=${customerId}`;
+      const endpoint =
+        isDealRow && dealId
+          ? `/v1/cart/deals/${dealId}?customerId=${customerId}`
+          : `/v1/cart/items/${id}?customerId=${customerId}`;
       const res = await del(endpoint);
 
       if (hasBackendError(res)) {
@@ -853,7 +975,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.failedRemoveItem"),
           res,
-          t("toast.failedRemoveItem")
+          t("toast.failedRemoveItem"),
         );
         return;
       }
@@ -861,7 +983,8 @@ function CheckoutPageContent() {
       dispatchCartChanged({
         itemCount: Math.max(
           0,
-          getCartItemCount(previousCartItems) - Math.max(1, toNumber(currentItem?.quantity, 1))
+          getCartItemCount(previousCartItems) -
+            Math.max(1, toNumber(currentItem?.quantity, 1)),
         ),
       });
       await fetchCart();
@@ -871,7 +994,7 @@ function CheckoutPageContent() {
       reportBackendError(
         t("toast.failedRemoveItem"),
         err,
-        err instanceof Error ? err.message : t("toast.failedRemoveItem")
+        err instanceof Error ? err.message : t("toast.failedRemoveItem"),
       );
     }
   };
@@ -901,7 +1024,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.failedClearCart"),
           res,
-          t("toast.failedClearCart")
+          t("toast.failedClearCart"),
         );
         return false;
       }
@@ -918,7 +1041,7 @@ function CheckoutPageContent() {
       reportBackendError(
         t("toast.failedClearCart"),
         err,
-        err instanceof Error ? err.message : t("toast.failedClearCart")
+        err instanceof Error ? err.message : t("toast.failedClearCart"),
       );
       return false;
     }
@@ -937,7 +1060,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.failedSetAddress"),
           res,
-          t("toast.failedSetAddress")
+          t("toast.failedSetAddress"),
         );
         return false;
       }
@@ -948,7 +1071,7 @@ function CheckoutPageContent() {
       reportBackendError(
         t("toast.failedSetAddress"),
         err,
-        err instanceof Error ? err.message : t("toast.failedSetAddress")
+        err instanceof Error ? err.message : t("toast.failedSetAddress"),
       );
       return false;
     }
@@ -1078,7 +1201,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.failedSetSchedule"),
           res,
-          t("toast.failedSetSchedule")
+          t("toast.failedSetSchedule"),
         );
         return false;
       }
@@ -1089,7 +1212,7 @@ function CheckoutPageContent() {
       reportBackendError(
         t("toast.failedSetSchedule"),
         err,
-        err instanceof Error ? err.message : t("toast.failedSetSchedule")
+        err instanceof Error ? err.message : t("toast.failedSetSchedule"),
       );
       return false;
     }
@@ -1116,7 +1239,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.failedSetTip"),
           res,
-          t("toast.failedSetTip")
+          t("toast.failedSetTip"),
         );
         return;
       }
@@ -1126,13 +1249,13 @@ function CheckoutPageContent() {
       applyTipToCurrentQuote(normalizedTip);
       clearBackendError();
       toast.success(
-        normalizedTip > 0 ? t("toast.tipApplied") : t("toast.tipRemoved")
+        normalizedTip > 0 ? t("toast.tipApplied") : t("toast.tipRemoved"),
       );
     } catch (err) {
       reportBackendError(
         t("toast.failedSetTip"),
         err,
-        err instanceof Error ? err.message : t("toast.failedSetTip")
+        err instanceof Error ? err.message : t("toast.failedSetTip"),
       );
     } finally {
       setApplyingTip(false);
@@ -1173,7 +1296,11 @@ function CheckoutPageContent() {
         return;
       }
 
-      if (activeTab === "delivery" && isGuest && !hasGuestDeliveryAddress(guestDeliveryAddress)) {
+      if (
+        activeTab === "delivery" &&
+        isGuest &&
+        !hasGuestDeliveryAddress(guestDeliveryAddress)
+      ) {
         toast.error(t("toast.enterGuestDeliveryAddress"));
         return;
       }
@@ -1189,12 +1316,13 @@ function CheckoutPageContent() {
         toast.error(
           activeTab === "delivery"
             ? t("toast.invalidScheduledDelivery")
-            : t("toast.invalidOrderTime")
+            : t("toast.invalidOrderTime"),
         );
         return;
       }
 
-      const cartOrderTime = scheduledDeliveryAt === undefined ? null : scheduledDeliveryAt;
+      const cartOrderTime =
+        scheduledDeliveryAt === undefined ? null : scheduledDeliveryAt;
       const scheduleUpdated = await setCartSchedule(cartOrderTime);
       if (!scheduleUpdated) return;
 
@@ -1203,9 +1331,12 @@ function CheckoutPageContent() {
 
       const checkoutTipAmount = Math.max(
         0,
-        toNumber(cartQuote?.tipAmount, appliedTipAmount)
+        toNumber(cartQuote?.tipAmount, appliedTipAmount),
       );
-      const checkoutLoyaltyPoints = Math.max(0, Math.floor(toNumber(loyaltyPoints, 0)));
+      const checkoutLoyaltyPoints = Math.max(
+        0,
+        Math.floor(toNumber(loyaltyPoints, 0)),
+      );
 
       if (checkoutLoyaltyPoints > 0) {
         if (!loyalty) {
@@ -1214,7 +1345,11 @@ function CheckoutPageContent() {
         }
 
         if (checkoutLoyaltyPoints < loyalty.minimumRedeemPoints) {
-          toast.error(t("toast.minimumLoyaltyPoints", { points: loyalty.minimumRedeemPoints }));
+          toast.error(
+            t("toast.minimumLoyaltyPoints", {
+              points: loyalty.minimumRedeemPoints,
+            }),
+          );
           return;
         }
 
@@ -1229,12 +1364,22 @@ function CheckoutPageContent() {
         payload: {
           ...(cartOrderTime !== undefined ? { orderTime: cartOrderTime } : {}),
           ...(checkoutTipAmount > 0 ? { tipAmount: checkoutTipAmount } : {}),
-          ...(checkoutLoyaltyPoints > 0 ? { loyaltyPoints: checkoutLoyaltyPoints } : {}),
+          ...(checkoutLoyaltyPoints > 0
+            ? { loyaltyPoints: checkoutLoyaltyPoints }
+            : {}),
           ...(isGuest
-            ? { guestContact: getGuestContactPayload(customer, privacyPolicyAccepted) }
+            ? {
+                guestContact: getGuestContactPayload(
+                  customer,
+                  privacyPolicyAccepted,
+                ),
+              }
             : {}),
           ...(isGuest && activeTab === "delivery"
-            ? { guestDeliveryAddress: getGuestDeliveryAddressPayload(guestDeliveryAddress) }
+            ? {
+                guestDeliveryAddress:
+                  getGuestDeliveryAddressPayload(guestDeliveryAddress),
+              }
             : {}),
           paymentMethod: checkoutPaymentMethod,
           customerNote: note,
@@ -1245,19 +1390,22 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.checkoutFailed"),
           res,
-          t("toast.checkoutFailed")
+          t("toast.checkoutFailed"),
         );
         return;
       }
 
       const orderData = asRecord(res?.data);
-      const orderId = typeof orderData.id === "string" || typeof orderData.id === "number" ? orderData.id : "";
+      const orderId =
+        typeof orderData.id === "string" || typeof orderData.id === "number"
+          ? orderData.id
+          : "";
 
       if (!orderId) {
         reportBackendError(
           t("toast.invalidOrderResponse"),
           res,
-          t("toast.invalidOrderResponse")
+          t("toast.invalidOrderResponse"),
         );
         return;
       }
@@ -1265,17 +1413,20 @@ function CheckoutPageContent() {
       clearBackendError();
 
       if (checkoutPaymentMethod === "STRIPE") {
-        const attemptRes = await post(`/v1/payments/orders/${orderId}/attempts`, {
-          paymentMethod: "STRIPE",
-          currency,
-          note: "Order payment",
-        });
+        const attemptRes = await post(
+          `/v1/payments/orders/${orderId}/attempts`,
+          {
+            paymentMethod: "STRIPE",
+            currency,
+            note: "Order payment",
+          },
+        );
 
         if (hasBackendError(attemptRes) || !attemptRes?.success) {
           reportBackendError(
             t("toast.failedInitiatePayment"),
             attemptRes,
-            t("toast.failedInitiatePayment")
+            t("toast.failedInitiatePayment"),
           );
           return;
         }
@@ -1300,7 +1451,10 @@ function CheckoutPageContent() {
           open: true,
           clientSecret,
           publishableKey,
-          paymentId: typeof payment.id === "string" ? payment.id : String(payment.id ?? ""),
+          paymentId:
+            typeof payment.id === "string"
+              ? payment.id
+              : String(payment.id ?? ""),
           orderId,
         });
 
@@ -1316,7 +1470,7 @@ function CheckoutPageContent() {
       reportBackendError(
         t("toast.orderFailed"),
         err,
-        err instanceof Error ? err.message : t("toast.orderFailed")
+        err instanceof Error ? err.message : t("toast.orderFailed"),
       );
     } finally {
       setPlacingOrder(false);
@@ -1346,7 +1500,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.invalidCoupon"),
           res,
-          t("toast.invalidCoupon")
+          t("toast.invalidCoupon"),
         );
         return;
       }
@@ -1362,7 +1516,7 @@ function CheckoutPageContent() {
       reportBackendError(
         t("toast.couponValidationFailed"),
         err,
-        err instanceof Error ? err.message : t("toast.couponValidationFailed")
+        err instanceof Error ? err.message : t("toast.couponValidationFailed"),
       );
     } finally {
       setValidatingCoupon(false);
@@ -1384,7 +1538,7 @@ function CheckoutPageContent() {
         reportBackendError(
           t("toast.couponRemoveFailed"),
           res,
-          t("toast.couponRemoveFailed")
+          t("toast.couponRemoveFailed"),
         );
         return;
       }
@@ -1403,7 +1557,7 @@ function CheckoutPageContent() {
       reportBackendError(
         t("toast.couponRemoveFailed"),
         err,
-        err instanceof Error ? err.message : t("toast.couponRemoveFailed")
+        err instanceof Error ? err.message : t("toast.couponRemoveFailed"),
       );
     } finally {
       setRemovingCoupon(false);
@@ -1514,7 +1668,9 @@ function CheckoutPageContent() {
               <X className="h-4 w-4" />
             </button>
 
-            <h2 className="mb-2 pr-10 text-lg font-semibold">{t("completePayment")}</h2>
+            <h2 className="mb-2 pr-10 text-lg font-semibold">
+              {t("completePayment")}
+            </h2>
             <p className="mb-5 text-sm leading-6 text-gray-500">
               {t("paymentPendingDescription")}
             </p>
@@ -1542,11 +1698,7 @@ function CheckoutPageContent() {
   );
 }
 
-const OrderStripeCheckout = ({
-  onSuccess,
-}: {
-  onSuccess: () => void;
-}) => {
+const OrderStripeCheckout = ({ onSuccess }: { onSuccess: () => void }) => {
   const t = useTranslations("checkout");
   const stripe = useStripe();
   const elements = useElements();
