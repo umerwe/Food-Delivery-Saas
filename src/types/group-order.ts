@@ -63,6 +63,8 @@ export type GroupOrderSelectedOption = {
 
 export type GroupOrderItem = {
   id: string | number;
+  menuItemId?: string | number | null;
+  variationId?: string | number | null;
   quantity: number;
   unitPrice?: number | string | null;
   price?: number | string | null;

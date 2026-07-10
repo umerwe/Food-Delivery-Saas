@@ -63,8 +63,21 @@ const formatLabel = (value?: string | number | null) =>
 const getItemName = (item: GroupOrderSuccessItem) =>
   item.menuItemName || item.name || item.menuItem?.name || "";
 
-const getItemImageUrl = (item: GroupOrderSuccessItem) =>
-  item.imageUrl || item.thumbnailUrl || item.menuItem?.imageUrl || null;
+const buildImageLookupKey = (menuItemId?: unknown, variationId?: unknown) =>
+  [menuItemId ?? "", variationId ?? ""].map(String).join("::");
+
+const getItemImageUrl = (
+  item: GroupOrderSuccessItem,
+  participantImageByItem: Map<string, string>,
+) =>
+  item.imageUrl ||
+  item.thumbnailUrl ||
+  item.menuItem?.imageUrl ||
+  participantImageByItem.get(
+    buildImageLookupKey(item.menuItemId, item.variationId),
+  ) ||
+  participantImageByItem.get(buildImageLookupKey(item.menuItemId, "")) ||
+  null;
 
 const getItemLineTotal = (item: GroupOrderSuccessItem) =>
   item.lineTotal ??
@@ -178,6 +191,31 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
   const coupon = order?.coupon;
   const couponLabel = [coupon?.title, coupon?.code].filter(Boolean).join(" · ");
   const participants = session?.participants || [];
+  const participantImageByItem = new Map<string, string>();
+
+  participants.forEach((participant) => {
+    participant.items?.forEach((participantItem) => {
+      const imageUrl = participantItem.menuItem?.imageUrl;
+
+      if (!imageUrl) return;
+
+      participantImageByItem.set(
+        buildImageLookupKey(
+          participantItem.menuItemId || participantItem.menuItem?.id,
+          participantItem.variationId,
+        ),
+        imageUrl,
+      );
+      participantImageByItem.set(
+        buildImageLookupKey(
+          participantItem.menuItemId || participantItem.menuItem?.id,
+          "",
+        ),
+        imageUrl,
+      );
+    });
+  });
+
   const items = order?.items || [];
 
   return (
@@ -295,7 +333,10 @@ const OrderSuccess = ({ data }: OrderSuccessProps) => {
                             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gray-200">
                               <Image
                                 src={
-                                  getItemImageUrl(item) || "/items/table.png"
+                                  getItemImageUrl(
+                                    item,
+                                    participantImageByItem,
+                                  ) || "/items/table.png"
                                 }
                                 alt={getItemName(item) || t("itemFallback")}
                                 fill
