@@ -40,8 +40,7 @@ export default function InviteFriends() {
         return;
       }
 
-      const latestOrder =
-        orders.find((o) => o.status === "OPEN") || orders[0];
+      const latestOrder = orders.find((o) => o.status === "OPEN") || orders[0];
 
       setOrder(latestOrder);
     } catch {
@@ -62,7 +61,10 @@ export default function InviteFriends() {
   };
 
   const handleCopy = async () => {
-    const link = buildGroupOrderInviteLink({ origin: window.location.origin, inviteCode: order?.inviteCode });
+    const link = buildGroupOrderInviteLink({
+      origin: window.location.origin,
+      inviteCode: order?.inviteCode,
+    });
     await navigator.clipboard.writeText(link);
     toast.success(t("linkCopied"));
   };
@@ -70,7 +72,10 @@ export default function InviteFriends() {
   const Skeleton = () => (
     <div className="animate-pulse space-y-4 mt-4">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center gap-4 bg-gray-100 p-4 rounded-xl">
+        <div
+          key={i}
+          className="flex items-center gap-4 bg-gray-100 p-4 rounded-xl"
+        >
           <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
           <div className="flex-1 space-y-2">
             <div className="h-3 bg-gray-300 rounded w-1/3"></div>
@@ -98,17 +103,13 @@ export default function InviteFriends() {
 
   return (
     <section className="w-full bg-[#f4f4f4] py-20 px-6 flex flex-col gap-20 items-center">
-
       <div className="w-full max-w-2xl relative bg-white rounded-2xl shadow-[0_12px_32px_rgba(26,28,28,0.06)] p-8 md:p-12 overflow-hidden">
-
         {/* HEADER */}
         <div className="text-center">
           <h2 className="text-2xl md:text-3xl font-semibold text-gray-900">
             {t("title")}
           </h2>
-          <p className="text-gray-500 mt-3 text-sm">
-            {t("description")}
-          </p>
+          <p className="text-gray-500 mt-3 text-sm">{t("description")}</p>
         </div>
 
         {/* ICON */}
@@ -130,7 +131,10 @@ export default function InviteFriends() {
 
           <div className="flex items-center bg-gray-100 rounded-full px-4 py-2 gap-3">
             <span className="text-gray-700 text-sm flex-1 truncate">
-              {buildGroupOrderInviteLink({ origin: window.location.origin, inviteCode: order.inviteCode })}
+              {buildGroupOrderInviteLink({
+                origin: window.location.origin,
+                inviteCode: order.inviteCode,
+              })}
             </span>
 
             <button
@@ -182,14 +186,16 @@ export default function InviteFriends() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="relative w-12 h-12 rounded-full overflow-hidden bg-gray-200">
-                      {p.user?.avatarUrl && (
-                        <Image
-                          src={p.user.avatarUrl}
-                          alt=""
-                          fill
-                          className="object-cover"
-                        />
-                      )}
+                      <Image
+                        src={
+                          p.user?.avatarUrl?.startsWith("http")
+                            ? p.user.avatarUrl
+                            : "/profile-user.png"
+                        }
+                        alt={`${p.user?.firstName || ""} ${p.user?.lastName || ""}`.trim()}
+                        fill
+                        className="object-cover"
+                      />
                     </div>
 
                     <div>
@@ -212,7 +218,9 @@ export default function InviteFriends() {
                   </div>
 
                   <div className="text-xs text-green-600">
-                    {p.status === "ACTIVE" ? t("activeStatus") : t("pendingStatus")}
+                    {p.status === "ACTIVE"
+                      ? t("activeStatus")
+                      : t("pendingStatus")}
                   </div>
                 </div>
               ))}
@@ -223,9 +231,7 @@ export default function InviteFriends() {
         {/* CTA */}
         <div className="mt-10 text-center">
           <button
-            onClick={() =>
-              router.push(`/items?code=${order.inviteCode}`)
-            }
+            onClick={() => router.push(`/items?code=${order.inviteCode}`)}
             className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full font-semibold shadow-md"
           >
             {t("goToMenu")}
