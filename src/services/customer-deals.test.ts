@@ -84,6 +84,8 @@ describe("getCustomerDeals", () => {
                 itemLimit: 2,
                 variationId: "large",
                 variation: { id: "large", name: "Large" },
+                eligibleMenuItemIds: ["item-1", 42, ""],
+                excludedMenuItemIds: ["item-2"],
               },
             ],
           },
@@ -104,6 +106,8 @@ describe("getCustomerDeals", () => {
       itemLimit: 2,
       variationId: "large",
       variation: { id: "large", name: "Large", displayText: null },
+      eligibleMenuItemIds: ["item-1", "42"],
+      excludedMenuItemIds: ["item-2"],
     });
   });
 

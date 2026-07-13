@@ -1,14 +1,8 @@
 export type CustomerDealDiscountType =
-  | "FIXED_PRICE"
-  | "PERCENTAGE"
-  | "FLAT"
-  | string;
+  "FIXED_PRICE" | "PERCENTAGE" | "FLAT" | string;
 
 export type CustomerDealApplyMode =
-  | "SCOPED_ITEMS"
-  | "SCOPED_CATEGORIES"
-  | "ALL_ITEMS"
-  | string;
+  "SCOPED_ITEMS" | "SCOPED_CATEGORIES" | "ALL_ITEMS" | string;
 
 export type CustomerDealSelectionMode = "FIXED_ITEMS" | "FLEXIBLE_ITEMS";
 
@@ -62,6 +56,8 @@ export type CustomerDealCategoryRule = {
     name?: string;
     displayText?: string | null;
   } | null;
+  eligibleMenuItemIds?: string[];
+  excludedMenuItemIds?: string[];
 };
 
 export type CustomerDealRestaurant = {
@@ -111,7 +107,8 @@ export type CustomerDealsResponse = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const getString = (value: unknown) => (typeof value === "string" ? value : undefined);
+const getString = (value: unknown) =>
+  typeof value === "string" ? value : undefined;
 
 const getNullableString = (value: unknown) => getString(value) ?? null;
 
@@ -132,7 +129,7 @@ const getNullableNumber = (value: unknown) => {
 const normalizeSelectionMode = (
   value: unknown,
   scopeCategories: CustomerDealCategory[],
-  dealRequiredQuantity: number | null
+  dealRequiredQuantity: number | null,
 ): CustomerDealSelectionMode => {
   if (value === "FIXED_ITEMS" || value === "FLEXIBLE_ITEMS") {
     return value;
@@ -157,7 +154,9 @@ const getStringOrNumber = (value: unknown) => {
   return null;
 };
 
-const normalizeMenuItemCategory = (value: unknown): CustomerDealMenuItemCategory | null => {
+const normalizeMenuItemCategory = (
+  value: unknown,
+): CustomerDealMenuItemCategory | null => {
   if (!isRecord(value)) {
     return null;
   }
@@ -169,7 +168,9 @@ const normalizeMenuItemCategory = (value: unknown): CustomerDealMenuItemCategory
   };
 };
 
-const normalizeUnknownArray = (value: unknown): CustomerDealMenuItemOption[] | undefined => {
+const normalizeUnknownArray = (
+  value: unknown,
+): CustomerDealMenuItemOption[] | undefined => {
   if (!Array.isArray(value)) {
     return undefined;
   }
@@ -177,7 +178,8 @@ const normalizeUnknownArray = (value: unknown): CustomerDealMenuItemOption[] | u
   return value.filter(isRecord);
 };
 
-const getBoolean = (value: unknown) => (typeof value === "boolean" ? value : undefined);
+const getBoolean = (value: unknown) =>
+  typeof value === "boolean" ? value : undefined;
 
 const normalizeMenuItems = (value: unknown): CustomerDealMenuItem[] => {
   if (!Array.isArray(value)) {
@@ -199,7 +201,10 @@ const normalizeMenuItems = (value: unknown): CustomerDealMenuItem[] => {
       modifierGroups: normalizeUnknownArray(item.modifierGroups) ?? [],
       modifiers: normalizeUnknownArray(item.modifiers) ?? [],
       modifierLinks: normalizeUnknownArray(item.modifierLinks) ?? [],
-      supportsSplitPizza: typeof item.supportsSplitPizza === "boolean" ? item.supportsSplitPizza : null,
+      supportsSplitPizza:
+        typeof item.supportsSplitPizza === "boolean"
+          ? item.supportsSplitPizza
+          : null,
       minSelect: getStringOrNumber(item.minSelect),
       maxSelect: getStringOrNumber(item.maxSelect),
       isRequired: typeof item.isRequired === "boolean" ? item.isRequired : null,
@@ -230,6 +235,24 @@ const normalizeCategories = (value: unknown): CustomerDealCategory[] => {
     .filter((category) => category.id);
 };
 
+const normalizeStringArray = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) =>
+          typeof item === "string" || typeof item === "number"
+            ? String(item).trim()
+            : "",
+        )
+        .filter(Boolean),
+    ),
+  );
+};
+
 const normalizeCategoryRules = (value: unknown): CustomerDealCategoryRule[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -239,6 +262,13 @@ const normalizeCategoryRules = (value: unknown): CustomerDealCategoryRule[] => {
     .filter(isRecord)
     .map((rule) => {
       const variation = isRecord(rule.variation) ? rule.variation : null;
+
+      const eligibleMenuItemIds = normalizeStringArray(
+        rule.eligibleMenuItemIds,
+      );
+      const excludedMenuItemIds = normalizeStringArray(
+        rule.excludedMenuItemIds,
+      );
 
       return {
         menuCategoryId: getString(rule.menuCategoryId) ?? "",
@@ -251,6 +281,8 @@ const normalizeCategoryRules = (value: unknown): CustomerDealCategoryRule[] => {
               displayText: getNullableString(variation.displayText),
             }
           : null,
+        ...(eligibleMenuItemIds ? { eligibleMenuItemIds } : {}),
+        ...(excludedMenuItemIds ? { excludedMenuItemIds } : {}),
       };
     })
     .filter((rule) => rule.menuCategoryId && rule.itemLimit > 0);
@@ -261,10 +293,15 @@ const normalizeCategoryIds = (value: unknown): string[] => {
     return [];
   }
 
-  return value.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+  return value.filter(
+    (id): id is string => typeof id === "string" && id.trim().length > 0,
+  );
 };
 
-const normalizeDealCategories = (categories: unknown, categoryIds: string[]) => {
+const normalizeDealCategories = (
+  categories: unknown,
+  categoryIds: string[],
+) => {
   const normalizedCategories = normalizeCategories(categories);
 
   if (normalizedCategories.length > 0) {
@@ -313,11 +350,14 @@ export const normalizeCustomerDeal = (input: unknown): CustomerDeal | null => {
 
   const dealRequiredQuantity = getNullableNumber(input.dealRequiredQuantity);
   const scopeCategoryIds = normalizeCategoryIds(input.scopeCategoryIds);
-  const scopeCategories = normalizeDealCategories(input.scopeCategories, scopeCategoryIds);
+  const scopeCategories = normalizeDealCategories(
+    input.scopeCategories,
+    scopeCategoryIds,
+  );
   const dealSelectionMode = normalizeSelectionMode(
     input.dealSelectionMode,
     scopeCategories,
-    dealRequiredQuantity
+    dealRequiredQuantity,
   );
 
   if (
@@ -327,7 +367,7 @@ export const normalizeCustomerDeal = (input: unknown): CustomerDeal | null => {
     input.dealSelectionMode === undefined
   ) {
     console.warn(
-      "Deal is using legacy response shape; flexible UI requires dealSelectionMode/dealRequiredQuantity from backend."
+      "Deal is using legacy response shape; flexible UI requires dealSelectionMode/dealRequiredQuantity from backend.",
     );
   }
 
@@ -357,7 +397,9 @@ const findDealsArray = (response: unknown): unknown[] => {
   const candidates = [
     response,
     isRecord(response) ? response.data : undefined,
-    isRecord(response) && isRecord(response.data) ? response.data.data : undefined,
+    isRecord(response) && isRecord(response.data)
+      ? response.data.data
+      : undefined,
   ];
 
   for (const candidate of candidates) {
@@ -395,7 +437,9 @@ const findMessage = (response: unknown) => {
   return undefined;
 };
 
-export const normalizeCustomerDealsResponse = (response: unknown): CustomerDealsResponse => ({
+export const normalizeCustomerDealsResponse = (
+  response: unknown,
+): CustomerDealsResponse => ({
   deals: findDealsArray(response)
     .map(normalizeCustomerDeal)
     .filter((deal): deal is CustomerDeal => deal !== null),

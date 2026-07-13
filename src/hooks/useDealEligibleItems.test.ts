@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canSubmitDealSelection,
+  filterDealItemsForForcedCategoryVariations,
   getDealRequiredSelectionCount,
   mergeUniqueDealEligibleItems,
   toDealEligibleMenuItem,
@@ -65,6 +66,78 @@ describe("deal eligible item helpers", () => {
       minQuantity: null,
       isRequired: false,
     });
+  });
+
+  it("filters category deal items to backend eligible ids for forced variations", () => {
+    const deal: CustomerDeal = {
+      ...baseDeal,
+      scopeCategories: [{ id: "pizza-category", name: "Pizza" }],
+      scopeCategoryRules: [
+        {
+          menuCategoryId: "pizza-category",
+          itemLimit: 1,
+          variationId: "large",
+          eligibleMenuItemIds: ["margherita"],
+          excludedMenuItemIds: ["pepperoni"],
+        },
+      ],
+    };
+
+    expect(
+      filterDealItemsForForcedCategoryVariations(deal, [
+        { id: "margherita", name: "Margherita", category: { id: "pizza-category" } },
+        { id: "pepperoni", name: "Pepperoni", category: { id: "pizza-category" } },
+        { id: "cola", name: "Cola", category: { id: "drink-category" } },
+      ])
+    ).toEqual([
+      { id: "margherita", name: "Margherita", category: { id: "pizza-category" } },
+      { id: "cola", name: "Cola", category: { id: "drink-category" } },
+    ]);
+  });
+
+  it("does not filter category deal items when no forced variation is selected", () => {
+    const deal: CustomerDeal = {
+      ...baseDeal,
+      scopeCategories: [{ id: "pizza-category", name: "Pizza" }],
+      scopeCategoryRules: [
+        {
+          menuCategoryId: "pizza-category",
+          itemLimit: 1,
+          eligibleMenuItemIds: ["margherita"],
+          excludedMenuItemIds: ["pepperoni"],
+        },
+      ],
+    };
+    const items = [
+      { id: "margherita", name: "Margherita", category: { id: "pizza-category" } },
+      { id: "pepperoni", name: "Pepperoni", category: { id: "pizza-category" } },
+    ];
+
+    expect(filterDealItemsForForcedCategoryVariations(deal, items)).toBe(items);
+  });
+
+  it("hides backend excluded ids for forced variations when eligible ids are absent", () => {
+    const deal: CustomerDeal = {
+      ...baseDeal,
+      scopeCategories: [{ id: "pizza-category", name: "Pizza" }],
+      scopeCategoryRules: [
+        {
+          menuCategoryId: "pizza-category",
+          itemLimit: 1,
+          variationId: "large",
+          excludedMenuItemIds: ["pepperoni"],
+        },
+      ],
+    };
+
+    expect(
+      filterDealItemsForForcedCategoryVariations(deal, [
+        { id: "margherita", name: "Margherita", category: { id: "pizza-category" } },
+        { id: "pepperoni", name: "Pepperoni", category: { id: "pizza-category" } },
+      ])
+    ).toEqual([
+      { id: "margherita", name: "Margherita", category: { id: "pizza-category" } },
+    ]);
   });
 
   it("requires selected count to meet deal required quantity", () => {

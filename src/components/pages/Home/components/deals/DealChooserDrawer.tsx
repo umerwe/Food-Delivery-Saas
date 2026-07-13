@@ -46,7 +46,10 @@ import {
 } from "@/hooks/useDealEligibleItems";
 import { useAddDealToCart } from "@/hooks/useCart";
 import { useDealScopedItemsDetails } from "@/hooks/useDealScopedItemsDetails";
-import type { CustomerDeal, CustomerDealMenuItem } from "@/types/customer-deals";
+import type {
+  CustomerDeal,
+  CustomerDealMenuItem,
+} from "@/types/customer-deals";
 
 type DealChooserDrawerProps = {
   deal: CustomerDeal | null;
@@ -56,14 +59,18 @@ type DealChooserDrawerProps = {
   currency?: string | null;
 };
 
-const getMenuItemInitial = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
+const getMenuItemInitial = (name: string) =>
+  name.trim().charAt(0).toUpperCase() || "?";
 
 const formatModifierSelectionPrice = (
   unitPrice: number,
   quantity: number,
-  currency?: string | null
+  currency?: string | null,
 ) => {
-  const safeQuantity = Math.max(1, Math.floor(getDealChooserNumber(quantity, 1)));
+  const safeQuantity = Math.max(
+    1,
+    Math.floor(getDealChooserNumber(quantity, 1)),
+  );
   const sign = unitPrice < 0 ? "-" : "+";
   const formattedUnitPrice = formatDealPrice(Math.abs(unitPrice), currency);
 
@@ -73,14 +80,14 @@ const formatModifierSelectionPrice = (
 
   return `${sign}${formattedUnitPrice} * ${safeQuantity} = ${sign}${formatDealPrice(
     Math.abs(unitPrice) * safeQuantity,
-    currency
+    currency,
   )}`;
 };
 
 const getRequirementText = (
   deal: CustomerDeal | null,
   requiredQuantity: number,
-  t: ReturnType<typeof useTranslations>
+  t: ReturnType<typeof useTranslations>,
 ) => {
   if (!deal) {
     return "";
@@ -109,15 +116,21 @@ export function DealChooserDrawer({
   const { items, isLoading, error } = useDealEligibleItems({ deal, open });
   const [selectedMenuItemIds, setSelectedMenuItemIds] = useState<string[]>([]);
   const [expandedItemIds, setExpandedItemIds] = useState<string[]>([]);
-  const [configurationsByItemId, setConfigurationsByItemId] = useState<Record<string, DealChooserItemConfiguration>>({});
-  const [itemErrorsById, setItemErrorsById] = useState<Record<string, string>>({});
-  const [groupErrorsByItemId, setGroupErrorsByItemId] = useState<Record<string, Record<string, string>>>({});
+  const [configurationsByItemId, setConfigurationsByItemId] = useState<
+    Record<string, DealChooserItemConfiguration>
+  >({});
+  const [itemErrorsById, setItemErrorsById] = useState<Record<string, string>>(
+    {},
+  );
+  const [groupErrorsByItemId, setGroupErrorsByItemId] = useState<
+    Record<string, Record<string, string>>
+  >({});
 
   const requiredQuantity = getDealRequiredSelectionCount(deal);
   const selectedCount = selectedMenuItemIds.length;
   const itemIds = useMemo(
     () => items.map((item) => item.id.trim()).filter(Boolean),
-    [items]
+    [items],
   );
   const itemDetailsQuery = useDealScopedItemsDetails({
     itemIds,
@@ -130,33 +143,44 @@ export function DealChooserDrawer({
       items.map((item) => {
         const detail = itemDetailsQuery.detailsById[item.id.trim()];
 
-        return detail ? { ...item, ...detail, id: item.id, name: detail.name || item.name } : item;
+        return detail
+          ? { ...item, ...detail, id: item.id, name: detail.name || item.name }
+          : item;
       }),
-    [itemDetailsQuery.detailsById, items]
+    [itemDetailsQuery.detailsById, items],
   );
   const detailedItemsById = useMemo(
     () => new Map(detailedItems.map((item) => [item.id, item])),
-    [detailedItems]
+    [detailedItems],
   );
   const selectedItems = useMemo(
     () => detailedItems.filter((item) => selectedMenuItemIds.includes(item.id)),
-    [detailedItems, selectedMenuItemIds]
+    [detailedItems, selectedMenuItemIds],
   );
   const selectedModifiersTotal = useMemo(() => {
     return selectedItems.reduce((total, item) => {
-      return total + getDealChooserSelectedModifiersTotal({
-        item,
-        configuration: configurationsByItemId[item.id],
-      });
+      return (
+        total +
+        getDealChooserSelectedModifiersTotal({
+          item,
+          configuration: configurationsByItemId[item.id],
+        })
+      );
     }, 0);
   }, [configurationsByItemId, selectedItems]);
   const displayedDealTotal = Math.max(
     0,
-    getDealChooserNumber(deal?.discountValue, 0) + selectedModifiersTotal
+    getDealChooserNumber(deal?.discountValue, 0) + selectedModifiersTotal,
   );
   const categoryNamesById = useMemo(
-    () => new Map((deal?.scopeCategories ?? []).map((category) => [category.id, category.name])),
-    [deal?.scopeCategories]
+    () =>
+      new Map(
+        (deal?.scopeCategories ?? []).map((category) => [
+          category.id,
+          category.name,
+        ]),
+      ),
+    [deal?.scopeCategories],
   );
   const selectedCountByCategoryId = useMemo(() => {
     const counts = new Map<string, number>();
@@ -173,12 +197,14 @@ export function DealChooserDrawer({
   }, [selectedItems]);
   const itemSections = useMemo(() => {
     if (!deal?.scopeCategoryRules?.length) {
-      return [{
-        id: "all",
-        title: "",
-        helper: "",
-        items: detailedItems,
-      }];
+      return [
+        {
+          id: "all",
+          title: "",
+          helper: "",
+          items: detailedItems,
+        },
+      ];
     }
 
     return (deal.scopeCategoryRules ?? []).map((rule) => ({
@@ -188,7 +214,9 @@ export function DealChooserDrawer({
         selected: selectedCountByCategoryId.get(rule.menuCategoryId) ?? 0,
         count: rule.itemLimit,
       }),
-      items: detailedItems.filter((item) => item.category?.id === rule.menuCategoryId),
+      items: detailedItems.filter(
+        (item) => item.category?.id === rule.menuCategoryId,
+      ),
     }));
   }, [categoryNamesById, deal, detailedItems, selectedCountByCategoryId, t]);
   const canAddSelectedItems = canSubmitDealSelection({
@@ -206,10 +234,39 @@ export function DealChooserDrawer({
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const visibleItemIds = new Set(itemIds);
+    const keepVisibleIds = (current: string[]) => {
+      const next = current.filter((id) => visibleItemIds.has(id));
+      return next.length === current.length ? current : next;
+    };
+    const keepVisibleRecord = <T,>(current: Record<string, T>) => {
+      const nextEntries = Object.entries(current).filter(([id]) =>
+        visibleItemIds.has(id),
+      );
+
+      if (nextEntries.length === Object.keys(current).length) {
+        return current;
+      }
+
+      return Object.fromEntries(nextEntries) as Record<string, T>;
+    };
+
+    setSelectedMenuItemIds(keepVisibleIds);
+    setExpandedItemIds(keepVisibleIds);
+    setConfigurationsByItemId(keepVisibleRecord);
+    setItemErrorsById(keepVisibleRecord);
+    setGroupErrorsByItemId(keepVisibleRecord);
+  }, [itemIds, open]);
+
   const updateItemConfiguration = useCallback(
     (
       menuItemId: string,
-      updater: (configuration: DealChooserItemConfiguration) => DealChooserItemConfiguration
+      updater: (
+        configuration: DealChooserItemConfiguration,
+      ) => DealChooserItemConfiguration,
     ) => {
       setConfigurationsByItemId((current) => {
         const existing = current[menuItemId] || {
@@ -228,7 +285,7 @@ export function DealChooserDrawer({
         return next;
       });
     },
-    []
+    [],
   );
 
   const clearItemConfiguration = useCallback((menuItemId: string) => {
@@ -252,15 +309,23 @@ export function DealChooserDrawer({
   const toggleSelectedItem = useCallback(
     (menuItemId: string, checked: boolean) => {
       if (!checked) {
-        setSelectedMenuItemIds((current) => current.filter((id) => id !== menuItemId));
-        setExpandedItemIds((current) => current.filter((id) => id !== menuItemId));
+        setSelectedMenuItemIds((current) =>
+          current.filter((id) => id !== menuItemId),
+        );
+        setExpandedItemIds((current) =>
+          current.filter((id) => id !== menuItemId),
+        );
         clearItemConfiguration(menuItemId);
         return;
       }
 
       const selectedItem = detailedItemsById.get(menuItemId);
-      const shouldExpand = selectedItem ? isDealChooserItemConfigurable(selectedItem) : true;
-      const categoryRule = selectedItem ? getDealCategoryRuleForItem(deal, selectedItem) : null;
+      const shouldExpand = selectedItem
+        ? isDealChooserItemConfigurable(selectedItem)
+        : true;
+      const categoryRule = selectedItem
+        ? getDealCategoryRuleForItem(deal, selectedItem)
+        : null;
 
       setSelectedMenuItemIds((current) => {
         if (current.includes(menuItemId)) return current;
@@ -273,10 +338,14 @@ export function DealChooserDrawer({
           }).length;
 
           if (selectedInCategory >= categoryRule.itemLimit) {
-            toast.error(t("maxCategoryItems", {
-              category: categoryNamesById.get(categoryRule.menuCategoryId) || t("category"),
-              count: categoryRule.itemLimit,
-            }));
+            toast.error(
+              t("maxCategoryItems", {
+                category:
+                  categoryNamesById.get(categoryRule.menuCategoryId) ||
+                  t("category"),
+                count: categoryRule.itemLimit,
+              }),
+            );
             return current;
           }
         }
@@ -296,7 +365,7 @@ export function DealChooserDrawer({
 
       if (shouldExpand) {
         setExpandedItemIds((current) =>
-          current.includes(menuItemId) ? current : [...current, menuItemId]
+          current.includes(menuItemId) ? current : [...current, menuItemId],
         );
       }
       updateItemConfiguration(menuItemId, (configuration) => configuration);
@@ -309,14 +378,14 @@ export function DealChooserDrawer({
       requiredQuantity,
       t,
       updateItemConfiguration,
-    ]
+    ],
   );
 
   const toggleExpandedItem = useCallback((menuItemId: string) => {
     setExpandedItemIds((current) =>
       current.includes(menuItemId)
         ? current.filter((id) => id !== menuItemId)
-        : [...current, menuItemId]
+        : [...current, menuItemId],
     );
   }, []);
 
@@ -325,7 +394,7 @@ export function DealChooserDrawer({
       menuItemId: string,
       group: DealChooserModifierGroup,
       modifier: DealChooserModifier,
-      checked: boolean
+      checked: boolean,
     ) => {
       const groupId = getDealChooserId(group.id);
       const modifierId = getDealChooserId(modifier.id);
@@ -333,16 +402,26 @@ export function DealChooserDrawer({
       if (!groupId || !modifierId) return;
 
       updateItemConfiguration(menuItemId, (configuration) => {
-        const selectedModifiersByGroup = getSelectedModifiersByGroup([group], configuration);
+        const selectedModifiersByGroup = getSelectedModifiersByGroup(
+          [group],
+          configuration,
+        );
         const selected = selectedModifiersByGroup[groupId] || [];
-        const selectionType = group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
-        const modifiersCount = Array.isArray(group.modifiers) ? group.modifiers.length : 0;
-        const rawMaxSelect = getDealChooserNumber(group.maxSelect, modifiersCount);
-        const maxSelect = selectionType === "SINGLE"
-          ? 1
-          : rawMaxSelect > 0
-            ? rawMaxSelect
-            : modifiersCount;
+        const selectionType =
+          group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+        const modifiersCount = Array.isArray(group.modifiers)
+          ? group.modifiers.length
+          : 0;
+        const rawMaxSelect = getDealChooserNumber(
+          group.maxSelect,
+          modifiersCount,
+        );
+        const maxSelect =
+          selectionType === "SINGLE"
+            ? 1
+            : rawMaxSelect > 0
+              ? rawMaxSelect
+              : modifiersCount;
         const nextModifier = {
           id: modifierId,
           name: getDealChooserModifierName(modifier),
@@ -363,17 +442,20 @@ export function DealChooserDrawer({
         }
 
         const otherSelections = configuration.modifierSelections.filter(
-          (selection) => selection.modifierGroupId !== groupId
+          (selection) => selection.modifierGroupId !== groupId,
         );
-        const nextSelection = nextSelected.length > 0
-          ? [{
-              modifierGroupId: groupId,
-              modifiers: nextSelected.map((entry) => ({
-                modifierId: entry.id,
-                quantity: entry.selectedQuantity,
-              })),
-            }]
-          : [];
+        const nextSelection =
+          nextSelected.length > 0
+            ? [
+                {
+                  modifierGroupId: groupId,
+                  modifiers: nextSelected.map((entry) => ({
+                    modifierId: entry.id,
+                    quantity: entry.selectedQuantity,
+                  })),
+                },
+              ]
+            : [];
 
         return {
           ...configuration,
@@ -390,7 +472,7 @@ export function DealChooserDrawer({
         };
       });
     },
-    [updateItemConfiguration]
+    [updateItemConfiguration],
   );
 
   const updateModifierQuantity = useCallback(
@@ -398,7 +480,7 @@ export function DealChooserDrawer({
       menuItemId: string,
       group: DealChooserModifierGroup,
       modifier: DealChooserModifier,
-      nextQuantity: number
+      nextQuantity: number,
     ) => {
       const groupId = getDealChooserId(group.id);
       const modifierId = getDealChooserId(modifier.id);
@@ -406,7 +488,10 @@ export function DealChooserDrawer({
       if (!groupId || !modifierId || group.selectionType === "SINGLE") return;
 
       updateItemConfiguration(menuItemId, (configuration) => {
-        const selectedModifiersByGroup = getSelectedModifiersByGroup([group], configuration);
+        const selectedModifiersByGroup = getSelectedModifiersByGroup(
+          [group],
+          configuration,
+        );
         const selected = selectedModifiersByGroup[groupId] || [];
         const currentModifier = selected.find(({ id }) => id === modifierId);
 
@@ -414,17 +499,28 @@ export function DealChooserDrawer({
           return configuration;
         }
 
-        const modifiersCount = Array.isArray(group.modifiers) ? group.modifiers.length : 0;
-        const rawMaxSelect = getDealChooserNumber(group.maxSelect, modifiersCount);
+        const modifiersCount = Array.isArray(group.modifiers)
+          ? group.modifiers.length
+          : 0;
+        const rawMaxSelect = getDealChooserNumber(
+          group.maxSelect,
+          modifiersCount,
+        );
         const maxSelect = rawMaxSelect > 0 ? rawMaxSelect : modifiersCount;
         const normalizedNextQuantity = Math.max(
           1,
-          Math.floor(Number.isFinite(nextQuantity) ? nextQuantity : 1)
+          Math.floor(Number.isFinite(nextQuantity) ? nextQuantity : 1),
         );
         const otherSelectedQuantity = selected.reduce((total, entry) => {
           if (entry.id === modifierId) return total;
 
-          return total + Math.max(1, Math.floor(getDealChooserNumber(entry.selectedQuantity, 1)));
+          return (
+            total +
+            Math.max(
+              1,
+              Math.floor(getDealChooserNumber(entry.selectedQuantity, 1)),
+            )
+          );
         }, 0);
         const maxAllowedQuantity =
           maxSelect > 0
@@ -434,12 +530,15 @@ export function DealChooserDrawer({
           entry.id === modifierId
             ? {
                 ...entry,
-                selectedQuantity: Math.min(normalizedNextQuantity, maxAllowedQuantity),
+                selectedQuantity: Math.min(
+                  normalizedNextQuantity,
+                  maxAllowedQuantity,
+                ),
               }
-            : entry
+            : entry,
         );
         const otherSelections = configuration.modifierSelections.filter(
-          (selection) => selection.modifierGroupId !== groupId
+          (selection) => selection.modifierGroupId !== groupId,
         );
 
         return {
@@ -466,7 +565,7 @@ export function DealChooserDrawer({
         };
       });
     },
-    [updateItemConfiguration]
+    [updateItemConfiguration],
   );
 
   const addSelectedItems = useCallback(() => {
@@ -485,16 +584,21 @@ export function DealChooserDrawer({
     }
 
     const ruleCountError = (deal.scopeCategoryRules ?? []).find((rule) => {
-      const selectedInCategory = selectedCountByCategoryId.get(rule.menuCategoryId) ?? 0;
+      const selectedInCategory =
+        selectedCountByCategoryId.get(rule.menuCategoryId) ?? 0;
 
       return selectedInCategory !== rule.itemLimit;
     });
 
     if (ruleCountError) {
-      toast.error(t("categoryRuleRequired", {
-        category: categoryNamesById.get(ruleCountError.menuCategoryId) || t("category"),
-        count: ruleCountError.itemLimit,
-      }));
+      toast.error(
+        t("categoryRuleRequired", {
+          category:
+            categoryNamesById.get(ruleCountError.menuCategoryId) ||
+            t("category"),
+          count: ruleCountError.itemLimit,
+        }),
+      );
       return;
     }
 
@@ -528,7 +632,10 @@ export function DealChooserDrawer({
           nextGroupErrors[menuItemId] = validation.groupErrors;
         }
 
-        if (validation.itemError || Object.keys(validation.groupErrors).length > 0) {
+        if (
+          validation.itemError ||
+          Object.keys(validation.groupErrors).length > 0
+        ) {
           return null;
         }
 
@@ -539,18 +646,23 @@ export function DealChooserDrawer({
           configuration: configurationsByItemId[menuItemId],
         });
       })
-      .filter((payload): payload is NonNullable<typeof payload> => payload !== null);
+      .filter(
+        (payload): payload is NonNullable<typeof payload> => payload !== null,
+      );
 
     setItemErrorsById(nextItemErrors);
     setGroupErrorsByItemId(nextGroupErrors);
 
-    if (Object.keys(nextItemErrors).length > 0 || Object.keys(nextGroupErrors).length > 0) {
+    if (
+      Object.keys(nextItemErrors).length > 0 ||
+      Object.keys(nextGroupErrors).length > 0
+    ) {
       const erroredItemIds = new Set([
         ...Object.keys(nextItemErrors),
         ...Object.keys(nextGroupErrors),
       ]);
       setExpandedItemIds((current) =>
-        Array.from(new Set([...current, ...Array.from(erroredItemIds)]))
+        Array.from(new Set([...current, ...Array.from(erroredItemIds)])),
       );
       return;
     }
@@ -566,7 +678,7 @@ export function DealChooserDrawer({
         onSuccess: () => {
           onOpenChange(false);
         },
-      }
+      },
     );
   }, [
     addDealMutation,
@@ -602,7 +714,10 @@ export function DealChooserDrawer({
         configuration: configurationsByItemId[itemId],
       });
 
-      return !validation.itemError && Object.keys(validation.groupErrors).length === 0;
+      return (
+        !validation.itemError &&
+        Object.keys(validation.groupErrors).length === 0
+      );
     });
 
   const getItemStatus = useCallback(
@@ -628,17 +743,21 @@ export function DealChooserDrawer({
         configuration: configurationsByItemId[item.id],
       });
 
-      return validation.itemError || Object.keys(validation.groupErrors).length > 0
+      return validation.itemError ||
+        Object.keys(validation.groupErrors).length > 0
         ? t("statusNeedsChoices")
         : t("statusComplete");
     },
-    [configurationsByItemId, deal, itemErrorsById, t]
+    [configurationsByItemId, deal, itemErrorsById, t],
   );
 
   const renderItemConfiguration = (item: CustomerDealMenuItem) => {
     const groups = getDealChooserModifierGroups(item);
     const configuration = configurationsByItemId[item.id];
-    const selectedModifiersByGroup = getSelectedModifiersByGroup(groups, configuration);
+    const selectedModifiersByGroup = getSelectedModifiersByGroup(
+      groups,
+      configuration,
+    );
     const itemError = itemErrorsById[item.id];
     const groupErrors = groupErrorsByItemId[item.id] || {};
 
@@ -649,7 +768,9 @@ export function DealChooserDrawer({
     return (
       <div className="border-t border-gray-100 bg-gray-50/60 px-3 pb-3 pt-3">
         {itemDetailsQuery.isLoading ? (
-          <p className="text-xs font-medium text-gray-500">{t("loadingItemOptions")}</p>
+          <p className="text-xs font-medium text-gray-500">
+            {t("loadingItemOptions")}
+          </p>
         ) : null}
 
         {itemError ? (
@@ -660,17 +781,26 @@ export function DealChooserDrawer({
 
         {groups.map((group) => {
           const groupId = getDealChooserId(group.id);
-          const groupModifiers = Array.isArray(group.modifiers) ? group.modifiers : [];
-          const selectedGroupModifiers = selectedModifiersByGroup[groupId] || [];
-          const selectedGroupQuantity =
-            getModifierGroupSelectedQuantity(selectedGroupModifiers);
-          const selectionType = group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
-          const maxSelect = selectionType === "SINGLE"
-            ? 1
-            : getDealChooserNumber(group.maxSelect, groupModifiers.length);
+          const groupModifiers = Array.isArray(group.modifiers)
+            ? group.modifiers
+            : [];
+          const selectedGroupModifiers =
+            selectedModifiersByGroup[groupId] || [];
+          const selectedGroupQuantity = getModifierGroupSelectedQuantity(
+            selectedGroupModifiers,
+          );
+          const selectionType =
+            group.selectionType === "SINGLE" ? "SINGLE" : "MULTIPLE";
+          const maxSelect =
+            selectionType === "SINGLE"
+              ? 1
+              : getDealChooserNumber(group.maxSelect, groupModifiers.length);
 
           return (
-            <div key={groupId} className="mb-3 rounded-2xl border border-gray-100 bg-white p-3 last:mb-0">
+            <div
+              key={groupId}
+              className="mb-3 rounded-2xl border border-gray-100 bg-white p-3 last:mb-0"
+            >
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
@@ -681,7 +811,9 @@ export function DealChooserDrawer({
                   </p>
                 </div>
                 <span className="text-xs font-medium text-gray-500">
-                  {selectionType === "SINGLE" ? t("chooseOne") : t("chooseMultiple")}
+                  {selectionType === "SINGLE"
+                    ? t("chooseOne")
+                    : t("chooseMultiple")}
                 </span>
               </div>
 
@@ -689,19 +821,28 @@ export function DealChooserDrawer({
                 {groupModifiers.map((modifier) => {
                   const modifierId = getDealChooserId(modifier.id);
                   const selectedModifier = selectedGroupModifiers.find(
-                    ({ id }) => id === modifierId
+                    ({ id }) => id === modifierId,
                   );
                   const checked = Boolean(selectedModifier);
                   const selectedModifierQuantity = Math.max(
                     1,
-                    Math.floor(getDealChooserNumber(selectedModifier?.selectedQuantity, 1))
+                    Math.floor(
+                      getDealChooserNumber(
+                        selectedModifier?.selectedQuantity,
+                        1,
+                      ),
+                    ),
                   );
-                  const modifierPrice = getDealChooserNumber(modifier.priceDelta, 0);
+                  const modifierPrice = getDealChooserNumber(
+                    modifier.priceDelta,
+                    0,
+                  );
                   const maxReached =
                     maxSelect > 0 &&
                     selectedGroupQuantity >= maxSelect &&
                     !checked;
-                  const canShowQuantitySelector = checked && selectionType !== "SINGLE";
+                  const canShowQuantitySelector =
+                    checked && selectionType !== "SINGLE";
 
                   return (
                     <div
@@ -710,8 +851,8 @@ export function DealChooserDrawer({
                         checked
                           ? "border-primary/20 bg-primary/5 ring-1 ring-primary/10"
                           : maxReached
-                          ? "border-gray-100 bg-gray-100 opacity-70"
-                          : "border-gray-100 bg-white"
+                            ? "border-gray-100 bg-gray-100 opacity-70"
+                            : "border-gray-100 bg-white"
                       }`}
                     >
                       <label className="flex items-start justify-between gap-3">
@@ -724,7 +865,7 @@ export function DealChooserDrawer({
                               {formatModifierSelectionPrice(
                                 modifierPrice,
                                 selectedModifierQuantity,
-                                currency
+                                currency,
                               )}
                             </span>
                           ) : null}
@@ -733,7 +874,12 @@ export function DealChooserDrawer({
                             checked={checked}
                             disabled={maxReached}
                             onCheckedChange={(value) =>
-                              toggleModifier(item.id, group, modifier, value === true)
+                              toggleModifier(
+                                item.id,
+                                group,
+                                modifier,
+                                value === true,
+                              )
                             }
                           />
                         </span>
@@ -753,7 +899,7 @@ export function DealChooserDrawer({
                                   item.id,
                                   group,
                                   modifier,
-                                  selectedModifierQuantity - 1
+                                  selectedModifierQuantity - 1,
                                 )
                               }
                               disabled={selectedModifierQuantity <= 1}
@@ -774,10 +920,13 @@ export function DealChooserDrawer({
                                   item.id,
                                   group,
                                   modifier,
-                                  selectedModifierQuantity + 1
+                                  selectedModifierQuantity + 1,
                                 )
                               }
-                              disabled={maxSelect > 0 && selectedGroupQuantity >= maxSelect}
+                              disabled={
+                                maxSelect > 0 &&
+                                selectedGroupQuantity >= maxSelect
+                              }
                               className="flex h-6 w-6 items-center justify-center rounded-full text-gray-700 transition hover:bg-white hover:text-primary disabled:cursor-not-allowed disabled:opacity-35"
                               aria-label={`Increase ${getDealChooserModifierName(modifier)} quantity`}
                             >
@@ -825,7 +974,8 @@ export function DealChooserDrawer({
               {getRequirementText(deal, requiredQuantity, t)}
             </span>
             <span className="ml-auto rounded-full bg-orange-50 px-2.5 py-1 text-orange-700">
-              {Math.min(selectedCount, requiredQuantity)}/{requiredQuantity} {t("selected")}
+              {Math.min(selectedCount, requiredQuantity)}/{requiredQuantity}{" "}
+              {t("selected")}
             </span>
           </div>
         ) : null}
@@ -854,90 +1004,104 @@ export function DealChooserDrawer({
               <div key={section.id} className="space-y-2">
                 {section.title ? (
                   <div className="flex items-center justify-between gap-3 rounded-2xl bg-gray-50 px-3 py-2">
-                    <p className="text-sm font-semibold text-gray-900">{section.title}</p>
-                    <span className="text-xs font-semibold text-primary">{section.helper}</span>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {section.title}
+                    </p>
+                    <span className="text-xs font-semibold text-primary">
+                      {section.helper}
+                    </span>
                   </div>
                 ) : null}
 
                 {section.items.map((item) => {
-              const checked = selectedMenuItemIds.includes(item.id);
-              const categoryName = item.category?.name?.trim();
-              const description = item.description?.trim();
-              const configurable = isDealChooserItemConfigurable(item);
-              const status = getItemStatus(item, checked);
-              const categoryRule = getDealCategoryRuleForItem(deal, item);
-              const categorySelectedCount = categoryRule
-                ? selectedCountByCategoryId.get(categoryRule.menuCategoryId) ?? 0
-                : 0;
-              const disableUnchecked =
-                !checked &&
-                ((selectedCount >= requiredQuantity && requiredQuantity !== 1) ||
-                  Boolean(categoryRule && categorySelectedCount >= categoryRule.itemLimit));
+                  const checked = selectedMenuItemIds.includes(item.id);
+                  const categoryName = item.category?.name?.trim();
+                  const description = item.description?.trim();
+                  const configurable = isDealChooserItemConfigurable(item);
+                  const status = getItemStatus(item, checked);
+                  const categoryRule = getDealCategoryRuleForItem(deal, item);
+                  const categorySelectedCount = categoryRule
+                    ? (selectedCountByCategoryId.get(
+                        categoryRule.menuCategoryId,
+                      ) ?? 0)
+                    : 0;
+                  const disableUnchecked =
+                    !checked &&
+                    ((selectedCount >= requiredQuantity &&
+                      requiredQuantity !== 1) ||
+                      Boolean(
+                        categoryRule &&
+                        categorySelectedCount >= categoryRule.itemLimit,
+                      ));
 
-              return (
-                <div
-                  key={item.id}
-                  className="overflow-hidden rounded-2xl border border-gray-100 transition-colors hover:border-primary/30 hover:bg-primary/5"
-                >
-                  <div className="flex items-start gap-4 p-4">
-                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-primary/10 text-primary">
-                      {item.imageUrl ? (
-                        <Image
-                          src={item.imageUrl}
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                          unoptimized
+                  return (
+                    <div
+                      key={item.id}
+                      className="overflow-hidden rounded-2xl border border-gray-100 transition-colors hover:border-primary/30 hover:bg-primary/5"
+                    >
+                      <div className="flex items-start gap-4 p-4">
+                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-primary/10 text-primary">
+                          {item.imageUrl ? (
+                            <Image
+                              src={item.imageUrl}
+                              alt={item.name}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <span className="flex h-full items-center justify-center text-lg font-bold">
+                              {getMenuItemInitial(item.name)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-[15px] font-semibold leading-5 text-gray-900">
+                            {item.name}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500">
+                            {categoryName ? <span>{categoryName}</span> : null}
+                            {categoryRule ? (
+                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                                {categorySelectedCount}/{categoryRule.itemLimit}
+                              </span>
+                            ) : null}
+                            {status ? (
+                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+                                {status}
+                              </span>
+                            ) : null}
+                          </div>
+                          {description ? (
+                            <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">
+                              {description}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        {configurable || checked ? (
+                          <Button
+                            className="h-9 shrink-0 rounded-full border border-primary/20 bg-white px-3 text-xs text-primary hover:bg-primary/5"
+                            onClick={() => toggleExpandedItem(item.id)}
+                          >
+                            {expandedItemIds.includes(item.id)
+                              ? t("hideOptions")
+                              : t("options")}
+                          </Button>
+                        ) : null}
+                        <Checkbox
+                          className="size-5"
+                          checked={checked}
+                          disabled={disableUnchecked}
+                          onCheckedChange={(value) =>
+                            toggleSelectedItem(item.id, value === true)
+                          }
                         />
-                      ) : (
-                        <span className="flex h-full items-center justify-center text-lg font-bold">
-                          {getMenuItemInitial(item.name)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-[15px] font-semibold leading-5 text-gray-900">
-                        {item.name}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-500">
-                        {categoryName ? <span>{categoryName}</span> : null}
-                        {categoryRule ? (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
-                            {categorySelectedCount}/{categoryRule.itemLimit}
-                          </span>
-                        ) : null}
-                        {status ? (
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
-                            {status}
-                          </span>
-                        ) : null}
                       </div>
-                      {description ? (
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-gray-500">
-                          {description}
-                        </p>
-                      ) : null}
+                      {renderItemConfiguration(item)}
                     </div>
-
-                    {configurable || checked ? (
-                      <Button
-                        className="h-9 shrink-0 rounded-full border border-primary/20 bg-white px-3 text-xs text-primary hover:bg-primary/5"
-                        onClick={() => toggleExpandedItem(item.id)}
-                      >
-                        {expandedItemIds.includes(item.id) ? t("hideOptions") : t("options")}
-                      </Button>
-                    ) : null}
-                    <Checkbox
-                      className="size-5"
-                      checked={checked}
-                      disabled={disableUnchecked}
-                      onCheckedChange={(value) => toggleSelectedItem(item.id, value === true)}
-                    />
-                  </div>
-                  {renderItemConfiguration(item)}
-                </div>
-              );
+                  );
                 })}
               </div>
             ))}
