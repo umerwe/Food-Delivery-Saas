@@ -204,12 +204,26 @@ export const getDealChooserGroupHelperText = (group: DealChooserModifierGroup) =
   return "Optional";
 };
 
+export type DealChooserModifierPriceResolver = ({
+  item,
+  group,
+  modifier,
+  modifierId,
+}: {
+  item: CustomerDealMenuItem;
+  group: DealChooserModifierGroup;
+  modifier: DealChooserModifier | undefined;
+  modifierId: string;
+}) => number;
+
 export const getDealChooserSelectedModifiersTotal = ({
   item,
   configuration,
+  modifierPriceResolver,
 }: {
   item: CustomerDealMenuItem;
   configuration?: DealChooserItemConfiguration;
+  modifierPriceResolver?: DealChooserModifierPriceResolver;
 }) => {
   if (!configuration?.modifierSelections?.length) {
     return 0;
@@ -225,7 +239,9 @@ export const getDealChooserSelectedModifiersTotal = ({
     return total + selection.modifiers.reduce((selectionTotal, selectedModifier) => {
       const modifierId = getDealChooserId(selectedModifier.modifierId);
       const modifier = modifiers.find((entry) => getDealChooserId(entry.id) === modifierId);
-      const unitPrice = getDealChooserNumber(modifier?.priceDelta, 0);
+      const unitPrice = modifierPriceResolver
+        ? modifierPriceResolver({ item, group: group || { modifiers: [] }, modifier, modifierId })
+        : getDealChooserNumber(modifier?.priceDelta, 0);
       const quantity = Math.max(
         1,
         Math.floor(getDealChooserNumber(selectedModifier.quantity, 1))

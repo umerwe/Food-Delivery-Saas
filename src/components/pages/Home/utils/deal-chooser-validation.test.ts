@@ -183,6 +183,45 @@ describe("deal chooser validation", () => {
     ).toBe(4.5);
   });
 
+  it("allows forced-variation modifier prices to drive deal display totals", () => {
+    const item: CustomerDealMenuItem = {
+      ...requiredModifierItem,
+      modifierGroups: [
+        {
+          id: "toppings",
+          name: "Toppings",
+          selectionType: "MULTIPLE",
+          minSelect: 0,
+          maxSelect: 4,
+          modifiers: [
+            { id: "cheese", name: "Cheese", priceDelta: 2 },
+            { id: "sauce", name: "Sauce", priceDelta: "0.5" },
+          ],
+        },
+      ],
+    };
+
+    expect(
+      getDealChooserSelectedModifiersTotal({
+        item,
+        configuration: {
+          menuItemId: "pizza",
+          modifierSelections: [
+            {
+              modifierGroupId: "toppings",
+              modifiers: [
+                { modifierId: "cheese", quantity: 2 },
+                { modifierId: "sauce", quantity: 1 },
+              ],
+            },
+          ],
+        },
+        modifierPriceResolver: ({ modifierId }) =>
+          modifierId === "cheese" ? 3 : 0,
+      })
+    ).toBe(6);
+  });
+
   it("blocks MULTIPLE group selections beyond maxSelect", () => {
     const item: CustomerDealMenuItem = {
       ...requiredModifierItem,

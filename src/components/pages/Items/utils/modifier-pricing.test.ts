@@ -175,6 +175,60 @@ describe("modifier pricing", () => {
     ).toBe(1);
   });
 
+  it("finds forced variation modifier prices attached to category variations", () => {
+    expect(
+      getModifierPriceForVariation({
+        item: {
+          ...baseItem,
+          category: {
+            variations: [
+              {
+                id: "large",
+                name: "Large",
+                modifierPriceOverrides: [
+                  { modifierId: "modifier-1", priceDelta: "1.25" },
+                ],
+              },
+            ],
+          },
+        },
+        selectedVariationId: "large",
+        modifierId: "modifier-1",
+      })
+    ).toBe(1.25);
+  });
+
+  it("finds forced variation modifier prices attached through itemPriceOverrides variation payloads", () => {
+    expect(
+      getModifierPriceForVariation({
+        item: {
+          ...baseItem,
+          category: {
+            variations: [
+              {
+                id: "large",
+                name: "Large",
+                itemPriceOverrides: [
+                  {
+                    variationId: "large",
+                    variation: {
+                      id: "large",
+                      modifierPriceOverrides: [
+                        { modifierId: "modifier-1", priceDelta: "1.5" },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        selectedVariationId: "large",
+        modifierId: "modifier-1",
+      })
+    ).toBe(1.5);
+  });
+
   it("uses active variation price before a generic item-level override", () => {
     expect(
       getModifierPriceForVariation({

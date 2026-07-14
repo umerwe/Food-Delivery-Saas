@@ -21,9 +21,15 @@ type ModifierPriceSource = {
 
 type VariationPriceOverrideSource = ModifierPriceSource & {
   variationId?: string | number | null;
-  variation?: { id?: string | number | null } | null;
+  variation?: VariationPriceOverrideSource | null;
   modifierPriceOverrides?: ModifierPriceSource[];
+  itemPriceOverrides?: VariationPriceOverrideSource[];
+  variationLinks?: VariationLinkSource[];
 };
+
+type VariationLinkSource = {
+  variation?: VariationPriceOverrideSource | null;
+} | null | undefined;
 
 type ModifierGroupSource = {
   id?: string | number | null;
@@ -49,10 +55,13 @@ export type ModifierPricingMenuItem = {
   categoryModifierGroups?: ModifierGroupSource[];
   modifierLinks?: ModifierLinkSource[];
   category?: {
+    variations?: VariationPriceOverrideSource[];
+    variationLinks?: VariationLinkSource[];
     modifierGroups?: ModifierGroupSource[];
     categoryModifierGroups?: ModifierGroupSource[];
     modifierLinks?: ModifierLinkSource[];
   } | null;
+  variations?: VariationPriceOverrideSource[];
 };
 
 const normalizeId = (value: unknown) => String(value ?? "");
@@ -95,6 +104,17 @@ const getPriceDelta = (source: ModifierPriceSource) => {
   return null;
 };
 
+const getAllVariationSources = (item: ModifierPricingMenuItem) => {
+  return [
+    ...normalizeArray<VariationPriceOverrideSource>(item.variationPriceOverrides),
+    ...normalizeArray<VariationPriceOverrideSource>(item.variations),
+    ...normalizeArray<VariationPriceOverrideSource>(item.category?.variations),
+    ...normalizeArray<VariationLinkSource>(item.category?.variationLinks).map(
+      (link) => link?.variation
+    ),
+  ];
+};
+
 const findVariationOverride = (
   item: ModifierPricingMenuItem,
   selectedVariationId?: string | null
@@ -104,10 +124,29 @@ const findVariationOverride = (
   if (!variationId) return null;
 
   return (
-    normalizeArray<VariationPriceOverrideSource>(item.variationPriceOverrides).find(
+    getAllVariationSources(item).find(
       (override) => getVariationId(override) === variationId
     ) ?? null
   );
+};
+
+const getVariationModifierPriceOverrideSources = (
+  variation: VariationPriceOverrideSource | null
+) => {
+  if (!variation) return [];
+
+  return [
+    ...normalizeArray<ModifierPriceSource>(variation.modifierPriceOverrides),
+    ...normalizeArray<ModifierPriceSource>(variation.variation?.modifierPriceOverrides),
+    ...normalizeArray<VariationPriceOverrideSource>(variation.itemPriceOverrides).flatMap(
+      (itemOverride) => [
+        ...normalizeArray<ModifierPriceSource>(itemOverride?.modifierPriceOverrides),
+        ...normalizeArray<ModifierPriceSource>(
+          itemOverride?.variation?.modifierPriceOverrides
+        ),
+      ]
+    ),
+  ];
 };
 
 const findModifierPrice = (
@@ -193,7 +232,7 @@ export const getModifierPriceForVariation = ({
   if (!normalizedModifierId) return 0;
 
   const selectedVariationModifierPrice = findModifierPrice(
-    selectedVariation?.modifierPriceOverrides,
+    getVariationModifierPriceOverrideSources(selectedVariation ?? null),
     normalizedModifierId
   );
 
@@ -203,7 +242,7 @@ export const getModifierPriceForVariation = ({
 
   const variation = findVariationOverride(item, selectedVariationId);
   const variationModifierPrice = findModifierPrice(
-    variation?.modifierPriceOverrides,
+    getVariationModifierPriceOverrideSources(variation),
     normalizedModifierId
   );
 

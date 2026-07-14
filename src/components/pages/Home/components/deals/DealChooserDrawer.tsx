@@ -40,6 +40,10 @@ import {
 import { formatDealPrice } from "@/components/pages/Home/utils/customer-deals-formatters";
 import { getModifierGroupSelectedQuantity } from "@/components/pages/Items/utils/modifier-selections";
 import {
+  getModifierPriceForVariation,
+  type ModifierPricingMenuItem,
+} from "@/components/pages/Items/utils/modifier-pricing";
+import {
   canSubmitDealSelection,
   getDealRequiredSelectionCount,
   useDealEligibleItems,
@@ -51,6 +55,11 @@ import type {
   CustomerDealMenuItem,
 } from "@/types/customer-deals";
 
+type ForcedDealItemVariation = {
+  variationId: string;
+  label: string;
+};
+
 type DealChooserDrawerProps = {
   deal: CustomerDeal | null;
   open: boolean;
@@ -61,6 +70,74 @@ type DealChooserDrawerProps = {
 
 const getMenuItemInitial = (name: string) =>
   name.trim().charAt(0).toUpperCase() || "?";
+
+const getUnknownRecordString = (value: unknown, key: string) => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return "";
+  }
+
+  const entry = (value as Record<string, unknown>)[key];
+
+  return typeof entry === "string" || typeof entry === "number"
+    ? String(entry).trim()
+    : "";
+};
+
+const resolveForcedVariationForDealItem = (
+  deal: CustomerDeal | null,
+  item: CustomerDealMenuItem,
+): ForcedDealItemVariation | null => {
+  const categoryId = item.category?.id?.trim();
+
+  if (!deal || !categoryId) {
+    return null;
+  }
+
+  const categoryRule = (deal.scopeCategoryRules ?? []).find(
+    (rule) => rule.menuCategoryId === categoryId && rule.variationId?.trim(),
+  );
+  const variationId = categoryRule?.variationId?.trim();
+
+  if (!categoryRule || !variationId) {
+    return null;
+  }
+
+  const itemVariation = (item.variations ?? []).find((variation) => {
+    const id = getUnknownRecordString(variation, "id");
+
+    return id === variationId;
+  });
+  const label =
+    categoryRule.variation?.displayText?.trim() ||
+    categoryRule.variation?.name?.trim() ||
+    getUnknownRecordString(itemVariation, "displayText") ||
+    getUnknownRecordString(itemVariation, "name") ||
+    variationId;
+
+  return { variationId, label };
+};
+
+const getDealModifierPrice = ({
+  item,
+  modifierId,
+  fallbackPriceDelta,
+  forcedVariationId,
+}: {
+  item: CustomerDealMenuItem;
+  modifierId: string;
+  fallbackPriceDelta: unknown;
+  forcedVariationId?: string | null;
+}) => {
+  if (!forcedVariationId) {
+    return getDealChooserNumber(fallbackPriceDelta, 0);
+  }
+
+  return getModifierPriceForVariation({
+    item: item as ModifierPricingMenuItem,
+    selectedVariationId: forcedVariationId,
+    modifierId,
+  });
+};
 
 const formatModifierSelectionPrice = (
   unitPrice: number,
@@ -164,10 +241,20 @@ export function DealChooserDrawer({
         getDealChooserSelectedModifiersTotal({
           item,
           configuration: configurationsByItemId[item.id],
+          modifierPriceResolver: ({ modifier, modifierId }) => {
+            const forcedVariation = resolveForcedVariationForDealItem(deal, item);
+
+            return getDealModifierPrice({
+              item,
+              modifierId,
+              fallbackPriceDelta: modifier?.priceDelta,
+              forcedVariationId: forcedVariation?.variationId,
+            });
+          },
         })
       );
     }, 0);
-  }, [configurationsByItemId, selectedItems]);
+  }, [configurationsByItemId, deal, selectedItems]);
   const displayedDealTotal = Math.max(
     0,
     getDealChooserNumber(deal?.discountValue, 0) + selectedModifiersTotal,
@@ -760,6 +847,7 @@ export function DealChooserDrawer({
     );
     const itemError = itemErrorsById[item.id];
     const groupErrors = groupErrorsByItemId[item.id] || {};
+    const forcedVariation = resolveForcedVariationForDealItem(deal, item);
 
     if (!expandedItemIds.includes(item.id)) {
       return null;
@@ -833,10 +921,12 @@ export function DealChooserDrawer({
                       ),
                     ),
                   );
-                  const modifierPrice = getDealChooserNumber(
-                    modifier.priceDelta,
-                    0,
-                  );
+                  const modifierPrice = getDealModifierPrice({
+                    item,
+                    modifierId,
+                    fallbackPriceDelta: modifier.priceDelta,
+                    forcedVariationId: forcedVariation?.variationId,
+                  });
                   const maxReached =
                     maxSelect > 0 &&
                     selectedGroupQuantity >= maxSelect &&
@@ -1020,6 +1110,10 @@ export function DealChooserDrawer({
                   const configurable = isDealChooserItemConfigurable(item);
                   const status = getItemStatus(item, checked);
                   const categoryRule = getDealCategoryRuleForItem(deal, item);
+                  const forcedVariation = resolveForcedVariationForDealItem(
+                    deal,
+                    item,
+                  );
                   const categorySelectedCount = categoryRule
                     ? (selectedCountByCategoryId.get(
                         categoryRule.menuCategoryId,
@@ -1065,6 +1159,11 @@ export function DealChooserDrawer({
                             {categoryRule ? (
                               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
                                 {categorySelectedCount}/{categoryRule.itemLimit}
+                              </span>
+                            ) : null}
+                            {forcedVariation ? (
+                              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
+                                Size: {forcedVariation.label}
                               </span>
                             ) : null}
                             {status ? (
