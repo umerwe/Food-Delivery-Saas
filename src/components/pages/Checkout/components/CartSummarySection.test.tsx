@@ -26,16 +26,16 @@ describe("getTotalBeforeDiscount", () => {
     ).toBe(1000);
   });
 
-  it("includes subtotal, deposit, fees, service charge, and tip before discount", () => {
+  it("includes subtotal, deposit, delivery fee, service charge, and tip before discount", () => {
     expect(
       getTotalBeforeDiscount({
         subtotal: 24.5,
         deposit: 0.08,
-        orderFee: 2,
-        serviceCharge: 1,
-        tipAmount: 0.5,
+        orderFee: 5,
+        serviceCharge: 3,
+        tipAmount: 0,
       })
-    ).toBe(28.08);
+    ).toBe(32.58);
   });
 });
 

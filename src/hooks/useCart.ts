@@ -282,13 +282,18 @@ export const useAddDealToCart = (branchId?: string | null) => {
         }
       }
 
-      const quoteResponse = await refreshCartQuote({ customerId });
+      try {
+        const quoteResponse = await refreshCartQuote({ customerId });
 
-      if (!quoteResponse || quoteResponse.error || quoteResponse.success === false) {
-        throw new Error(getApiErrorMessage(quoteResponse, t("failedRefreshQuote")));
+        if (quoteResponse && !quoteResponse.error && quoteResponse.success !== false) {
+          return quoteResponse;
+        }
+      } catch {
+        // Deal rows were already added successfully. Quote can fail before a
+        // delivery address is selected, so do not show a false add-to-cart error.
       }
 
-      return quoteResponse;
+      return { success: true };
     },
     onSuccess: async () => {
       await Promise.all([

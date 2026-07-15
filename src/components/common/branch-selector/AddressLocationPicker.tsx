@@ -128,6 +128,7 @@ export function AddressLocationPicker({
   const [query, setQuery] = useState(locationLabel ?? "");
   const [predictions, setPredictions] = useState<GooglePlacePrediction[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isGeocodingQuery, setIsGeocodingQuery] = useState(false);
   const [isPredictionPanelOpen, setIsPredictionPanelOpen] = useState(false);
   const [internalMapOpen, setInternalMapOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement | null>(null);
@@ -331,6 +332,52 @@ export function AddressLocationPicker({
     return true;
   };
 
+  const applyGeocodeResult = (
+    nextCoordinates: GoogleLatLngLiteral,
+    label: string,
+    components: GoogleAddressComponent[] | undefined
+  ) => {
+    setPredictions([]);
+    setIsPredictionPanelOpen(false);
+    setQuery(label);
+    setMapOpenState(true);
+    syncMarker(nextCoordinates);
+    onSelectLocation(
+      nextCoordinates,
+      label,
+      parseAddressDetails(components, label)
+    );
+  };
+
+  const handleAddressSearch = () => {
+    if (handleCoordinateSearch()) return;
+    if (!googleMaps || trimmedQuery.length < MIN_QUERY_LENGTH) return;
+
+    setIsGeocodingQuery(true);
+    const geocoder = new googleMaps.maps.Geocoder();
+
+    geocoder.geocode({ address: trimmedQuery }, (results, geocoderStatus) => {
+      setIsGeocodingQuery(false);
+
+      const firstResult = results?.[0];
+      const location = firstResult?.geometry?.location;
+
+      if (geocoderStatus !== googleMaps.maps.GeocoderStatus.OK || !firstResult || !location) {
+        setIsPredictionPanelOpen(false);
+        return;
+      }
+
+      applyGeocodeResult(
+        {
+          lat: location.lat(),
+          lng: location.lng(),
+        },
+        firstResult.formatted_address || trimmedQuery,
+        firstResult.address_components
+      );
+    });
+  };
+
   const handlePredictionSelect = (prediction: GooglePlacePrediction) => {
     if (!googleMaps) return;
 
@@ -386,8 +433,9 @@ export function AddressLocationPicker({
               setIsPredictionPanelOpen(true);
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && handleCoordinateSearch()) {
+              if (event.key === "Enter") {
                 event.preventDefault();
+                handleAddressSearch();
               }
             }}
             onFocus={() => {
@@ -396,9 +444,28 @@ export function AddressLocationPicker({
               }
             }}
             placeholder="Search your address"
-            className="h-[49px] w-full rounded-xl border border-transparent bg-[#F5F5F5] pl-11 pr-4 text-sm text-gray-700 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
+            className="h-[49px] w-full rounded-xl border border-transparent bg-[#F5F5F5] pl-11 pr-12 text-sm text-gray-700 outline-none transition focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10"
             disabled={status === "missing-key" || status === "error"}
           />
+
+          <button
+            type="button"
+            onClick={handleAddressSearch}
+            disabled={
+              isGeocodingQuery ||
+              trimmedQuery.length < MIN_QUERY_LENGTH ||
+              status === "missing-key" ||
+              status === "error"
+            }
+            aria-label="Search address"
+            className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg bg-primary text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/35"
+          >
+            {isGeocodingQuery ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4" />
+            )}
+          </button>
 
           {isPredictionPanelOpen && (isSearching || predictions.length > 0) && (
             <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 max-h-[min(260px,42vh)] overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.14)]">
