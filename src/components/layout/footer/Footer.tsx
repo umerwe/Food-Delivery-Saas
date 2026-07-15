@@ -140,6 +140,18 @@ export const Footer = () => {
   const privacyHref = restaurantId
     ? `/privacy?restaurantId=${encodeURIComponent(restaurantId)}`
     : "/privacy";
+  const impressumParams = new URLSearchParams();
+
+  if (restaurantId) {
+    impressumParams.set("restaurantId", restaurantId);
+  }
+
+  if (branchId) {
+    impressumParams.set("branchId", branchId);
+  }
+
+  const impressumQuery = impressumParams.toString();
+  const impressumHref = impressumQuery ? `/impressum?${impressumQuery}` : "/impressum";
 
   const quickLinks = [
     // { label: "Menu", href: "/menu" },
@@ -152,6 +164,7 @@ export const Footer = () => {
     { label: t("about"), href: "/about" },
     { label: t("terms"), href: "/terms" },
     { label: t("privacyPolicy"), href: privacyHref },
+    { label: t("impressum"), href: impressumHref },
     { label: t("refundPolicy"), href: "/refund" },
   ];
 

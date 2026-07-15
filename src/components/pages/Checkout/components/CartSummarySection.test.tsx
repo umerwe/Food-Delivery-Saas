@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getCartBillTotals,
   getItemPricing,
   getScopedItemDiscountDisplays,
   getServiceChargeAmountFromQuote,
   getTotalBeforeDiscount,
+  isDealCartItem,
   type CartItem,
 } from "./CartSummarySection";
 
@@ -24,14 +26,55 @@ describe("getTotalBeforeDiscount", () => {
     ).toBe(1000);
   });
 
-  it("includes only subtotal, order fee, and tip before discount", () => {
+  it("includes subtotal, deposit, fees, service charge, and tip before discount", () => {
     expect(
       getTotalBeforeDiscount({
-        subtotal: 1000,
-        orderFee: 50,
-        tipAmount: 25,
+        subtotal: 24.5,
+        deposit: 0.08,
+        orderFee: 2,
+        serviceCharge: 1,
+        tipAmount: 0.5,
       })
-    ).toBe(1075);
+    ).toBe(28.08);
+  });
+});
+
+describe("getCartBillTotals", () => {
+  it("uses displayed deal merchandise total separately from deposit when cart rows exist", () => {
+    expect(
+      getCartBillTotals(
+        [
+          {
+            pricing: {
+              lineTotal: 24.58,
+              depositTotal: 0.08,
+            },
+          },
+        ],
+        22.58,
+      ),
+    ).toEqual({
+      itemTotal: 24.5,
+      depositTotal: 0.08,
+      displaySubtotal: 24.5,
+    });
+  });
+
+  it("falls back to quote subtotal when display cart items are unavailable", () => {
+    expect(getCartBillTotals([], 22.58)).toEqual({
+      itemTotal: 0,
+      depositTotal: 0,
+      displaySubtotal: 22.58,
+    });
+  });
+});
+
+describe("isDealCartItem", () => {
+  it("treats backend deal rows and deal-included rows as deal cart items", () => {
+    expect(isDealCartItem({ id: "deal-row", type: "DEAL", name: "Deal", price: 10, quantity: 1 })).toBe(true);
+    expect(isDealCartItem({ id: "included-row", dealId: "deal-1", name: "Included", price: 10, quantity: 1 })).toBe(true);
+    expect(isDealCartItem({ id: "parent-row", name: "Parent", price: 10, quantity: 1, includedItems: [{ name: "Included", quantity: 1, selectedModifiers: [] }] })).toBe(true);
+    expect(isDealCartItem({ id: "item-row", name: "Regular", price: 10, quantity: 1 })).toBe(false);
   });
 });
 

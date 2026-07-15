@@ -297,32 +297,32 @@ describe("cart service", () => {
     expect(patchCartMock.mock.calls[0][1]).not.toHaveProperty("restaurantMenuId");
   });
 
-  it("updates grouped deal quantity with the deal endpoint", async () => {
+  it("updates grouped deal quantity with the encoded rendered row id", async () => {
     patchCartMock.mockResolvedValue({ success: true });
 
     await updateCustomerCartDealQuantity({
       customerId: "customer-1",
-      dealId: "deal-1",
+      dealTargetId: "deal:deal-1:0:1",
       quantity: 2,
     });
 
     expect(patchCartMock).toHaveBeenCalledWith(
-      "/v1/cart/deals/deal-1?customerId=customer-1",
+      "/v1/cart/deals/deal%3Adeal-1%3A0%3A1?customerId=customer-1",
       { quantity: 2 },
       undefined
     );
   });
 
-  it("deletes grouped deals with the deal endpoint", async () => {
+  it("deletes grouped deals with the encoded rendered row id", async () => {
     deleteCartMock.mockResolvedValue({ success: true });
 
     await deleteCustomerCartDeal({
       customerId: "customer-1",
-      dealId: "deal-1",
+      dealTargetId: "deal:deal-1:0:1",
     });
 
     expect(deleteCartMock).toHaveBeenCalledWith(
-      "/v1/cart/deals/deal-1?customerId=customer-1",
+      "/v1/cart/deals/deal%3Adeal-1%3A0%3A1?customerId=customer-1",
       undefined
     );
   });
@@ -701,6 +701,65 @@ describe("cart service", () => {
       discountAmount: 100,
       totalAmount: 1200,
       payableAmount: 1200,
+    });
+  });
+
+  it("normalizes top-level cart totals as quote fallback", async () => {
+    getCartMock.mockResolvedValue({
+      success: true,
+      data: {
+        id: "cart-1",
+        items: [],
+        subtotal: 24.5,
+        taxAmount: 0.53,
+        deliveryFee: 2,
+        serviceChargeAmount: 3,
+        discountAmount: 0,
+        totalAmount: 27.58,
+        payableAmount: 27.58,
+      },
+    });
+
+    const cart = await fetchCustomerCart({ customerId: "customer-1" });
+
+    expect(getCartMock).toHaveBeenCalledWith("/v1/cart?customerId=customer-1", undefined);
+    expect(cart.quote).toMatchObject({
+      subtotal: 24.5,
+      taxAmount: 0.53,
+      deliveryFee: 2,
+      serviceChargeAmount: 3,
+      totalAmount: 27.58,
+      payableAmount: 27.58,
+    });
+  });
+
+  it("merges cart-level subtotal into partial saved cart quote", async () => {
+    getCartMock.mockResolvedValue({
+      success: true,
+      data: {
+        cart: {
+          id: "cart-1",
+          items: [],
+          subtotal: 24.5,
+          deliveryFee: 5,
+          serviceChargeAmount: 3,
+          payableAmount: 30.58,
+          quote: {
+            deliveryFee: 5,
+            serviceChargeAmount: 3,
+            payableAmount: 30.58,
+          },
+        },
+      },
+    });
+
+    const cart = await fetchCustomerCart({ customerId: "customer-1" });
+
+    expect(cart.quote).toMatchObject({
+      subtotal: 24.5,
+      deliveryFee: 5,
+      serviceChargeAmount: 3,
+      payableAmount: 30.58,
     });
   });
 });

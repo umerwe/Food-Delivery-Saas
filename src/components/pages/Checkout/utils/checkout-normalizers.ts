@@ -635,6 +635,33 @@ export const normalizeCartQuote = (value: unknown): NormalizedCartQuote | null =
   };
 };
 
+const getCartQuoteSource = (cart: ApiRecord) => {
+  const quote = asRecord(cart.quote);
+
+  if (!Object.keys(quote).length) {
+    return cart;
+  }
+
+  return {
+    ...quote,
+    subtotal: quote.subtotal ?? cart.subtotal,
+    taxAmount: quote.taxAmount ?? cart.taxAmount,
+    deliveryFee: quote.deliveryFee ?? cart.deliveryFee,
+    serviceChargeType: quote.serviceChargeType ?? cart.serviceChargeType,
+    serviceChargeValue: quote.serviceChargeValue ?? cart.serviceChargeValue,
+    serviceChargeAmount: quote.serviceChargeAmount ?? cart.serviceChargeAmount,
+    tipAmount: quote.tipAmount ?? cart.tipAmount,
+    discountAmount: quote.discountAmount ?? cart.discountAmount,
+    loyaltyDiscountAmount: quote.loyaltyDiscountAmount ?? cart.loyaltyDiscountAmount,
+    loyaltyPointsRedeemed: quote.loyaltyPointsRedeemed ?? cart.loyaltyPointsRedeemed,
+    walletAppliedAmount: quote.walletAppliedAmount ?? cart.walletAppliedAmount,
+    totalAmount: quote.totalAmount ?? cart.totalAmount,
+    payableAmount: quote.payableAmount ?? cart.payableAmount,
+    appliedPromotion: quote.appliedPromotion ?? cart.appliedPromotion,
+    chargeBreakdown: quote.chargeBreakdown ?? cart.chargeBreakdown,
+  };
+};
+
 export const getAppliedPromotionDiscountLine = (
   quote?: {
     subtotal?: unknown;
@@ -701,6 +728,8 @@ export const normalizeCartResponse = (res: unknown): CartResponse => {
 
   return {
     items: hasDisplayCartItems ? items : [],
-    quote: normalizeCartQuote(cart.quote) ?? (isQuoteRecord(cart) ? normalizeCartQuote(cart) : null),
+    quote: isQuoteRecord(cart) || Object.keys(asRecord(cart.quote)).length
+      ? normalizeCartQuote(getCartQuoteSource(cart))
+      : null,
   };
 };

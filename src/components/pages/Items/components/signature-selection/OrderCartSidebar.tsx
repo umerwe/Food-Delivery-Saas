@@ -216,8 +216,8 @@ export function OrderCartSidebar({
       );
 
       const isDealItem = isDealCartItem(item);
-      const res = isDealItem && item.dealId
-        ? await updateCustomerCartDealQuantity({ customerId, dealId: item.dealId, quantity: newQty })
+      const res = isDealItem
+        ? await updateCustomerCartDealQuantity({ customerId, dealTargetId: id, quantity: newQty })
         : await updateCustomerCartItemQuantity({ customerId, cartItemId: id, quantity: newQty });
 
       if (!res || res.error) {
@@ -246,8 +246,8 @@ export function OrderCartSidebar({
       setActionId(id);
 
       const isDealItem = item ? isDealCartItem(item) : false;
-      const res = isDealItem && item?.dealId
-        ? await deleteCustomerCartDeal({ customerId, dealId: item.dealId })
+      const res = isDealItem
+        ? await deleteCustomerCartDeal({ customerId, dealTargetId: id })
         : await deleteCustomerCartItem({ customerId, cartItemId: id });
 
       if (!res || res.error) {

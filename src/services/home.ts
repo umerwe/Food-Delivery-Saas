@@ -112,7 +112,7 @@ export const getHomeCategories = async (restaurantId: string) => {
       page: String(page),
       limit: String(HOME_CATEGORIES_PAGE_LIMIT),
       sortBy: "sortOrder",
-      sortOrder: "ASC",
+      sortOrder: "DESC",
     });
 
     const response = await getRequest(`/v1/menu/categories?${params.toString()}`);

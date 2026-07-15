@@ -68,9 +68,9 @@ export type CartApi = DomainApiHook & {
   updateCustomerCartItem: (args: { cartItemId: string; payload: CartMutationPayload }) => Promise<ApiResult>;
   clearCustomerCart: (args: { customerId: string }) => Promise<ApiResult>;
   updateCustomerCartItemQuantity: (args: { customerId: string; cartItemId: string; quantity: number }) => Promise<ApiResult>;
-  updateCustomerCartDealQuantity: (args: { customerId: string; dealId: string; quantity: number }) => Promise<ApiResult>;
+  updateCustomerCartDealQuantity: (args: { customerId: string; dealTargetId: string; quantity: number }) => Promise<ApiResult>;
   deleteCustomerCartItem: (args: { customerId: string; cartItemId: string }) => Promise<ApiResult>;
-  deleteCustomerCartDeal: (args: { customerId: string; dealId: string }) => Promise<ApiResult>;
+  deleteCustomerCartDeal: (args: { customerId: string; dealTargetId: string }) => Promise<ApiResult>;
   fetchGroupOrders: () => Promise<{ response: ApiResult; groupOrders: ApiRecord[] }>;
   addGroupOrderItem: (args: { groupOrderId: string; payload: CartMutationPayload }) => Promise<ApiResult>;
 };
@@ -160,8 +160,8 @@ export const useCart = (token: string | null): CartApi => {
   );
 
   const updateCartDealQuantity = useCallback(
-    async ({ customerId, dealId, quantity }: { customerId: string; dealId: string; quantity: number }) => {
-      const response = await updateCustomerCartDealQuantity({ customerId, dealId, quantity, token });
+    async ({ customerId, dealTargetId, quantity }: { customerId: string; dealTargetId: string; quantity: number }) => {
+      const response = await updateCustomerCartDealQuantity({ customerId, dealTargetId, quantity, token });
 
       if (response && !response.error && response.success !== false) {
         dispatchCartChanged();
@@ -186,8 +186,8 @@ export const useCart = (token: string | null): CartApi => {
   );
 
   const deleteCartDeal = useCallback(
-    async ({ customerId, dealId }: { customerId: string; dealId: string }) => {
-      const response = await deleteCustomerCartDeal({ customerId, dealId, token });
+    async ({ customerId, dealTargetId }: { customerId: string; dealTargetId: string }) => {
+      const response = await deleteCustomerCartDeal({ customerId, dealTargetId, token });
 
       if (response && !response.error && response.success !== false) {
         dispatchCartChanged();

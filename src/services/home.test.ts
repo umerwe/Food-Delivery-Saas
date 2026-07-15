@@ -97,11 +97,11 @@ describe("getHomeCategories", () => {
     expect(categories.map((category) => category.id)).toEqual(["c1", "c2", "c3"]);
     expect(getRequestMock).toHaveBeenNthCalledWith(
       1,
-      "/v1/menu/categories?restaurantId=restaurant-1&page=1&limit=50&sortBy=sortOrder&sortOrder=ASC"
+      "/v1/menu/categories?restaurantId=restaurant-1&page=1&limit=50&sortBy=sortOrder&sortOrder=DESC"
     );
     expect(getRequestMock).toHaveBeenNthCalledWith(
       2,
-      "/v1/menu/categories?restaurantId=restaurant-1&page=2&limit=50&sortBy=sortOrder&sortOrder=ASC"
+      "/v1/menu/categories?restaurantId=restaurant-1&page=2&limit=50&sortBy=sortOrder&sortOrder=DESC"
     );
   });
 

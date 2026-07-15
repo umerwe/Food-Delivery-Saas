@@ -159,6 +159,37 @@ export const normalizeCartQuote = (value: unknown): CartQuote | null => {
   };
 };
 
+const getCartQuoteSource = (cart: ApiRecord | null) => {
+  if (!cart) {
+    return null;
+  }
+
+  const quote = getRecord(cart.quote);
+
+  if (!quote) {
+    return cart;
+  }
+
+  return {
+    ...quote,
+    subtotal: quote.subtotal ?? cart.subtotal,
+    taxAmount: quote.taxAmount ?? cart.taxAmount,
+    deliveryFee: quote.deliveryFee ?? cart.deliveryFee,
+    serviceChargeType: quote.serviceChargeType ?? cart.serviceChargeType,
+    serviceChargeValue: quote.serviceChargeValue ?? cart.serviceChargeValue,
+    serviceChargeAmount: quote.serviceChargeAmount ?? cart.serviceChargeAmount,
+    tipAmount: quote.tipAmount ?? cart.tipAmount,
+    discountAmount: quote.discountAmount ?? cart.discountAmount,
+    loyaltyDiscountAmount: quote.loyaltyDiscountAmount ?? cart.loyaltyDiscountAmount,
+    loyaltyPointsRedeemed: quote.loyaltyPointsRedeemed ?? cart.loyaltyPointsRedeemed,
+    walletAppliedAmount: quote.walletAppliedAmount ?? cart.walletAppliedAmount,
+    totalAmount: quote.totalAmount ?? cart.totalAmount,
+    payableAmount: quote.payableAmount ?? cart.payableAmount,
+    appliedPromotion: quote.appliedPromotion ?? cart.appliedPromotion,
+    chargeBreakdown: quote.chargeBreakdown ?? cart.chargeBreakdown,
+  };
+};
+
 const resolveCartRecord = (responseData: unknown) => {
   const resData = getRecord(responseData);
   const nestedData = getRecord(resData?.data);
@@ -190,7 +221,7 @@ export const fetchCustomerCart = async ({
   return {
     response,
     items: normalizeArray<CartItemRecord>(cart?.items),
-    quote: normalizeCartQuote(cart?.quote),
+    quote: normalizeCartQuote(getCartQuoteSource(cart)),
   };
 };
 
@@ -380,15 +411,15 @@ export const updateCustomerCartItemQuantity = ({
 
 export const updateCustomerCartDealQuantity = ({
   customerId,
-  dealId,
+  dealTargetId,
   quantity,
   token,
 }: {
   customerId: string;
-  dealId: string;
+  dealTargetId: string;
   quantity: number;
   token?: string | null;
-}) => patchCart(`/v1/cart/deals/${dealId}?customerId=${customerId}`, { quantity }, token);
+}) => patchCart(`/v1/cart/deals/${encodeURIComponent(dealTargetId)}?customerId=${customerId}`, { quantity }, token);
 
 export const deleteCustomerCartItem = ({
   customerId,
@@ -402,13 +433,13 @@ export const deleteCustomerCartItem = ({
 
 export const deleteCustomerCartDeal = ({
   customerId,
-  dealId,
+  dealTargetId,
   token,
 }: {
   customerId: string;
-  dealId: string;
+  dealTargetId: string;
   token?: string | null;
-}) => deleteCart(`/v1/cart/deals/${dealId}?customerId=${customerId}`, token);
+}) => deleteCart(`/v1/cart/deals/${encodeURIComponent(dealTargetId)}?customerId=${customerId}`, token);
 
 export const fetchGroupOrders = async (token?: string | null) => {
   const openResponse = await getCart("/v1/group-orders?status=OPEN", token);

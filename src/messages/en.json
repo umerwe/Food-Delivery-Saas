@@ -103,7 +103,8 @@
     "branch": "Branch",
     "followUs": "Follow us",
     "brandDescription": "A perfect place for perfect food, all kind of parties and any other gathering as well, for our guests to simply unwind and relax in complete serenity.",
-    "copyright": "Copyright © {year} {name}. All Rights Reserved."
+    "copyright": "Copyright © {year} {name}. All Rights Reserved.",
+    "impressum": "Impressum"
   },
   "auth": {
     "brandHeroAlt": "Brand hero image",
@@ -1925,6 +1926,29 @@
       "adjudicationDescription": "A member of our quality control trust reviews cases that do not meet automated approval thresholds.",
       "reimbursementTitle": "Reimbursement",
       "reimbursementDescription": "Credits are issued as either Editorial Points for immediate use or returned to your banking institution."
+    },
+    "impressum": {
+      "eyebrow": "Legal Notice",
+      "title": "Impressum",
+      "description": "Responsible provider information for this restaurant website, including operator, branch, address, and official contact details.",
+      "sourceTitle": "Platform legal notice",
+      "sourceDescription": "This page lists the legally responsible restaurant operator and branch contact details for orders placed through this storefront.",
+      "loading": "Loading restaurant legal details...",
+      "operatorTitle": "Restaurant operator",
+      "operatorDescription": "Legal and administrative details for the restaurant responsible for this website.",
+      "branchTitle": "Branch details",
+      "branchDescription": "Business address and branch administration contact for the active location.",
+      "legalName": "Legal / business name",
+      "tradeName": "Trading name",
+      "ownerName": "Owner / representative",
+      "taxNumber": "Tax / VAT number",
+      "registrationNumber": "Registration number",
+      "restaurantAdminEmail": "Restaurant admin email",
+      "branchName": "Branch",
+      "businessAddress": "Business address",
+      "branchAdminEmail": "Branch admin email",
+      "fallbackRestaurantName": "Restaurant",
+      "missingDetails": "Restaurant legal details are not available for the current site context yet."
     }
   },
   "validation": {

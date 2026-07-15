@@ -640,6 +640,31 @@ describe("checkout normalizers", () => {
     });
   });
 
+  it("merges cart-level subtotal into partial quote for deal checkout totals", () => {
+    const { quote } = normalizeCartResponse({
+      data: {
+        cart: {
+          subtotal: 24.5,
+          deliveryFee: 5,
+          serviceChargeAmount: 3,
+          payableAmount: 30.58,
+          quote: {
+            deliveryFee: 5,
+            serviceChargeAmount: 3,
+            payableAmount: 30.58,
+          },
+        },
+      },
+    });
+
+    expect(quote).toMatchObject({
+      subtotal: 24.5,
+      deliveryFee: 5,
+      serviceChargeAmount: 3,
+      payableAmount: 30.58,
+    });
+  });
+
   it("quote normalizer preserves service charge tip and payable amount", () => {
     const { quote } = normalizeCartResponse({
       data: {

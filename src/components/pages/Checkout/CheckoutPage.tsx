@@ -4,7 +4,10 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Tabs from "@/components/pages/Checkout/components/Tabs";
 import { DeliverySection } from "@/components/pages/Checkout/components/DeliverySection";
 import { PickupSection } from "@/components/pages/Checkout/components/PickupSection";
-import { CartSummarySection } from "@/components/pages/Checkout/components/CartSummarySection";
+import {
+  CartSummarySection,
+  isDealCartItem,
+} from "@/components/pages/Checkout/components/CartSummarySection";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCheckout } from "@/hooks/useCheckout";
 import { useCart } from "@/hooks/useCart";
@@ -913,12 +916,9 @@ function CheckoutPageContent() {
     );
 
     try {
-      const isDealRow = String(currentItem.type || "").toUpperCase() === "DEAL";
-      const dealId =
-        typeof currentItem.dealId === "string" ? currentItem.dealId : "";
       const endpoint =
-        isDealRow && dealId
-          ? `/v1/cart/deals/${dealId}?customerId=${customerId}`
+        isDealCartItem(currentItem)
+          ? `/v1/cart/deals/${encodeURIComponent(id)}?customerId=${customerId}`
           : `/v1/cart/items/${id}?customerId=${customerId}`;
       const res = await patch(endpoint, {
         quantity: newQty,
@@ -957,16 +957,12 @@ function CheckoutPageContent() {
   const deleteItem = async (id: string) => {
     const previousCartItems = cartItems;
     const currentItem = cartItems.find((item) => String(item.id) === id);
-    const isDealRow = String(currentItem?.type || "").toUpperCase() === "DEAL";
-    const dealId =
-      typeof currentItem?.dealId === "string" ? currentItem.dealId : "";
-
     try {
       setCartItems((prev) => prev.filter((item) => String(item.id) !== id));
 
       const endpoint =
-        isDealRow && dealId
-          ? `/v1/cart/deals/${dealId}?customerId=${customerId}`
+        currentItem && isDealCartItem(currentItem)
+          ? `/v1/cart/deals/${encodeURIComponent(id)}?customerId=${customerId}`
           : `/v1/cart/items/${id}?customerId=${customerId}`;
       const res = await del(endpoint);
 

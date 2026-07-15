@@ -321,7 +321,9 @@ export const getItemImage = (item: CartItem) => {
 };
 
 export const isDealCartItem = (item: CartItem) =>
-  String(item.type || "").toUpperCase() === "DEAL";
+  String(item.type || "").toUpperCase() === "DEAL" ||
+  Boolean(item.dealId) ||
+  Boolean(item.includedItems?.length);
 
 export const getSelectedVariationName = (item: CartItem) => {
   return (
@@ -700,15 +702,44 @@ export const getCheckoutPriceAdjustmentTotal = (
   }, 0);
 };
 
+export const getCartBillTotals = (
+  pricingItems: Array<{
+    pricing: { lineTotal: number; depositTotal: number };
+  }>,
+  quoteSubtotal?: unknown,
+) => {
+  const itemTotal = pricingItems.reduce(
+    (acc, entry) =>
+      acc + Math.max(0, entry.pricing.lineTotal - entry.pricing.depositTotal),
+    0,
+  );
+  const depositTotal = pricingItems.reduce(
+    (acc, entry) => acc + entry.pricing.depositTotal,
+    0,
+  );
+  const normalizedQuoteSubtotal = toNullableNumber(quoteSubtotal);
+
+  return {
+    itemTotal,
+    depositTotal,
+    displaySubtotal:
+      pricingItems.length > 0 ? itemTotal : (normalizedQuoteSubtotal ?? itemTotal),
+  };
+};
+
 export const getTotalBeforeDiscount = ({
   subtotal,
+  deposit = 0,
   orderFee = 0,
+  serviceCharge = 0,
   tipAmount = 0,
 }: {
   subtotal: number;
+  deposit?: number;
   orderFee?: number;
+  serviceCharge?: number;
   tipAmount?: number;
-}) => subtotal + orderFee + tipAmount;
+}) => subtotal + deposit + orderFee + serviceCharge + tipAmount;
 
 export const getServiceChargeAmountFromQuote = (quote?: CartQuote | null) => {
   const breakdownTotal = toNullableNumber(
@@ -957,16 +988,12 @@ export function CartSummarySection({
     pricing: getItemPricing(item, checkoutType),
   }));
 
-  const itemTotal = pricingItems.reduce((acc, entry) => {
-    return acc + entry.pricing.itemSubtotal;
-  }, 0);
-
-  const depositTotal = pricingItems.reduce((acc, entry) => {
-    return acc + entry.pricing.depositTotal;
-  }, 0);
-
   const resolvedQuote = quote ?? cartQuote ?? null;
   const quoteSubtotal = toNullableNumber(resolvedQuote?.subtotal);
+  const { itemTotal, depositTotal, displaySubtotal } = getCartBillTotals(
+    pricingItems,
+    quoteSubtotal,
+  );
   const quoteDeliveryFee = toNullableNumber(resolvedQuote?.deliveryFee);
   const quoteTipAmount =
     toNullableNumber(resolvedQuote?.tipAmount) ??
@@ -1050,8 +1077,10 @@ export function CartSummarySection({
   );
 
   const computedTotalBeforeDiscount = getTotalBeforeDiscount({
-    subtotal: itemTotal,
+    subtotal: displaySubtotal,
+    deposit: depositTotal,
     orderFee: selectedOrderFee,
+    serviceCharge: serviceChargeAmount,
     tipAmount,
   });
 
@@ -1059,12 +1088,7 @@ export function CartSummarySection({
     resolvedQuote?.totalBeforeDiscount,
   );
   const totalBeforeDiscount =
-    backendTotalBeforeDiscount ??
-    getTotalBeforeDiscount({
-      subtotal: quoteSubtotal !== null ? quoteSubtotal : itemTotal,
-      orderFee: selectedOrderFee,
-      tipAmount,
-    });
+    backendTotalBeforeDiscount ?? computedTotalBeforeDiscount;
   const payableBeforeLoyaltyPreview = Math.max(
     0,
     quotePayableAmount ??
@@ -1694,7 +1718,7 @@ export function CartSummarySection({
         <div className="space-y-4 text-sm text-gray-500">
           <div className="flex items-center justify-between">
             <span>{t("itemTotal")}</span>
-            <span>{formatCurrency(quoteSubtotal ?? itemTotal, currency)}</span>
+            <span>{formatCurrency(displaySubtotal, currency)}</span>
           </div>
 
           {depositTotal > 0 ? (

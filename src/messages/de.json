@@ -103,7 +103,8 @@
     "branch": "Filiale",
     "followUs": "Folgen Sie uns",
     "brandDescription": "Ein perfekter Ort für perfektes Essen, Feiern aller Art und andere Zusammenkünfte, an dem unsere Gäste in völliger Ruhe abschalten und entspannen können.",
-    "copyright": "Copyright © {year} {name}. Alle Rechte vorbehalten."
+    "copyright": "Copyright © {year} {name}. Alle Rechte vorbehalten.",
+    "impressum": "Impressum"
   },
   "auth": {
     "brandHeroAlt": "Marken-Hero-Bild",
@@ -1925,6 +1926,29 @@
       "adjudicationDescription": "Ein Mitglied unserer Qualitätskontrolle prüft Fälle, die keine automatische Genehmigungsschwelle erreichen.",
       "reimbursementTitle": "Erstattung",
       "reimbursementDescription": "Gutschriften werden entweder als Editorial Points zur sofortigen Nutzung ausgegeben oder an Ihr Bankinstitut zurückerstattet."
+    },
+    "impressum": {
+      "eyebrow": "Rechtlicher Hinweis",
+      "title": "Impressum",
+      "description": "Anbieterkennzeichnung für diese Restaurant-Website mit Betreiber, Filiale, Geschäftsadresse und offiziellen Kontaktdaten.",
+      "sourceTitle": "Plattform-Impressum",
+      "sourceDescription": "Diese Seite nennt den rechtlich verantwortlichen Restaurantbetreiber und die Kontaktdaten der Filiale für Bestellungen über diesen Storefront.",
+      "loading": "Restaurant-Rechtsdaten werden geladen...",
+      "operatorTitle": "Restaurantbetreiber",
+      "operatorDescription": "Rechtliche und administrative Angaben zum Restaurant, das für diese Website verantwortlich ist.",
+      "branchTitle": "Filialdaten",
+      "branchDescription": "Geschäftsadresse und Administrationskontakt der aktiven Filiale.",
+      "legalName": "Rechts- / Geschäftsname",
+      "tradeName": "Handelsname",
+      "ownerName": "Inhaber / Vertreter",
+      "taxNumber": "Steuer- / USt-IdNr.",
+      "registrationNumber": "Registernummer",
+      "restaurantAdminEmail": "Restaurant-Admin-E-Mail",
+      "branchName": "Filiale",
+      "businessAddress": "Geschäftsadresse",
+      "branchAdminEmail": "Filial-Admin-E-Mail",
+      "fallbackRestaurantName": "Restaurant",
+      "missingDetails": "Für den aktuellen Website-Kontext sind noch keine rechtlichen Restaurantdaten verfügbar."
     }
   },
   "validation": {
