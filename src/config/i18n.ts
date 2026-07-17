@@ -17,3 +17,15 @@ export const isSupportedLocale = (value: unknown): value is AppLocale =>
 
 export const resolveLocale = (value: unknown): AppLocale =>
   isSupportedLocale(value) ? value : DEFAULT_LOCALE;
+
+export const getRequestLocale = (): AppLocale => {
+  if (typeof window === "undefined") {
+    return DEFAULT_LOCALE;
+  }
+
+  try {
+    return resolveLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY));
+  } catch {
+    return DEFAULT_LOCALE;
+  }
+};

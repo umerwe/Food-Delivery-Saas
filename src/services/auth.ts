@@ -1,4 +1,5 @@
 import { buildApiUrl } from "@/lib/api-endpoint";
+import { getRequestLocale } from "@/config/i18n";
 import { API_BASE_URL } from "@/lib/constants";
 import { isAuthSession, isAuthUser } from "@/lib/auth";
 import type {
@@ -33,6 +34,7 @@ const requestAuth = async (endpoint: string, init: RequestInit = {}) => {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "Accept-Language": getRequestLocale(),
       ...(init.headers ?? {}),
     },
   });

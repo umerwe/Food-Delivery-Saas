@@ -1865,14 +1865,7 @@
       "cookiesTitle": "2. Cookies & Tracking",
       "cookiesDescription": "Our website uses cookies to distinguish you from other users. This helps us provide you with a good experience when you browse our website and also allows us to improve our site.",
       "cookiesQuote": "Cookies are small text files placed on your computer by websites that you visit. They are widely used to make websites work.",
-      "loadingPolicy": "Loading restaurant legal details...",
-      "legalProfileTitle": "Restaurant legal details",
-      "legalProfileDescription": "Business and tax details provided by the restaurant.",
-      "ownerName": "Owner name",
-      "legalBusinessName": "Legal business name",
-      "taxNumber": "Tax/VAT number",
-      "businessAddress": "Business address",
-      "contractText": "Legal agreement"
+      "loadingPolicy": "Loading privacy policy..."
     },
     "terms": {
       "title": "Terms & Conditions",
@@ -1947,6 +1940,7 @@
       "branchName": "Branch",
       "businessAddress": "Business address",
       "branchAdminEmail": "Branch admin email",
+      "contractText": "Legal agreement",
       "fallbackRestaurantName": "Restaurant",
       "missingDetails": "Restaurant legal details are not available for the current site context yet."
     }

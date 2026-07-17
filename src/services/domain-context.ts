@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "@/lib/axios";
 import { buildApiUrl } from "@/lib/api-endpoint";
+import { getRequestLocale } from "@/config/i18n";
 import { normalizeDomainContext, normalizeDomainHost, type DomainContext } from "@/lib/domain-context";
 
 const getMessage = (value: unknown, fallback: string) => {
@@ -20,7 +21,10 @@ export const resolveDomainContext = async (host: string): Promise<DomainContext>
 
   const endpoint = `/customer-app/domain-context?host=${encodeURIComponent(normalizedHost)}`;
   const response = await fetch(buildApiUrl(API_BASE_URL, endpoint), {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Accept-Language": getRequestLocale(),
+    },
   });
   const payload = (await response.json()) as unknown;
 

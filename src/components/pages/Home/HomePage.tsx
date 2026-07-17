@@ -153,7 +153,7 @@ const HomePage = () => {
   const branchId = useMemo(() => resolveHomeBranchId(user) || domainContext?.branchId || "", [domainContext?.branchId, user]);
   const hasRestaurantContext = Boolean(restaurantId);
   const homeQuery = useHome(restaurantId, branchId, hasRestaurantContext && Boolean(branchId));
-  const categoriesQuery = useHomeCategories(restaurantId, hasRestaurantContext);
+  const categoriesQuery = useHomeCategories(restaurantId, locale, hasRestaurantContext);
   const promotionalItemsQuery = useHomePromotionalItems({
     restaurantId,
     branchId,

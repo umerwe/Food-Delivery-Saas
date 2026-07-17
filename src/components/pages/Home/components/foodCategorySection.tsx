@@ -21,6 +21,7 @@ import type { UseEmblaCarouselType } from "embla-carousel-react";
 import { useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppLocale } from "@/hooks/useAppLocale";
 import { useHome } from "@/hooks/useHome";
 import { useHomeCategories, useHomePromotions } from "@/hooks/useHomeCategories";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
@@ -259,9 +260,10 @@ export function FoodCategorySection() {
   const tPromotions = useTranslations("home.promotions");
   const router = useRouter();
   const { token, user, restaurantId: authRestaurantId } = useAuth();
+  const { locale } = useAppLocale();
   const restaurantId = resolveHomeRestaurantId(user, authRestaurantId);
   const branchId = resolveHomeBranchId(user);
-  const categoriesQuery = useHomeCategories(restaurantId, Boolean(token));
+  const categoriesQuery = useHomeCategories(restaurantId, locale, Boolean(token));
   const promotionsQuery = useHomePromotions(restaurantId, branchId, Boolean(token));
   const homeQuery = useHome(restaurantId, branchId, Boolean(token && restaurantId && branchId));
   const currency = resolveCustomerCurrency({

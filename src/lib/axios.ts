@@ -1,5 +1,6 @@
-import axios, { type AxiosRequestHeaders } from "axios";
+import axios, { AxiosHeaders } from "axios";
 
+import { getRequestLocale } from "@/config/i18n";
 import { normalizeApiEndpoint as normalizeEndpointForBase } from "@/lib/api-endpoint";
 import { getAuthToken } from "@/lib/auth";
 
@@ -25,15 +26,15 @@ export const httpClient = axios.create({
 
 httpClient.interceptors.request.use((config) => {
   const token = getAuthToken();
+  const headers = AxiosHeaders.from(config.headers);
 
-  if (!token) {
-    return config;
+  headers.set("Accept-Language", getRequestLocale());
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
-  config.headers = {
-    ...(config.headers ?? {}),
-    Authorization: `Bearer ${token}`,
-  } as AxiosRequestHeaders;
+  config.headers = headers;
 
   return config;
 });

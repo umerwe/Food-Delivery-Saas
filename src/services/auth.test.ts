@@ -36,6 +36,10 @@ describe("auth service", () => {
       "https://deliveryway.dcodax.co/api/v1/auth/google-login",
       expect.objectContaining({
         method: "POST",
+        headers: {
+          "Accept-Language": "en",
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           idToken: "google-id-token",
           restaurantId: "restaurant-1",

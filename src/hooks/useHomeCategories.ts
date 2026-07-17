@@ -2,12 +2,17 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { DEFAULT_LOCALE, type AppLocale } from "@/config/i18n";
 import { queryKeys } from "@/config/query-keys";
 import { getHomeCategories, getHomePromotions, getPromotionalItems } from "@/services/home";
 
-export const useHomeCategories = (restaurantId?: string | null, enabled = true) =>
+export const useHomeCategories = (
+  restaurantId?: string | null,
+  currentLocale: AppLocale = DEFAULT_LOCALE,
+  enabled = true,
+) =>
   useQuery({
-    queryKey: queryKeys.home.categories(restaurantId),
+    queryKey: queryKeys.home.categories(restaurantId, currentLocale),
     queryFn: () => getHomeCategories(restaurantId ?? ""),
     enabled: enabled && Boolean(restaurantId),
   });

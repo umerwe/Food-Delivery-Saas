@@ -1865,14 +1865,7 @@
       "cookiesTitle": "2. Cookies & Tracking",
       "cookiesDescription": "Unsere Website verwendet Cookies, um Sie von anderen Nutzern zu unterscheiden. So können wir Ihnen beim Besuch unserer Website ein gutes Erlebnis bieten und unsere Seite verbessern.",
       "cookiesQuote": "Cookies sind kleine Textdateien, die von besuchten Websites auf Ihrem Computer gespeichert werden. Sie werden häufig verwendet, damit Websites funktionieren.",
-      "loadingPolicy": "Rechtliche Restaurantdetails werden geladen...",
-      "legalProfileTitle": "Rechtliche Restaurantdetails",
-      "legalProfileDescription": "Vom Restaurant bereitgestellte Geschäfts- und Steuerdetails.",
-      "ownerName": "Name des Eigentümers",
-      "legalBusinessName": "Rechtlicher Geschäftsname",
-      "taxNumber": "Steuer-/USt-Nummer",
-      "businessAddress": "Geschäftsadresse",
-      "contractText": "Rechtliche Vereinbarung"
+      "loadingPolicy": "Datenschutzerklärung wird geladen..."
     },
     "terms": {
       "title": "AGB",
@@ -1947,6 +1940,7 @@
       "branchName": "Filiale",
       "businessAddress": "Geschäftsadresse",
       "branchAdminEmail": "Filial-Admin-E-Mail",
+      "contractText": "Rechtliche Vereinbarung",
       "fallbackRestaurantName": "Restaurant",
       "missingDetails": "Für den aktuellen Website-Kontext sind noch keine rechtlichen Restaurantdaten verfügbar."
     }

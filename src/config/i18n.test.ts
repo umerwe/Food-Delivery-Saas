@@ -1,13 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_LOCALE,
+  getRequestLocale,
   LOCALE_STORAGE_KEY,
   SUPPORTED_LOCALES,
   resolveLocale,
 } from "@/config/i18n";
 
 describe("i18n config", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("uses English as the default locale", () => {
     expect(DEFAULT_LOCALE).toBe("en");
   });
@@ -29,5 +34,27 @@ describe("i18n config", () => {
 
   it("uses the Deliveryway customer locale storage key", () => {
     expect(LOCALE_STORAGE_KEY).toBe("deliveryway-customer-locale");
+  });
+
+  it("uses the persisted customer locale for API requests", () => {
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: vi.fn().mockReturnValue("de"),
+      },
+    });
+
+    expect(getRequestLocale()).toBe("de");
+  });
+
+  it("falls back to English when browser storage is unavailable", () => {
+    vi.stubGlobal("window", {
+      localStorage: {
+        getItem: vi.fn(() => {
+          throw new Error("Storage blocked");
+        }),
+      },
+    });
+
+    expect(getRequestLocale()).toBe("en");
   });
 });

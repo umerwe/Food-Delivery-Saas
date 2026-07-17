@@ -1,5 +1,6 @@
 import axios from "axios";
 
+import { getRequestLocale } from "@/config/i18n";
 import { API_BASE_URL } from "@/lib/axios";
 import { httpClient } from "@/lib/axios";
 import { cleanParams } from "@/lib/params";
@@ -48,6 +49,7 @@ export const getAvailableGiftCards = async ({
         restaurantId,
         branchId,
       }),
+      headers: { "Accept-Language": getRequestLocale() },
     }
   );
 
@@ -66,6 +68,7 @@ export const guestPurchaseGiftCard = async (
         restaurantId: params.restaurantId,
         branchId: params.branchId,
       }),
+      headers: { "Accept-Language": getRequestLocale() },
     }
   );
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizePrivacyPolicyContent } from "./legal-content";
+import { normalizePrivacyPolicyContent, sanitizeLegalHtml } from "./legal-content";
 
 describe("legal content service", () => {
   it("normalizes privacy policy legal profile fields", () => {
@@ -81,5 +81,36 @@ describe("legal content service", () => {
       state: undefined,
       country: "Deutschland",
     });
+  });
+
+  it("preserves supported legal markup and secures links", () => {
+    expect(sanitizeLegalHtml('<h2>Agreement</h2><a href="https://example.com">Read more</a>')).toBe(
+      '<h2>Agreement</h2><a href="https://example.com" target="_blank" rel="noopener noreferrer">Read more</a>',
+    );
+  });
+
+  it("preserves safe rich-editor font sizes", () => {
+    expect(sanitizeLegalHtml('<font size="5">Large policy text</font>')).toBe(
+      '<font size="5">Large policy text</font>',
+    );
+    expect(sanitizeLegalHtml('<font size="99">Unsafe size</font>')).toBe(
+      "<font>Unsafe size</font>",
+    );
+  });
+
+  it("preserves rich-editor block lines instead of collapsing their content", () => {
+    expect(
+      sanitizeLegalHtml(
+        "<div>- <strong>Account information:</strong> Account details</div><div>- <strong>Order information:</strong> Order details</div>",
+      ),
+    ).toBe(
+      "<div>- <strong>Account information:</strong> Account details</div><div>- <strong>Order information:</strong> Order details</div>",
+    );
+  });
+
+  it("removes executable legal markup and event handlers", () => {
+    expect(
+      sanitizeLegalHtml('<p onclick="alert(1)">Safe</p><script>alert(1)</script>'),
+    ).toBe("<p>Safe</p>");
   });
 });

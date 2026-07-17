@@ -187,7 +187,10 @@ describe("gift card service", () => {
 
     expect(publicClientGetMock).toHaveBeenCalledWith(
       "/customer-app/gift-cards/available",
-      { params: { restaurantId: "restaurant-1", branchId: "branch-1" } }
+      {
+        params: { restaurantId: "restaurant-1", branchId: "branch-1" },
+        headers: { "Accept-Language": "en" },
+      }
     );
     expect(response.items[0].amount).toBe(2500);
   });
@@ -234,7 +237,10 @@ describe("gift card service", () => {
         message: "Enjoy",
         currency: "USD",
       },
-      { params: { restaurantId: "restaurant-1", branchId: "branch-1" } }
+      {
+        params: { restaurantId: "restaurant-1", branchId: "branch-1" },
+        headers: { "Accept-Language": "en" },
+      }
     );
     expect(httpClientPostMock).not.toHaveBeenCalled();
   });

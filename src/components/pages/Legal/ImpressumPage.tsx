@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Building2, Loader2, Mail, MapPin, ShieldCheck, Store } from "lucide-react";
+import { Building2, FileText, Loader2, Mail, MapPin, ShieldCheck, Store } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,11 @@ import { useHome } from "@/hooks/useHome";
 import { DEFAULT_BRANDING } from "@/config/default-branding";
 import { formatDisplayAddress } from "@/lib/address-display";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
+import {
+  fetchPrivacyPolicyContent,
+  sanitizeLegalHtml,
+  type LegalProfile,
+} from "@/services/legal-content";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -74,6 +79,8 @@ const ImpressumPage = () => {
   const { context: domainContext, loading: domainLoading } = useDomainContext();
   const { branding: fallbackBranding } = useBranding();
   const [urlContext, setUrlContext] = useState({ restaurantId: "", branchId: "" });
+  const [legalProfile, setLegalProfile] = useState<LegalProfile | null>(null);
+  const [legalProfileLoading, setLegalProfileLoading] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -97,6 +104,41 @@ const ImpressumPage = () => {
     [domainContext?.branchId, urlContext.branchId, user],
   );
 
+  useEffect(() => {
+    if (!restaurantId) {
+      setLegalProfile(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadLegalProfile = async () => {
+      try {
+        setLegalProfileLoading(true);
+        setLegalProfile(null);
+        const policy = await fetchPrivacyPolicyContent(restaurantId);
+
+        if (isMounted) {
+          setLegalProfile(policy.legalProfile ?? null);
+        }
+      } catch {
+        if (isMounted) {
+          setLegalProfile(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLegalProfileLoading(false);
+        }
+      }
+    };
+
+    void loadLegalProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [restaurantId]);
+
   const homeQuery = useHome(restaurantId, branchId || null, Boolean(restaurantId));
   const homeData = homeQuery.data?.data;
   const restaurant = homeData?.restaurant;
@@ -104,12 +146,17 @@ const ImpressumPage = () => {
   const branding = homeData?.branding ?? fallbackBranding ?? DEFAULT_BRANDING;
 
   const restaurantName =
+    legalProfile?.legalBusinessName ||
     getTextField(restaurant, ["legalBusinessName", "businessName", "name"]) ||
     branding.restaurantName ||
     t("fallbackRestaurantName");
   const tradeName = getTextField(restaurant, ["name"]);
-  const ownerName = getTextField(restaurant, ["ownerName", "owner", "representativeName"]);
-  const taxNumber = getTextField(restaurant, ["taxNumber", "vatNumber", "vatId", "taxId"]);
+  const ownerName =
+    legalProfile?.ownerName ||
+    getTextField(restaurant, ["ownerName", "owner", "representativeName"]);
+  const taxNumber =
+    legalProfile?.taxNumber ||
+    getTextField(restaurant, ["taxNumber", "vatNumber", "vatId", "taxId"]);
   const registrationNumber = getTextField(restaurant, [
     "registrationNumber",
     "companyRegistrationNumber",
@@ -121,7 +168,11 @@ const ImpressumPage = () => {
   const branchAddress = formatDisplayAddress(branch?.address ?? branch, {
     includeRegionCountry: true,
   });
-  const isLoading = authLoading || domainLoading || homeQuery.isLoading;
+  const legalBusinessAddress = formatDisplayAddress(legalProfile?.businessAddress, {
+    includeRegionCountry: true,
+  });
+  const safeContractText = sanitizeLegalHtml(legalProfile?.contractText || "");
+  const isLoading = authLoading || domainLoading || homeQuery.isLoading || legalProfileLoading;
 
   return (
     <div className="min-h-screen bg-[#F7F7F7] px-6 py-12 md:px-12 lg:px-20">
@@ -181,6 +232,11 @@ const ImpressumPage = () => {
               {registrationNumber ? (
                 <DetailCard label={t("registrationNumber")} value={registrationNumber} />
               ) : null}
+              {legalBusinessAddress ? (
+                <div className="md:col-span-2">
+                  <DetailCard label={t("businessAddress")} value={legalBusinessAddress} />
+                </div>
+              ) : null}
               {restaurantEmail ? (
                 <DetailCard
                   label={t("restaurantAdminEmail")}
@@ -189,6 +245,19 @@ const ImpressumPage = () => {
                 />
               ) : null}
             </div>
+
+            {safeContractText ? (
+              <div className="mt-4 rounded-2xl bg-[#F9F9F9] p-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <FileText className="h-4 w-4 text-[#E74C3C]" />
+                  {t("contractText")}
+                </div>
+                <article
+                  className="space-y-4 text-sm leading-6 text-gray-600 [&_a]:font-semibold [&_a]:text-primary [&_a]:underline [&_div]:!my-0 [&_div]:min-h-6 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:text-gray-950 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:leading-tight [&_h2]:text-gray-950 [&_h3]:pt-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-gray-950 [&_h4]:pt-1 [&_h4]:font-semibold [&_h4]:text-gray-950 [&_li]:ml-5 [&_li]:list-disc [&_ol_li]:list-decimal [&_p]:text-gray-600"
+                  dangerouslySetInnerHTML={{ __html: safeContractText }}
+                />
+              </div>
+            ) : null}
           </section>
 
           <aside className="rounded-[24px] border border-gray-100 bg-white p-6 shadow-sm shadow-gray-100 md:p-8">
@@ -235,7 +304,7 @@ const ImpressumPage = () => {
           </aside>
         </div>
 
-        {!isLoading && !restaurant && !branch ? (
+        {!isLoading && !restaurant && !branch && !legalProfile ? (
           <div className="mt-6 rounded-2xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-500">
             {t("missingDetails")}
           </div>
