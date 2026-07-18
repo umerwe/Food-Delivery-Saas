@@ -253,8 +253,10 @@
       "viewDetails": "View details",
       "promotionItemsUnavailable": "Offer items are unavailable",
       "promotionItemsUnavailableDescription": "This offer does not have a dedicated item list right now. Explore the full menu to continue ordering.",
+      "noPromotionsBadge": "No active promotions",
       "noActivePromotions": "No active promotions right now",
-      "noActivePromotionsDescription": "Explore the menu and check back later for fresh deals and exclusive branch offers."
+      "noActivePromotionsDescription": "But delicious deals are always cooking! Explore the menu or check back later for exciting offers.",
+      "notifyMe": "Notify Me"
     },
     "promotionalItems": {
       "eyebrow": "Special for you",

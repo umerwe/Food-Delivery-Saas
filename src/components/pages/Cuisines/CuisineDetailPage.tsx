@@ -7,12 +7,13 @@ import { ArrowLeft, Sparkles, Utensils } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { CuisineItemCard } from "@/components/pages/Cuisines/components/CuisineItemCard";
-import { getCuisineBadge, getCuisineImage } from "@/components/pages/Cuisines/components/cuisine-display";
+import { getCuisineBadge } from "@/components/pages/Cuisines/components/cuisine-display";
 import { useAppLocale } from "@/hooks/useAppLocale";
 import { useAuth } from "@/hooks/useAuth";
 import { useCustomerCuisineItems, useCustomerCuisines } from "@/hooks/useCuisines";
 import { useDomainContext } from "@/hooks/useDomainContext";
 import { useHome } from "@/hooks/useHome";
+import { useStableCuisineImage } from "@/hooks/useStableCuisineImage";
 import { resolveHomeBranchId, resolveHomeRestaurantId } from "@/lib/home";
 import { resolveCustomerCurrency } from "@/lib/money";
 
@@ -27,6 +28,7 @@ function CuisineDetailContent({ cuisineId }: { cuisineId: string }) {
   const itemsQuery = useCustomerCuisineItems({ cuisineId, restaurantId, branchId, locale, limit: 48, enabled: Boolean(restaurantId && cuisineId) });
   const homeQuery = useHome(restaurantId, branchId, Boolean(restaurantId && branchId));
   const cuisine = cuisinesQuery.data?.cuisines.find((entry) => entry.id === cuisineId) ?? null;
+  const { imageUrl, handleImageError } = useStableCuisineImage(cuisine);
   const items = itemsQuery.data?.items ?? [];
   const currency = resolveCustomerCurrency({
     configCurrency: homeQuery.data?.data.config?.currency,
@@ -70,13 +72,14 @@ function CuisineDetailContent({ cuisineId }: { cuisineId: string }) {
 
         <div className="relative min-h-[320px] overflow-hidden bg-[#F7F0E8] lg:min-h-[430px]">
           <Image
-            src={getCuisineImage(cuisine)}
+            src={imageUrl}
             alt={cuisine?.name || t("title")}
             fill
             className="object-cover"
             sizes="(max-width: 1024px) 100vw, 720px"
             unoptimized
             priority
+            onError={handleImageError}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
           <div className="absolute right-6 top-1/2 hidden w-[190px] -translate-y-1/2 rounded-[18px] bg-white/95 p-5 shadow-[0_20px_46px_rgba(17,24,39,0.14)] sm:block">

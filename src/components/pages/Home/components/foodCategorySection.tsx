@@ -3,12 +3,15 @@
 import Image from "next/image";
 import {
   BadgePercent,
+  Bell,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Send,
   Sparkles,
   Store,
   Tag,
+  Utensils,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -133,6 +136,75 @@ const PromotionBannerSkeleton = () => {
     </div>
   );
 };
+
+function NoPromotionsState({ onExploreMenu }: { onExploreMenu: () => void }) {
+  const t = useTranslations("home.promotions");
+  const router = useRouter();
+
+  return (
+    <div className="relative overflow-hidden rounded-[28px] border border-dashed border-primary/20 bg-[linear-gradient(115deg,#fffafa_0%,#fff_48%,#fffafa_100%)] px-6 py-10 sm:px-10 lg:min-h-[390px] lg:px-14 lg:py-12">
+      <div className="pointer-events-none absolute -bottom-28 -right-24 h-72 w-72 rounded-full bg-primary/[0.025] blur-2xl" />
+
+      <div className="relative mx-auto grid max-w-[1020px] items-center gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-16">
+        <div className="relative mx-auto flex h-[250px] w-[250px] items-center justify-center sm:h-[300px] sm:w-[300px] lg:h-[320px] lg:w-[320px]">
+          <div className="absolute inset-3 rounded-full bg-primary/[0.045]" />
+          <Send
+            aria-hidden="true"
+            className="absolute right-3 top-6 z-10 h-12 w-12 rotate-[-14deg] fill-primary/55 text-primary/55 sm:right-0 sm:top-4"
+            strokeWidth={1.4}
+          />
+          <span className="absolute right-5 top-20 h-16 w-20 rounded-[50%] border-t-2 border-dashed border-primary/25 sm:right-2 sm:top-20" />
+          <Image
+            src="/no-promotions-shopping-bag.webp"
+            alt=""
+            width={900}
+            height={794}
+            sizes="(min-width: 1024px) 320px, 250px"
+            className="relative z-[1] h-auto w-[92%] mix-blend-multiply"
+          />
+        </div>
+
+        <div className="text-center lg:text-left">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/[0.075] px-4 py-2 text-sm font-semibold text-primary">
+            <Tag aria-hidden="true" size={18} />
+            {t("noPromotionsBadge")}
+          </div>
+
+          <h3 className="mt-5 text-[30px] font-extrabold leading-[1.12] tracking-[-0.02em] text-gray-950 sm:text-[36px] lg:max-w-[520px] lg:text-[40px]">
+            {t("noActivePromotions")}
+          </h3>
+
+          <p className="mx-auto mt-4 max-w-[560px] text-base leading-7 text-gray-500 sm:text-[17px] lg:mx-0">
+            {t("noActivePromotionsDescription")}
+          </p>
+
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
+            <Button
+              type="button"
+              variant="primary"
+              className="h-13 rounded-full px-7 text-base font-semibold shadow-[0_10px_24px_rgba(220,0,30,0.16)]"
+              onClick={onExploreMenu}
+            >
+              <Utensils aria-hidden="true" size={19} />
+              {t("exploreMenu")}
+              <ChevronRight aria-hidden="true" size={18} strokeWidth={2.5} />
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="h-13 rounded-full border-primary/35 px-7 text-base font-semibold text-primary hover:bg-primary/[0.04] hover:text-primary"
+              onClick={() => router.push("/notifications")}
+            >
+              <Bell aria-hidden="true" size={19} />
+              {t("notifyMe")}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PromotionBannerCard({
   promotion,
@@ -412,19 +484,7 @@ export function FoodCategorySection() {
           ))}
         </div>
       ) : (
-        <div className="rounded-[24px] border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <BadgePercent size={24} />
-          </div>
-
-          <h3 className="mt-4 text-lg font-semibold text-gray-900">
-            {tPromotions("noActivePromotions")}
-          </h3>
-
-          <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
-            {tPromotions("noActivePromotionsDescription")}
-          </p>
-        </div>
+        <NoPromotionsState onExploreMenu={() => router.push("/items")} />
       )}
     </section>
   );

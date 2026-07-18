@@ -6,12 +6,13 @@ import { ArrowUpRight, Sparkles, Utensils } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import type { CustomerCuisine } from "@/services/cuisines";
-import { getCuisineBadge, getCuisineImage, getCuisinePromotion } from "@/components/pages/Cuisines/components/cuisine-display";
+import { getCuisineBadge } from "@/components/pages/Cuisines/components/cuisine-display";
+import { useStableCuisineImage } from "@/hooks/useStableCuisineImage";
 
 export function CuisineCard({ cuisine }: { cuisine: CustomerCuisine }) {
   const t = useTranslations("cuisines");
-  const promotion = getCuisinePromotion(cuisine);
   const badge = getCuisineBadge(cuisine, t("badges.cuisine"));
+  const { imageUrl, handleImageError } = useStableCuisineImage(cuisine);
 
   return (
     <Link
@@ -20,22 +21,19 @@ export function CuisineCard({ cuisine }: { cuisine: CustomerCuisine }) {
     >
       <div className="relative h-44 bg-primary/5">
         <Image
-          src={getCuisineImage(cuisine)}
+          src={imageUrl}
           alt={cuisine.name}
           fill
           className="object-cover transition duration-500 group-hover:scale-[1.03]"
+          sizes="(max-width: 640px) 92vw, (max-width: 1280px) 48vw, 350px"
           unoptimized
+          onError={handleImageError}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
         <span className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-black uppercase tracking-wide text-primary shadow-sm">
           <Sparkles className="h-3 w-3" />
           {badge}
         </span>
-        {promotion ? (
-          <span className="absolute bottom-4 left-4 rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white shadow-lg">
-            {promotion.description || t("badges.promotion")}
-          </span>
-        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col p-5">

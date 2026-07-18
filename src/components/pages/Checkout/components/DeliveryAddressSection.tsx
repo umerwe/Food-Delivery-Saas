@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, MapPin, Navigation, Plus } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Loader2, MapPin, Navigation, Plus } from "lucide-react";
 import { AddressModal } from "@/components/forms/AddressModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,10 +63,12 @@ export function DeliveryAddressSection({
 
       setAddresses(addressList);
       if (!selectedAddress) {
-        const defaultAddress = addressList.find((item) => item.isDefault);
+        const preferredAddress =
+          addressList.find((item) => item.isDefault) ??
+          (addressList.length === 1 ? addressList[0] : null);
 
-        if (defaultAddress) {
-          setSelectedAddress(defaultAddress.id);
+        if (preferredAddress) {
+          setSelectedAddress(preferredAddress.id);
         }
       }
 
@@ -306,6 +308,63 @@ export function DeliveryAddressSection({
         <p className="text-gray-500">{t("loadingAddresses")}</p>
       ) : addresses.length === 0 ? (
         <p className="text-gray-400">{t("noAddressesFound")}</p>
+      ) : addresses.length === 1 ? (
+        <div className="pt-3">
+          {addresses.map((addr) => {
+            const isSelected = selectedAddress === addr.id;
+            const addressLabel = formatDisplayAddress(addr);
+            const addressTitle =
+              addr.houseNumber || addr.area || addr.city || addressT("deliveryAddress");
+
+            return (
+              <button
+                key={addr.id}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => setSelectedAddress(addr.id)}
+                className={`group flex w-full items-center gap-4 rounded-[20px] border p-5 text-left transition-all duration-200 sm:p-6 ${
+                  isSelected
+                    ? "border-primary/35 bg-primary/[0.035] shadow-[0_16px_40px_rgba(211,18,26,0.10)]"
+                    : "border-gray-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.07)] hover:border-primary/25"
+                }`}
+              >
+                <span
+                  className={`flex size-12 shrink-0 items-center justify-center rounded-2xl transition-colors ${
+                    isSelected
+                      ? "bg-primary text-white"
+                      : "bg-gray-100 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary"
+                  }`}
+                >
+                  <MapPin size={22} strokeWidth={2.4} />
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-bold text-gray-950">{addressTitle}</span>
+                    {addr.isDefault ? (
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                        {addressT("defaultAddress")}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-1.5 block text-sm font-medium leading-6 text-gray-600">
+                    {addressLabel}
+                  </span>
+                </span>
+
+                <span
+                  className={`flex size-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                    isSelected
+                      ? "border-primary bg-primary text-white"
+                      : "border-gray-300 bg-white text-transparent"
+                  }`}
+                >
+                  <Check size={15} strokeWidth={3} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
       ) : (
         <div className="grid grid-cols-[56px_minmax(0,1fr)_56px] items-center gap-4 overflow-visible pt-1">
           <div className="flex justify-start">

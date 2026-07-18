@@ -29,7 +29,7 @@ type CategorySidebarProps = {
   onCategorySelect?: (id: string) => void;
 };
 
-export default function CategorySidebar({
+export function CategorySidebar({
   activeCategoryId,
   categories = [],
   loading,
@@ -47,11 +47,8 @@ export default function CategorySidebar({
   const tCommon = useTranslations("items.common");
   const tSidebar = useTranslations("items.sidebar");
   const router = useRouter();
-
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const categoryButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
-    {}
-  );
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
+  const categoryButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const handleCategoryClick = (id: string) => {
     if (viewMode === "onePage") {
@@ -70,36 +67,36 @@ export default function CategorySidebar({
   useEffect(() => {
     if (!activeCategoryId) return;
 
-    const container = listRef.current;
+    const sidebar = sidebarRef.current;
     const activeButton = categoryButtonRefs.current[String(activeCategoryId)];
 
-    if (!container || !activeButton) return;
+    if (!sidebar || !activeButton || sidebar.scrollHeight <= sidebar.clientHeight) return;
 
-    const containerRect = container.getBoundingClientRect();
+    const sidebarRect = sidebar.getBoundingClientRect();
     const activeRect = activeButton.getBoundingClientRect();
+    const safeInset = 16;
 
-    const topGap = activeRect.top - containerRect.top;
-    const bottomGap = activeRect.bottom - containerRect.bottom;
-
-    if (topGap < 12) {
-      container.scrollTo({
-        top: Math.max(0, container.scrollTop + topGap - 16),
+    if (activeRect.top < sidebarRect.top + safeInset) {
+      sidebar.scrollTo({
+        top: Math.max(0, sidebar.scrollTop + activeRect.top - sidebarRect.top - safeInset),
         behavior: "smooth",
       });
-
       return;
     }
 
-    if (bottomGap > -12) {
-      container.scrollTo({
-        top: container.scrollTop + bottomGap + 16,
+    if (activeRect.bottom > sidebarRect.bottom - safeInset) {
+      sidebar.scrollTo({
+        top: sidebar.scrollTop + activeRect.bottom - sidebarRect.bottom + safeInset,
         behavior: "smooth",
       });
     }
-  }, [activeCategoryId, categories, viewMode]);
+  }, [activeCategoryId, categories]);
 
   return (
-    <div className="min-w-0 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+    <div
+      ref={sidebarRef}
+      className="min-w-0 max-h-[calc(100dvh-7.5rem)] overflow-y-auto overscroll-contain rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 [scrollbar-width:thin]"
+    >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold text-gray-900">{tCommon("fullMenuLower")}</h2>
@@ -185,10 +182,7 @@ export default function CategorySidebar({
       </div>
 
       {/* LIST */}
-      <div
-        ref={listRef}
-        className="max-h-[calc(100vh-320px)] min-h-[180px] space-y-2 overflow-y-auto overflow-x-hidden pr-1 [scrollbar-width:thin]"
-      >
+      <div className="space-y-2">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-400">
             <Loader2 size={16} className="animate-spin" />

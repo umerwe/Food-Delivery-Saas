@@ -3,9 +3,12 @@ import type { MenuItem, PromotionInfo } from "@/components/pages/Items/types";
 import type { CustomerCuisine } from "@/services/cuisines";
 import { toNumber } from "@/components/pages/Items/utils/restaurant-card-utils";
 
-export const getCuisineImage = (cuisine?: CustomerCuisine | null) => {
+export const CUISINE_FALLBACK_IMAGE = "/categories/cuisine-fallback-v1.webp";
+
+export const getCuisineRemoteImage = (cuisine?: CustomerCuisine | null) => {
   const image = cuisine?.imageUrl || cuisine?.coverImage || cuisine?.bannerUrl || "";
-  return image.startsWith("http") ? image : "/categories/background_banner.png";
+
+  return image.startsWith("https://") ? image : null;
 };
 
 export const getCuisinePromotion = (cuisine: CustomerCuisine): PromotionInfo | null =>

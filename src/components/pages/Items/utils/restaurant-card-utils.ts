@@ -3,7 +3,7 @@ import { formatDisplayAddress } from "@/lib/address-display";
 import { formatMoney } from "@/lib/money";
 import type { BranchSettings, BranchTemporaryClosure } from "@/types/branches";
 
-export const FALLBACK_BANNER = "/categories/background_banner.png";
+export const FALLBACK_BANNER = "/categories/new_banner.png";
 export const FALLBACK_ITEM_IMAGE = "/menu-item.jpg";
 
 export const toNumber = (value: unknown, fallback = 0) => {

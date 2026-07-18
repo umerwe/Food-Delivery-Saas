@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import CategorySidebar from "./CategorySidebar";
+import { CategorySidebar } from "./CategorySidebar";
 import { ItemsListing } from "./Items";
 import { CustomerDealsSection } from "@/components/pages/Home/components/CustomerDealsSection";
 import useItems from "@/hooks/useItems";

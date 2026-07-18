@@ -253,8 +253,10 @@
       "viewDetails": "Details ansehen",
       "promotionItemsUnavailable": "Angebotsartikel sind nicht verfügbar",
       "promotionItemsUnavailableDescription": "Für dieses Angebot gibt es derzeit keine eigene Artikelliste. Entdecken Sie das vollständige Menü, um weiter zu bestellen.",
+      "noPromotionsBadge": "Keine aktiven Aktionen",
       "noActivePromotions": "Derzeit keine aktiven Aktionen",
-      "noActivePromotionsDescription": "Entdecken Sie das Menü und schauen Sie später wieder vorbei, um frische Angebote und exklusive Filialaktionen zu finden."
+      "noActivePromotionsDescription": "Aber köstliche Angebote sind immer in Vorbereitung! Entdecken Sie das Menü oder schauen Sie später wieder vorbei.",
+      "notifyMe": "Benachrichtigen"
     },
     "promotionalItems": {
       "eyebrow": "Speziell für Sie",

@@ -12,7 +12,7 @@ const FoodBanner = () => {
 
       {/* Background Image */}
       <Image
-        src="/categories/background_banner.png"
+        src="/categories/new_banner.png"
         alt={t("foodBackgroundAlt")}
         fill
         priority
